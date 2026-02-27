@@ -29,6 +29,123 @@ export default tseslint.config(
     },
   },
   {
+    files: ['src/auth/**/*.{ts,js,svelte}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            '@graph',
+            '@graph/*',
+            '**/graph',
+            '**/graph/*',
+            '@db',
+            '@db/*',
+            '**/db',
+            '**/db/*',
+            '@cache',
+            '@cache/*',
+            '**/cache',
+            '**/cache/*',
+            '@features',
+            '@features/*',
+            '**/features',
+            '**/features/*',
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/graph/**/*.{ts,js,svelte}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            '@db',
+            '@db/*',
+            '**/db',
+            '**/db/*',
+            '@cache',
+            '@cache/*',
+            '**/cache',
+            '**/cache/*',
+            '@features',
+            '@features/*',
+            '**/features',
+            '**/features/*',
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/db/**/*.{ts,js,svelte}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            '@auth',
+            '@auth/*',
+            '**/auth',
+            '**/auth/*',
+            '@graph',
+            '@graph/*',
+            '**/graph',
+            '**/graph/*',
+            '@cache',
+            '@cache/*',
+            '**/cache',
+            '**/cache/*',
+            '@features',
+            '@features/*',
+            '**/features',
+            '**/features/*',
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/cache/**/*.{ts,js,svelte}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            '@auth',
+            '@auth/*',
+            '**/auth',
+            '**/auth/*',
+            '@graph',
+            '@graph/*',
+            '**/graph',
+            '**/graph/*',
+            '@db',
+            '@db/*',
+            '**/db',
+            '**/db/*',
+            '@features',
+            '@features/*',
+            '**/features',
+            '**/features/*',
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/shared/**/*.{ts,js,svelte}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        { patterns: ['@features', '@features/*', '**/features', '**/features/*'] },
+      ],
+    },
+  },
+  {
     ignores: ['dist', 'coverage', 'node_modules'],
   },
 );

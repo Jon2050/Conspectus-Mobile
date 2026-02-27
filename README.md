@@ -48,6 +48,33 @@ Provide fast mobile access to a personal Conspectus SQLite database stored in On
 Detailed architecture and implementation plan:
 - `Architecture-and-Implementation-Plan.md`
 
+## Architecture Modules
+
+The codebase is organized into architecture-aligned module roots in `src/`:
+
+- `auth`: authentication and token/session handling.
+- `graph`: Microsoft Graph API client logic.
+- `db`: SQLite/sql.js data access and write logic.
+- `cache`: local cache persistence (IndexedDB/Dexie).
+- `features`: UI feature modules and user workflows.
+- `shared`: cross-module utilities and shared state.
+
+Each module includes:
+
+- `README.md` with module responsibilities.
+- `index.ts` as the public barrel export.
+
+Import convention:
+
+- Use module-root aliases for cross-module imports:
+  - `@auth`
+  - `@graph`
+  - `@db`
+  - `@cache`
+  - `@features`
+  - `@shared`
+- Use relative imports only for files inside the same module.
+
 ## Quality Tooling
 
 Local quality scripts:

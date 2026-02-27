@@ -5,6 +5,15 @@
     "target": "ES2022",
     "useDefineForClassFields": true,
     "module": "ESNext",
+    "baseUrl": ".",
+    "paths": {
+      "@auth": ["src/auth/index.ts"],
+      "@graph": ["src/graph/index.ts"],
+      "@db": ["src/db/index.ts"],
+      "@cache": ["src/cache/index.ts"],
+      "@features": ["src/features/index.ts"],
+      "@shared": ["src/shared/index.ts"]
+    },
     "types": ["svelte", "vite/client", "vite-plugin-pwa/client"],
     "noEmit": true,
     "strict": true,

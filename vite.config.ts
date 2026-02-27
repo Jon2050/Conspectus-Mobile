@@ -1,4 +1,5 @@
 import { svelte } from '@sveltejs/vite-plugin-svelte';
+import { fileURLToPath, URL } from 'node:url';
 import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig } from 'vitest/config';
 
@@ -29,5 +30,15 @@ export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
     environment: 'node',
+  },
+  resolve: {
+    alias: {
+      '@auth': fileURLToPath(new URL('./src/auth', import.meta.url)),
+      '@graph': fileURLToPath(new URL('./src/graph', import.meta.url)),
+      '@db': fileURLToPath(new URL('./src/db', import.meta.url)),
+      '@cache': fileURLToPath(new URL('./src/cache', import.meta.url)),
+      '@features': fileURLToPath(new URL('./src/features', import.meta.url)),
+      '@shared': fileURLToPath(new URL('./src/shared', import.meta.url)),
+    },
   },
 });
