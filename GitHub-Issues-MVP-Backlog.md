@@ -131,7 +131,7 @@ Update each issue heading status marker to reflect current status.
 1. E2E smoke test runs in CI.
 2. Failure artifacts are uploaded.
 
-### :green_circle: M1-05 Configure vite-plugin-pwa and manifest
+### :white_check_mark: M1-05 Configure vite-plugin-pwa and manifest
 - Labels: `feature`
 - Milestone: `M1 - Foundation`
 - Depends on: `M1-01`
