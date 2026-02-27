@@ -45,7 +45,7 @@ Update each issue heading status marker to reflect current status.
 1. Milestones and labels exist in GitHub.
 2. Team has written rules for issue labeling.
 
-### :green_circle: PM-02 Create issue templates
+### :white_check_mark: PM-02 Create issue templates
 - Labels: `infra`
 - Milestone: none
 - Depends on: `PM-01`
@@ -57,7 +57,7 @@ Update each issue heading status marker to reflect current status.
 1. Templates are available in the repo.
 2. New issues follow a consistent structure.
 
-### :green_circle: PM-03 Create PR template with QS checklist
+### :white_check_mark: PM-03 Create PR template with QS checklist
 - Labels: `infra`
 - Milestone: none
 - Depends on: `PM-01`
