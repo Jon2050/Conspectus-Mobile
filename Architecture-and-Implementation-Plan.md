@@ -14,7 +14,6 @@ In-scope MVP features:
 - View accounts and current balances.
 - View transfers for a selected month (default current month), including swipe month navigation.
 - Add new transfer.
-- Strictly validate supported database model version and block otherwise.
 
 Out-of-scope for MVP:
 - Database migrations.
@@ -34,7 +33,6 @@ Out-of-scope for MVP:
 - Settings must include local reset/rebind option.
 - Offline mode: **viewing only** using cached last DB.
 - Offline add transfer: **not supported**.
-- DB version check: hard gate; app works only for exact supported version.
 - File transport: raw `.db` only.
 - Keep source code small and simple.
 - Separate repository from main desktop Conspectus repo.
@@ -88,9 +86,9 @@ Rationale:
 6. `App State Module`
 - Selected month.
 - Sync lifecycle states.
-- Active DB support/version state.
+- Cached file identity and sync metadata state.
 
-## 3.3 Data Model Compatibility
+## 3.3 Data Model Parity
 
 The PWA must mirror desktop behavior for transfer creation:
 - Insert into `transfer`.
@@ -99,10 +97,6 @@ The PWA must mirror desktop behavior for transfer creation:
   - name length > 2
   - amount > 0
   - account combination constraints
-
-Database version gate:
-- Read `constants` table entry `datamodel_version`.
-- If mismatch, show blocking screen with clear message and stop all features.
 
 ## 3.4 Sync and Caching Strategy
 
@@ -199,7 +193,6 @@ Substeps:
    - theme color
 5. Add environment config strategy:
    - `VITE_AZURE_CLIENT_ID`
-   - `VITE_SUPPORTED_DB_VERSION`
 6. Create base architecture folders:
    - `src/auth`
    - `src/graph`
@@ -225,7 +218,36 @@ Exit criteria:
 
 ---
 
-## Milestone 2: Auth + OneDrive File Binding
+## Milestone 2: Website Integration + Early Deploy
+
+Goal: integrate the PWA into the existing static website as early as possible for real-device testing.
+
+Substeps:
+1. Confirm final public route:
+   - `jon2050.de/conspectus/webapp/`
+2. Configure Vite build base path for subdirectory hosting.
+3. Add deploy target structure compatible with existing website static hosting.
+4. Add minimal "PWA shell smoke" page to verify:
+   - app route loads under website path
+   - service worker registration works
+   - manifest and icons resolve correctly
+5. Add website navigation entry/link to the PWA route (or temporary test link).
+6. Add a fast deploy workflow for test iterations:
+   - build
+   - publish to website path
+   - quick smoke check (HTTP 200 + app boot)
+
+Deliverables:
+- Publicly reachable PWA shell on `jon2050.de` for iOS/Android testing.
+- Repeatable early deploy process independent of feature completion.
+
+Exit criteria:
+- PWA opens correctly at `https://jon2050.de/conspectus/webapp/`.
+- Install prompt/service worker/manifest behavior is testable on mobile devices.
+
+---
+
+## Milestone 3: Auth + OneDrive File Binding
 
 Goal: user can authenticate and bind a DB file once.
 
@@ -255,7 +277,7 @@ Exit criteria:
 
 ---
 
-## Milestone 3: Sync Engine + Local Cache (Offline Read)
+## Milestone 4: Sync Engine + Local Cache (Offline Read)
 
 Goal: robust online/offline read behavior with minimal traffic.
 
@@ -287,29 +309,6 @@ Deliverables:
 Exit criteria:
 - Airplane mode still shows cached accounts/transfers.
 - Online resume refreshes when eTag changed.
-
----
-
-## Milestone 4: Database Version Gate
-
-Goal: strict compatibility guard.
-
-Substeps:
-1. Implement query for `constants.datamodel_version`.
-2. Compare with `VITE_SUPPORTED_DB_VERSION`.
-3. Build blocking incompatibility screen:
-   - actual version
-   - supported version
-   - clear instruction to update desktop app/process first
-4. Prevent all read/write feature routes when incompatible.
-5. Add telemetry/log event for mismatch (local console or optional client logging).
-
-Deliverables:
-- Hard-stop compatibility check before feature usage.
-
-Exit criteria:
-- Compatible DB enters app.
-- Incompatible DB cannot read/write and displays clear reason.
 
 ---
 
@@ -390,7 +389,6 @@ Substeps:
 1. Settings page sections:
    - bound OneDrive file info
    - last sync timestamp
-   - current DB model version
    - app version/build
 2. Actions:
    - change file
@@ -473,8 +471,7 @@ Exit criteria:
 ## 6.3 Test Data and Fixtures
 
 - Maintain small fixture DBs:
-  - valid supported version
-  - unsupported version
+  - baseline production-like schema/data
   - empty/month-heavy data
 - Include deterministic transfer/account sets for assertion stability.
 
@@ -577,12 +574,11 @@ Privacy principle:
 
 MVP deliverables:
 1. Installable PWA on iOS/Android.
-2. OneDrive-authenticated access to selected SQLite DB.
-3. Cached offline viewing.
-4. Accounts view.
-5. Month-based transfers view with swipe.
-6. Add-transfer write flow with desktop-compatible DB updates.
-7. Strict DB version compatibility gate.
+2. Early integrated deployment on `jon2050.de/conspectus/webapp/` for device testing.
+3. OneDrive-authenticated access to selected SQLite DB.
+4. Cached offline viewing.
+5. Accounts view.
+6. Month-based transfers view with swipe.
+7. Add-transfer write flow with desktop-compatible DB updates.
 8. Settings recovery tools.
 9. Documented test suite and release process.
-

@@ -1,6 +1,6 @@
 # Conspectus Desktop Info (for PWA Implementation)
 
-This file summarizes the current desktop Conspectus app in this repository and captures the information needed to implement the mobile PWA in a separate repo.
+This file summarizes the current desktop Conspectus app which is in another repository and captures the information needed to implement the mobile PWA in this repo.
 
 Scope of this document:
 - What the desktop app is and how it behaves.
@@ -128,7 +128,6 @@ Core tables for MVP:
 - `name TEXT PRIMARY KEY`
 - `text_value TEXT`
 - `numeric_value NUMERIC`
-- Includes `datamodel_version`
 
 Additional tables present but not needed for MVP read/write:
 - `standing_order`
@@ -254,29 +253,9 @@ References:
 
 ---
 
-## 6. Version Compatibility Gate
+## 6. Query Recipes Needed by PWA MVP
 
-PWA should enforce strict DB model compatibility:
-
-Check:
-```sql
-SELECT numeric_value
-FROM constants
-WHERE name = 'datamodel_version';
-```
-
-If table/row missing or value mismatch:
-- Block app features.
-- Show explicit unsupported-version message.
-
-Reason:
-- Desktop schema artifacts in repo are not fully consistent (see section 8).
-
----
-
-## 7. Query Recipes Needed by PWA MVP
-
-## 7.1 Load primary accounts
+## 6.1 Load primary accounts
 
 ```sql
 SELECT account_id, ac_type_id, name
@@ -286,7 +265,7 @@ WHERE ac_type_id IN (1, 2);
 
 Do not hardcode account IDs. Detect by `ac_type_id`.
 
-## 7.2 Load account options for transfer form
+## 6.2 Load account options for transfer form
 
 Spending (`from`) options (desktop equivalent intent):
 - visible accounts + primary income account
@@ -308,7 +287,7 @@ WHERE visible = 1 OR ac_type_id = 2
 ORDER BY CASE WHEN ac_type_id = 2 THEN 0 ELSE 1 END, ac_order ASC, LOWER(name) ASC;
 ```
 
-## 7.3 Load categories
+## 6.3 Load categories
 
 ```sql
 SELECT category_id, name
@@ -318,7 +297,7 @@ ORDER BY LOWER(name) ASC;
 
 Desktop UI has "No category" sentinel (`EMPTY_CAT`) that is **not** a DB row; represent this client-side.
 
-## 7.4 Month presence list
+## 6.4 Month presence list
 
 Desktop behavior:
 - derives months from transfer dates
@@ -331,7 +310,7 @@ Simple approach in PWA:
 
 ---
 
-## 8. Inconsistencies and Caveats in This Repo
+## 7. Inconsistencies and Caveats in This Repo
 
 Important for safe PWA implementation:
 
@@ -350,7 +329,7 @@ Practical rule:
 
 ---
 
-## 9. UI/Locale Notes from Desktop
+## 8. UI/Locale Notes from Desktop
 
 - Language resources currently found in repo: German (`resources/lang/conspectus_lang_de.properties`).
 - Desktop color language:
@@ -363,24 +342,23 @@ Useful for PWA visual continuity.
 
 ---
 
-## 10. Suggested PWA Parity Checklist
+## 9. Suggested PWA Parity Checklist
 
 Use this checklist during PWA implementation/testing:
 
 1. DB opens and `PRAGMA foreign_keys = ON` is set.
-2. `datamodel_version` check enforced before feature screens.
-3. Accounts screen shows visible non-primary accounts and balances in cents->currency conversion.
-4. Transfers screen loads current month by default.
-5. Month navigation uses inclusive month bounds.
-6. Add transfer validation matches desktop rules.
-7. Insert + account updates happen in one SQL transaction.
-8. Transfer type is derived exactly as desktop.
-9. Category null handling supports 0-3 categories.
-10. Upload only after successful local DB commit and export.
+2. Accounts screen shows visible non-primary accounts and balances in cents->currency conversion.
+3. Transfers screen loads current month by default.
+4. Month navigation uses inclusive month bounds.
+5. Add transfer validation matches desktop rules.
+6. Insert + account updates happen in one SQL transaction.
+7. Transfer type is derived exactly as desktop.
+8. Category null handling supports 0-3 categories.
+9. Upload only after successful local DB commit and export.
 
 ---
 
-## 11. Source File Map (Quick Reference)
+## 10. Source File Map (Quick Reference)
 
 Business logic and rules:
 - `src/main/java/conspectus/data/FieldValidator.java`
@@ -402,4 +380,3 @@ Schema references:
 Formatting and encoding:
 - `src/main/java/tools/MoneyFormat.java`
 - `src/main/java/tools/Formatters.java`
-

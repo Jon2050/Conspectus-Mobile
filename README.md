@@ -13,7 +13,6 @@ Provide fast mobile access to a personal Conspectus SQLite database stored in On
 - Swipe to previous/next month.
 - Add a new transfer.
 - Offline viewing from cached last synced data.
-- Strict database version check (only supported model version is allowed).
 
 ## Non-Goals (MVP)
 
@@ -47,5 +46,4 @@ Provide fast mobile access to a personal Conspectus SQLite database stored in On
 ## Related Document
 
 Detailed architecture and implementation plan:
-- `docs/Conspectus-PWA-Architecture-and-Implementation-Plan.md`
-
+- `Architecture-and-Implementation-Plan.md`
