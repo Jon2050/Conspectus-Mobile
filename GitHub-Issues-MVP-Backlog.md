@@ -180,11 +180,11 @@ All issues are written so they can be copied into GitHub as-is.
 1. Create base layout with navigation placeholders.
 2. Add route placeholders: Accounts, Transfers, Add, Settings.
 3. Add loading and error boundary placeholder components.
-4. Decide and document SPA routing strategy (hash-based, pushState, or library) considering subdirectory hosting.
+4. Use Hash-based routing (`/#/transfers`) to ensure reliable direct-URL reloading under the `/conspectus/webapp/` subdirectory without requiring complex server-side redirects.
 - Acceptance criteria:
 1. App shell is navigable on mobile viewport.
 2. Placeholder routes render without errors.
-3. Routing approach is documented and compatible with `/conspectus/webapp/` hosting.
+3. Routing uses hash-based paths, and direct reloads of routes do not 404.
 
 ## Milestone 2 - Website Integration + Early Deploy
 ### M2-01 Decide cross-repo deployment architecture
@@ -359,18 +359,18 @@ All issues are written so they can be copied into GitHub as-is.
 - Depends on: `M3-05`
 - Implementation steps:
 1. Implement file browse/select for `.db` target.
-2. Capture `driveId`, `itemId`, and file name.
+2. Capture `driveId`, `itemId`, file `name`, and `parentReference` (folder path).
 3. Validate selection data before storing.
 - Acceptance criteria:
 1. User can select a DB file once.
-2. Selection returns required identifiers.
+2. Selection returns all required identifiers including path for self-healing fallback.
 
 ### M3-07 Persist binding in local storage layer
 - Labels: `type:feature`
 - Milestone: `M3 - Auth + OneDrive Binding`
 - Depends on: `M3-06`
 - Implementation steps:
-1. Persist selected file identifiers and display metadata.
+1. Persist selected file identifiers (`driveId`, `itemId`, `name`, `parentReference`/path).
 2. Load binding at startup.
 3. Add schema versioning for local metadata store.
 - Acceptance criteria:
@@ -557,9 +557,11 @@ All issues are written so they can be copied into GitHub as-is.
 1. Create account card/list components.
 2. Apply positive/negative amount styling.
 3. Add loading and empty states.
+4. Apply CSS `env(safe-area-inset-bottom)` to ensure the bottom navigation does not overlap with the iOS home bar or Android gesture hints.
 - Acceptance criteria:
 1. Accounts are readable on mobile widths.
 2. Amount color semantics are consistent.
+3. Bottom navigation is fully accessible and visually distinct from OS-level safe areas on notched/bezelless devices.
 
 ### M5-06 Build Transfers screen UI
 - Labels: `type:feature`
@@ -703,10 +705,12 @@ All issues are written so they can be copied into GitHub as-is.
 2. Add retry action without retyping full form.
 3. Prevent false-success UI states.
 4. Handle token expiry during upload: silently re-acquire token, retry upload, and preserve local state.
+5. Upon successful upload, display a clear visual success message (e.g. checkmark toast or distinct animation).
 - Acceptance criteria:
 1. User can retry failed uploads safely.
 2. App never reports success before upload completes.
-3. Token expiry during upload is recovered transparently without losing form data or local DB state.
+3. User sees a distinct visual confirmation only after the transfer is fully saved and uploaded.
+4. Token expiry during upload is recovered transparently without losing form data or local DB state.
 
 ### M6-09 Block write flow while offline
 - Labels: `type:feature`
@@ -715,10 +719,12 @@ All issues are written so they can be copied into GitHub as-is.
 - Implementation steps:
 1. Detect offline state before submit.
 2. Disable submit action with clear explanation.
-3. Re-enable automatically when online.
+3. Display a prominent warning message indicating the app is offline and transfers cannot be saved.
+4. Re-enable automatically when online.
 - Acceptance criteria:
 1. Offline write attempts are prevented.
-2. User message explains online requirement.
+2. User message clearly explains online requirement.
+3. User is visually warned of the offline state before attempting to submit.
 
 ### M6-10 Add write-path tests (unit/integration/e2e)
 - Labels: `type:test`
@@ -740,11 +746,12 @@ All issues are written so they can be copied into GitHub as-is.
 1. When upload returns `412 Precondition Failed` (eTag mismatch), show a conflict dialog.
 2. Offer option to download the latest DB version from OneDrive.
 3. Preserve the form data from the failed transfer so the user can re-enter it after sync.
-4. After re-sync, allow the user to retry the transfer creation with the fresh DB.
+4. IMPORTANT: Fully destroy and re-initialize the `sql.js` database in memory with the newly fetched bytes before the user can click save again, preventing stale overwrites.
+5. After re-sync, allow the user to retry the transfer creation with the fresh DB.
 - Acceptance criteria:
 1. eTag conflict is surfaced with a clear, non-technical message.
 2. User does not lose already-entered form data on conflict.
-3. User can recover by syncing and re-submitting without restarting the app.
+3. User can recover by syncing and re-submitting without restarting the app, and the local DB state is safely reset.
 
 ## Milestone 7 - Settings + Recovery
 
@@ -804,12 +811,14 @@ All issues are written so they can be copied into GitHub as-is.
 - Milestone: `M7 - Settings + Recovery`
 - Depends on: `M3-06`, `M4-02`
 - Implementation steps:
-1. Detect not-found/moved file responses.
-2. Prompt for rebind flow.
-3. Preserve safe local state during recovery.
+1. Detect not-found/moved file responses (404) for `itemId`.
+2. Attempt self-healing fallback: query Graph using the saved `parentReference` (path) and file `name` to get the new `itemId` (handles Desktop safe-saves).
+3. If fallback fails, prompt for rebind flow.
+4. Preserve safe local state during recovery.
 - Acceptance criteria:
-1. Missing file does not break entire app state.
-2. User can recover by selecting a new file.
+1. App silently self-heals if the file `itemId` changed due to a desktop safe-save but the path/name remains identical.
+2. Missing file does not break entire app state.
+3. User can recover by selecting a new file if self-healing fails.
 
 ### M7-06 Implement diagnostics panel with copy action
 - Labels: `type:feature`
@@ -849,7 +858,19 @@ All issues are written so they can be copied into GitHub as-is.
 1. Security headers are active in production.
 2. App behavior remains correct under CSP constraints.
 
-### M8-02 Add dependency vulnerability scanning
+### M8-02 Implement PWA Service Worker Update Flow
+- Labels: `type:feature`
+- Milestone: `M8 - Hardening + QA + Release`
+- Depends on: `M1-05`
+- Implementation steps:
+1. Configure `vite-plugin-pwa` to prompt for updates (`promptForUpdate` strategy).
+2. Add an "Update Available" toast/banner component to the UI.
+3. Expose a button to accept the update and trigger a page reload.
+- Acceptance criteria:
+1. When a new deployment happens, active clients receive an update notification.
+2. Users do not get permanently stuck on stale cached app shells.
+
+### M8-03 Add dependency vulnerability scanning
 - Labels: `type:security`
 - Milestone: `M8 - Hardening + QA + Release`
 - Depends on: `M1-08`
@@ -861,7 +882,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Vulnerability scan runs on PR and scheduled basis.
 2. High/critical findings block release.
 
-### M8-03 Add bundle size budget checks
+### M8-04 Add bundle size budget checks
 - Labels: `type:infra`
 - Milestone: `M8 - Hardening + QA + Release`
 - Depends on: `M1-08`
@@ -873,7 +894,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Bundle budget check runs in CI.
 2. Significant size regressions fail PR checks.
 
-### M8-04 Add Lighthouse CI checks for mobile performance
+### M8-05 Add Lighthouse CI checks for mobile performance
 - Labels: `type:test`
 - Milestone: `M8 - Hardening + QA + Release`
 - Depends on: `M2-05`
@@ -885,7 +906,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Lighthouse reports are generated automatically.
 2. Scores meet agreed thresholds for release.
 
-### M8-05 Expand Playwright suite to critical user journeys
+### M8-06 Expand Playwright suite to critical user journeys
 - Labels: `type:test`
 - Milestone: `M8 - Hardening + QA + Release`
 - Depends on: `M6-10`, `M7-07`
@@ -897,7 +918,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Critical journeys are automated.
 2. E2E suite is stable enough for release gating.
 
-### M8-06 Create manual device QA checklist issue
+### M8-07 Create manual device QA checklist issue
 - Labels: `type:test`
 - Milestone: `M8 - Hardening + QA + Release`
 - Depends on: `M2-07`, `M6-10`, `M7-07`
@@ -909,7 +930,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Manual matrix is run before release.
 2. Results are attached and traceable.
 
-### M8-07 Create release checklist and cut process
+### M8-08 Create release checklist and cut process
 - Labels: `type:docs`
 - Milestone: `M8 - Hardening + QA + Release`
 - Depends on: `M8-05`, `M8-06`
@@ -921,7 +942,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Release process is documented and repeatable.
 2. Every release follows one checklist.
 
-### M8-08 Create rollback procedure for two-repo deployment
+### M8-09 Create rollback procedure for two-repo deployment
 - Labels: `type:docs`
 - Milestone: `M8 - Hardening + QA + Release`
 - Depends on: `M2-08`
@@ -933,7 +954,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Rollback can be executed in under 15 minutes.
 2. Procedure is verified in a dry run.
 
-### M8-09 Add post-deploy smoke monitor job
+### M8-10 Add post-deploy smoke monitor job
 - Labels: `type:infra`
 - Milestone: `M8 - Hardening + QA + Release`
 - Depends on: `M2-05`
@@ -945,7 +966,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Basic availability monitoring exists.
 2. Alerts contain enough context for fast triage.
 
-### M8-10 Final MVP release issue
+### M8-11 Final MVP release issue
 - Labels: `type:feature`
 - Milestone: `M8 - Hardening + QA + Release`
 - Depends on: all milestone issues

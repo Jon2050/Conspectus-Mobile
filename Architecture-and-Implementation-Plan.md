@@ -82,11 +82,10 @@ Rationale:
 5. `Local Cache Module`
 - Persist DB blob + metadata (`eTag`, file IDs, last sync).
 - Provide offline read when network unavailable.
-
 6. `App State Module`
 - Selected month.
 - Sync lifecycle states.
-- Cached file identity and sync metadata state.
+- Cached file identity (including fallback path/name) and sync metadata state.
 
 ## 3.3 Data Model Parity
 
@@ -102,7 +101,7 @@ The PWA must mirror desktop behavior for transfer creation:
 
 Read flow on app startup:
 1. Resolve user auth.
-2. Resolve stored file binding (`driveId`, `itemId`).
+2. Resolve stored file binding (`driveId`, `itemId`, `parentReference/path`, `name`).
 3. Fetch file metadata (including `eTag`).
 4. If cached blob exists and eTag unchanged, load cached DB.
 5. Else download full DB, cache it, and load it.
@@ -120,6 +119,7 @@ Write flow for "Add Transfer":
 Conflict policy:
 - User agreement says desktop and mobile won't be used concurrently.
 - Still keep eTag conditional upload for protection.
+- If an eTag conflict occurs, the in-memory `sql.js` database instance MUST be completely destroyed and re-initialized with the freshly downloaded bytes before the user is allowed to retry the transfer save.
 
 Data recovery:
 - OneDrive automatically keeps version history for uploaded files (30 days for personal accounts).
@@ -181,6 +181,8 @@ Core UI patterns:
 - Keyboard-safe form interactions.
 - Explicit loading and error states.
 - Reduced-motion compatibility.
+- Native feel via `viewport-fit=cover` and CSS safe-area insets (`env(safe-area-inset-bottom)`) to prevent notch/home bar overlap.
+- Explicit Apple touch icons for Add to Home Screen.
 
 ---
 
@@ -270,7 +272,7 @@ Substeps:
 6. Persist selected file binding in IndexedDB/local storage:
    - `driveId`
    - `itemId`
-   - file display name
+   - file display name and `parentReference` (path) for fallback recovery
 7. Add settings actions:
    - "Change DB file"
    - "Reset local app data"
@@ -297,7 +299,7 @@ Substeps:
    - db bytes
    - `eTag`
    - `lastSyncAt`
-   - file identifiers
+   - file identifiers (`driveId`, `itemId`, `path`, `name`)
 5. Implement startup decision tree:
    - online + unchanged => cached DB
    - online + changed => download
@@ -377,7 +379,11 @@ Substeps:
    - show failure state
    - keep form data for retry
    - do not pretend success
-7. Optional maintenance toggle:
+7. Show clear visual success message upon successful upload completion.
+8. Block offline writes:
+   - detect missing internet connection
+   - disable save button and show prominent offline warning message
+9. Optional maintenance toggle:
    - run `VACUUM` every N writes or manual trigger in settings.
 
 Deliverables:
