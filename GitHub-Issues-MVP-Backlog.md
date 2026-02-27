@@ -4,6 +4,13 @@ This is a complete MVP issue backlog for GitHub Issues, aligned to the milestone
 Scope includes only MVP.
 All issues are written so they can be copied into GitHub as-is.
 
+## Issue Status Legend
+
+- `:green_circle:` Open
+- `:yellow_circle:` In Progress
+- `:white_check_mark:` Done
+
+Update each issue heading status marker to reflect current status.
 ## Label Set (create first)
 
 - `feature`
@@ -26,7 +33,7 @@ All issues are written so they can be copied into GitHub as-is.
 
 ## Project Setup Issues
 
-### PM-01 Create milestone and label taxonomy
+### :white_check_mark: PM-01 Create milestone and label taxonomy
 - Labels: `infra`
 - Milestone: none
 - Depends on: none
@@ -38,7 +45,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Milestones and labels exist in GitHub.
 2. Team has written rules for issue labeling.
 
-### PM-02 Create issue templates
+### :green_circle: PM-02 Create issue templates
 - Labels: `infra`
 - Milestone: none
 - Depends on: `PM-01`
@@ -50,7 +57,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Templates are available in the repo.
 2. New issues follow a consistent structure.
 
-### PM-03 Create PR template with QS checklist
+### :green_circle: PM-03 Create PR template with QS checklist
 - Labels: `infra`
 - Milestone: none
 - Depends on: `PM-01`
@@ -62,7 +69,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. PR template is active.
 2. Every PR shows QS checklist items.
 
-### PM-04 Configure branch protection and required checks
+### :green_circle: PM-04 Configure branch protection and required checks
 - Labels: `infra`
 - Milestone: none
 - Depends on: `PM-03`
@@ -76,7 +83,7 @@ All issues are written so they can be copied into GitHub as-is.
 
 ## Milestone 1 - Foundation
 
-### M1-01 Bootstrap Svelte + TypeScript + Vite app
+### :green_circle: M1-01 Bootstrap Svelte + TypeScript + Vite app
 - Labels: `feature`
 - Milestone: `M1 - Foundation`
 - Depends on: `PM-01`
@@ -88,7 +95,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. `npm run build` succeeds.
 2. App runs locally with `npm run dev`.
 
-### M1-02 Configure code quality tooling
+### :green_circle: M1-02 Configure code quality tooling
 - Labels: `infra`
 - Milestone: `M1 - Foundation`
 - Depends on: `M1-01`
@@ -100,7 +107,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Lint and typecheck run in CI and locally.
 2. Repo has deterministic formatting behavior.
 
-### M1-03 Add Vitest baseline
+### :green_circle: M1-03 Add Vitest baseline
 - Labels: `test`
 - Milestone: `M1 - Foundation`
 - Depends on: `M1-01`
@@ -112,7 +119,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Unit tests run in CI.
 2. At least one test suite exists and passes.
 
-### M1-04 Add Playwright baseline
+### :green_circle: M1-04 Add Playwright baseline
 - Labels: `test`
 - Milestone: `M1 - Foundation`
 - Depends on: `M1-01`
@@ -124,7 +131,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. E2E smoke test runs in CI.
 2. Failure artifacts are uploaded.
 
-### M1-05 Configure vite-plugin-pwa and manifest
+### :green_circle: M1-05 Configure vite-plugin-pwa and manifest
 - Labels: `feature`
 - Milestone: `M1 - Foundation`
 - Depends on: `M1-01`
@@ -136,7 +143,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Manifest is generated in production build.
 2. Service worker registers successfully.
 
-### M1-06 Prepare app architecture folders
+### :green_circle: M1-06 Prepare app architecture folders
 - Labels: `infra`
 - Milestone: `M1 - Foundation`
 - Depends on: `M1-01`
@@ -148,7 +155,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Folder structure matches architecture plan.
 2. Import paths are stable and documented.
 
-### M1-07 Add environment handling
+### :green_circle: M1-07 Add environment handling
 - Labels: `infra`
 - Milestone: `M1 - Foundation`
 - Depends on: `M1-01`
@@ -160,7 +167,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Missing required vars fail fast with clear message.
 2. `.env.example` is complete.
 
-### M1-08 Create baseline CI workflow
+### :green_circle: M1-08 Create baseline CI workflow
 - Labels: `infra`
 - Milestone: `M1 - Foundation`
 - Depends on: `M1-02`, `M1-03`, `M1-04`
@@ -172,7 +179,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Workflow runs on push and pull request.
 2. Required checks are green for merge.
 
-### M1-09 Build initial mobile-first app shell
+### :green_circle: M1-09 Build initial mobile-first app shell
 - Labels: `feature`
 - Milestone: `M1 - Foundation`
 - Depends on: `M1-01`
@@ -187,7 +194,7 @@ All issues are written so they can be copied into GitHub as-is.
 3. Routing uses hash-based paths, and direct reloads of routes do not 404.
 
 ## Milestone 2 - Website Integration + Early Deploy
-### M2-01 Decide cross-repo deployment architecture
+### :green_circle: M2-01 Decide cross-repo deployment architecture
 - Labels: `infra`
 - Milestone: `M2 - Website Integration + Early Deploy`
 - Depends on: `M1-08`
@@ -199,7 +206,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. One approved deployment architecture is documented.
 2. Both repos can implement it without manual copy steps.
 
-### M2-02 Configure Vite base path for `/conspectus/webapp/`
+### :green_circle: M2-02 Configure Vite base path for `/conspectus/webapp/`
 - Labels: `feature`
 - Milestone: `M2 - Website Integration + Early Deploy`
 - Depends on: `M2-01`
@@ -215,7 +222,7 @@ All issues are written so they can be copied into GitHub as-is.
 4. Parent site routes (`jon2050.de/`) are not intercepted by service worker.
 5. `start_url` in manifest resolves correctly under subdirectory path.
 
-### M2-03 Create PWA deploy workflow in PWA repo
+### :green_circle: M2-03 Create PWA deploy workflow in PWA repo
 - Labels: `infra`
 - Milestone: `M2 - Website Integration + Early Deploy`
 - Depends on: `M2-01`, `M2-02`
@@ -227,7 +234,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Every successful build emits a deployable artifact.
 2. Artifact metadata is traceable.
 
-### M2-04 Integrate PWA artifact consumption in website repo CI
+### :green_circle: M2-04 Integrate PWA artifact consumption in website repo CI
 - Labels: `infra`
 - Milestone: `M2 - Website Integration + Early Deploy`
 - Depends on: `M2-03`
@@ -239,7 +246,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Website pipeline deploys PWA files automatically.
 2. Deploy does not break non-Conspectus website content.
 
-### M2-05 Add deployment smoke checks in website pipeline
+### :green_circle: M2-05 Add deployment smoke checks in website pipeline
 - Labels: `test`
 - Milestone: `M2 - Website Integration + Early Deploy`
 - Depends on: `M2-04`
@@ -251,7 +258,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Pipeline blocks bad deployments.
 2. Smoke checks run after every deploy.
 
-### M2-06 Add early public test page/link
+### :green_circle: M2-06 Add early public test page/link
 - Labels: `feature`
 - Milestone: `M2 - Website Integration + Early Deploy`
 - Depends on: `M2-04`
@@ -263,7 +270,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Users can navigate to PWA from website.
 2. Link survives full website rebuild.
 
-### M2-07 Verify iOS and Android installability on production URL
+### :green_circle: M2-07 Verify iOS and Android installability on production URL
 - Labels: `test`
 - Milestone: `M2 - Website Integration + Early Deploy`
 - Depends on: `M2-05`, `M2-06`
@@ -275,7 +282,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Install flow works on both platforms.
 2. Documented issues are tracked as bugs.
 
-### M2-08 Add deployment runbook for two-repo flow
+### :green_circle: M2-08 Add deployment runbook for two-repo flow
 - Labels: `docs`
 - Milestone: `M2 - Website Integration + Early Deploy`
 - Depends on: `M2-04`, `M2-05`
@@ -289,7 +296,7 @@ All issues are written so they can be copied into GitHub as-is.
 
 ## Milestone 3 - Auth + OneDrive Binding
 
-### M3-01 Create Microsoft Entra app registration (SPA, personal accounts)
+### :green_circle: M3-01 Create Microsoft Entra app registration (SPA, personal accounts)
 - Labels: `feature`
 - Milestone: `M3 - Auth + OneDrive Binding`
 - Depends on: `M1-07`
@@ -301,7 +308,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. App registration exists with correct redirect URIs.
 2. Client ID is available for frontend configuration.
 
-### M3-02 Configure Graph scopes and consent documentation
+### :green_circle: M3-02 Configure Graph scopes and consent documentation
 - Labels: `security`
 - Milestone: `M3 - Auth + OneDrive Binding`
 - Depends on: `M3-01`
@@ -313,7 +320,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Only required scopes are requested.
 2. Scope list is documented and approved.
 
-### M3-03 Implement MSAL bootstrap module
+### :green_circle: M3-03 Implement MSAL bootstrap module
 - Labels: `feature`
 - Milestone: `M3 - Auth + OneDrive Binding`
 - Depends on: `M3-01`
@@ -325,7 +332,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Tokens can be acquired without repeated login when session exists.
 2. Auth module exposes stable API to UI/Graph layers.
 
-### M3-04 Build sign-in/sign-out UX
+### :green_circle: M3-04 Build sign-in/sign-out UX
 - Labels: `feature`
 - Milestone: `M3 - Auth + OneDrive Binding`
 - Depends on: `M3-03`
@@ -341,7 +348,7 @@ All issues are written so they can be copied into GitHub as-is.
 4. Auth flow works from iOS home-screen PWA install.
 5. Auth flow works on Android Chrome.
 
-### M3-05 Implement Graph client wrapper
+### :green_circle: M3-05 Implement Graph client wrapper
 - Labels: `feature`
 - Milestone: `M3 - Auth + OneDrive Binding`
 - Depends on: `M3-03`
@@ -353,7 +360,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Graph calls are centralized behind one client interface.
 2. Common Graph errors are mapped to user-facing categories.
 
-### M3-06 Implement OneDrive file selection flow
+### :green_circle: M3-06 Implement OneDrive file selection flow
 - Labels: `feature`
 - Milestone: `M3 - Auth + OneDrive Binding`
 - Depends on: `M3-05`
@@ -365,7 +372,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. User can select a DB file once.
 2. Selection returns all required identifiers including path for self-healing fallback.
 
-### M3-07 Persist binding in local storage layer
+### :green_circle: M3-07 Persist binding in local storage layer
 - Labels: `feature`
 - Milestone: `M3 - Auth + OneDrive Binding`
 - Depends on: `M3-06`
@@ -377,7 +384,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Binding survives app restart.
 2. Binding can be read without extra network calls.
 
-### M3-08 Add settings actions for rebind and local reset
+### :green_circle: M3-08 Add settings actions for rebind and local reset
 - Labels: `feature`
 - Milestone: `M3 - Auth + OneDrive Binding`
 - Depends on: `M3-07`
@@ -389,7 +396,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Rebind flow works end-to-end.
 2. Reset clears local binding and cache reliably.
 
-### M3-09 Add auth and binding integration tests
+### :green_circle: M3-09 Add auth and binding integration tests
 - Labels: `test`
 - Milestone: `M3 - Auth + OneDrive Binding`
 - Depends on: `M3-04`, `M3-06`, `M3-07`
@@ -402,7 +409,7 @@ All issues are written so they can be copied into GitHub as-is.
 2. Failure modes are asserted, not only happy paths.
 
 ## Milestone 4 - Sync Engine + Cache
-### M4-01 Define Dexie schema for DB cache and metadata
+### :green_circle: M4-01 Define Dexie schema for DB cache and metadata
 - Labels: `feature`
 - Milestone: `M4 - Sync Engine + Cache`
 - Depends on: `M3-07`
@@ -414,7 +421,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Cache schema supports all MVP sync requirements.
 2. Schema migration path is documented.
 
-### M4-02 Implement Graph metadata fetch (`eTag` and file info)
+### :green_circle: M4-02 Implement Graph metadata fetch (`eTag` and file info)
 - Labels: `feature`
 - Milestone: `M4 - Sync Engine + Cache`
 - Depends on: `M3-05`
@@ -426,7 +433,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Metadata fetch returns stable `eTag`.
 2. Missing/invalid metadata is handled safely.
 
-### M4-03 Implement file download and cache write
+### :green_circle: M4-03 Implement file download and cache write
 - Labels: `feature`
 - Milestone: `M4 - Sync Engine + Cache`
 - Depends on: `M4-01`, `M4-02`
@@ -438,7 +445,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Fresh DB can be cached from OneDrive.
 2. Corrupt/empty payloads do not overwrite valid cache silently.
 
-### M4-04 Implement startup freshness decision tree
+### :green_circle: M4-04 Implement startup freshness decision tree
 - Labels: `feature`
 - Milestone: `M4 - Sync Engine + Cache`
 - Depends on: `M4-02`, `M4-03`
@@ -450,7 +457,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Startup behavior matches architecture decision tree.
 2. Offline startup works with existing cache.
 
-### M4-05 Implement sync state machine for UI
+### :green_circle: M4-05 Implement sync state machine for UI
 - Labels: `feature`
 - Milestone: `M4 - Sync Engine + Cache`
 - Depends on: `M4-04`
@@ -462,7 +469,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. UI always shows one valid sync status.
 2. State transitions are reproducible in tests.
 
-### M4-06 Add retry and backoff for transient sync failures
+### :green_circle: M4-06 Add retry and backoff for transient sync failures
 - Labels: `feature`
 - Milestone: `M4 - Sync Engine + Cache`
 - Depends on: `M4-03`, `M4-04`
@@ -474,7 +481,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Transient failures retry automatically.
 2. Non-retryable failures fail fast with clear reason.
 
-### M4-07 Add sync/cache integration tests
+### :green_circle: M4-07 Add sync/cache integration tests
 - Labels: `test`
 - Milestone: `M4 - Sync Engine + Cache`
 - Depends on: `M4-04`, `M4-05`, `M4-06`
@@ -486,7 +493,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Sync logic has deterministic tests for all branches.
 2. Regressions are caught in CI.
 
-### M4-08 Implement progress feedback for DB sync and upload operations
+### :green_circle: M4-08 Implement progress feedback for DB sync and upload operations
 - Labels: `feature`
 - Milestone: `M4 - Sync Engine + Cache`
 - Depends on: `M4-05`
@@ -501,7 +508,7 @@ All issues are written so they can be copied into GitHub as-is.
 
 ## Milestone 5 - Accounts + Transfers Read UX
 
-### M5-01 Integrate sql.js runtime and DB open service
+### :green_circle: M5-01 Integrate sql.js runtime and DB open service
 - Labels: `feature`
 - Milestone: `M5 - Accounts + Transfers Read UX`
 - Depends on: `M4-03`
@@ -513,7 +520,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. DB can be opened from cached/downloaded bytes.
 2. DB lifecycle is stable across app reloads.
 
-### M5-02 Implement account query service
+### :green_circle: M5-02 Implement account query service
 - Labels: `feature`
 - Milestone: `M5 - Accounts + Transfers Read UX`
 - Depends on: `M5-01`
@@ -525,7 +532,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Query returns expected accounts and sort order.
 2. Results render without runtime parsing errors.
 
-### M5-03 Implement transfer-by-month query service
+### :green_circle: M5-03 Implement transfer-by-month query service
 - Labels: `feature`
 - Milestone: `M5 - Accounts + Transfers Read UX`
 - Depends on: `M5-01`
@@ -537,7 +544,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Month query results match expected desktop semantics.
 2. Boundary dates are included correctly.
 
-### M5-04 Implement month navigation state and gestures
+### :green_circle: M5-04 Implement month navigation state and gestures
 - Labels: `feature`
 - Milestone: `M5 - Accounts + Transfers Read UX`
 - Depends on: `M5-03`
@@ -549,7 +556,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Month switching works by swipe and buttons.
 2. Current month logic is stable and test-covered.
 
-### M5-05 Build Accounts screen UI
+### :green_circle: M5-05 Build Accounts screen UI
 - Labels: `feature`
 - Milestone: `M5 - Accounts + Transfers Read UX`
 - Depends on: `M5-02`
@@ -563,7 +570,7 @@ All issues are written so they can be copied into GitHub as-is.
 2. Amount color semantics are consistent.
 3. Bottom navigation is fully accessible and visually distinct from OS-level safe areas on notched/bezelless devices.
 
-### M5-06 Build Transfers screen UI
+### :green_circle: M5-06 Build Transfers screen UI
 - Labels: `feature`
 - Milestone: `M5 - Accounts + Transfers Read UX`
 - Depends on: `M5-03`, `M5-04`
@@ -575,7 +582,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Transfers are readable and sortable by month.
 2. Empty month state is explicit and clear.
 
-### M5-07 Add formatting utilities and localization-ready rendering
+### :green_circle: M5-07 Add formatting utilities and localization-ready rendering
 - Labels: `feature`
 - Milestone: `M5 - Accounts + Transfers Read UX`
 - Depends on: `M5-05`, `M5-06`
@@ -587,7 +594,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Currency and dates render correctly.
 2. Utilities are reusable across screens.
 
-### M5-08 Add read-flow tests (unit + integration + e2e smoke)
+### :green_circle: M5-08 Add read-flow tests (unit + integration + e2e smoke)
 - Labels: `test`
 - Milestone: `M5 - Accounts + Transfers Read UX`
 - Depends on: `M5-02`, `M5-03`, `M5-06`
@@ -599,7 +606,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Read path is covered by automated tests.
 2. Regression risk for month logic is reduced.
 
-### M5-09 Capture live DB schema as reference artifact
+### :green_circle: M5-09 Capture live DB schema as reference artifact
 - Labels: `docs`
 - Milestone: `M5 - Accounts + Transfers Read UX`
 - Depends on: none
@@ -612,7 +619,7 @@ All issues are written so they can be copied into GitHub as-is.
 2. All PWA SQL queries are validated against this snapshot.
 
 ## Milestone 6 - Add Transfer Write Path
-### M6-01 Build Add Transfer form UI (bottom sheet)
+### :green_circle: M6-01 Build Add Transfer form UI (bottom sheet)
 - Labels: `feature`
 - Milestone: `M6 - Add Transfer Write Path`
 - Depends on: `M5-06`
@@ -624,7 +631,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Form is fully usable on iOS and Android screen sizes.
 2. All MVP fields are present and editable.
 
-### M6-02 Implement account/category options loading for form
+### :green_circle: M6-02 Implement account/category options loading for form
 - Labels: `feature`
 - Milestone: `M6 - Add Transfer Write Path`
 - Depends on: `M5-01`
@@ -636,7 +643,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Options match desktop intent.
 2. Category selection supports 0 to 3 categories.
 
-### M6-03 Implement transfer validation rules
+### :green_circle: M6-03 Implement transfer validation rules
 - Labels: `feature`
 - Milestone: `M6 - Add Transfer Write Path`
 - Depends on: `M6-01`, `M6-02`
@@ -648,7 +655,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Invalid forms are blocked client-side.
 2. Validation messages are specific and actionable.
 
-### M6-04 Implement transfer type derivation logic
+### :green_circle: M6-04 Implement transfer type derivation logic
 - Labels: `feature`
 - Milestone: `M6 - Add Transfer Write Path`
 - Depends on: `M6-02`
@@ -660,7 +667,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Derived transfer type matches desktop semantics.
 2. All branches are test-covered.
 
-### M6-05 Implement SQL write transaction
+### :green_circle: M6-05 Implement SQL write transaction
 - Labels: `feature`
 - Milestone: `M6 - Add Transfer Write Path`
 - Depends on: `M6-03`, `M6-04`
@@ -672,7 +679,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Transaction rolls back on any statement failure.
 2. Account balances and transfer row remain consistent.
 
-### M6-06 Implement DB export after successful local write
+### :green_circle: M6-06 Implement DB export after successful local write
 - Labels: `feature`
 - Milestone: `M6 - Add Transfer Write Path`
 - Depends on: `M6-05`
@@ -684,7 +691,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Export runs only after local commit success.
 2. Export output is usable for upload.
 
-### M6-07 Implement Graph upload with `If-Match` eTag
+### :green_circle: M6-07 Implement Graph upload with `If-Match` eTag
 - Labels: `feature`
 - Milestone: `M6 - Add Transfer Write Path`
 - Depends on: `M6-06`, `M4-02`
@@ -696,7 +703,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Successful writes update remote DB and local eTag.
 2. Conflict responses are surfaced clearly.
 
-### M6-08 Implement write failure and retry UX
+### :green_circle: M6-08 Implement write failure and retry UX
 - Labels: `feature`
 - Milestone: `M6 - Add Transfer Write Path`
 - Depends on: `M6-07`
@@ -712,7 +719,7 @@ All issues are written so they can be copied into GitHub as-is.
 3. User sees a distinct visual confirmation only after the transfer is fully saved and uploaded.
 4. Token expiry during upload is recovered transparently without losing form data or local DB state.
 
-### M6-09 Block write flow while offline
+### :green_circle: M6-09 Block write flow while offline
 - Labels: `feature`
 - Milestone: `M6 - Add Transfer Write Path`
 - Depends on: `M6-01`
@@ -726,7 +733,7 @@ All issues are written so they can be copied into GitHub as-is.
 2. User message clearly explains online requirement.
 3. User is visually warned of the offline state before attempting to submit.
 
-### M6-10 Add write-path tests (unit/integration/e2e)
+### :green_circle: M6-10 Add write-path tests (unit/integration/e2e)
 - Labels: `test`
 - Milestone: `M6 - Add Transfer Write Path`
 - Depends on: `M6-05`, `M6-07`, `M6-08`, `M6-09`
@@ -738,7 +745,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Core write path is fully automated in CI.
 2. Conflict and failure states are explicitly tested.
 
-### M6-11 Implement eTag conflict resolution UX
+### :green_circle: M6-11 Implement eTag conflict resolution UX
 - Labels: `feature`
 - Milestone: `M6 - Add Transfer Write Path`
 - Depends on: `M6-07`, `M6-08`
@@ -755,7 +762,7 @@ All issues are written so they can be copied into GitHub as-is.
 
 ## Milestone 7 - Settings + Recovery
 
-### M7-01 Build Settings screen sections
+### :green_circle: M7-01 Build Settings screen sections
 - Labels: `feature`
 - Milestone: `M7 - Settings + Recovery`
 - Depends on: `M3-08`, `M4-05`
@@ -767,7 +774,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Settings data is accurate and readable.
 2. Actions are discoverable and clear.
 
-### M7-02 Implement force refresh action
+### :green_circle: M7-02 Implement force refresh action
 - Labels: `feature`
 - Milestone: `M7 - Settings + Recovery`
 - Depends on: `M4-04`
@@ -779,7 +786,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Force refresh executes predictable sync behavior.
 2. UI clearly indicates progress and result.
 
-### M7-03 Add operational safety notice and data recovery documentation
+### :green_circle: M7-03 Add operational safety notice and data recovery documentation
 - Labels: `docs`
 - Milestone: `M7 - Settings + Recovery`
 - Depends on: `M7-01`
@@ -794,7 +801,7 @@ All issues are written so they can be copied into GitHub as-is.
 2. Message is understandable without technical jargon.
 3. Data recovery path via OneDrive version history is documented and discoverable by the user.
 
-### M7-04 Implement stale token recovery flow
+### :green_circle: M7-04 Implement stale token recovery flow
 - Labels: `feature`
 - Milestone: `M7 - Settings + Recovery`
 - Depends on: `M3-03`, `M3-04`
@@ -806,7 +813,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Expired token scenario is recoverable in-app.
 2. User context is preserved after re-auth.
 
-### M7-05 Implement missing/moved OneDrive file recovery
+### :green_circle: M7-05 Implement missing/moved OneDrive file recovery
 - Labels: `feature`
 - Milestone: `M7 - Settings + Recovery`
 - Depends on: `M3-06`, `M4-02`
@@ -820,7 +827,7 @@ All issues are written so they can be copied into GitHub as-is.
 2. Missing file does not break entire app state.
 3. User can recover by selecting a new file if self-healing fails.
 
-### M7-06 Implement diagnostics panel with copy action
+### :green_circle: M7-06 Implement diagnostics panel with copy action
 - Labels: `feature`
 - Milestone: `M7 - Settings + Recovery`
 - Depends on: `M7-01`
@@ -832,7 +839,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Diagnostics are useful for support troubleshooting.
 2. Copied text excludes secrets.
 
-### M7-07 Add recovery-flow tests
+### :green_circle: M7-07 Add recovery-flow tests
 - Labels: `test`
 - Milestone: `M7 - Settings + Recovery`
 - Depends on: `M7-04`, `M7-05`, `M7-06`
@@ -846,7 +853,7 @@ All issues are written so they can be copied into GitHub as-is.
 
 ## Milestone 8 - Hardening + QA + Release
 
-### M8-01 Implement CSP and security headers for PWA path
+### :green_circle: M8-01 Implement CSP and security headers for PWA path
 - Labels: `security`
 - Milestone: `M8 - Hardening + QA + Release`
 - Depends on: `M2-04`
@@ -858,7 +865,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Security headers are active in production.
 2. App behavior remains correct under CSP constraints.
 
-### M8-02 Implement PWA Service Worker Update Flow
+### :green_circle: M8-02 Implement PWA Service Worker Update Flow
 - Labels: `feature`
 - Milestone: `M8 - Hardening + QA + Release`
 - Depends on: `M1-05`
@@ -870,7 +877,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. When a new deployment happens, active clients receive an update notification.
 2. Users do not get permanently stuck on stale cached app shells.
 
-### M8-03 Add dependency vulnerability scanning
+### :green_circle: M8-03 Add dependency vulnerability scanning
 - Labels: `security`
 - Milestone: `M8 - Hardening + QA + Release`
 - Depends on: `M1-08`
@@ -882,7 +889,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Vulnerability scan runs on PR and scheduled basis.
 2. High/critical findings block release.
 
-### M8-04 Add bundle size budget checks
+### :green_circle: M8-04 Add bundle size budget checks
 - Labels: `infra`
 - Milestone: `M8 - Hardening + QA + Release`
 - Depends on: `M1-08`
@@ -894,7 +901,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Bundle budget check runs in CI.
 2. Significant size regressions fail PR checks.
 
-### M8-05 Add Lighthouse CI checks for mobile performance
+### :green_circle: M8-05 Add Lighthouse CI checks for mobile performance
 - Labels: `test`
 - Milestone: `M8 - Hardening + QA + Release`
 - Depends on: `M2-05`
@@ -906,7 +913,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Lighthouse reports are generated automatically.
 2. Scores meet agreed thresholds for release.
 
-### M8-06 Expand Playwright suite to critical user journeys
+### :green_circle: M8-06 Expand Playwright suite to critical user journeys
 - Labels: `test`
 - Milestone: `M8 - Hardening + QA + Release`
 - Depends on: `M6-10`, `M7-07`
@@ -918,7 +925,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Critical journeys are automated.
 2. E2E suite is stable enough for release gating.
 
-### M8-07 Create manual device QA checklist issue
+### :green_circle: M8-07 Create manual device QA checklist issue
 - Labels: `test`
 - Milestone: `M8 - Hardening + QA + Release`
 - Depends on: `M2-07`, `M6-10`, `M7-07`
@@ -930,7 +937,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Manual matrix is run before release.
 2. Results are attached and traceable.
 
-### M8-08 Create release checklist and cut process
+### :green_circle: M8-08 Create release checklist and cut process
 - Labels: `docs`
 - Milestone: `M8 - Hardening + QA + Release`
 - Depends on: `M8-05`, `M8-06`
@@ -942,7 +949,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Release process is documented and repeatable.
 2. Every release follows one checklist.
 
-### M8-09 Create rollback procedure for two-repo deployment
+### :green_circle: M8-09 Create rollback procedure for two-repo deployment
 - Labels: `docs`
 - Milestone: `M8 - Hardening + QA + Release`
 - Depends on: `M2-08`
@@ -954,7 +961,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Rollback can be executed in under 15 minutes.
 2. Procedure is verified in a dry run.
 
-### M8-10 Add post-deploy smoke monitor job
+### :green_circle: M8-10 Add post-deploy smoke monitor job
 - Labels: `infra`
 - Milestone: `M8 - Hardening + QA + Release`
 - Depends on: `M2-05`
@@ -966,7 +973,7 @@ All issues are written so they can be copied into GitHub as-is.
 1. Basic availability monitoring exists.
 2. Alerts contain enough context for fast triage.
 
-### M8-11 Final MVP release issue
+### :green_circle: M8-11 Final MVP release issue
 - Labels: `feature`
 - Milestone: `M8 - Hardening + QA + Release`
 - Depends on: all milestone issues
@@ -983,3 +990,5 @@ All issues are written so they can be copied into GitHub as-is.
 1. Create all `PM-*` issues.
 2. Create all issues in milestone order (`M1` to `M8`).
 3. Link dependencies during creation using issue references.
+
+
