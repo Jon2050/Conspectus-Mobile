@@ -3,8 +3,6 @@ name: Quality
 on:
   pull_request:
   push:
-    branches:
-      - main
 
 jobs:
   lint-typecheck:
@@ -32,7 +30,22 @@ jobs:
         run: npm run typecheck
 
       - name: Unit tests
-        run: npm run test
+        run: |
+          mkdir -p reports/vitest
+          set -o pipefail
+          npx vitest run --reporter=default --reporter=junit --outputFile=reports/vitest/junit.xml | tee reports/vitest/vitest.log
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload unit test failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-failure-artifacts
+          if-no-files-found: ignore
+          path: |
+            reports/vitest/
 
   e2e-smoke:
     runs-on: ubuntu-latest
