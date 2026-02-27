@@ -1,6 +1,6 @@
-# Conspectus Mobile PWA
+# Conspectus-Mobile
 
-Conspectus Mobile PWA is a small, modern web app for iOS and Android to use key Conspectus features on mobile.
+Conspectus-Mobile is a small, modern PWA for iOS and Android to use key Conspectus features on mobile.
 
 ## Goal
 

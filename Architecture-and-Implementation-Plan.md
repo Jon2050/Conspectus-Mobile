@@ -1,8 +1,8 @@
-# Conspectus Mobile PWA - Architecture and Implementation Plan
+# Conspectus-Mobile - Architecture and Implementation Plan
 
 ## 1. Purpose and Scope
 
-This document defines the target architecture and delivery plan for a separate **Conspectus Mobile PWA** that runs on iOS and Android browsers/home screen installs.
+This document defines the target architecture and delivery plan for a separate **Conspectus-Mobile** PWA that runs on iOS and Android browsers/home screen installs.
 
 The PWA must:
 - Work with each user's own OneDrive and own Conspectus SQLite file.
@@ -35,7 +35,7 @@ Out-of-scope for MVP:
 - Offline add transfer: **not supported**.
 - File transport: raw `.db` only.
 - Keep source code small and simple.
-- Separate repository from main desktop Conspectus repo.
+- Separate repository (`Conspectus-Mobile`) from main desktop Conspectus repo.
 
 ---
 
@@ -107,6 +107,8 @@ Read flow on app startup:
 4. If cached blob exists and eTag unchanged, load cached DB.
 5. Else download full DB, cache it, and load it.
 
+Cache loss is non-critical: if the local IndexedDB cache is evicted (e.g. by iOS after inactivity), the app simply re-downloads the DB from OneDrive on next online startup. No data is lost because OneDrive is always the authoritative source.
+
 Write flow for "Add Transfer":
 1. Require online state.
 2. Validate fields.
@@ -118,6 +120,12 @@ Write flow for "Add Transfer":
 Conflict policy:
 - User agreement says desktop and mobile won't be used concurrently.
 - Still keep eTag conditional upload for protection.
+
+Data recovery:
+- OneDrive automatically keeps version history for uploaded files (30 days for personal accounts).
+- Every PWA upload creates a recoverable version in OneDrive.
+- If a write corrupts data or the user makes a mistake, previous versions can be restored via OneDrive's web UI.
+- No custom backup mechanism is needed in the PWA.
 
 ## 3.5 Performance and Data Traffic
 
@@ -183,7 +191,7 @@ Core UI patterns:
 Goal: create a clean, production-ready technical baseline.
 
 Substeps:
-1. Create new repository `conspectus-pwa`.
+1. Use repository `Conspectus-Mobile`.
 2. Bootstrap Svelte + TS + Vite project.
 3. Add lint/format/typecheck scripts.
 4. Add `vite-plugin-pwa` and baseline manifest:
@@ -527,7 +535,7 @@ Hard gates before release:
 ## 8.1 Separate Repo + Website Integration
 
 Recommended:
-1. Keep `conspectus-pwa` as independent git repository.
+1. Keep `Conspectus-Mobile` as independent git repository.
 2. Build and deploy static output directly to:
    - `jon2050.de/conspectus/webapp/`
 3. Keep website repo independent; add simple link to PWA route.
