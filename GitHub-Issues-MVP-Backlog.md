@@ -179,7 +179,7 @@ Update each issue heading status marker to reflect current status.
 1. Workflow runs on push and pull request.
 2. Required checks are green for merge.
 
-### :green_circle: M1-09 Build initial mobile-first app shell
+### :white_check_mark: M1-09 Build initial mobile-first app shell
 - Labels: `feature`
 - Milestone: `M1 - Foundation`
 - Depends on: `M1-01`
