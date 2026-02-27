@@ -119,7 +119,7 @@ Update each issue heading status marker to reflect current status.
 1. Unit tests run in CI.
 2. At least one test suite exists and passes.
 
-### :green_circle: M1-04 Add Playwright baseline
+### :white_check_mark: M1-04 Add Playwright baseline
 - Labels: `test`
 - Milestone: `M1 - Foundation`
 - Depends on: `M1-01`

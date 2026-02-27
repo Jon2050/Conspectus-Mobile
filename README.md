@@ -54,6 +54,7 @@ Local quality scripts:
 - `npm run format` - verifies deterministic formatting with Prettier.
 - `npm run lint` - runs ESLint and fails on warnings/errors.
 - `npm run test` - runs baseline unit tests with Vitest.
+- `npm run test:e2e` - runs baseline Playwright app-shell smoke tests.
 - `npm run typecheck` - runs Svelte + TypeScript checks in strict mode.
 
 CI runs these checks on every push to `main` and every pull request.
