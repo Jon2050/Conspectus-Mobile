@@ -47,3 +47,22 @@ Provide fast mobile access to a personal Conspectus SQLite database stored in On
 
 Detailed architecture and implementation plan:
 - `Architecture-and-Implementation-Plan.md`
+
+## Issue Labeling Rules
+
+Backlog source of truth:
+- `GitHub-Issues-MVP-Backlog.md`
+
+Required project labels:
+- `feature`: user-visible functionality or behavior changes in the app.
+- `infra`: repository, CI/CD, tooling, workflow, or deployment plumbing.
+- `bug`: defect fixes for incorrect current behavior.
+- `docs`: documentation-only work.
+- `test`: automated test work and QA harness improvements.
+- `security`: security, auth hardening, scopes, headers, dependency risk mitigation.
+
+Usage rules:
+- Apply exactly one primary label from the required project labels on each issue.
+- If an issue spans multiple areas, choose the dominant work type and capture secondary concerns in the issue body.
+- Assign a milestone to all milestone delivery issues (`M1-*` through `M8-*`).
+- Keep project-management bootstrap issues (`PM-*`) without milestone unless explicitly planned into one.
