@@ -69,7 +69,7 @@ Update each issue heading status marker to reflect current status.
 1. PR template is active.
 2. Every PR shows QS checklist items.
 
-### :green_circle: PM-04 Configure branch protection and required checks
+### :white_check_mark: PM-04 Configure branch protection and required checks
 - Labels: `infra`
 - Milestone: none
 - Depends on: `PM-03`
@@ -83,7 +83,7 @@ Update each issue heading status marker to reflect current status.
 
 ## Milestone 1 - Foundation
 
-### :green_circle: M1-01 Bootstrap Svelte + TypeScript + Vite app
+### :white_check_mark: M1-01 Bootstrap Svelte + TypeScript + Vite app
 - Labels: `feature`
 - Milestone: `M1 - Foundation`
 - Depends on: `PM-01`
