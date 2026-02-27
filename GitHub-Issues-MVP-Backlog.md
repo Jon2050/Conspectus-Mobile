@@ -107,7 +107,7 @@ Update each issue heading status marker to reflect current status.
 1. Lint and typecheck run in CI and locally.
 2. Repo has deterministic formatting behavior.
 
-### :green_circle: M1-03 Add Vitest baseline
+### :white_check_mark: M1-03 Add Vitest baseline
 - Labels: `test`
 - Milestone: `M1 - Foundation`
 - Depends on: `M1-01`

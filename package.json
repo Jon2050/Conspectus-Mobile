@@ -11,7 +11,7 @@
     "lint:fix": "eslint . --max-warnings=0 --fix",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
-    "test": "echo \"Test setup scheduled in M1-03\"",
+    "test": "vitest run",
     "typecheck": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json"
   },
   "devDependencies": {
@@ -29,6 +29,7 @@
     "svelte-check": "^4.3.4",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.56.1",
-    "vite": "^7.3.1"
+    "vite": "^7.3.1",
+    "vitest": "^4.0.18"
   }
 }
