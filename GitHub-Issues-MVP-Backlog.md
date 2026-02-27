@@ -167,7 +167,7 @@ Update each issue heading status marker to reflect current status.
 1. Missing required vars fail fast with clear message.
 2. `.env.example` is complete.
 
-### :green_circle: M1-08 Create baseline CI workflow
+### :white_check_mark: M1-08 Create baseline CI workflow
 - Labels: `infra`
 - Milestone: `M1 - Foundation`
 - Depends on: `M1-02`, `M1-03`, `M1-04`
