@@ -143,7 +143,7 @@ Update each issue heading status marker to reflect current status.
 1. Manifest is generated in production build.
 2. Service worker registers successfully.
 
-### :green_circle: M1-06 Prepare app architecture folders
+### :white_check_mark: M1-06 Prepare app architecture folders
 - Labels: `infra`
 - Milestone: `M1 - Foundation`
 - Depends on: `M1-01`
