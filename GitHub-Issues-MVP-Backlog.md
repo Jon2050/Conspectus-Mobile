@@ -95,7 +95,7 @@ Update each issue heading status marker to reflect current status.
 1. `npm run build` succeeds.
 2. App runs locally with `npm run dev`.
 
-### :green_circle: M1-02 Configure code quality tooling
+### :white_check_mark: M1-02 Configure code quality tooling
 - Labels: `infra`
 - Milestone: `M1 - Foundation`
 - Depends on: `M1-01`

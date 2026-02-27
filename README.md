@@ -48,6 +48,15 @@ Provide fast mobile access to a personal Conspectus SQLite database stored in On
 Detailed architecture and implementation plan:
 - `Architecture-and-Implementation-Plan.md`
 
+## Quality Tooling
+
+Local quality scripts:
+- `npm run format` - verifies deterministic formatting with Prettier.
+- `npm run lint` - runs ESLint and fails on warnings/errors.
+- `npm run typecheck` - runs Svelte + TypeScript checks in strict mode.
+
+CI runs these checks on every push to `main` and every pull request.
+
 ## Issue Labeling Rules
 
 Backlog source of truth:
