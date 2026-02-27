@@ -46,6 +46,13 @@ h1 {
   text-align: center;
 }
 
+.startup-error {
+  padding: 1.5rem;
+  border: 1px solid #fa2828;
+  border-radius: 0.75rem;
+  background-color: color-mix(in srgb, #fa2828 10%, transparent);
+}
+
 button {
   border-radius: 8px;
   border: 1px solid transparent;

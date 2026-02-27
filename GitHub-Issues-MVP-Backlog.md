@@ -155,7 +155,7 @@ Update each issue heading status marker to reflect current status.
 1. Folder structure matches architecture plan.
 2. Import paths are stable and documented.
 
-### :green_circle: M1-07 Add environment handling
+### :white_check_mark: M1-07 Add environment handling
 - Labels: `infra`
 - Milestone: `M1 - Foundation`
 - Depends on: `M1-01`

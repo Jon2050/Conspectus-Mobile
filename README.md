@@ -30,6 +30,21 @@ Provide fast mobile access to a personal Conspectus SQLite database stored in On
 - SQLite in browser via sql.js
 - Local cache via IndexedDB
 
+## Environment Setup
+
+Create a `.env` file in the repository root. Use `.env.example` as the template.
+
+Required variable:
+- `VITE_AZURE_CLIENT_ID`: Microsoft Entra SPA client ID used for MSAL login.
+
+Optional deployment variables:
+- `VITE_DEPLOY_BASE_PATH`: Optional deploy path override (default target path is `/conspectus/webapp/`).
+- `VITE_DEPLOY_PUBLIC_URL`: Optional full public app URL for deployment/reference tooling.
+
+Startup validation:
+- App startup fails fast when required variables are missing.
+- A clear startup message is shown in the UI and explains how to fix the configuration.
+
 ## Sync Model
 
 - One DB file is selected once from OneDrive.
