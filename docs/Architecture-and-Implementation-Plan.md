@@ -2,24 +2,22 @@
 
 ## 1. Purpose and Scope
 
-This document defines the target architecture and delivery plan for a separate **Conspectus-Mobile** PWA that runs on iOS and Android browsers/home screen installs.
+This document is the deep source-of-truth for architecture decisions, sync/write behavior, and milestone delivery for **Conspectus-Mobile**.
 
-The PWA must:
-- Work with each user's own OneDrive and own Conspectus SQLite file.
-- Require no backend server.
-- Require no changes in the desktop Conspectus app.
-- Stay simple, fast, and maintainable.
+Use `README.md` as the quick-entry document for goal, MVP/non-goal summary, local setup, environment variables, and module import conventions.
 
-In-scope MVP features:
-- View accounts and current balances.
-- View transfers for a selected month (default current month), including swipe month navigation.
-- Add new transfer.
+Core product constraints remain:
+- OneDrive-hosted personal SQLite file per user.
+- No backend server.
+- No required desktop-app changes.
+- Simple, maintainable mobile-first implementation.
 
-Out-of-scope for MVP:
-- Database migrations.
-- Offline transfer creation/sync queue.
-- Shared/multi-user same database workflows.
-- Receipt OCR implementation (included here as future concept only).
+## 1.1 Documentation Ownership
+
+Canonical sections by topic:
+- Sync/caching model (`eTag`, `If-Match`, conflict recovery): this document, `## 3.4 Sync and Caching Strategy`.
+- Environment variable definitions/defaults: `README.md`, `## Environment Setup`.
+- Module import conventions and aliases: `README.md`, `## Architecture Modules`.
 
 ---
 
@@ -98,6 +96,8 @@ The PWA must mirror desktop behavior for transfer creation:
   - account combination constraints
 
 ## 3.4 Sync and Caching Strategy
+
+This section is the canonical sync behavior definition for the repository.
 
 Read flow on app startup:
 1. Resolve user auth.
@@ -202,7 +202,7 @@ Substeps:
    - standalone mode
    - theme color
 5. Add environment config strategy:
-   - `VITE_AZURE_CLIENT_ID`
+   - `VITE_AZURE_CLIENT_ID` (definition/defaults are maintained in `README.md`)
 6. Create base architecture folders:
    - `src/auth`
    - `src/graph`

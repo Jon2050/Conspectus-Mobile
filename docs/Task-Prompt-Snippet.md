@@ -6,6 +6,8 @@ Execution rules:
 - Work only in this repository.
 - Do not modify unrelated files.
 - If requirements are ambiguous, infer from architecture/backlog docs and state assumptions.
+- If needed, to a web research for help, framework or tool questions or anything else needed.
+- If you do have any important questions you cannot solve or answer by yourself, ask me.
 - Keep changes minimal but complete for acceptance criteria.
 
 Workflow:
@@ -64,6 +66,7 @@ Workflow:
   - Ensure no temporary issue branch remains.
 - Mark the issue as done in GitHub.
 - Update `docs/GitHub-Issues-MVP-Backlog.md` status marker to done.
+- Update `docs/Architecture-and-Implementation-Plan.md` if changes or clarifications occured during implementation. The plan should always be up to date and source of truth.
 - Provide final report with:
   - changed files
   - commands run and results

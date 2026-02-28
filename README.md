@@ -29,6 +29,7 @@ Provide fast mobile access to a personal Conspectus SQLite database stored in On
 - OneDrive sync via Microsoft Graph
 - SQLite in browser via sql.js
 - Local cache via IndexedDB
+- Architecture rationale, runtime flows, and milestone delivery details live in `docs/Architecture-and-Implementation-Plan.md`.
 
 ## Environment Setup
 
@@ -45,11 +46,12 @@ Startup validation:
 - App startup fails fast when required variables are missing.
 - A clear startup message is shown in the UI and explains how to fix the configuration.
 
-## Sync Model
+## Documentation Ownership
 
-- One DB file is selected once from OneDrive.
-- App checks metadata (`eTag`) and downloads only when changed.
-- Adding a transfer updates the DB locally and uploads the full DB file back to OneDrive.
+Canonical source-of-truth by topic:
+- Environment variables and defaults: this `README.md` (`## Environment Setup`).
+- Module import conventions and aliases: this `README.md` (`## Architecture Modules`).
+- Sync/caching model (`eTag`, `If-Match`, conflict recovery): `docs/Architecture-and-Implementation-Plan.md` (`## 3.4 Sync and Caching Strategy`).
 
 ## Security
 
@@ -58,10 +60,11 @@ Startup validation:
 - Least-privilege Graph permissions
 - Separate Microsoft account/OneDrive per user
 
-## Related Document
+## Related Documents
 
-Detailed architecture and implementation plan:
-- `docs/Architecture-and-Implementation-Plan.md`
+- Architecture and implementation plan: `docs/Architecture-and-Implementation-Plan.md`
+- Desktop parity reference used for DB/business-rule alignment: `docs/Conspectus-Desktop-Info.md`
+- MVP tracker/index of milestone issues: `docs/GitHub-Issues-MVP-Backlog.md`
 
 ## Architecture Modules
 
