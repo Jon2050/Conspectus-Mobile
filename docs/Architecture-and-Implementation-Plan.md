@@ -564,8 +564,10 @@ Recommended:
    - `jon2050.de/conspectus/webapp/`
 4. Keep website repo independent; add simple link to PWA route.
 
-Alternative:
-- Use git submodule in website repo and copy built assets during website pipeline.
+Rejected alternatives for MVP (authoritative decision is section `8.3`):
+- Git submodule with website-side build/copy steps.
+- Git subtree syncing of mobile source into website repository.
+- Package-registry pull flow for static assets.
 
 ## 8.2 CI/CD
 
@@ -577,6 +579,52 @@ Pipeline stages:
 5. `Preview Cleanup` removes stale preview paths when branches are deleted.
 6. Website repo consumes main artifact and deploys to `jon2050.de/conspectus/webapp/`.
 7. Post-deploy smoke check for app shell availability.
+
+## 8.3 Approved Cross-Repo Deployment Architecture (M2-01)
+
+Decision status:
+- Approved for MVP Milestone 2.
+- Selected strategy: artifact handoff (PWA repo produces immutable build artifacts; website repo consumes artifacts in CI).
+
+Options reviewed:
+- Artifact handoff (selected): clean repo separation, immutable versioned outputs, simple rollback to known-good artifact, no cross-repo working-tree coupling.
+- Submodule (rejected): pins source code commit, not compiled output; adds submodule update overhead and failure modes that are unrelated to deployment correctness.
+- Subtree (rejected): duplicates source history into website repo and increases merge/maintenance complexity for routine deploys.
+- Package pull (rejected for MVP): adds package publish/registry lifecycle that is unnecessary for static-site artifact delivery.
+
+Producer/consumer CI contract (automation-only, no manual copy):
+1. Producer (`Conspectus-Mobile`):
+   - Source workflow: `Deploy Channels` after successful `Quality` push runs.
+   - Production artifact is published only for `main`.
+   - Artifact name format: `conspectus-mobile-production-<commitSha>`.
+   - Artifact payload is `dist/` and MUST include `deploy-metadata.json` with:
+     - `channel` (`production`)
+     - `basePath` (`/conspectus/webapp/`)
+     - `sourceBranch`
+     - `commitSha`
+     - `buildTimeUtc`
+     - `qualityRunId`
+     - `deployRunId`
+   - Deterministic handoff event to website repo (no human selection):
+     - Trigger `repository_dispatch` with event type `conspectus-mobile-production-ready`.
+     - Payload MUST include `commitSha`, `deployRunId`, `qualityRunId`, and `artifactName`.
+     - Producer dispatch token MUST be scoped to trigger workflow events in the website repository.
+2. Consumer (website repository):
+   - Trigger on `repository_dispatch` (`conspectus-mobile-production-ready`) and read payload fields as the single source of artifact identity.
+   - Resolve artifact deterministically via GitHub Actions API using `deployRunId`:
+     - List artifacts for that run and select exact `artifactName`.
+     - Download artifact archive from the same run.
+   - Consumer token MUST have `actions:read` access to `Conspectus-Mobile` artifacts.
+   - Validate `deploy-metadata.json` before publish (channel is `production`, base path is `/conspectus/webapp/`, identity fields present).
+   - Validate identity match (`deploy-metadata.commitSha == dispatch.commitSha`, `deploy-metadata.deployRunId == dispatch.deployRunId`).
+   - Perform atomic replace of website output directory `conspectus/webapp/` from the artifact contents.
+   - Fail deployment if artifact download or metadata validation fails.
+
+Failure and rollback behavior:
+1. If producer artifact generation fails, website deployment does not run for that revision.
+2. If consumer artifact retrieval or validation fails, website deployment fails without changing live files.
+3. Rollback re-deploys the last known-good `deployRunId` artifact through website CI `workflow_dispatch`; rollback must use CI automation only (no manual filesystem copy steps).
+4. Detailed operator runbook steps remain tracked in `M2-08` and `M8-09`.
 
 ---
 
