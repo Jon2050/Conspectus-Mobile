@@ -1,0 +1,182 @@
+name: Deploy Channels
+
+on:
+  workflow_run:
+    workflows:
+      - Quality
+    types:
+      - completed
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: deploy-channels-${{ github.event.workflow_run.head_branch || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  prepare-context:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch != ''
+    runs-on: ubuntu-latest
+    outputs:
+      branch_name: ${{ steps.context.outputs.branch_name }}
+      branch_slug: ${{ steps.context.outputs.branch_slug }}
+      head_sha: ${{ steps.context.outputs.head_sha }}
+      is_main: ${{ steps.context.outputs.is_main }}
+      preview_base_prefix: ${{ steps.context.outputs.preview_base_prefix }}
+      preview_base_path: ${{ steps.context.outputs.preview_base_path }}
+    steps:
+      - name: Resolve deployment context
+        id: context
+        env:
+          BRANCH_NAME: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          set -euo pipefail
+
+          branch_slug="$(python - <<'PY'
+          import os
+
+          branch_name = os.environ["BRANCH_NAME"].strip().lower()
+          encoded = []
+
+          for char in branch_name:
+              if ("a" <= char <= "z") or ("0" <= char <= "9") or char == "-":
+                  encoded.append(char)
+              else:
+                  encoded.append(f"_{ord(char):x}_")
+
+          print("".join(encoded).strip("-"))
+          PY
+          )"
+
+          if [ -z "${branch_slug}" ]; then
+            echo "Failed to derive preview slug from branch '${BRANCH_NAME}'." >&2
+            exit 1
+          fi
+
+          preview_base_prefix="/${REPO_NAME}"
+
+          is_main='false'
+          if [ "${BRANCH_NAME}" = 'main' ]; then
+            is_main='true'
+          fi
+
+          {
+            echo "branch_name=${BRANCH_NAME}"
+            echo "branch_slug=${branch_slug}"
+            echo "head_sha=${HEAD_SHA}"
+            echo "is_main=${is_main}"
+            echo "preview_base_prefix=${preview_base_prefix}"
+            echo "preview_base_path=${preview_base_prefix}/previews/${branch_slug}/"
+          } >> "${GITHUB_OUTPUT}"
+
+  deploy-preview:
+    name: Deploy Preview
+    runs-on: ubuntu-latest
+    needs:
+      - prepare-context
+    steps:
+      - name: Checkout source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare-context.outputs.head_sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build preview channel
+        env:
+          DEPLOY_CHANNEL: preview
+          DEPLOY_PREVIEW_SLUG: ${{ needs.prepare-context.outputs.branch_slug }}
+          DEPLOY_PREVIEW_BASE_PREFIX: ${{ needs.prepare-context.outputs.preview_base_prefix }}
+        run: npm run build
+
+      - name: Verify preview build channel paths and scope
+        run: >-
+          node scripts/verify-build-channel.mjs
+          --dist dist
+          --channel preview
+          --base "${{ needs.prepare-context.outputs.preview_base_path }}"
+
+      - name: Publish preview to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./dist
+          destination_dir: previews/${{ needs.prepare-context.outputs.branch_slug }}
+          keep_files: true
+          full_commit_message: >-
+            deploy(preview): ${{ needs.prepare-context.outputs.branch_name }}
+            (${{ needs.prepare-context.outputs.head_sha }})
+
+      - name: Preview URL
+        run: |
+          echo "Preview URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/previews/${{ needs.prepare-context.outputs.branch_slug }}/"
+
+  publish-production-artifact:
+    name: Publish Production Artifact
+    runs-on: ubuntu-latest
+    needs:
+      - prepare-context
+    if: needs.prepare-context.outputs.is_main == 'true'
+    steps:
+      - name: Checkout source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare-context.outputs.head_sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build production channel
+        env:
+          DEPLOY_CHANNEL: production
+        run: npm run build
+
+      - name: Verify production build channel paths and scope
+        run: >-
+          node scripts/verify-build-channel.mjs
+          --dist dist
+          --channel production
+          --base /conspectus/webapp/
+
+      - name: Add production artifact metadata
+        run: |
+          timestamp="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          cat > dist/deploy-metadata.json <<EOF
+          {
+            "channel": "production",
+            "basePath": "/conspectus/webapp/",
+            "sourceBranch": "${{ needs.prepare-context.outputs.branch_name }}",
+            "commitSha": "${{ needs.prepare-context.outputs.head_sha }}",
+            "buildTimeUtc": "${timestamp}",
+            "qualityRunId": "${{ github.event.workflow_run.id }}",
+            "deployRunId": "${{ github.run_id }}"
+          }
+          EOF
+
+      - name: Upload production artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: conspectus-mobile-production-${{ needs.prepare-context.outputs.head_sha }}
+          if-no-files-found: error
+          path: dist

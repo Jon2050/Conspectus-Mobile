@@ -39,7 +39,7 @@ Required variable:
 - `VITE_AZURE_CLIENT_ID`: Microsoft Entra SPA client ID used for MSAL login.
 
 Optional deployment variables:
-- `VITE_DEPLOY_BASE_PATH`: Optional deploy path override (default target path is `/conspectus/webapp/`).
+- `VITE_DEPLOY_BASE_PATH`: Optional base-path override for non-channel/local builds.
 - `VITE_DEPLOY_PUBLIC_URL`: Optional full public app URL for deployment/reference tooling.
 
 Startup validation:
@@ -102,18 +102,23 @@ Local quality scripts:
 - `npm run test:e2e` - runs baseline Playwright app-shell smoke tests.
 - `npm run typecheck` - runs Svelte + TypeScript checks in strict mode.
 
-CI runs these checks on every push to `main` and every pull request.
+CI runs these checks on every push and every pull request.
 
 ## Deployment Channels
 
 Deployment is split into two CI-gated channels:
 
-- Branch previews (including `main`) are published to GitHub-hosted preview URLs only after the `Quality` workflow passes.
-- Production deployment to `https://jon2050.de/conspectus/webapp/` is main-only and is driven by a production artifact from successful `main` builds.
+- `Quality` remains the only gate for deploy eligibility.
+- `Deploy Channels` runs only from successful `Quality` push runs (`workflow_run` trigger).
+- Branch previews (including `main`) publish to:
+  - `https://<owner>.github.io/<repo>/previews/<branch-slug>/`
+- Main branch runs additionally publish a production artifact for website-repo consumption, built for `/conspectus/webapp/`.
 
 Operational notes:
-- Preview deployments are isolated by branch path (for example, `/previews/<branch-slug>/`) for safe parallel testing.
-- Production website rollout can be enabled in a later step, but the artifact contract is part of the current deployment design.
+- Preview builds use `DEPLOY_CHANNEL=preview` with deterministic path-safe branch slugging (single path segment, no nested branch folders) and isolate service worker scope/assets under `/<repo>/previews/<branch-slug>/`.
+- Production artifact builds use `DEPLOY_CHANNEL=production` and enforce `/conspectus/webapp/` for Vite `base`, PWA manifest `start_url`, and service worker scope.
+- Failed `Quality` runs do not produce preview deployments or production artifacts.
+- `Preview Cleanup` removes stale `gh-pages/previews/<branch-slug>/` content when a branch is deleted.
 
 ## Issue Labeling Rules
 
@@ -172,10 +177,10 @@ High-level steps or design constraints. Keep detailed implementation decisions i
 ## Issue Delivery Workflow
 
 Issue completion definition (required):
+- Every issue must be implemented from a dedicated issue branch and merged through a PR.
 - All scoped code/tests/docs changes are committed and pushed.
 - Local quality gates pass (`format`, `lint`, `typecheck`, `test`, `build`, and `test:e2e` when relevant).
 - Required GitHub checks are green.
-- If a PR is used: merge it into `main` and delete the head branch.
-- If direct-main delivery is used: verify the implementation commit is on `main` (only when repository policy allows direct commits).
+- Merge the PR into `main` and delete the head branch.
 
 Do not mark an issue as done until all items above are complete.

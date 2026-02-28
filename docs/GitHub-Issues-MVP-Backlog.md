@@ -16,9 +16,9 @@ Update each issue heading status marker to reflect current status.
 ## Completion Rule
 
 An issue is only considered done when:
-1. The implementation reaches `main` (via merged PR or direct commit, depending on repository policy).
+1. The implementation reaches `main` via a merged PR from a dedicated issue branch.
 2. Required CI checks are green for the merged/pushed commit.
-3. If a working branch was created, it is deleted after merge.
+3. The issue branch is deleted after merge.
 4. The corresponding backlog status marker is updated to `:white_check_mark:`.
 
 ## Label Set (create first)
@@ -134,7 +134,7 @@ An issue is only considered done when:
 - Depends on: `M1-01`
 - GitHub: [#13](https://github.com/Jon2050/Conspectus-Mobile/issues/13)
 
-### :green_circle: M2-00 Define branch preview + main-only production deployment architecture
+### :white_check_mark: M2-00 Define branch preview + main-only production deployment architecture
 - Label: `infra`
 - Milestone: `M2 - Website Integration + Early Deploy`
 - Summary: Work includes Every successful branch push creates or updates a branch-specific preview URL on GitHub-hosted pages and Failed quality runs do not deploy previews or production artifacts. It also covers Successful main runs additionally produce a production-ready artifact for website-repo consumption.

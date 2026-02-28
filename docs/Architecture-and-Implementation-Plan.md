@@ -236,7 +236,8 @@ Substeps:
 1. Define deployment channel architecture (M2-00 foundation):
    - branch preview channel on GitHub-hosted URLs for every branch push after `Quality` passes
    - main-only production channel for `jon2050.de` deployment eligibility
-   - branch preview path convention (for example `/previews/<branch-slug>/`) with cleanup on branch deletion
+   - branch preview path convention (`/previews/<branch-slug>/`) with cleanup on branch deletion
+   - deterministic branch slugging (`branch-name` -> lowercase path-safe single-segment slug) for stable preview URLs and safe cleanup behavior
 2. Confirm final public route:
    - `jon2050.de/conspectus/webapp/`
 3. Configure Vite/PWA build paths per channel:
@@ -250,8 +251,11 @@ Substeps:
    - manifest and icons resolve correctly
 6. Add website navigation entry/link to the PWA route (or temporary test link).
 7. Add CI deployment workflows:
-   - publish/update preview on successful branch builds
+   - `Deploy Channels` workflow runs from successful `Quality` push runs (`workflow_run`)
+   - publish/update preview on successful branch builds (including `main`)
    - publish production artifact only on successful `main` builds
+   - run build-output path/scope assertions for preview and production channels
+   - `Preview Cleanup` workflow removes branch preview path on delete event
    - keep production website rollout as a separate follow-up in website repo
 
 Deliverables:
@@ -567,10 +571,12 @@ Alternative:
 
 Pipeline stages:
 1. Build/test on push and PR.
-2. Deploy/update branch preview URL on successful branch quality runs.
-3. On successful `main` quality runs, publish a production artifact for website deployment.
-4. Website repo consumes main artifact and deploys to `jon2050.de/conspectus/webapp/`.
-5. Post-deploy smoke check for app shell availability.
+2. `Deploy Channels` listens to successful `Quality` push runs only.
+3. Deploy/update branch preview URL on `gh-pages` path `/previews/<branch-slug>/`.
+4. On successful `main` quality runs, publish a production artifact with deployment metadata (`commit SHA`, UTC build time, run IDs).
+5. `Preview Cleanup` removes stale preview paths when branches are deleted.
+6. Website repo consumes main artifact and deploys to `jon2050.de/conspectus/webapp/`.
+7. Post-deploy smoke check for app shell availability.
 
 ---
 
