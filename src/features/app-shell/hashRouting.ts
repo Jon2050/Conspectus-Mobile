@@ -21,11 +21,25 @@ export const APP_ROUTES: readonly AppRoute[] = ROUTE_KEYS.map((key) => ({
 
 export const toRouteHash = (route: AppRouteKey): string => `#/${route}`;
 
-export const resolveRouteFromHash = (hash: string): AppRouteKey => {
-  const trimmedHash = hash.trim();
-  const normalizedHash = trimmedHash.startsWith('#') ? trimmedHash.slice(1) : trimmedHash;
+const normalizeHash = (hash: unknown): string => {
+  if (typeof hash !== 'string') {
+    return '';
+  }
+
+  return hash.trim();
+};
+
+const getRouteCandidate = (hash: string): string | undefined => {
+  const normalizedHash = hash.startsWith('#') ? hash.slice(1) : hash;
   const normalizedPath = normalizedHash.startsWith('/') ? normalizedHash.slice(1) : normalizedHash;
-  const routeCandidate = normalizedPath.split('/')[0]?.toLowerCase();
+
+  return normalizedPath.split(/[/?#]/)[0]?.toLowerCase();
+};
+
+export const resolveRouteFromHash = (hash: unknown): AppRouteKey => {
+  const trimmedHash = normalizeHash(hash);
+  const normalizedHash = trimmedHash.startsWith('#') ? trimmedHash.slice(1) : trimmedHash;
+  const routeCandidate = getRouteCandidate(normalizedHash);
 
   if (routeCandidate && ROUTE_KEY_SET.has(routeCandidate)) {
     return routeCandidate as AppRouteKey;
@@ -34,18 +48,35 @@ export const resolveRouteFromHash = (hash: string): AppRouteKey => {
   return DEFAULT_ROUTE;
 };
 
-const readRouteFromWindow = (target: Window): AppRouteKey =>
-  resolveRouteFromHash(target.location.hash);
+type HashRoutingWindowTarget = Pick<
+  Window,
+  'location' | 'addEventListener' | 'removeEventListener'
+>;
 
-export const createHashRouteStore = (target: Window = window): Readable<AppRouteKey> =>
-  readable(readRouteFromWindow(target), (set) => {
+const hasBrowserTarget = (
+  target: HashRoutingWindowTarget | undefined,
+): target is HashRoutingWindowTarget =>
+  Boolean(target && target.location && typeof target.location.hash === 'string');
+
+const readRouteFromTarget = (target: HashRoutingWindowTarget | undefined): AppRouteKey =>
+  resolveRouteFromHash(target?.location.hash);
+
+export const createHashRouteStore = (target?: HashRoutingWindowTarget): Readable<AppRouteKey> => {
+  const resolvedTarget = target ?? (typeof window !== 'undefined' ? window : undefined);
+
+  if (!hasBrowserTarget(resolvedTarget)) {
+    return readable(DEFAULT_ROUTE);
+  }
+
+  return readable(readRouteFromTarget(resolvedTarget), (set) => {
     const handleHashChange = (): void => {
-      set(readRouteFromWindow(target));
+      set(readRouteFromTarget(resolvedTarget));
     };
 
-    target.addEventListener('hashchange', handleHashChange);
+    resolvedTarget.addEventListener('hashchange', handleHashChange);
 
     return () => {
-      target.removeEventListener('hashchange', handleHashChange);
+      resolvedTarget.removeEventListener('hashchange', handleHashChange);
     };
   });
+};

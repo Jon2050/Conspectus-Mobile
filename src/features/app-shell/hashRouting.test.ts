@@ -15,6 +15,15 @@ describe('hashRouting', () => {
     expect(resolveRouteFromHash('#/')).toBe(DEFAULT_ROUTE);
     expect(resolveRouteFromHash('#/unknown')).toBe(DEFAULT_ROUTE);
     expect(resolveRouteFromHash('#/transfers/details')).toBe('transfers');
+    expect(resolveRouteFromHash('#/settings?tab=general')).toBe('settings');
+    expect(resolveRouteFromHash('#/add#dialog')).toBe('add');
+  });
+
+  it('falls back safely for malformed hash values', () => {
+    expect(resolveRouteFromHash(undefined)).toBe(DEFAULT_ROUTE);
+    expect(resolveRouteFromHash(null)).toBe(DEFAULT_ROUTE);
+    expect(resolveRouteFromHash(123)).toBe(DEFAULT_ROUTE);
+    expect(resolveRouteFromHash({ hash: '#/accounts' })).toBe(DEFAULT_ROUTE);
   });
 
   it('builds hash URLs for known routes', () => {

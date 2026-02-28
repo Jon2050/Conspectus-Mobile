@@ -44,6 +44,13 @@ test('does not trap browser back navigation from fallback hash route', async ({ 
   await expect(page.getByRole('heading', { level: 2, name: 'Accounts' })).toBeVisible();
 });
 
+test('falls back safely on invalid hash routes', async ({ page }) => {
+  const initialResponse = await page.goto('/#/unknown');
+  expect(initialResponse?.status()).toBe(200);
+  await expect(page.getByTestId('app-shell')).toBeVisible();
+  await expect(page.getByRole('heading', { level: 2, name: 'Accounts' })).toBeVisible();
+});
+
 test('exposes manifest and registers service worker', async ({ page }) => {
   await page.goto('/');
 
