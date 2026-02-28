@@ -61,7 +61,7 @@ Startup validation:
 ## Related Document
 
 Detailed architecture and implementation plan:
-- `Architecture-and-Implementation-Plan.md`
+- `docs/Architecture-and-Implementation-Plan.md`
 
 ## Architecture Modules
 
@@ -104,7 +104,7 @@ CI runs these checks on every push to `main` and every pull request.
 ## Issue Labeling Rules
 
 Backlog source of truth:
-- `GitHub-Issues-MVP-Backlog.md`
+- `docs/GitHub-Issues-MVP-Backlog.md`
 
 Required project labels:
 - `feature`: user-visible functionality or behavior changes in the app.
@@ -119,3 +119,14 @@ Usage rules:
 - If an issue spans multiple areas, choose the dominant work type and capture secondary concerns in the issue body.
 - Assign a milestone to all milestone delivery issues (`M1-*` through `M8-*`).
 - Keep project-management bootstrap issues (`PM-*`) without milestone unless explicitly planned into one.
+
+## Issue Delivery Workflow
+
+Issue completion definition (required):
+- All scoped code/tests/docs changes are committed and pushed.
+- Local quality gates pass (`format`, `lint`, `typecheck`, `test`, `build`, and `test:e2e` when relevant).
+- Required GitHub checks are green.
+- The PR is merged into `main`.
+- The head branch is deleted after merge.
+
+Do not mark an issue as done until all items above are complete.

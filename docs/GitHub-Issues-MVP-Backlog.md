@@ -11,6 +11,14 @@ All issues are written so they can be copied into GitHub as-is.
 - `:white_check_mark:` Done
 
 Update each issue heading status marker to reflect current status.
+
+## Completion Rule
+
+An issue is only considered done when:
+1. The implementation PR is merged into `main`.
+2. Required CI checks are green for the merged PR/commit.
+3. The working branch is deleted after merge.
+4. The corresponding backlog status marker is updated to `:white_check_mark:`.
 ## Label Set (create first)
 
 - `feature`
