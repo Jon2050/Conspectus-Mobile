@@ -118,6 +118,7 @@ Operational notes:
 - Preview builds use `DEPLOY_CHANNEL=preview` with deterministic path-safe branch slugging (single path segment, no nested branch folders) and isolate service worker scope/assets under `/<repo>/previews/<branch-slug>/`.
 - Production artifact builds use `DEPLOY_CHANNEL=production` and enforce `/conspectus/webapp/` for Vite `base`, PWA manifest `start_url`, and service worker scope.
 - Failed `Quality` runs do not produce preview deployments or production artifacts.
+- `Deploy Channels` includes a hard post-deploy preview availability check; if GitHub Pages is unavailable or the preview URL is not reachable, the workflow fails.
 - `Preview Cleanup` removes stale `gh-pages/previews/<branch-slug>/` content when a branch is deleted.
 
 ## Issue Labeling Rules
