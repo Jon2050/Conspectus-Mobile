@@ -10,6 +10,7 @@ on:
 permissions:
   contents: write
   actions: read
+  pages: read
 
 concurrency:
   group: deploy-channels-${{ github.event.workflow_run.head_branch || github.run_id }}
@@ -122,7 +123,48 @@ jobs:
             deploy(preview): ${{ needs.prepare-context.outputs.branch_name }}
             (${{ needs.prepare-context.outputs.head_sha }})
 
-      - name: Preview URL
+      - name: Verify preview deployment availability
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PREVIEW_URL: >-
+            https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/previews/${{ needs.prepare-context.outputs.branch_slug }}/
+        run: |
+          set -euo pipefail
+
+          pages_api_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pages"
+          pages_status="$(curl -sS -o pages-response.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H 'Accept: application/vnd.github+json' \
+            "${pages_api_url}")"
+
+          if [ "${pages_status}" != '200' ]; then
+            echo "GitHub Pages site is not configured/available for this repository." >&2
+            echo "Pages API status: ${pages_status}" >&2
+            cat pages-response.json >&2 || true
+            exit 1
+          fi
+
+          preview_index_url="${PREVIEW_URL}index.html"
+          max_attempts=30
+          for attempt in $(seq 1 "${max_attempts}"); do
+            preview_status="$(curl -sS -L -o preview-index.html -w '%{http_code}' "${preview_index_url}")"
+            if [ "${preview_status}" = '200' ] && grep -q 'id="app"' preview-index.html; then
+              echo "Preview deployment is reachable at ${PREVIEW_URL}"
+              exit 0
+            fi
+
+            if [ "${attempt}" -lt "${max_attempts}" ]; then
+              echo "Preview check attempt ${attempt}/${max_attempts} not ready (status ${preview_status}); retrying in 10s..."
+              sleep 10
+            fi
+          done
+
+          echo "Preview deployment did not become reachable in time: ${PREVIEW_URL}" >&2
+          echo "Last response status: ${preview_status}" >&2
+          cat preview-index.html >&2 || true
+          exit 1
+
+      - name: Preview URL (reachable)
         run: |
           echo "Preview URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/previews/${{ needs.prepare-context.outputs.branch_slug }}/"
 
