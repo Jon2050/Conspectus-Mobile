@@ -1,0 +1,82 @@
+name: Preview Cleanup
+
+on:
+  delete:
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup-preview:
+    if: github.event.ref_type == 'branch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Resolve deleted branch slug
+        id: context
+        env:
+          BRANCH_NAME: ${{ github.event.ref }}
+        run: |
+          set -euo pipefail
+
+          branch_slug="$(python - <<'PY'
+          import os
+
+          branch_name = os.environ["BRANCH_NAME"].strip().lower()
+          encoded = []
+
+          for char in branch_name:
+              if ("a" <= char <= "z") or ("0" <= char <= "9") or char == "-":
+                  encoded.append(char)
+              else:
+                  encoded.append(f"_{ord(char):x}_")
+
+          print("".join(encoded).strip("-"))
+          PY
+          )"
+
+          if [ -z "${branch_slug}" ]; then
+            echo "Failed to derive preview slug from deleted branch '${BRANCH_NAME}'." >&2
+            exit 1
+          fi
+
+          echo "branch_slug=${branch_slug}" >> "${GITHUB_OUTPUT}"
+
+      - name: Remove preview directory from gh-pages
+        env:
+          BRANCH_NAME: ${{ github.event.ref }}
+          BRANCH_SLUG: ${{ steps.context.outputs.branch_slug }}
+        run: |
+          set -euo pipefail
+
+          if ! git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            echo "No gh-pages branch found. Nothing to clean up."
+            exit 0
+          fi
+
+          git fetch origin gh-pages
+          git checkout -B gh-pages origin/gh-pages
+
+          target_path="previews/${BRANCH_SLUG}"
+          if [ ! -d "${target_path}" ]; then
+            echo "No preview path found for deleted branch '${BRANCH_NAME}'."
+            exit 0
+          fi
+
+          rm -rf "${target_path}"
+
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "No changes detected after cleanup."
+            exit 0
+          fi
+
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m "chore(preview): remove deleted branch ${BRANCH_NAME}"
+          git push origin gh-pages
