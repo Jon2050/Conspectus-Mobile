@@ -101,6 +101,17 @@ Local quality scripts:
 
 CI runs these checks on every push to `main` and every pull request.
 
+## Deployment Channels
+
+Deployment is split into two CI-gated channels:
+
+- Branch previews (including `main`) are published to GitHub-hosted preview URLs only after the `Quality` workflow passes.
+- Production deployment to `https://jon2050.de/conspectus/webapp/` is main-only and is driven by a production artifact from successful `main` builds.
+
+Operational notes:
+- Preview deployments are isolated by branch path (for example, `/previews/<branch-slug>/`) for safe parallel testing.
+- Production website rollout can be enabled in a later step, but the artifact contract is part of the current deployment design.
+
 ## Issue Labeling Rules
 
 Backlog source of truth:

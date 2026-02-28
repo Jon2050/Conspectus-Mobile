@@ -233,27 +233,38 @@ Exit criteria:
 Goal: integrate the PWA into the existing static website as early as possible for real-device testing.
 
 Substeps:
-1. Confirm final public route:
+1. Define deployment channel architecture (M2-00 foundation):
+   - branch preview channel on GitHub-hosted URLs for every branch push after `Quality` passes
+   - main-only production channel for `jon2050.de` deployment eligibility
+   - branch preview path convention (for example `/previews/<branch-slug>/`) with cleanup on branch deletion
+2. Confirm final public route:
    - `jon2050.de/conspectus/webapp/`
-2. Configure Vite build base path for subdirectory hosting.
-3. Add deploy target structure compatible with existing website static hosting.
-4. Add minimal "PWA shell smoke" page to verify:
+3. Configure Vite/PWA build paths per channel:
+   - preview: branch-scoped base path and `start_url`
+   - production: `/conspectus/webapp/` base path and `start_url`
+   - service worker scope isolation for both channels
+4. Add deploy target structure compatible with existing website static hosting.
+5. Add minimal "PWA shell smoke" page to verify:
    - app route loads under website path
    - service worker registration works
    - manifest and icons resolve correctly
-5. Add website navigation entry/link to the PWA route (or temporary test link).
-6. Add a fast deploy workflow for test iterations:
-   - build
-   - publish to website path
-   - quick smoke check (HTTP 200 + app boot)
+6. Add website navigation entry/link to the PWA route (or temporary test link).
+7. Add CI deployment workflows:
+   - publish/update preview on successful branch builds
+   - publish production artifact only on successful `main` builds
+   - keep production website rollout as a separate follow-up in website repo
 
 Deliverables:
 - Publicly reachable PWA shell on `jon2050.de` for iOS/Android testing.
 - Repeatable early deploy process independent of feature completion.
+- Branch preview URLs for development and QA on every branch.
+- Main-only production artifact handoff contract for website deployment.
 
 Exit criteria:
+- Successful branch pushes produce isolated preview URLs.
 - PWA opens correctly at `https://jon2050.de/conspectus/webapp/`.
 - Install prompt/service worker/manifest behavior is testable on mobile devices.
+- Successful `main` builds produce traceable production artifacts for website consumption.
 
 ---
 
@@ -542,9 +553,12 @@ Hard gates before release:
 
 Recommended:
 1. Keep `Conspectus-Mobile` as independent git repository.
-2. Build and deploy static output directly to:
+2. Use dual deployment channels:
+   - branch previews hosted from this repo on GitHub paths for development validation
+   - main-only production artifact handoff for website deployment
+3. Build and deploy static output directly to:
    - `jon2050.de/conspectus/webapp/`
-3. Keep website repo independent; add simple link to PWA route.
+4. Keep website repo independent; add simple link to PWA route.
 
 Alternative:
 - Use git submodule in website repo and copy built assets during website pipeline.
@@ -553,8 +567,10 @@ Alternative:
 
 Pipeline stages:
 1. Build/test on push and PR.
-2. Deploy on tag or protected branch merge.
-3. Post-deploy smoke check for app shell availability.
+2. Deploy/update branch preview URL on successful branch quality runs.
+3. On successful `main` quality runs, publish a production artifact for website deployment.
+4. Website repo consumes main artifact and deploys to `jon2050.de/conspectus/webapp/`.
+5. Post-deploy smoke check for app shell availability.
 
 ---
 

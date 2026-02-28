@@ -202,10 +202,41 @@ An issue is only considered done when:
 3. Routing uses hash-based paths, and direct reloads of routes do not 404.
 
 ## Milestone 2 - Website Integration + Early Deploy
-### :green_circle: M2-01 Decide cross-repo deployment architecture
+### :green_circle: M2-00 Define branch preview + main-only production deployment architecture
 - Labels: `infra`
 - Milestone: `M2 - Website Integration + Early Deploy`
 - Depends on: `M1-08`
+- Implementation steps:
+1. Define a dual deployment channel model:
+   - branch preview deployments for every branch push (including `main`) only after `Quality` passes
+   - main-only production deployment eligibility for `jon2050.de`
+2. Add a CI deployment trigger contract based on successful `Quality` workflow completion.
+3. Define preview URL/path strategy:
+   - GitHub-hosted preview URL per branch
+   - branch-scoped output path (for example `/previews/<branch-slug>/`)
+   - preview cleanup workflow on branch deletion
+4. Define production artifact strategy:
+   - publish production-ready artifact only from successful `main` runs
+   - include trace metadata (commit SHA and build timestamp)
+   - formalize artifact contract for website repo consumption
+5. Define required Vite/PWA path behavior per channel:
+   - preview build base path and manifest `start_url` resolve under branch preview path
+   - production build base path and manifest `start_url` resolve under `/conspectus/webapp/`
+   - service worker scope remains isolated to each channel path and never intercepts parent site routes
+6. Document required repository settings and permissions (GitHub-hosted previews, workflow permissions, required checks).
+7. Align project docs (`README.md`, architecture plan, and backlog) with the finalized channel model.
+- Acceptance criteria:
+1. Deployment architecture for preview and production channels is fully documented and approved.
+2. Successful branch pushes have a defined preview deployment path and URL contract.
+3. Failed quality runs never deploy previews or publish production artifacts.
+4. Successful `main` runs have a defined, traceable production artifact handoff contract.
+5. Path/scope correctness requirements (asset URLs, manifest `start_url`, service worker scope) are explicitly testable.
+6. Documentation is synchronized across README and docs.
+
+### :green_circle: M2-01 Decide cross-repo deployment architecture
+- Labels: `infra`
+- Milestone: `M2 - Website Integration + Early Deploy`
+- Depends on: `M1-08`, `M2-00`
 - Implementation steps:
 1. Compare options: artifact handoff, submodule, subtree, package pull.
 2. Choose one strategy and document rationale.
