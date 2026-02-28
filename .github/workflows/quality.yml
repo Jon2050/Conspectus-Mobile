@@ -4,12 +4,22 @@ on:
   pull_request:
   push:
 
+env:
+  VITE_AZURE_CLIENT_ID: ${{ vars.VITE_AZURE_CLIENT_ID }}
+
 jobs:
   lint-typecheck:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate required runtime env
+        run: |
+          if [ -z "${VITE_AZURE_CLIENT_ID}" ]; then
+            echo "Missing repository variable VITE_AZURE_CLIENT_ID." >&2
+            exit 1
+          fi
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -52,6 +62,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate required runtime env
+        run: |
+          if [ -z "${VITE_AZURE_CLIENT_ID}" ]; then
+            echo "Missing repository variable VITE_AZURE_CLIENT_ID." >&2
+            exit 1
+          fi
 
       - name: Setup Node
         uses: actions/setup-node@v4

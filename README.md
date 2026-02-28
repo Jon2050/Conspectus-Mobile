@@ -37,6 +37,7 @@ Create a `.env` file in the repository root. Use `.env.example` as the template.
 
 Required variable:
 - `VITE_AZURE_CLIENT_ID`: Microsoft Entra SPA client ID used for MSAL login.
+  - CI/CD requirement: this repository variable must also be set in GitHub Actions repository variables.
 
 Optional deployment variables:
 - `VITE_DEPLOY_BASE_PATH`: Optional base-path override for non-channel/local builds.
