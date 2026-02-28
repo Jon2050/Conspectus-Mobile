@@ -141,7 +141,7 @@ An issue is only considered done when:
 - Depends on: `M1-08`
 - GitHub: [#94](https://github.com/Jon2050/Conspectus-Mobile/issues/94)
 
-### :green_circle: M2-01 Decide cross-repo deployment architecture
+### :white_check_mark: M2-01 Decide cross-repo deployment architecture
 - Label: `infra`
 - Milestone: `M2 - Website Integration + Early Deploy`
 - Summary: Work includes options: artifact handoff, submodule, subtree, package pull and one strategy and document rationale. It also covers failure/rollback behavior for the chosen strategy.

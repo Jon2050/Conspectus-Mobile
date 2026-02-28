@@ -121,6 +121,7 @@ Operational notes:
 - Failed `Quality` runs do not produce preview deployments or production artifacts.
 - `Deploy Channels` includes a hard post-deploy preview availability check; if GitHub Pages is unavailable or the preview URL is not reachable, the workflow fails.
 - `Preview Cleanup` removes stale `gh-pages/previews/<branch-slug>/` content when a branch is deleted.
+- Canonical cross-repo producer/consumer architecture decision (M2-01): `docs/Architecture-and-Implementation-Plan.md` section `8.3`.
 
 ## Issue Labeling Rules
 
