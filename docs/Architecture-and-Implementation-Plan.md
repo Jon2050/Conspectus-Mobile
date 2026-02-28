@@ -249,12 +249,14 @@ Substeps:
    - app route loads under website path
    - service worker registration works
    - manifest and icons resolve correctly
+   - e2e smoke asserts production base-path manifest fields (`start_url`, `scope`) and that parent-site routes outside app scope are not service-worker-controlled
 6. Add website navigation entry/link to the PWA route (or temporary test link).
 7. Add CI deployment workflows:
    - `Deploy Channels` workflow runs from successful `Quality` push runs (`workflow_run`)
    - publish/update preview on successful branch builds (including `main`)
    - publish production artifact only on successful `main` builds
    - run build-output path/scope assertions for preview and production channels
+   - run the same channel path/scope assertions in `Quality` to catch regressions before deploy workflows execute
    - `Preview Cleanup` workflow removes branch preview path on delete event
    - keep production website rollout as a separate follow-up in website repo
 

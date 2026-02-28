@@ -148,7 +148,7 @@ An issue is only considered done when:
 - Depends on: `M1-08, M2-00`
 - GitHub: [#14](https://github.com/Jon2050/Conspectus-Mobile/issues/14)
 
-### :green_circle: M2-02 Configure Vite base path for `/conspectus/webapp/`
+### :white_check_mark: M2-02 Configure Vite base path for `/conspectus/webapp/`
 - Label: `feature`
 - Milestone: `M2 - Website Integration + Early Deploy`
 - Summary: Work includes production base path to /conspectus/webapp/ and routes, assets, manifest, and service worker scope. It also covers tests for generated asset URLs.
