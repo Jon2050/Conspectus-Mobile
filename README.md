@@ -126,7 +126,7 @@ Issue completion definition (required):
 - All scoped code/tests/docs changes are committed and pushed.
 - Local quality gates pass (`format`, `lint`, `typecheck`, `test`, `build`, and `test:e2e` when relevant).
 - Required GitHub checks are green.
-- The PR is merged into `main`.
-- The head branch is deleted after merge.
+- If a PR is used: merge it into `main` and delete the head branch.
+- If direct-main delivery is used: verify the implementation commit is on `main` (only when repository policy allows direct commits).
 
 Do not mark an issue as done until all items above are complete.

@@ -15,9 +15,9 @@ Update each issue heading status marker to reflect current status.
 ## Completion Rule
 
 An issue is only considered done when:
-1. The implementation PR is merged into `main`.
-2. Required CI checks are green for the merged PR/commit.
-3. The working branch is deleted after merge.
+1. The implementation reaches `main` (via merged PR or direct commit, depending on repository policy).
+2. Required CI checks are green for the merged/pushed commit.
+3. If a working branch was created, it is deleted after merge.
 4. The corresponding backlog status marker is updated to `:white_check_mark:`.
 ## Label Set (create first)
 

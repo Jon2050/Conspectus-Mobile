@@ -33,7 +33,7 @@
 - [ ] No secrets, tokens, or credentials were added to the repository.
 - [ ] No breaking path/base URL changes were introduced (must preserve `/conspectus/webapp/` deployment path behavior).
 
-## Merge And Cleanup
+## Merge And Cleanup (PR Path)
 - [ ] Required GitHub checks are green.
 - [ ] PR will be merged into `main` once checks/review requirements are satisfied.
 - [ ] Head branch will be deleted after merge.
