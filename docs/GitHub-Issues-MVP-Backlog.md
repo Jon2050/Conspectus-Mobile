@@ -167,7 +167,7 @@ Update each issue heading status marker to reflect current status.
 1. Missing required vars fail fast with clear message.
 2. `.env.example` is complete.
 
-### :green_circle: M1-08 Create baseline CI workflow
+### :white_check_mark: M1-08 Create baseline CI workflow
 - Labels: `infra`
 - Milestone: `M1 - Foundation`
 - Depends on: `M1-02`, `M1-03`, `M1-04`
@@ -179,7 +179,7 @@ Update each issue heading status marker to reflect current status.
 1. Workflow runs on push and pull request.
 2. Required checks are green for merge.
 
-### :green_circle: M1-09 Build initial mobile-first app shell
+### :white_check_mark: M1-09 Build initial mobile-first app shell
 - Labels: `feature`
 - Milestone: `M1 - Foundation`
 - Depends on: `M1-01`
@@ -276,11 +276,12 @@ Update each issue heading status marker to reflect current status.
 - Depends on: `M2-05`, `M2-06`
 - Implementation steps:
 1. Test Add to Home Screen flow on iOS Safari and Android Chrome.
-2. Verify icon, app name, and launch behavior.
+2. Verify install icon uses the Conspectus moneybag assets (`public/icons/moneysack.ico` and `public/icons/moneysack*.png`), app name, and launch behavior.
 3. Record issues with screenshots.
 - Acceptance criteria:
 1. Install flow works on both platforms.
 2. Documented issues are tracked as bugs.
+3. Installed app icon is the Conspectus moneybag icon set (no placeholder icon).
 
 ### :green_circle: M2-08 Add deployment runbook for two-repo flow
 - Labels: `docs`
@@ -565,10 +566,12 @@ Update each issue heading status marker to reflect current status.
 2. Apply positive/negative amount styling.
 3. Add loading and empty states.
 4. Apply CSS `env(safe-area-inset-bottom)` to ensure the bottom navigation does not overlap with the iOS home bar or Android gesture hints.
+5. Use the repository icon assets in `public/icons` for bottom navigation with icon + label, including the settings icon asset for the Settings tab.
 - Acceptance criteria:
 1. Accounts are readable on mobile widths.
 2. Amount color semantics are consistent.
 3. Bottom navigation is fully accessible and visually distinct from OS-level safe areas on notched/bezelless devices.
+4. Bottom navigation uses the Conspectus icon set from `public/icons`, including a visible settings icon.
 
 ### :green_circle: M5-06 Build Transfers screen UI
 - Labels: `feature`
@@ -578,9 +581,11 @@ Update each issue heading status marker to reflect current status.
 1. Build transfer list item component.
 2. Show date, name, amount, account context, categories.
 3. Add loading, empty, and error visuals.
+4. Use the existing `public/icons` assets where transfer/category iconography is shown to keep visual language consistent with the app shell.
 - Acceptance criteria:
 1. Transfers are readable and sortable by month.
 2. Empty month state is explicit and clear.
+3. Any transfer/category iconography uses the repository icon set consistently.
 
 ### :green_circle: M5-07 Add formatting utilities and localization-ready rendering
 - Labels: `feature`
@@ -627,9 +632,11 @@ Update each issue heading status marker to reflect current status.
 1. Implement fields: date, name, amount, from, to, categories, buyplace.
 2. Add touch-friendly controls and keyboard-safe layout.
 3. Add form-level loading/error states.
+4. Use `public/icons` assets for form icon affordances where relevant (especially category-related controls).
 - Acceptance criteria:
 1. Form is fully usable on iOS and Android screen sizes.
 2. All MVP fields are present and editable.
+3. Icon affordances use the repository icon set consistently where icons are shown.
 
 ### :green_circle: M6-02 Implement account/category options loading for form
 - Labels: `feature`
@@ -770,9 +777,11 @@ Update each issue heading status marker to reflect current status.
 1. Show bound file details and last sync timestamp.
 2. Show app version/build info.
 3. Group actions by risk level.
+4. Use the settings icon asset from `public/icons` (`settings.png` or `settings_55.png`) in the Settings entry/header.
 - Acceptance criteria:
 1. Settings data is accurate and readable.
 2. Actions are discoverable and clear.
+3. Settings screen/tab presents a visible settings icon from the repository icon set.
 
 ### :green_circle: M7-02 Implement force refresh action
 - Labels: `feature`

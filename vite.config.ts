@@ -8,7 +8,12 @@ export default defineConfig({
     svelte(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['vite.svg'],
+      includeAssets: [
+        'icons/moneysack.ico',
+        'icons/moneysack32x32.png',
+        'icons/moneysack64x64.png',
+        'icons/moneysack256_256.png',
+      ],
       manifest: {
         name: 'Conspectus Mobile',
         short_name: 'Conspectus',
@@ -19,9 +24,14 @@ export default defineConfig({
         start_url: '/',
         icons: [
           {
-            src: 'vite.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
+            src: 'icons/moneysack64x64.png',
+            sizes: '64x64',
+            type: 'image/png',
+          },
+          {
+            src: 'icons/moneysack256_256.png',
+            sizes: '256x256',
+            type: 'image/png',
           },
         ],
       },
