@@ -131,6 +131,41 @@ Usage rules:
 - Assign a milestone to all milestone delivery issues (`M1-*` through `M8-*`).
 - Keep project-management bootstrap issues (`PM-*`) without milestone unless explicitly planned into one.
 
+## Issue Body Template
+
+Use this as a starting point when creating GitHub issues (especially `feature` work). Keep it short, but make it actionable. MORE THAN THIS CAN ALWAYS BE ADDED IF NEEDED FOR THE ISSUE.
+
+```md
+## Context / Problem
+What is the user/dev problem and why does it matter? Link any prior issues/PRs.
+
+## Goals
+- ...
+
+## Non-Goals
+- ...
+
+## Scope
+- Code areas likely touched (modules/paths): ...
+- Config/infra changes (if any): ...
+- Dependencies / prerequisites (if any): ...
+
+## Proposed Approach
+High-level steps or design constraints. Keep detailed implementation decisions in the PR when possible.
+
+## Acceptance Criteria
+- Observable behavior outcomes (user-visible and/or internal).
+- Edge cases worth explicitly covering.
+
+## Test Plan
+- Unit/integration: ...
+- E2E/manual: ...
+
+## Notes / Rollout
+- Risks, migration notes, or compatibility concerns.
+- Rollout or verification steps (if relevant).
+```
+
 ## Issue Delivery Workflow
 
 Issue completion definition (required):
