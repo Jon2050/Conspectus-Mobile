@@ -73,6 +73,103 @@ const getAbsolutePathReferences = (htmlText) => {
   return references;
 };
 
+const TEXT_FILE_EXTENSIONS = new Set(['.html', '.js', '.css', '.webmanifest']);
+
+const collectTextFiles = (directoryPath) => {
+  const discoveredFiles = [];
+  const entries = fs.readdirSync(directoryPath, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const absolutePath = path.join(directoryPath, entry.name);
+    if (entry.isDirectory()) {
+      discoveredFiles.push(...collectTextFiles(absolutePath));
+      continue;
+    }
+
+    if (TEXT_FILE_EXTENSIONS.has(path.extname(entry.name))) {
+      discoveredFiles.push(absolutePath);
+    }
+  }
+
+  return discoveredFiles;
+};
+
+const extractRootAbsolutePathReferences = (text) => {
+  const references = [];
+
+  const attributePattern = /(?:src|href|content|action)=["'](\/[^"']+)["']/g;
+  for (const match of text.matchAll(attributePattern)) {
+    references.push(match[1]);
+  }
+
+  const cssUrlPattern = /url\((['"]?)(\/[^)'"]+)\1\)/g;
+  for (const match of text.matchAll(cssUrlPattern)) {
+    references.push(match[2]);
+  }
+
+  const quotedPathPattern = /(["'`])(\/[^"'`\s]+)\1/g;
+  for (const match of text.matchAll(quotedPathPattern)) {
+    references.push(match[2]);
+  }
+
+  return references;
+};
+
+const stripQueryAndHash = (value) => value.split(/[?#]/)[0];
+
+const isAssetLikeRootPath = (referencePath) => {
+  const normalizedReference = stripQueryAndHash(referencePath);
+  if (normalizedReference.endsWith('/')) {
+    return false;
+  }
+
+  return /\/[^/]+\.[a-z0-9]+$/i.test(normalizedReference);
+};
+
+const isPathWithinBase = (referencePath, expectedBasePath) => {
+  const normalizedReference = stripQueryAndHash(referencePath);
+  const expectedBaseWithoutTrailingSlash = expectedBasePath.endsWith('/')
+    ? expectedBasePath.slice(0, -1)
+    : expectedBasePath;
+
+  if (normalizedReference === expectedBaseWithoutTrailingSlash) {
+    return true;
+  }
+
+  return normalizedReference.startsWith(expectedBasePath);
+};
+
+const verifyNoRootPathLeakage = (distDir, expectedBasePath) => {
+  const textFiles = collectTextFiles(distDir);
+  const leakedReferences = [];
+
+  for (const filePath of textFiles) {
+    const fileText = readTextFile(filePath);
+    const references = extractRootAbsolutePathReferences(fileText);
+
+    for (const reference of references) {
+      if (reference.startsWith('//')) {
+        continue;
+      }
+
+      if (!isAssetLikeRootPath(reference)) {
+        continue;
+      }
+
+      if (!isPathWithinBase(reference, expectedBasePath)) {
+        const relativePath = path.relative(distDir, filePath) || path.basename(filePath);
+        leakedReferences.push(`${relativePath}:${reference}`);
+      }
+    }
+  }
+
+  const uniqueLeaks = [...new Set(leakedReferences)];
+  assert(
+    uniqueLeaks.length === 0,
+    `Found root-path leakage outside expected base "${expectedBasePath}": ${uniqueLeaks.join(', ')}`,
+  );
+};
+
 const verifyAbsolutePathReferences = (indexHtml, expectedBasePath) => {
   const absoluteReferences = getAbsolutePathReferences(indexHtml);
   const unexpectedPaths = absoluteReferences.filter((entry) => !entry.startsWith(expectedBasePath));
@@ -140,6 +237,7 @@ const main = () => {
   const manifestText = readTextFile(manifestPath);
 
   verifyAbsolutePathReferences(indexHtml, args.base);
+  verifyNoRootPathLeakage(distDir, args.base);
   verifyManifest(manifestText, args.base);
   verifyServiceWorkerRegistration(distDir, args.base);
 

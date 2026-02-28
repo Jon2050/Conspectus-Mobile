@@ -48,6 +48,22 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Build and verify production channel paths/scope
+        env:
+          DEPLOY_CHANNEL: production
+        run: |
+          npm run build
+          node scripts/verify-build-channel.mjs --dist dist --channel production --base /conspectus/webapp/
+
+      - name: Build and verify preview channel paths/scope
+        env:
+          DEPLOY_CHANNEL: preview
+          DEPLOY_PREVIEW_SLUG: quality-smoke
+          DEPLOY_PREVIEW_BASE_PREFIX: /${{ github.event.repository.name }}
+        run: |
+          npm run build
+          node scripts/verify-build-channel.mjs --dist dist --channel preview --base "/${{ github.event.repository.name }}/previews/quality-smoke/"
+
       - name: Upload unit test failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
