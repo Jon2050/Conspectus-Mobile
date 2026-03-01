@@ -9,6 +9,7 @@ on:
 
 env:
   VITE_AZURE_CLIENT_ID: ${{ vars.VITE_AZURE_CLIENT_ID }}
+  WEBSITE_REPO_FULL_NAME: ${{ vars.WEBSITE_REPO_FULL_NAME || 'Jon2050/conspectus' }}
 
 permissions:
   contents: write
@@ -184,6 +185,11 @@ jobs:
     needs:
       - prepare-context
     if: needs.prepare-context.outputs.is_main == 'true'
+    outputs:
+      artifact_name: ${{ steps.handoff.outputs.artifact_name }}
+      commit_sha: ${{ steps.handoff.outputs.commit_sha }}
+      quality_run_id: ${{ steps.handoff.outputs.quality_run_id }}
+      deploy_run_id: ${{ steps.handoff.outputs.deploy_run_id }}
     steps:
       - name: Checkout source commit
         uses: actions/checkout@v4
@@ -218,24 +224,111 @@ jobs:
           --channel production
           --base /conspectus/webapp/
 
+      - name: Resolve production handoff identity
+        id: handoff
+        run: |
+          build_time_utc="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          artifact_name="conspectus-mobile-production-${{ needs.prepare-context.outputs.head_sha }}"
+          {
+            echo "artifact_name=${artifact_name}"
+            echo "commit_sha=${{ needs.prepare-context.outputs.head_sha }}"
+            echo "quality_run_id=${{ github.event.workflow_run.id }}"
+            echo "deploy_run_id=${{ github.run_id }}"
+            echo "build_time_utc=${build_time_utc}"
+          } >> "${GITHUB_OUTPUT}"
+
       - name: Add production artifact metadata
         run: |
-          timestamp="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           cat > dist/deploy-metadata.json <<EOF
           {
             "channel": "production",
             "basePath": "/conspectus/webapp/",
             "sourceBranch": "${{ needs.prepare-context.outputs.branch_name }}",
-            "commitSha": "${{ needs.prepare-context.outputs.head_sha }}",
-            "buildTimeUtc": "${timestamp}",
-            "qualityRunId": "${{ github.event.workflow_run.id }}",
-            "deployRunId": "${{ github.run_id }}"
+            "commitSha": "${{ steps.handoff.outputs.commit_sha }}",
+            "buildTimeUtc": "${{ steps.handoff.outputs.build_time_utc }}",
+            "qualityRunId": "${{ steps.handoff.outputs.quality_run_id }}",
+            "deployRunId": "${{ steps.handoff.outputs.deploy_run_id }}"
           }
           EOF
 
       - name: Upload production artifact
         uses: actions/upload-artifact@v4
         with:
-          name: conspectus-mobile-production-${{ needs.prepare-context.outputs.head_sha }}
+          name: ${{ steps.handoff.outputs.artifact_name }}
           if-no-files-found: error
           path: dist
+
+      - name: Verify production handoff outputs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          artifacts_api_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts"
+          artifacts_status="$(curl -sS -o artifacts-response.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H 'Accept: application/vnd.github+json' \
+            "${artifacts_api_url}")"
+
+          if [ "${artifacts_status}" != '200' ]; then
+            echo "Failed to list run artifacts for production handoff verification." >&2
+            echo "Artifacts API status: ${artifacts_status}" >&2
+            cat artifacts-response.json >&2 || true
+            exit 1
+          fi
+
+          node scripts/verify-production-handoff.mjs \
+            --artifacts-json artifacts-response.json \
+            --metadata dist/deploy-metadata.json \
+            --artifact-name "${{ steps.handoff.outputs.artifact_name }}" \
+            --commit-sha "${{ steps.handoff.outputs.commit_sha }}" \
+            --quality-run-id "${{ steps.handoff.outputs.quality_run_id }}" \
+            --deploy-run-id "${{ steps.handoff.outputs.deploy_run_id }}"
+
+  dispatch-production-ready:
+    name: Dispatch Production Ready
+    runs-on: ubuntu-latest
+    needs:
+      - publish-production-artifact
+    if: needs.publish-production-artifact.result == 'success'
+    steps:
+      - name: Validate producer dispatch token
+        run: |
+          if [ -z "${{ secrets.WEBSITE_REPO_DISPATCH_TOKEN }}" ]; then
+            echo "Missing required secret WEBSITE_REPO_DISPATCH_TOKEN." >&2
+            echo "This token must be scoped to trigger workflow events in ${WEBSITE_REPO_FULL_NAME}." >&2
+            exit 1
+          fi
+
+      - name: Trigger deterministic website handoff event
+        env:
+          DISPATCH_TOKEN: ${{ secrets.WEBSITE_REPO_DISPATCH_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          cat > dispatch-payload.json <<EOF
+          {
+            "event_type": "conspectus-mobile-production-ready",
+            "client_payload": {
+              "commitSha": "${{ needs.publish-production-artifact.outputs.commit_sha }}",
+              "deployRunId": "${{ needs.publish-production-artifact.outputs.deploy_run_id }}",
+              "qualityRunId": "${{ needs.publish-production-artifact.outputs.quality_run_id }}",
+              "artifactName": "${{ needs.publish-production-artifact.outputs.artifact_name }}"
+            }
+          }
+          EOF
+
+          dispatch_status="$(curl -sS -o dispatch-response.txt -w '%{http_code}' \
+            -X POST \
+            -H "Authorization: Bearer ${DISPATCH_TOKEN}" \
+            -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/${WEBSITE_REPO_FULL_NAME}/dispatches" \
+            --data-binary @dispatch-payload.json)"
+
+          if [ "${dispatch_status}" != '204' ]; then
+            echo "Failed to dispatch production-ready event to ${WEBSITE_REPO_FULL_NAME}." >&2
+            echo "Dispatch API status: ${dispatch_status}" >&2
+            cat dispatch-response.txt >&2 || true
+            exit 1
+          fi
+
+          echo "Dispatched conspectus-mobile-production-ready to ${WEBSITE_REPO_FULL_NAME}."

@@ -598,6 +598,7 @@ Producer/consumer CI contract (automation-only, no manual copy):
 1. Producer (`Conspectus-Mobile`):
    - Source workflow: `Deploy Channels` after successful `Quality` push runs.
    - Production artifact is published only for `main`.
+   - Every successful `main` deploy run MUST emit exactly one deployable production artifact; the producer workflow enforces this before handoff dispatch.
    - Artifact name format: `conspectus-mobile-production-<commitSha>`.
    - Artifact payload is `dist/` and MUST include `deploy-metadata.json` with:
      - `channel` (`production`)
@@ -611,6 +612,8 @@ Producer/consumer CI contract (automation-only, no manual copy):
      - Trigger `repository_dispatch` with event type `conspectus-mobile-production-ready`.
      - Payload MUST include `commitSha`, `deployRunId`, `qualityRunId`, and `artifactName`.
      - Producer dispatch token MUST be scoped to trigger workflow events in the website repository.
+     - Producer workflow secret `WEBSITE_REPO_DISPATCH_TOKEN` is required for dispatch.
+     - Producer workflow variable `WEBSITE_REPO_FULL_NAME` may override the default consumer target (`Jon2050/conspectus`).
 2. Consumer (website repository):
    - Trigger on `repository_dispatch` (`conspectus-mobile-production-ready`) and read payload fields as the single source of artifact identity.
    - Resolve artifact deterministically via GitHub Actions API using `deployRunId`:
