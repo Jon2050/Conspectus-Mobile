@@ -162,10 +162,10 @@ An issue is only considered done when:
 - Depends on: `M2-01, M2-02`
 - GitHub: [#17](https://github.com/Jon2050/Conspectus-Mobile/issues/17)
 
-### :green_circle: M2-04 Integrate PWA artifact consumption in website repo CI
+### :white_check_mark: M2-04 Integrate PWA artifact consumption in website repo CI
 - Label: `infra`
 - Milestone: `M2 - Website Integration + Early Deploy`
-- Summary: Work includes CI job in website repo to fetch approved PWA artifact and files to conspectus/webapp/ output location. It also covers Enforce atomic replace behavior.
+- Summary: Work includes CI job in website repo to fetch approved PWA artifact and files to conspectus/webapp/ output location. It also covers deterministic payload-driven artifact resolution, metadata identity validation, staged atomic replacement with rollback attempt, and fail-closed behavior.
 - Depends on: `M2-03`
 - GitHub: [#19](https://github.com/Jon2050/Conspectus-Mobile/issues/19)
 
