@@ -155,7 +155,7 @@ An issue is only considered done when:
 - Depends on: `M2-01`
 - GitHub: [#15](https://github.com/Jon2050/Conspectus-Mobile/issues/15)
 
-### :green_circle: M2-03 Create PWA deploy workflow in PWA repo
+### :white_check_mark: M2-03 Create PWA deploy workflow in PWA repo
 - Label: `infra`
 - Milestone: `M2 - Website Integration + Early Deploy`
 - Summary: Work includes production bundle in CI and artifact for website repo consumption. It also covers Tag artifact with commit SHA and timestamp.
@@ -587,4 +587,3 @@ An issue is only considered done when:
 1. Create all `PM-*` issues.
 2. Create all issues in milestone order (`M1` to `M8`).
 3. Link dependencies during creation using issue references.
-

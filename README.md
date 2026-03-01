@@ -121,6 +121,8 @@ Operational notes:
 - Failed `Quality` runs do not produce preview deployments or production artifacts.
 - `Deploy Channels` includes a hard post-deploy preview availability check; if GitHub Pages is unavailable or the preview URL is not reachable, the workflow fails.
 - `Preview Cleanup` removes stale `gh-pages/previews/<branch-slug>/` content when a branch is deleted.
+- Production handoff dispatch requires repository secret `WEBSITE_REPO_DISPATCH_TOKEN` (scoped to trigger workflow events in the website repo).
+- Production handoff target repository defaults to `Jon2050/conspectus` and can be overridden with repository variable `WEBSITE_REPO_FULL_NAME`.
 - Canonical cross-repo producer/consumer architecture decision (M2-01): `docs/Architecture-and-Implementation-Plan.md` section `8.3`.
 
 ## Issue Labeling Rules
