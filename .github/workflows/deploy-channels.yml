@@ -9,7 +9,7 @@ on:
 
 env:
   VITE_AZURE_CLIENT_ID: ${{ vars.VITE_AZURE_CLIENT_ID }}
-  WEBSITE_REPO_FULL_NAME: ${{ vars.WEBSITE_REPO_FULL_NAME || 'Jon2050/conspectus' }}
+  WEBSITE_REPO_FULL_NAME: ${{ vars.WEBSITE_REPO_FULL_NAME || 'Jon2050/Jon2050_Webpage' }}
 
 permissions:
   contents: write

@@ -613,7 +613,7 @@ Producer/consumer CI contract (automation-only, no manual copy):
      - Payload MUST include `commitSha`, `deployRunId`, `qualityRunId`, and `artifactName`.
      - Producer dispatch token MUST be scoped to trigger workflow events in the website repository.
      - Producer workflow secret `WEBSITE_REPO_DISPATCH_TOKEN` is required for dispatch.
-     - Producer workflow variable `WEBSITE_REPO_FULL_NAME` may override the default consumer target (`Jon2050/conspectus`).
+     - Producer workflow variable `WEBSITE_REPO_FULL_NAME` may override the default consumer target (`Jon2050/Jon2050_Webpage`).
 2. Consumer (website repository):
    - Trigger on `repository_dispatch` (`conspectus-mobile-production-ready`) and read payload fields as the single source of artifact identity.
    - Resolve artifact deterministically via GitHub Actions API using `deployRunId`:
@@ -624,6 +624,8 @@ Producer/consumer CI contract (automation-only, no manual copy):
    - Validate identity match (`deploy-metadata.commitSha == dispatch.commitSha`, `deploy-metadata.deployRunId == dispatch.deployRunId`).
    - Perform atomic replace of website output directory `conspectus/webapp/` from the artifact contents.
    - Fail deployment if artifact download or metadata validation fails.
+   - Implementation note (M2-04): consumer automation is implemented in website repo workflow `.github/workflows/deploy.yml` on branch `master` in `Jon2050/Jon2050_Webpage`, with metadata validation script `scripts/validate-conspectus-deploy-metadata.mjs`.
+   - Consumer credential note (M2-04): website repo secret `CONSPECTUS_MOBILE_ARTIFACT_TOKEN` must provide `actions:read` access to `Jon2050/Conspectus-Mobile` artifacts.
 
 Failure and rollback behavior:
 1. If producer artifact generation fails, website deployment does not run for that revision.
