@@ -55,3 +55,10 @@ Execution workflow:
 3. "Everything green" means all required local checks pass and required GitHub checks pass.
 4. If e2e is costly, run only when changed area touches e2e-relevant behavior.
 5. "Mark issue done" means both GitHub issue state and backlog markdown status marker are updated.
+
+### Quality and Guidelines
+
+1. **Documentation**: Code must be properly documented. Code should speak for itself, but when it cannot, it should be documented. This includes inline comments, function documentation, and any other relevant documentation.
+2. **Testing**: Code and functionality must be accompanied by appropriate tests.
+3. **Duplication**: Do not duplicate code. If you find yourself writing the same code in multiple places, refactor it into a reusable function or component. Do also not implement multiple ways or "backup" ways of doing things. Pick the one way that is intended and implement it well.
+4. **Overview considerations**: Before implementing a feature, assure that the preparation and foundation for it that should be done by previous tasks is completed and matches the plan for the current issue. Also have a look to following Issues, that are related to the current one, to assure that the implementation is a good and matching foundation for them. 
