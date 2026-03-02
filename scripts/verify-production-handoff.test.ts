@@ -83,7 +83,9 @@ describe('verify-production-handoff script', () => {
         '2002',
       ]);
 
-      expect(result.stdout).toContain('[verify-production-handoff] verified artifact');
+      expect(result.stdout).toContain(
+        '[verify-production-handoff] commitSha=abc123 deployRunId=2002 verified artifact',
+      );
     } finally {
       rmSync(fixturePath, { force: true, recursive: true });
     }

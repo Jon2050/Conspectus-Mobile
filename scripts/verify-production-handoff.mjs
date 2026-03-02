@@ -114,7 +114,7 @@ const main = () => {
   });
 
   console.log(
-    `[verify-production-handoff] verified artifact "${args.artifactName}" and deploy metadata traceability.`,
+    `[verify-production-handoff] commitSha=${args.commitSha} deployRunId=${args.deployRunId} verified artifact "${args.artifactName}" and deploy metadata traceability.`,
   );
 };
 
