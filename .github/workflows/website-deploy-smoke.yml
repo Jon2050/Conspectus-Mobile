@@ -1,0 +1,41 @@
+name: Website Deploy Smoke
+
+on:
+  workflow_run:
+    workflows:
+      - Deploy Channels
+    types:
+      - completed
+
+env:
+  PRODUCTION_APP_BASE_URL: ${{ vars.PRODUCTION_APP_BASE_URL || 'https://jon2050.de/conspectus/webapp/' }}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: website-deploy-smoke-${{ github.event.workflow_run.id || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  verify-production-smoke:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Run production deployment smoke checks
+        run: >-
+          node scripts/verify-production-deploy-smoke.mjs
+          --base-url "${{ env.PRODUCTION_APP_BASE_URL }}"
+          --commit-sha "${{ github.event.workflow_run.head_sha }}"
+          --deploy-run-id "${{ github.event.workflow_run.id }}"
+          --max-attempts 36
+          --retry-delay-seconds 10
+          --request-timeout-ms 10000

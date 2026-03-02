@@ -580,7 +580,8 @@ Pipeline stages:
 4. On successful `main` quality runs, publish a production artifact with deployment metadata (`commit SHA`, UTC build time, run IDs).
 5. `Preview Cleanup` removes stale preview paths when branches are deleted.
 6. Website repo consumes main artifact and deploys to `jon2050.de/conspectus/webapp/`.
-7. Post-dispatch production smoke checks validate deployed app route, manifest, service worker URL, HTML bootstrap markers, and `deploy-metadata.json` identity fields.
+7. `Deploy Channels` publishes preview/artifact outputs and dispatches the production-ready event to the website repository.
+8. `Website Deploy Smoke` (separate workflow) runs after successful `Deploy Channels` main runs and validates deployed app route, manifest, service worker URL, HTML bootstrap markers, and `deploy-metadata.json` identity fields.
 
 ## 8.3 Approved Cross-Repo Deployment Architecture (M2-01)
 
@@ -614,8 +615,8 @@ Producer/consumer CI contract (automation-only, no manual copy):
      - Producer dispatch token MUST be scoped to trigger workflow events in the website repository.
      - Producer workflow secret `WEBSITE_REPO_DISPATCH_TOKEN` is required for dispatch.
      - Producer workflow variable `WEBSITE_REPO_FULL_NAME` may override the default consumer target (`Jon2050/Jon2050_Webpage`).
-   - After dispatch, producer workflow MUST run deployment smoke checks against the production app base URL (`https://jon2050.de/conspectus/webapp/` by default; override via `PRODUCTION_APP_BASE_URL` repository variable).
-   - Smoke checks MUST fail closed, verify deployed `deploy-metadata.json` identity fields (`commitSha`, `deployRunId`) against expected handoff context, and include deploy identity context in logs for correlation with artifact metadata and dispatch payload.
+   - Post-deploy production smoke checks MUST run in separate workflow `Website Deploy Smoke`, triggered by successful `Deploy Channels` runs on `main`.
+   - Smoke checks MUST target the production app base URL (`https://jon2050.de/conspectus/webapp/` by default; override via `PRODUCTION_APP_BASE_URL` repository variable), fail closed, verify deployed `deploy-metadata.json` identity fields (`commitSha`, `deployRunId`) against expected handoff context, and include deploy identity context in logs.
 2. Consumer (website repository):
    - Trigger on `repository_dispatch` (`conspectus-mobile-production-ready`) and read payload fields as the single source of artifact identity.
    - Resolve artifact deterministically via GitHub Actions API using `deployRunId`:
