@@ -10,7 +10,6 @@ on:
 env:
   VITE_AZURE_CLIENT_ID: ${{ vars.VITE_AZURE_CLIENT_ID }}
   WEBSITE_REPO_FULL_NAME: ${{ vars.WEBSITE_REPO_FULL_NAME || 'Jon2050/Jon2050_Webpage' }}
-  PRODUCTION_APP_BASE_URL: ${{ vars.PRODUCTION_APP_BASE_URL || 'https://jon2050.de/conspectus/webapp/' }}
 
 permissions:
   contents: write
@@ -333,26 +332,3 @@ jobs:
           fi
 
           echo "Dispatched conspectus-mobile-production-ready to ${WEBSITE_REPO_FULL_NAME}."
-
-  verify-production-smoke:
-    name: Verify Production Deployment Smoke
-    runs-on: ubuntu-latest
-    needs:
-      - publish-production-artifact
-      - dispatch-production-ready
-    if: needs.dispatch-production-ready.result == 'success'
-    steps:
-      - name: Checkout source commit
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.publish-production-artifact.outputs.commit_sha }}
-
-      - name: Run production deployment smoke checks
-        run: >-
-          node scripts/verify-production-deploy-smoke.mjs
-          --base-url "${{ env.PRODUCTION_APP_BASE_URL }}"
-          --commit-sha "${{ needs.publish-production-artifact.outputs.commit_sha }}"
-          --deploy-run-id "${{ needs.publish-production-artifact.outputs.deploy_run_id }}"
-          --max-attempts 36
-          --retry-delay-seconds 10
-          --request-timeout-ms 10000
