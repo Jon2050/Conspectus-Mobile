@@ -169,7 +169,7 @@ An issue is only considered done when:
 - Depends on: `M2-03`
 - GitHub: [#19](https://github.com/Jon2050/Conspectus-Mobile/issues/19)
 
-### :green_circle: M2-05 Add deployment smoke checks in website pipeline
+### :white_check_mark: M2-05 Add deployment smoke checks in website pipeline
 - Label: `test`
 - Milestone: `M2 - Website Integration + Early Deploy`
 - Summary: Work includes HTTP checks for app route, manifest, and service worker URLs and HTML response sanity check for app bootstrap. It also covers Fail deploy if checks fail.
