@@ -183,7 +183,7 @@ An issue is only considered done when:
 - Depends on: `M2-04`
 - GitHub: [#23](https://github.com/Jon2050/Conspectus-Mobile/issues/23)
 
-### :green_circle: M2-07 Verify iOS and Android installability on production URL
+### :white_check_mark: M2-07 Verify iOS and Android installability on production URL
 - Label: `test`
 - Milestone: `M2 - Website Integration + Early Deploy`
 - Summary: Work includes Add to Home Screen flow on iOS Safari and Android Chrome and install icon uses the Conspectus moneybag assets (public/icons/moneysack.ico and.... It also covers Record issues with screenshots.

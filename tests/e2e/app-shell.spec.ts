@@ -5,6 +5,16 @@ test.use({ viewport: { width: 390, height: 844 } });
 const APP_BASE_PATH = '/conspectus/webapp/';
 const APP_BASE_PATH_WITHOUT_TRAILING_SLASH = APP_BASE_PATH.slice(0, -1);
 const appPath = (suffix = ''): string => `${APP_BASE_PATH}${suffix}`;
+const REQUIRED_MANIFEST_ICONS = [
+  {
+    src: 'icons/moneysack192x192.png',
+    sizes: '192x192',
+  },
+  {
+    src: 'icons/moneysack512x512.png',
+    sizes: '512x512',
+  },
+];
 
 test('loads a mobile app shell and navigates placeholder routes', async ({ page }) => {
   await page.goto(appPath('#/accounts'));
@@ -66,14 +76,37 @@ test('exposes manifest and registers service worker', async ({ page }) => {
     display?: string;
     start_url?: string;
     scope?: string;
-    icons?: Array<{ src?: string }>;
+    icons?: Array<{ src?: string; sizes?: string }>;
   };
 
   expect(manifest.name).toBe('Conspectus Mobile');
   expect(manifest.display).toBe('standalone');
   expect(manifest.start_url).toBe(APP_BASE_PATH);
   expect(manifest.scope).toBe(APP_BASE_PATH);
-  expect(manifest.icons?.length).toBeGreaterThan(0);
+
+  const manifestIcons = manifest.icons ?? [];
+  expect(manifestIcons.length).toBeGreaterThan(0);
+
+  for (const expectedIcon of REQUIRED_MANIFEST_ICONS) {
+    expect(manifestIcons).toContainEqual(
+      expect.objectContaining({
+        src: expectedIcon.src,
+        sizes: expectedIcon.sizes,
+      }),
+    );
+
+    const iconResponse = await page.request.get(appPath(expectedIcon.src));
+    expect(iconResponse.ok()).toBeTruthy();
+  }
+
+  const appleTouchIconHref = await page
+    .locator('link[rel="apple-touch-icon"]')
+    .first()
+    .getAttribute('href');
+  expect(appleTouchIconHref).toBe(appPath('icons/moneysack180x180.png'));
+
+  const appleTouchIconResponse = await page.request.get(appPath('icons/moneysack180x180.png'));
+  expect(appleTouchIconResponse.ok()).toBeTruthy();
 
   const expectedServiceWorkerScope = new URL(APP_BASE_PATH, page.url()).toString();
 

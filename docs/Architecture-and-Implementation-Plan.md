@@ -259,12 +259,17 @@ Substeps:
    - run the same channel path/scope assertions in `Quality` to catch regressions before deploy workflows execute
    - `Preview Cleanup` workflow removes branch preview path on delete event
    - keep production website rollout as a separate follow-up in website repo
+8. Verify production installability contract (`M2-07`):
+   - enforce install icon contract in automated checks (`manifest` includes moneybag `192x192` and `512x512`, HTML includes moneybag `apple-touch-icon`)
+   - keep manual iOS Safari / Android Chrome Add to Home Screen checklist in repo docs (`docs/M2-07-installability-verification.md`)
+   - track discovered installability defects as `bug` issues (current follow-up: icon cropping/centering issue `#106`)
 
 Deliverables:
 - Publicly reachable PWA shell on `jon2050.de` for iOS/Android testing.
 - Repeatable early deploy process independent of feature completion.
 - Branch preview URLs for development and QA on every branch.
 - Main-only production artifact handoff contract for website deployment.
+- Installability verification record with explicit bug-tracking linkage.
 
 Exit criteria:
 - Successful branch pushes produce isolated preview URLs.
