@@ -12,6 +12,9 @@ const baseOptions = {
 
 const appHtml = `<!doctype html>
 <html lang="en">
+  <head>
+    <link rel="apple-touch-icon" sizes="180x180" href="/conspectus/webapp/icons/moneysack180x180.png" />
+  </head>
   <body>
     <div id="app"></div>
     <script type="module" src="/conspectus/webapp/assets/index.js"></script>
@@ -69,7 +72,32 @@ const createHealthyResponses = (): Record<string, MockHttpResponse> => ({
   },
   'https://jon2050.de/conspectus/webapp/manifest.webmanifest': {
     status: 200,
-    body: '{"start_url":"/conspectus/webapp/","scope":"/conspectus/webapp/"}',
+    body: JSON.stringify({
+      start_url: '/conspectus/webapp/',
+      scope: '/conspectus/webapp/',
+      icons: [
+        {
+          src: 'icons/moneysack64x64.png',
+          sizes: '64x64',
+          type: 'image/png',
+        },
+        {
+          src: 'icons/moneysack192x192.png',
+          sizes: '192x192',
+          type: 'image/png',
+        },
+        {
+          src: 'icons/moneysack256_256.png',
+          sizes: '256x256',
+          type: 'image/png',
+        },
+        {
+          src: 'icons/moneysack512x512.png',
+          sizes: '512x512',
+          type: 'image/png',
+        },
+      ],
+    }),
   },
   'https://jon2050.de/conspectus/webapp/sw.js': {
     status: 200,
@@ -78,6 +106,26 @@ const createHealthyResponses = (): Record<string, MockHttpResponse> => ({
   'https://jon2050.de/conspectus/webapp/deploy-metadata.json': {
     status: 200,
     body: validDeployMetadata,
+  },
+  'https://jon2050.de/conspectus/webapp/icons/moneysack180x180.png': {
+    status: 200,
+    body: 'icon-bytes',
+  },
+  'https://jon2050.de/conspectus/webapp/icons/moneysack64x64.png': {
+    status: 200,
+    body: 'icon-bytes',
+  },
+  'https://jon2050.de/conspectus/webapp/icons/moneysack192x192.png': {
+    status: 200,
+    body: 'icon-bytes',
+  },
+  'https://jon2050.de/conspectus/webapp/icons/moneysack256_256.png': {
+    status: 200,
+    body: 'icon-bytes',
+  },
+  'https://jon2050.de/conspectus/webapp/icons/moneysack512x512.png': {
+    status: 200,
+    body: 'icon-bytes',
   },
 });
 
@@ -92,7 +140,7 @@ describe('verify-production-deploy-smoke script', () => {
     const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
     await expect(runSmokeChecks(baseOptions, fetchMock, sleepMock)).resolves.toBeUndefined();
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock).toHaveBeenCalledTimes(9);
     expect(consoleLog).toHaveBeenCalledWith(
       expect.stringContaining(
         'commitSha=abc123 deployRunId=2002 all deployment smoke checks passed',
@@ -145,6 +193,44 @@ describe('verify-production-deploy-smoke script', () => {
 
     await expect(runSmokeChecks(baseOptions, fetchMock, sleepMock)).rejects.toThrow(
       'check=app-route',
+    );
+  });
+
+  it('fails when app route is missing moneybag apple-touch-icon link', async () => {
+    const responses = createHealthyResponses();
+    responses['https://jon2050.de/conspectus/webapp/'] = {
+      status: 200,
+      body: `<!doctype html>
+<html lang="en">
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/conspectus/webapp/assets/index.js"></script>
+  </body>
+</html>`,
+    };
+    const fetchMock = createFetchByUrl(responses);
+    const sleepMock = vi.fn(async () => undefined);
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await expect(runSmokeChecks(baseOptions, fetchMock, sleepMock)).rejects.toThrow(
+      'check=app-route',
+    );
+  });
+
+  it('fails when apple touch icon URL is not reachable', async () => {
+    const responses = createHealthyResponses();
+    responses['https://jon2050.de/conspectus/webapp/icons/moneysack180x180.png'] = {
+      status: 404,
+      body: 'missing',
+    };
+    const fetchMock = createFetchByUrl(responses);
+    const sleepMock = vi.fn(async () => undefined);
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await expect(runSmokeChecks(baseOptions, fetchMock, sleepMock)).rejects.toThrow(
+      'check=apple-touch-icon',
     );
   });
 
@@ -204,6 +290,48 @@ describe('verify-production-deploy-smoke script', () => {
     ).resolves.toBeUndefined();
     expect(sleepMock).toHaveBeenCalledTimes(1);
     expect(sleepMock).toHaveBeenCalledWith(1000);
+  });
+
+  it('fails when required moneybag manifest icons are missing', async () => {
+    const responses = createHealthyResponses();
+    responses['https://jon2050.de/conspectus/webapp/manifest.webmanifest'] = {
+      status: 200,
+      body: JSON.stringify({
+        start_url: '/conspectus/webapp/',
+        scope: '/conspectus/webapp/',
+        icons: [
+          {
+            src: 'icons/moneysack64x64.png',
+            sizes: '64x64',
+            type: 'image/png',
+          },
+        ],
+      }),
+    };
+    const fetchMock = createFetchByUrl(responses);
+    const sleepMock = vi.fn(async () => undefined);
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await expect(runSmokeChecks(baseOptions, fetchMock, sleepMock)).rejects.toThrow(
+      'check=manifest',
+    );
+  });
+
+  it('fails when one manifest icon URL is not reachable', async () => {
+    const responses = createHealthyResponses();
+    responses['https://jon2050.de/conspectus/webapp/icons/moneysack512x512.png'] = {
+      status: 404,
+      body: 'missing',
+    };
+    const fetchMock = createFetchByUrl(responses);
+    const sleepMock = vi.fn(async () => undefined);
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await expect(runSmokeChecks(baseOptions, fetchMock, sleepMock)).rejects.toThrow(
+      'check=manifest-icon',
+    );
   });
 
   it('normalizes cli args and applies numeric defaults', () => {

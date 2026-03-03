@@ -4,6 +4,11 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 
 const REQUIRED_ARGS = new Set(['baseUrl', 'commitSha', 'deployRunId']);
+const REQUIRED_MONEYBAG_ICON_SPECS = [
+  { src: 'icons/moneysack192x192.png', sizes: '192x192' },
+  { src: 'icons/moneysack512x512.png', sizes: '512x512' },
+];
+const REQUIRED_APPLE_TOUCH_ICON = 'icons/moneysack180x180.png';
 
 const assert = (condition, message) => {
   if (!condition) {
@@ -80,7 +85,9 @@ export const parseArgs = (argv) => {
 const buildContextLabel = ({ commitSha, deployRunId }) =>
   `commitSha=${commitSha} deployRunId=${deployRunId}`;
 
-const ensureBootstrapMarkers = (html) => {
+const toPathname = (urlOrPath, baseUrl) => new URL(urlOrPath, baseUrl).pathname;
+
+const ensureBootstrapMarkers = (html, options) => {
   assert(
     /id=["']app["']/.test(html),
     'HTML bootstrap sanity check failed: missing app root element id="app".',
@@ -89,6 +96,27 @@ const ensureBootstrapMarkers = (html) => {
     /<script\b[^>]*type=["']module["'][^>]*>/i.test(html),
     'HTML bootstrap sanity check failed: missing module bootstrap script tag.',
   );
+  assert(
+    /<link\b[^>]*rel=["']apple-touch-icon["'][^>]*>/i.test(html),
+    'HTML bootstrap sanity check failed: missing moneybag apple-touch-icon link.',
+  );
+
+  const appleTouchIconTag =
+    html.match(/<link\b[^>]*rel=["']apple-touch-icon["'][^>]*>/i)?.[0] ?? '';
+  const appleTouchIconHref = appleTouchIconTag.match(/\bhref=["']([^"']+)["']/i)?.[1] ?? '';
+  assert(
+    appleTouchIconHref.length > 0,
+    'HTML bootstrap sanity check failed: apple-touch-icon is missing href.',
+  );
+
+  const resolvedAppleTouchIconUrl = new URL(appleTouchIconHref, options.baseUrl).toString();
+  const expectedAppleTouchIconUrl = new URL(REQUIRED_APPLE_TOUCH_ICON, options.baseUrl).toString();
+  assert(
+    resolvedAppleTouchIconUrl === expectedAppleTouchIconUrl,
+    `apple-touch-icon href mismatch. Expected "${expectedAppleTouchIconUrl}", got "${resolvedAppleTouchIconUrl}".`,
+  );
+
+  return resolvedAppleTouchIconUrl;
 };
 
 const ensureDeployIdentity = (metadataText, options) => {
@@ -114,6 +142,58 @@ const ensureDeployIdentity = (metadataText, options) => {
   );
 };
 
+const ensureManifestInstallability = (manifestText, options) => {
+  let manifest;
+  try {
+    manifest = JSON.parse(manifestText);
+  } catch {
+    throw new Error('manifest is not valid JSON.');
+  }
+
+  const expectedBasePath = new URL(options.baseUrl).pathname;
+  assert(
+    manifest.start_url === expectedBasePath,
+    `manifest start_url mismatch. Expected "${expectedBasePath}", got "${manifest.start_url}".`,
+  );
+  assert(
+    manifest.scope === expectedBasePath,
+    `manifest scope mismatch. Expected "${expectedBasePath}", got "${manifest.scope}".`,
+  );
+
+  const rawIcons = Array.isArray(manifest.icons) ? manifest.icons : [];
+  assert(rawIcons.length > 0, 'manifest is missing icons entries.');
+
+  const iconEntries = rawIcons.map((icon) => {
+    const src = typeof icon?.src === 'string' ? icon.src.trim() : '';
+    const sizes = typeof icon?.sizes === 'string' ? icon.sizes.trim() : '';
+    assert(src.length > 0, 'manifest icon entry is missing src.');
+    assert(
+      src.includes('moneysack'),
+      `manifest icon entry must reference moneybag assets; got "${src}".`,
+    );
+
+    return {
+      src,
+      sizes,
+      url: new URL(src, options.baseUrl).toString(),
+      pathname: toPathname(src, options.baseUrl),
+    };
+  });
+
+  for (const requiredIcon of REQUIRED_MONEYBAG_ICON_SPECS) {
+    const requiredPathname = toPathname(requiredIcon.src, options.baseUrl);
+    const iconMatch = iconEntries.find(
+      (entry) => entry.pathname === requiredPathname && entry.sizes === requiredIcon.sizes,
+    );
+    assert(
+      Boolean(iconMatch),
+      `manifest missing required icon "${requiredIcon.src}" with sizes "${requiredIcon.sizes}".`,
+    );
+  }
+
+  return iconEntries.map((entry) => entry.url);
+};
+
 const fetchWithTimeout = async (fetchImpl, url, requestTimeoutMs) => {
   const controller = new AbortController();
   const timeoutHandle = setTimeout(() => controller.abort(), requestTimeoutMs);
@@ -131,15 +211,22 @@ const fetchWithTimeout = async (fetchImpl, url, requestTimeoutMs) => {
   }
 };
 
-const createChecks = (options) => [
+const createChecks = (options, setManifestIconUrls, setAppleTouchIconUrl) => [
   {
     name: 'app-route',
     url: options.baseUrl,
-    validateBody: ensureBootstrapMarkers,
+    validateBody: (bodyText) => {
+      const appleTouchIconUrl = ensureBootstrapMarkers(bodyText, options);
+      setAppleTouchIconUrl(appleTouchIconUrl);
+    },
   },
   {
     name: 'manifest',
     url: new URL('manifest.webmanifest', options.baseUrl).toString(),
+    validateBody: (bodyText) => {
+      const manifestIconUrls = ensureManifestInstallability(bodyText, options);
+      setManifestIconUrls(manifestIconUrls);
+    },
   },
   {
     name: 'service-worker',
@@ -154,10 +241,20 @@ const createChecks = (options) => [
 
 export const runSmokeChecks = async (options, fetchImpl = fetch, sleepImpl = delay) => {
   const contextLabel = buildContextLabel(options);
-  const checks = createChecks(options);
   let lastErrors = [];
 
   for (let attempt = 1; attempt <= options.maxAttempts; attempt += 1) {
+    let manifestIconUrls = [];
+    let appleTouchIconUrl = '';
+    const checks = createChecks(
+      options,
+      (iconUrls) => {
+        manifestIconUrls = iconUrls;
+      },
+      (iconUrl) => {
+        appleTouchIconUrl = iconUrl;
+      },
+    );
     lastErrors = [];
     console.log(
       `[verify-production-deploy-smoke] ${contextLabel} starting attempt ${attempt}/${options.maxAttempts}.`,
@@ -181,6 +278,52 @@ export const runSmokeChecks = async (options, fetchImpl = fetch, sleepImpl = del
         const checkError = `check=${check.name} url=${check.url} error="${message}"`;
         lastErrors.push(checkError);
         console.error(`[verify-production-deploy-smoke] ${contextLabel} ${checkError}`);
+      }
+    }
+
+    if (lastErrors.length === 0) {
+      try {
+        assert(
+          appleTouchIconUrl.length > 0,
+          'apple-touch-icon URL missing from bootstrap validation context.',
+        );
+        const appleTouchIconResponse = await fetchWithTimeout(
+          fetchImpl,
+          appleTouchIconUrl,
+          options.requestTimeoutMs,
+        );
+        assert(
+          appleTouchIconResponse.status === 200,
+          `apple-touch-icon returned HTTP ${appleTouchIconResponse.status}.`,
+        );
+        console.log(
+          `[verify-production-deploy-smoke] ${contextLabel} check=apple-touch-icon status=${appleTouchIconResponse.status} url=${appleTouchIconUrl}`,
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const appleIconError = `check=apple-touch-icon url=${appleTouchIconUrl || '(missing)'} error="${message}"`;
+        lastErrors.push(appleIconError);
+        console.error(`[verify-production-deploy-smoke] ${contextLabel} ${appleIconError}`);
+      }
+    }
+
+    if (lastErrors.length === 0) {
+      for (const iconUrl of manifestIconUrls) {
+        try {
+          const iconResponse = await fetchWithTimeout(fetchImpl, iconUrl, options.requestTimeoutMs);
+          assert(
+            iconResponse.status === 200,
+            `manifest icon returned HTTP ${iconResponse.status}.`,
+          );
+          console.log(
+            `[verify-production-deploy-smoke] ${contextLabel} check=manifest-icon status=${iconResponse.status} url=${iconUrl}`,
+          );
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          const iconError = `check=manifest-icon url=${iconUrl} error="${message}"`;
+          lastErrors.push(iconError);
+          console.error(`[verify-production-deploy-smoke] ${contextLabel} ${iconError}`);
+        }
       }
     }
 

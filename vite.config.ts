@@ -63,9 +63,12 @@ export default defineConfig({
       scope: basePath,
       includeAssets: [
         'icons/moneysack.ico',
+        'icons/moneysack180x180.png',
+        'icons/moneysack192x192.png',
         'icons/moneysack32x32.png',
         'icons/moneysack64x64.png',
         'icons/moneysack256_256.png',
+        'icons/moneysack512x512.png',
       ],
       manifest: {
         name: 'Conspectus Mobile',
@@ -83,8 +86,18 @@ export default defineConfig({
             type: 'image/png',
           },
           {
+            src: 'icons/moneysack192x192.png',
+            sizes: '192x192',
+            type: 'image/png',
+          },
+          {
             src: 'icons/moneysack256_256.png',
             sizes: '256x256',
+            type: 'image/png',
+          },
+          {
+            src: 'icons/moneysack512x512.png',
+            sizes: '512x512',
             type: 'image/png',
           },
         ],
