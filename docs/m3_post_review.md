@@ -75,6 +75,8 @@ Repository: `Jon2050/Conspectus-Mobile`
    - Added hash-route store lifecycle test in `src/features/app-shell/hashRouting.test.ts` (subscribe/update/unsubscribe behavior).
 8. Backlog consistency:
    - Updated `M2-06` marker to done in `docs/GitHub-Issues-MVP-Backlog.md`.
+9. CI budget optimization for PRs:
+   - Updated `.github/workflows/quality.yml` to detect docs-only PRs and skip heavy quality jobs (`lint/typecheck/tests/build/e2e`) for those PRs.
 
 ## Remaining Findings (Not Fully Fixable Here or Deferred)
 
@@ -93,6 +95,17 @@ Repository: `Jon2050/Conspectus-Mobile`
 
 1. CI quality workflow performs multiple full builds in one run (cost/time duplication, non-blocking).
 2. CSP/security-header runtime validation is not yet part of smoke checks (tracked naturally by future M8 security hardening).
+
+## CI/CD Optimization Findings and Suggestions
+
+Implemented in this issue:
+1. Docs-only PR optimization: `Quality` now skips heavy jobs when a pull request only changes `docs/**` and/or `*.md`.
+
+Additional recommended optimizations:
+1. Add `concurrency` to `.github/workflows/quality.yml` with `cancel-in-progress: true` per branch/PR to stop superseded runs.
+2. Simplify `Quality` build stages by removing one redundant full build step (currently three full builds occur in one job).
+3. Cache Playwright browser binaries in `e2e-smoke` to reduce repeated browser install time.
+4. Revisit retry caps in preview/prod smoke checks to balance reliability and quota usage on long-tail failures.
 
 ## Test Review and Additional Useful Tests
 
