@@ -66,6 +66,7 @@ Canonical source-of-truth by topic:
 - Architecture and implementation plan: `docs/Architecture-and-Implementation-Plan.md`
 - Desktop parity reference used for DB/business-rule alignment: `docs/Conspectus-Desktop-Info.md`
 - MVP tracker/index of milestone issues: `docs/GitHub-Issues-MVP-Backlog.md`
+- Two-repo deploy/rollback operator runbook: `docs/M2-08-two-repo-deployment-runbook.md`
 
 ## Architecture Modules
 

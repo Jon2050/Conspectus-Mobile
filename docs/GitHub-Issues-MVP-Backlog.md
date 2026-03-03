@@ -190,7 +190,7 @@ An issue is only considered done when:
 - Depends on: `M2-05, M2-06`
 - GitHub: [#25](https://github.com/Jon2050/Conspectus-Mobile/issues/25)
 
-### :green_circle: M2-08 Add deployment runbook for two-repo flow
+### :white_check_mark: M2-08 Add deployment runbook for two-repo flow
 - Label: `docs`
 - Milestone: `M2 - Website Integration + Early Deploy`
 - Summary: Work includes trigger conditions for deploy and rollback steps and owner responsibilities. It also covers how to hotfix only PWA without full website regression.

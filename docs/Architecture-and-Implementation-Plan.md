@@ -638,8 +638,8 @@ Producer/consumer CI contract (automation-only, no manual copy):
 Failure and rollback behavior:
 1. If producer artifact generation fails, website deployment does not run for that revision.
 2. If consumer artifact retrieval or validation fails, website deployment fails without changing live files.
-3. Rollback re-deploys the last known-good `deployRunId` artifact through website CI `workflow_dispatch`; rollback must use CI automation only (no manual filesystem copy steps).
-4. Detailed operator runbook steps remain tracked in `M2-08` and `M8-09`.
+3. Rollback re-deploys the last known-good `deployRunId` artifact via consumer CI automation by replaying the `repository_dispatch` handoff payload with known-good identity fields; rollback must use CI automation only (no manual filesystem copy steps).
+4. Detailed operator runbook steps are documented in `docs/M2-08-two-repo-deployment-runbook.md`; expanded rollback coverage remains tracked in `M8-09`.
 
 ---
 
