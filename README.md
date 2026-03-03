@@ -180,6 +180,21 @@ High-level steps or design constraints. Keep detailed implementation decisions i
 - Rollout or verification steps (if relevant).
 ```
 
+## Commit Agent Attribution
+
+Every commit by an AI Agent must include an `Agent:` trailer at the end of the commit message identifying who or what created it. This is enforced by a `commit-msg` hook and commits without the trailer are rejected.
+
+Example:
+```
+feat: add login button
+
+Agent: Claude
+```
+
+Valid agent names: `Claude`, `Gemini`, `Codex`, `None`, or any descriptive identifier.
+
+This enables filtering by agent: `git log --grep="Agent: Claude"`.
+
 ## Issue Delivery Workflow
 
 Issue completion definition (required):
