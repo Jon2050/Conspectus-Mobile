@@ -7,21 +7,30 @@ assignees: []
 ---
 
 ## Context / Problem
-- What is broken and where does it happen?
-- Include expected vs actual behavior.
+- What is the user/dev problem and why does it matter? Link any prior issues/PRs.
 
-## Tasks
-- [ ] Reproduce and isolate the bug
-- [ ] Implement fix
-- [ ] Add regression test
+## Goals
+- ...
+
+## Non-Goals
+- ...
+
+## Scope
+- Code areas likely touched (modules/paths): ...
+- Config/infra changes (if any): ...
+- Dependencies / prerequisites (if any): ...
+
+## Proposed Approach
+High-level steps or design constraints. Keep detailed implementation decisions in the PR when possible.
 
 ## Acceptance Criteria
-- [ ] Repro steps no longer fail
-- [ ] Existing behavior outside the bug scope is unchanged
+- Observable behavior outcomes (user-visible and/or internal).
+- Edge cases worth explicitly covering.
 
 ## Test Plan
 - Unit/integration:
 - E2E/manual:
 
-## Milestone
-- [ ] Assign the correct milestone (`M1`-`M8`) if this bug is part of milestone delivery
+## Notes / Rollout
+- Risks, migration notes, or compatibility concerns.
+- Rollout or verification steps (if relevant).

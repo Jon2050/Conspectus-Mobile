@@ -7,20 +7,30 @@ assignees: []
 ---
 
 ## Context / Problem
-- What infrastructure/tooling limitation exists?
+- What is the user/dev problem and why does it matter? Link any prior issues/PRs.
 
-## Tasks
-- [ ] Implement infra/tooling changes
-- [ ] Validate pipeline/tooling behavior
-- [ ] Update operational docs if needed
+## Goals
+- ...
+
+## Non-Goals
+- ...
+
+## Scope
+- Code areas likely touched (modules/paths): ...
+- Config/infra changes (if any): ...
+- Dependencies / prerequisites (if any): ...
+
+## Proposed Approach
+High-level steps or design constraints. Keep detailed implementation decisions in the PR when possible.
 
 ## Acceptance Criteria
-- [ ] Pipeline/tooling behavior is deterministic and verifiable
-- [ ] Rollback or failure behavior is documented when relevant
+- Observable behavior outcomes (user-visible and/or internal).
+- Edge cases worth explicitly covering.
 
 ## Test Plan
-- Automated checks:
-- Manual verification:
+- Unit/integration:
+- E2E/manual:
 
-## Milestone
-- [ ] Assign the correct milestone (`M1`-`M8`) for milestone-scoped work (leave empty for PM-only setup issues)
+## Notes / Rollout
+- Risks, migration notes, or compatibility concerns.
+- Rollout or verification steps (if relevant).

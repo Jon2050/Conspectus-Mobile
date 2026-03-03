@@ -7,20 +7,30 @@ assignees: []
 ---
 
 ## Context / Problem
-- What user or product problem does this solve?
+- What is the user/dev problem and why does it matter? Link any prior issues/PRs.
 
-## Tasks
-- [ ] Implement the feature changes
-- [ ] Add/update tests
-- [ ] Update docs if needed
+## Goals
+- ...
+
+## Non-Goals
+- ...
+
+## Scope
+- Code areas likely touched (modules/paths): ...
+- Config/infra changes (if any): ...
+- Dependencies / prerequisites (if any): ...
+
+## Proposed Approach
+High-level steps or design constraints. Keep detailed implementation decisions in the PR when possible.
 
 ## Acceptance Criteria
-- [ ] Observable behavior outcomes are clear and testable
-- [ ] Edge cases and failure states are handled
+- Observable behavior outcomes (user-visible and/or internal).
+- Edge cases worth explicitly covering.
 
 ## Test Plan
 - Unit/integration:
 - E2E/manual:
 
-## Milestone
-- [ ] Assign the correct milestone (`M1`-`M8`) before starting implementation
+## Notes / Rollout
+- Risks, migration notes, or compatibility concerns.
+- Rollout or verification steps (if relevant).

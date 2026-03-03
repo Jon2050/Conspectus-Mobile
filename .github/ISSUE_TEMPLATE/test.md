@@ -7,20 +7,30 @@ assignees: []
 ---
 
 ## Context / Problem
-- What quality risk or test gap is being addressed?
+- What is the user/dev problem and why does it matter? Link any prior issues/PRs.
 
-## Tasks
-- [ ] Add or update tests
-- [ ] Verify failure mode before the change
-- [ ] Verify passing mode after the change
+## Goals
+- ...
+
+## Non-Goals
+- ...
+
+## Scope
+- Code areas likely touched (modules/paths): ...
+- Config/infra changes (if any): ...
+- Dependencies / prerequisites (if any): ...
+
+## Proposed Approach
+High-level steps or design constraints. Keep detailed implementation decisions in the PR when possible.
 
 ## Acceptance Criteria
-- [ ] Test coverage proves the targeted behavior
-- [ ] Tests are stable and CI-ready
+- Observable behavior outcomes (user-visible and/or internal).
+- Edge cases worth explicitly covering.
 
 ## Test Plan
-- Scope covered:
-- Local/CI commands:
+- Unit/integration:
+- E2E/manual:
 
-## Milestone
-- [ ] Assign the correct milestone (`M1`-`M8`) before implementation when milestone delivery is impacted
+## Notes / Rollout
+- Risks, migration notes, or compatibility concerns.
+- Rollout or verification steps (if relevant).
