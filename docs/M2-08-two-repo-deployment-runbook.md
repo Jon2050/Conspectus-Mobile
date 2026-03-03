@@ -46,6 +46,10 @@ Required fields:
 | `qualityRunId` | Producer `Quality` run ID paired to the deploy run | `deploy-metadata.json`, dispatch payload |
 | `artifactName` | Exact artifact name: `conspectus-mobile-production-<commitSha>` | Producer run artifacts + dispatch payload |
 
+Artifact retention contract:
+1. Producer production artifacts are retained for 90 days (`actions/upload-artifact` retention setting).
+2. Rollback replay beyond that window requires a newer known-good deploy identity.
+
 Deterministic selection rule:
 1. Identify one producer `deployRunId`.
 2. List artifacts for that exact run.

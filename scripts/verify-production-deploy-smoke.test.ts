@@ -353,4 +353,17 @@ describe('verify-production-deploy-smoke script', () => {
       requestTimeoutMs: 10000,
     });
   });
+
+  it('rejects non-https base URLs', () => {
+    expect(() =>
+      parseArgs([
+        '--base-url',
+        'http://jon2050.de/conspectus/webapp',
+        '--commit-sha',
+        'abc123',
+        '--deploy-run-id',
+        '2002',
+      ]),
+    ).toThrow('Use an absolute https URL');
+  });
 });
