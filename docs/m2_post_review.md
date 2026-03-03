@@ -95,6 +95,8 @@ Repository: `Jon2050/Conspectus-Mobile`
 
 1. CI quality workflow performs multiple full builds in one run (cost/time duplication, non-blocking).
 2. CSP/security-header runtime validation is not yet part of smoke checks (tracked naturally by future M8 security hardening).
+3. The `viewport-fit=cover` meta tag attribute is missing from `index.html`, which contradicts the mobile-first UX requirement for safe-area insets.
+4. `.eslint.config.js` does not explicitly ignore test output directories (e.g., `playwright-report/`, `test-results/`), which could lead to accidental linting of generated test artifacts.
 
 ## CI/CD Optimization Findings and Suggestions
 
@@ -119,6 +121,7 @@ Current state after fixes:
 Additional tests still useful (recommended follow-up):
 1. E2E test for startup env-failure UI path (`VITE_AZURE_CLIENT_ID` missing).
 2. More component-level tests for app shell transitions and loading/error rendering states.
+3. Expand `playwright.config.ts` to include mobile device profiles (e.g., 'Mobile Chrome', 'Mobile Safari'). Currently, it only runs tests against 'Desktop Chrome', despite the app's mobile-first PWA focus.
 
 ## M3 Readiness Confirmation
 
