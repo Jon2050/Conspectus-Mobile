@@ -192,7 +192,7 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 #### CI/CD
 
-20. ~~**Triple full build in `lint-typecheck` job** (`quality.yml` lines 112–129): The job runs three separate Vite builds: (1) default build (line 113, no `DEPLOY_CHANNEL`), (2) production build (line 119, `DEPLOY_CHANNEL=production`), (3) preview build (line 128, `DEPLOY_CHANNEL=preview`). **Fix:** Drop the default build (line 112–113) — the production and preview builds already exercise all code paths and additionally verify channel-specific path/scope constraints.~~ **RESOLVED** - Removed the redundant default `npm run build` step from `.github/workflows/quality.yml`. The `lint-typecheck` job now runs only production and preview channel builds with channel-specific verification.
+20. ~~**Triple full build in `lint-typecheck` job** (`quality.yml` lines 112ï¿½129): The job runs three separate Vite builds: (1) default build (line 113, no `DEPLOY_CHANNEL`), (2) production build (line 119, `DEPLOY_CHANNEL=production`), (3) preview build (line 128, `DEPLOY_CHANNEL=preview`). **Fix:** Drop the default build (line 112ï¿½113) ï¿½ the production and preview builds already exercise all code paths and additionally verify channel-specific path/scope constraints.~~ **RESOLVED** - Removed the redundant default `npm run build` step from `.github/workflows/quality.yml`. The `lint-typecheck` job now runs only production and preview channel builds with channel-specific verification.
 
 21. ~~**Triple build per Quality run overall:** `e2e-smoke` builds via `playwright.config.ts` `webServer.command`. Combined with the two channel builds in `lint-typecheck`, a single Quality run still produces **three full Vite builds**. Restructuring to share build artifacts across jobs would significantly reduce CI time.~~ **RESOLVED** - `lint-typecheck` now uploads the production `dist` artifact, and `e2e-smoke` downloads it and runs Playwright with `PLAYWRIGHT_WEB_SERVER_BUILD=0` so the web server uses `vite preview` without rebuilding. A full `Quality` run now performs two builds total (production + preview in `lint-typecheck`).
 
@@ -218,7 +218,7 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 30. ~~**E2E test for startup env-failure UI path** (`VITE_AZURE_CLIENT_ID` missing) does not exist.~~ **RESOLVED** - Added a Playwright E2E test in `tests/e2e/app-shell.spec.ts` that intercepts the app JavaScript bundle, strips the injected `VITE_AZURE_CLIENT_ID` value, and verifies startup renders the expected configuration error UI (`Startup configuration error` + missing-env message).
 
-31. **No unit tests for route placeholder Svelte components** (`AccountsRoute`, `TransfersRoute`, `AddRoute`, `SettingsRoute`). Basic render tests would catch import/export breakage.
+31. ~~**No unit tests for route placeholder Svelte components** (`AccountsRoute`, `TransfersRoute`, `AddRoute`, `SettingsRoute`). Basic render tests would catch import/export breakage.~~ **RESOLVED** - Added `src/features/app-shell/routes/placeholderRoutes.test.ts` with SSR render assertions for all four route placeholders (test id, heading, and body copy), covering import/export and baseline render integrity.
 
 32. **More component-level tests for app shell transition and loading/error rendering states** are recommended.
 
@@ -258,10 +258,10 @@ All remaining findings that are not yet fixed, organized by severity and categor
 | --- | --- | --- |
 | **High** | 0 | - |
 | **Medium** | 0 | - |
-| **Low** | 9 | CI build waste (1), test gaps (5), docs gaps (2), config gap (1), script test isolation |
-| Resolved | 29 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication - shared module + contract test), #6 (empty deploy dir removed), #9 (website-repo contract validation), #10 (Workflow string interpolation), #11 (Unused src/lib directory), #12 (Inconsistent icon naming), #13 (vite.config.ts includeAssets vs manifest.icons asymmetry), #14 (CSS design variables), #15 (`viewport-fit=cover` in `index.html`), #16 (`meta description` in `index.html`), #17 (`meta theme-color` in `index.html`), #18 (noscript fallback), #19 (`%BASE_URL%` docs), #20 (redundant default quality build), #21 (Quality run triple-build reduction via dist artifact reuse), #22 (Playwright browser caching), #23 (workflow slug script contract coverage), #24 (preview-cleanup permissions), #25 (`website-deploy-smoke.yml` `npm ci`), #26 (smoke retry cap tuning), #27 (CSP/security-header runtime validation in production smoke checks), #28 (index.html baseline CSP meta tag + build-channel CI guard), #29 (Playwright mobile device profile coverage), #30 (startup env-failure E2E coverage), #40 (package.json version), #42 (ESLint ignores), #43 (engines field) |
+| **Low** | 8 | CI build waste (1), test gaps (4), docs gaps (2), config gap (1), script test isolation |
+| Resolved | 30 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication - shared module + contract test), #6 (empty deploy dir removed), #9 (website-repo contract validation), #10 (Workflow string interpolation), #11 (Unused src/lib directory), #12 (Inconsistent icon naming), #13 (vite.config.ts includeAssets vs manifest.icons asymmetry), #14 (CSS design variables), #15 (`viewport-fit=cover` in `index.html`), #16 (`meta description` in `index.html`), #17 (`meta theme-color` in `index.html`), #18 (noscript fallback), #19 (`%BASE_URL%` docs), #20 (redundant default quality build), #21 (Quality run triple-build reduction via dist artifact reuse), #22 (Playwright browser caching), #23 (workflow slug script contract coverage), #24 (preview-cleanup permissions), #25 (`website-deploy-smoke.yml` `npm ci`), #26 (smoke retry cap tuning), #27 (CSP/security-header runtime validation in production smoke checks), #28 (index.html baseline CSP meta tag + build-channel CI guard), #29 (Playwright mobile device profile coverage), #30 (startup env-failure E2E coverage), #31 (route placeholder component unit tests), #40 (package.json version), #42 (ESLint ignores), #43 (engines field) |
 | Removed | 6 | #4, #7, #33, #37, #39, #44 |
-| **Total open** | 9 | |
+| **Total open** | 8 | |
 
 ---
 
