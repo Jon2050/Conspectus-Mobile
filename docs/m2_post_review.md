@@ -198,7 +198,7 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 22. ~~**No Playwright browser caching:** `e2e-smoke` runs `npx playwright install --with-deps chromium` on every run. Using `actions/cache` for browser binaries would save ~30-60s per run.~~ **RESOLVED** - Added `actions/cache@v4` for `~/.cache/ms-playwright` in `.github/workflows/quality.yml`, keyed by runner OS and `@playwright/test` version. The workflow now installs OS deps every run and installs Chromium only on cache misses.
 
-23. **Branch slug Python logic in workflows is not tested:** The inline Python slugging code in `deploy-channels.yml` and `preview-cleanup.yml` has no automated tests. If it diverges from `toPreviewSlug` in `vite.config.ts`, preview cleanup could fail silently.
+23. ~~**Branch slug Python logic in workflows is not tested:** The inline Python slugging code in `deploy-channels.yml` and `preview-cleanup.yml` has no automated tests. If it diverges from `toPreviewSlug` in `vite.config.ts`, preview cleanup could fail silently.~~ **RESOLVED** - Added workflow contract assertions in `scripts/deploy-utils.test.ts` that verify both workflows use `python scripts/slugify-branch.py` (and do not embed inline Python slug logic). This complements the existing JS/Python slug parity contract test.
 
 24. ~~**`preview-cleanup.yml` uses top-level `permissions: contents: write`**~~ **RESOLVED** — Moved `contents: write` to job-level permissions and set top-level to `contents: read`, matching the hardened pattern in `deploy-channels.yml`.
 
@@ -258,10 +258,10 @@ All remaining findings that are not yet fixed, organized by severity and categor
 | --- | --- | --- |
 | **High** | 0 | - |
 | **Medium** | 0 | - |
-| **Low** | 16 | CI build waste (1), security headers (2), test gaps (6), docs gaps (2), config gap (1), Playwright device profiles, script test isolation, retry caps, website-smoke npm ci |
-| Resolved | 22 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication - shared module + contract test), #6 (empty deploy dir removed), #9 (website-repo contract validation), #10 (Workflow string interpolation), #11 (Unused src/lib directory), #12 (Inconsistent icon naming), #13 (vite.config.ts includeAssets vs manifest.icons asymmetry), #14 (CSS design variables), #15 (`viewport-fit=cover` in `index.html`), #16 (`meta description` in `index.html`), #17 (`meta theme-color` in `index.html`), #18 (noscript fallback), #19 (`%BASE_URL%` docs), #20 (redundant default quality build), #21 (Quality run triple-build reduction via dist artifact reuse), #22 (Playwright browser caching), #24 (preview-cleanup permissions), #40 (package.json version), #42 (ESLint ignores), #43 (engines field) |
+| **Low** | 15 | CI build waste (1), security headers (2), test gaps (6), docs gaps (2), config gap (1), Playwright device profiles, script test isolation, retry caps, website-smoke npm ci |
+| Resolved | 23 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication - shared module + contract test), #6 (empty deploy dir removed), #9 (website-repo contract validation), #10 (Workflow string interpolation), #11 (Unused src/lib directory), #12 (Inconsistent icon naming), #13 (vite.config.ts includeAssets vs manifest.icons asymmetry), #14 (CSS design variables), #15 (`viewport-fit=cover` in `index.html`), #16 (`meta description` in `index.html`), #17 (`meta theme-color` in `index.html`), #18 (noscript fallback), #19 (`%BASE_URL%` docs), #20 (redundant default quality build), #21 (Quality run triple-build reduction via dist artifact reuse), #22 (Playwright browser caching), #23 (workflow slug script contract coverage), #24 (preview-cleanup permissions), #40 (package.json version), #42 (ESLint ignores), #43 (engines field) |
 | Removed | 6 | #4, #7, #33, #37, #39, #44 |
-| **Total open** | 16 | |
+| **Total open** | 15 | |
 
 ---
 
