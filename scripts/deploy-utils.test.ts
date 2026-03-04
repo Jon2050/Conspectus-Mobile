@@ -1,0 +1,91 @@
+import { execSync } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
+
+// @ts-expect-error -- .mjs import has no type declarations
+import { normalizeBasePath, toPreviewSlug } from './deploy-utils.mjs';
+
+const thisFilePath = fileURLToPath(import.meta.url);
+const scriptsDirectoryPath = path.dirname(thisFilePath);
+const slugifyScriptPath = path.resolve(scriptsDirectoryPath, 'slugify-branch.py');
+
+const runPythonSlugify = (branchName: string): string => {
+  const result = execSync('python ' + JSON.stringify(slugifyScriptPath), {
+    encoding: 'utf8',
+    env: { ...process.env, BRANCH_NAME: branchName },
+  });
+  return result.trim();
+};
+
+describe('normalizeBasePath', () => {
+  it('adds leading slash when missing', () => {
+    expect(normalizeBasePath('foo/')).toBe('/foo/');
+  });
+
+  it('adds trailing slash when missing', () => {
+    expect(normalizeBasePath('/foo')).toBe('/foo/');
+  });
+
+  it('adds both slashes when missing', () => {
+    expect(normalizeBasePath('foo')).toBe('/foo/');
+  });
+
+  it('returns unchanged when already normalized', () => {
+    expect(normalizeBasePath('/foo/')).toBe('/foo/');
+  });
+
+  it('handles nested paths', () => {
+    expect(normalizeBasePath('/conspectus/webapp')).toBe('/conspectus/webapp/');
+  });
+});
+
+describe('toPreviewSlug', () => {
+  it('lowercases input', () => {
+    expect(toPreviewSlug('MAIN')).toBe('main');
+  });
+
+  it('replaces forward slashes with _2f_', () => {
+    expect(toPreviewSlug('feature/login')).toBe('feature_2f_login');
+  });
+
+  it('hex-encodes non-alphanumeric characters (except hyphens)', () => {
+    expect(toPreviewSlug('my.branch_name')).toBe('my_2e_branch_5f_name');
+  });
+
+  it('strips leading/trailing hyphens', () => {
+    expect(toPreviewSlug('--branch--')).toBe('branch');
+  });
+
+  it('trims whitespace', () => {
+    expect(toPreviewSlug('  main  ')).toBe('main');
+  });
+
+  it('handles complex branch names', () => {
+    expect(toPreviewSlug('feature/UPPER-Case/dots.and_underscores')).toBe(
+      'feature_2f_upper-case_2f_dots_2e_and_5f_underscores',
+    );
+  });
+});
+
+describe('JS/Python slug parity (contract test)', () => {
+  const branchNames = [
+    'main',
+    'feature/add-login',
+    'my-branch',
+    'UPPER/Case',
+    'dots.and_underscores',
+    'feature/UPPER-Case/dots.and_underscores',
+    'bugfix/fix-123',
+    'release/v1.0.0',
+    'user/name@special',
+  ];
+
+  for (const branchName of branchNames) {
+    it(`produces identical output for "${branchName}"`, () => {
+      const jsResult = toPreviewSlug(branchName);
+      const pyResult = runPythonSlugify(branchName);
+      expect(jsResult).toBe(pyResult);
+    });
+  }
+});

@@ -140,12 +140,7 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 3. ~~**`ErrorBoundaryPlaceholder.svelte` uses Svelte 4 `export let` syntax in a Svelte 5 project:**~~ **RESOLVED** — Migrated `ErrorBoundaryPlaceholder.svelte` to Svelte 5 `$props()` syntax. Removed dead error boundary code from `AppShell.svelte`: the `hasErrorPlaceholder` variable (never set to `true`), its reset in the route subscriber, the `{#if hasErrorPlaceholder}` template branch, and the unused import. Component file retained for future use. All quality gates pass.
 
-5. **`normalizeBasePath` / slug generation duplication across 3+ locations:**
-   - `normalizeBasePath` exists in `vite.config.ts` (line 8) and `scripts/verify-build-channel.mjs` (line 6) — identical implementations.
-   - Slug generation is in Python: `deploy-channels.yml` (lines 49–62) and `preview-cleanup.yml` (lines 27–41) — identical copies. A JavaScript version exists in `vite.config.ts` (`toPreviewSlug`, line 23) with equivalent but syntactically different logic.
-   - Total: **2 implementations of path normalization** (JS), **3 implementations of slug generation** (2 Python + 1 JS) — all must stay in sync manually.
-   - Risk: drift/regression if one implementation changes independently.
-   - **Fix options:** (a) Extract `normalizeBasePath` into a shared Node script that both `vite.config.ts` and `verify-build-channel.mjs` import. (b) For slug generation, add a contract test that runs `toPreviewSlug` (JS) against the same inputs as the Python version and asserts identical outputs, so drift is caught in CI.
+5. ~~**`normalizeBasePath` / slug generation duplication across 3+ locations:**~~ **RESOLVED** — Extracted `normalizeBasePath` and `toPreviewSlug` into `scripts/deploy-utils.mjs`; `vite.config.ts` and `verify-build-channel.mjs` now import from this shared module. Consolidated inline Python slug logic from `deploy-channels.yml` and `preview-cleanup.yml` into `scripts/slugify-branch.py`. Added `scripts/deploy-utils.test.ts` with unit tests for both functions and a JS/Python contract test that verifies identical output across 9 diverse branch-name inputs, catching any future drift in CI. Also fixed a latent bug: the original JS `toPreviewSlug` preserved underscores while Python hex-encoded them — the JS implementation now uses per-character encoding matching Python exactly. All quality gates pass.
 
 6. **Empty `src/shared/deploy/` directory:** has no files and no clear purpose. Either remove it or add a README explaining its intended future use.
 
@@ -258,11 +253,11 @@ All remaining findings that are not yet fixed, organized by severity and categor
 | Severity | Count | Key areas |
 | --- | --- | --- |
 | **High** | 0 | — |
-| **Medium** | 5 | normalizeBasePath/slug duplication (3+ places), empty deploy dir, Quality concurrency, website-repo validation, secret interpolation |
+| **Medium** | 4 | empty deploy dir, Quality concurrency, website-repo validation, secret interpolation |
 | **Low** | 30 | index.html meta tags (4), icon naming, CSS design variables, CI build waste (4), security headers (2), test gaps (6), docs gaps (2), config gaps (3), `%BASE_URL%` docs, `src/lib/` leftover, icon asymmetry, Playwright device profiles, script test isolation, retry caps, website-smoke npm ci |
-| **Resolved** | 3 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code) |
+| **Resolved** | 4 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication — shared module + contract test) |
 | **Removed** | 6 | #4, #7, #33, #37, #39, #44 |
-| **Total open** | 35 | |
+| **Total open** | 34 | |
 
 ---
 

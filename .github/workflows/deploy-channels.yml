@@ -46,21 +46,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          branch_slug="$(python - <<'PY'
-          import os
-
-          branch_name = os.environ["BRANCH_NAME"].strip().lower()
-          encoded = []
-
-          for char in branch_name:
-              if ("a" <= char <= "z") or ("0" <= char <= "9") or char == "-":
-                  encoded.append(char)
-              else:
-                  encoded.append(f"_{ord(char):x}_")
-
-          print("".join(encoded).strip("-"))
-          PY
-          )"
+          branch_slug="$(python scripts/slugify-branch.py)"
 
           if [ -z "${branch_slug}" ]; then
             echo "Failed to derive preview slug from branch '${BRANCH_NAME}'." >&2

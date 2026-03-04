@@ -3,10 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const normalizeBasePath = (value) => {
-  const withLeadingSlash = value.startsWith('/') ? value : `/${value}`;
-  return withLeadingSlash.endsWith('/') ? withLeadingSlash : `${withLeadingSlash}/`;
-};
+import { normalizeBasePath } from './deploy-utils.mjs';
 
 const parseArgs = (argv) => {
   const args = {
