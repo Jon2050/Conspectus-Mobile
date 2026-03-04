@@ -178,7 +178,7 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 15. ~~**Missing `viewport-fit=cover`** in `index.html` line 10. The CSS already uses `env(safe-area-inset-bottom)` in `.app-shell` (line 48) and the `@media` block (line 148), which has no effect unless `viewport-fit=cover` is set. **Fix:** Change the viewport meta to `<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />`.~~ **RESOLVED** — Updated `index.html` viewport meta to include `viewport-fit=cover`. All quality gates pass.
 
-16. **No `<meta name="description">` tag:** `index.html` lacks a description element. **Fix:** Add `<meta name="description" content="Mobile PWA for Conspectus personal finance tracking." />` to `<head>`.
+16. ~~**No `<meta name="description">` tag:** `index.html` lacks a description element. **Fix:** Add `<meta name="description" content="Mobile PWA for Conspectus personal finance tracking." />` to `<head>`.~~ **RESOLVED** — Added `<meta name="description" content="Mobile PWA for Conspectus personal finance tracking." />` in `index.html`. Local quality gates are green (`format`, `lint`, `test`, `typecheck`, `build`, `test:e2e`).
 
 17. **No `<meta name="theme-color">` tag:** The `<head>` does not include a `<meta name="theme-color">` to match the manifest's `theme_color: '#dcdcdc'` (defined in `vite.config.ts` line 77). Browsers use this for address-bar coloring before manifest parsing. **Fix:** Add `<meta name="theme-color" content="#dcdcdc" />` to `<head>`.
 
@@ -254,10 +254,10 @@ All remaining findings that are not yet fixed, organized by severity and categor
 | --- | --- | --- |
 | **High** | 0 | — |
 | **Medium** | 2 | Quality concurrency, website-repo validation |
-| **Low** | 27 | index.html meta tags (3), icon naming, CSS design variables, CI build waste (4), security headers (2), test gaps (6), docs gaps (2), config gaps (3), `%BASE_URL%` docs, Playwright device profiles, script test isolation, retry caps, website-smoke npm ci |
-| Resolved | 10 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication — shared module + contract test), #6 (empty deploy dir removed), #10 (Workflow string interpolation), #11 (Unused src/lib directory), #12 (Inconsistent icon naming), #13 (vite.config.ts includeAssets vs manifest.icons asymmetry), #15 (`viewport-fit=cover` in `index.html`) |
+| **Low** | 26 | index.html meta tags (2), icon naming, CSS design variables, CI build waste (4), security headers (2), test gaps (6), docs gaps (2), config gaps (3), `%BASE_URL%` docs, Playwright device profiles, script test isolation, retry caps, website-smoke npm ci |
+| Resolved | 11 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication — shared module + contract test), #6 (empty deploy dir removed), #10 (Workflow string interpolation), #11 (Unused src/lib directory), #12 (Inconsistent icon naming), #13 (vite.config.ts includeAssets vs manifest.icons asymmetry), #15 (`viewport-fit=cover` in `index.html`), #16 (`meta description` in `index.html`) |
 | Removed | 6 | #4, #7, #33, #37, #39, #44 |
-| **Total open** | 28 | |
+| **Total open** | 27 | |
 
 ---
 
@@ -277,4 +277,3 @@ Not blocking M3 but should be tracked:
 4. ~~Fix `renderStartupError` XSS vector~~ — **RESOLVED.**
 
 ---
-
