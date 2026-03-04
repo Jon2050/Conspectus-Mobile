@@ -189,7 +189,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: production-dist
-          path: .
+          path: dist
 
       - name: Install Playwright OS dependencies
         run: npx playwright install-deps chromium
