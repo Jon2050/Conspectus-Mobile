@@ -57,7 +57,7 @@ export default defineConfig({
         'icons/moneysack192x192.png',
         'icons/moneysack32x32.png',
         'icons/moneysack64x64.png',
-        'icons/moneysack256_256.png',
+        'icons/moneysack256x256.png',
         'icons/moneysack512x512.png',
       ],
       manifest: {
@@ -81,7 +81,7 @@ export default defineConfig({
             type: 'image/png',
           },
           {
-            src: 'icons/moneysack256_256.png',
+            src: 'icons/moneysack256x256.png',
             sizes: '256x256',
             type: 'image/png',
           },

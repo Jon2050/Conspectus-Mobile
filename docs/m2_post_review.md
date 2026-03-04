@@ -168,7 +168,7 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 11. ~~**`src/lib/` directory** contains only `Counter.svelte` (the Vite scaffold default component). It is not listed as an architecture module in README's `## Architecture Modules` section and has no `README.md` or barrel `index.ts`. **Fix:** Delete `src/lib/` and `Counter.svelte` entirely — neither is imported anywhere in the project.~~ **RESOLVED** — Deleted the unused `src/lib/` directory and `Counter.svelte`. All quality gates pass.
 
-12. **Inconsistent icon naming:** `moneysack256_256.png` uses underscores while all other icons use `moneysack{W}x{H}.png` (lowercase-x convention).
+12. ~~**Inconsistent icon naming:** `moneysack256_256.png` uses underscores while all other icons use `moneysack{W}x{H}.png` (lowercase-x convention).~~ **RESOLVED** — Renamed `public/icons/moneysack256_256.png` to `moneysack256x256.png` and updated references in `vite.config.ts` and `scripts/verify-production-deploy-smoke.test.ts`. All quality gates pass.
 
 13. **`vite.config.ts` `includeAssets` / `manifest.icons` cross-check:** `moneysack.ico` and `moneysack180x180.png` are in `includeAssets` but not in `manifest.icons`. While technically correct, this asymmetry could confuse future maintainers.
 
@@ -255,9 +255,9 @@ All remaining findings that are not yet fixed, organized by severity and categor
 | **High** | 0 | — |
 | **Medium** | 2 | Quality concurrency, website-repo validation |
 | **Low** | 29 | index.html meta tags (4), icon naming, CSS design variables, CI build waste (4), security headers (2), test gaps (6), docs gaps (2), config gaps (3), `%BASE_URL%` docs, icon asymmetry, Playwright device profiles, script test isolation, retry caps, website-smoke npm ci |
-| **Resolved** | 7 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication — shared module + contract test), #6 (empty deploy dir removed), #10 (Workflow string interpolation), #11 (Unused src/lib directory) |
-| **Removed** | 6 | #4, #7, #33, #37, #39, #44 |
-| **Total open** | 31 | |
+| Resolved | 8 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication — shared module + contract test), #6 (empty deploy dir removed), #10 (Workflow string interpolation), #11 (Unused src/lib directory), #12 (Inconsistent icon naming) |
+| Removed | 6 | #4, #7, #33, #37, #39, #44 |
+| **Total open** | 30 | |
 
 ---
 
