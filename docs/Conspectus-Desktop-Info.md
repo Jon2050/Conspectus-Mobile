@@ -3,6 +3,7 @@
 This file summarizes the current desktop Conspectus app which is in another repository and captures the information needed to implement the mobile PWA in this repo.
 
 Scope of this document:
+
 - What the desktop app is and how it behaves.
 - Database schema and data conventions relevant for PWA MVP.
 - Business rules to mirror for read/write parity.
@@ -19,6 +20,7 @@ Scope of this document:
 - DB access: JDBC via `org.xerial:sqlite-jdbc`
 
 Current feature set (desktop):
+
 - Accounts and balances
 - Transfers (income/expense/internal)
 - Categories (up to 3 per transfer)
@@ -27,6 +29,7 @@ Current feature set (desktop):
 - Monthly stats/balance views
 
 Key source entry points:
+
 - `src/main/java/conspectus/Main.java`
 - `src/main/java/conspectus/database/Database.java`
 - `src/main/java/conspectus/database/loader/*`
@@ -46,6 +49,7 @@ Key source entry points:
   - Expense/income meaning comes from transfer type and account roles.
 
 References:
+
 - `tools/MoneyFormat.java`
 - `conspectus/ui/framework/element/MoneyField.java`
 
@@ -55,27 +59,32 @@ References:
 - Month filters use inclusive range `[firstDayEpoch, lastDayEpoch]`.
 
 References:
+
 - `DBInserts.insertTransfer(...)` stores epoch day.
 - `TransferLoader.loadTransfersByMonth(...)` uses inclusive epoch-day range.
 
 ## 2.3 Transfer type mapping
 
 Enum and IDs:
+
 - `STD_EXPENSE` = `1`
 - `STD_EARNING` = `2`
 - `INTERN_TRANSFER` = `3`
 
 Desktop determination logic:
+
 - If receiving account is primary -> `STD_EXPENSE`
 - Else if spending account is primary -> `STD_EARNING`
 - Else -> `INTERN_TRANSFER`
 
 Reference:
+
 - `conspectus/data/entity/Transfer.java` (`TransferType.getTransferType`)
 
 ## 2.4 Primary accounts
 
 Primary account types:
+
 - `PRIMARY_INCOME` (type ID `1`)
 - `PRIMARY_SPENDINGS` (type ID `2`)
 
@@ -86,11 +95,13 @@ These are system accounts used to classify income/expense flows.
 ## 3. Database Schema (PWA-Relevant)
 
 The most complete schema snapshot in repo is:
+
 - `resources/conspectusDB.schema.sql`
 
 Core tables for MVP:
 
 1. `account`
+
 - `account_id INTEGER PRIMARY KEY`
 - `name TEXT NOT NULL`
 - `amount INTEGER NOT NULL` (cents)
@@ -99,11 +110,13 @@ Core tables for MVP:
 - `visible BOOLEAN DEFAULT TRUE`
 
 2. `account_type`
+
 - `ac_type_id INTEGER PRIMARY KEY`
 - `account_type_name TEXT`
 - Expected values include primary and standard account kinds.
 
 3. `transfer`
+
 - `transfer_id INTEGER PRIMARY KEY`
 - `name TEXT NOT NULL`
 - `from_account INTEGER` (FK -> `account.account_id`)
@@ -117,19 +130,23 @@ Core tables for MVP:
 - `buyplace TEXT NULL`
 
 4. `transfer_type`
+
 - `transfer_type_id INTEGER PRIMARY KEY`
 - `transfer_type_name TEXT`
 
 5. `category`
+
 - `category_id INTEGER PRIMARY KEY`
 - `name TEXT NOT NULL UNIQUE`
 
 6. `constants`
+
 - `name TEXT PRIMARY KEY`
 - `text_value TEXT`
 - `numeric_value NUMERIC`
 
 Additional tables present but not needed for MVP read/write:
+
 - `standing_order`
 - `standing_order__transfer`
 - `account_group`
@@ -144,14 +161,17 @@ Additional tables present but not needed for MVP read/write:
 ## 4.1 Accounts view behavior
 
 Desktop accounts table shows:
+
 - **visible, non-primary accounts** (`getVisibleAccountsList()`)
 - sorted by account comparator (for non-primary effectively `ac_order`, then name)
 
 Reference:
+
 - `AccountViewerController.loadInitData()`
 - `AccountLoader.getVisibleAccountsList()`
 
 Suggested equivalent SQL for PWA display:
+
 ```sql
 SELECT account_id, name, amount, ac_order, ac_type_id, visible
 FROM account
@@ -163,14 +183,17 @@ ORDER BY ac_order ASC, LOWER(name) ASC;
 ## 4.2 Transfers-by-month behavior
 
 Desktop default transfer base:
+
 - current month
 - month chosen via month list
 - data source: transfer rows in chosen month range
 
 Desktop sort:
+
 - by date ascending, tie-break by transfer ID
 
 Suggested SQL:
+
 ```sql
 SELECT transfer_id, name, from_account, to_account, amount, transfer_type_id,
        category_1_id, category_2_id, category_3_id, date, buyplace
@@ -182,12 +205,14 @@ ORDER BY date ASC, transfer_id ASC;
 ## 4.3 Add transfer behavior (must match desktop semantics)
 
 Desktop add action does:
+
 1. Validate input.
 2. Insert `transfer` row.
 3. Update source account amount (`-amount`).
 4. Update destination account amount (`+amount`).
 
 References:
+
 - `TransferCreatorController.handleAddTransferBTAction(...)`
 - `TransferExecute.addTransfer(..., true)`
 - `DBInserts.insertTransfer(...)`
@@ -196,23 +221,28 @@ References:
 ### Validation rules used by desktop
 
 Transfer name:
+
 - length > 2
 
 Transfer amount:
+
 - amount > 0
 
 Account combination:
+
 - `from != to`
 - `from != PRIMARY_SPENDINGS`
 - `to != PRIMARY_INCOME`
 - not `(from == PRIMARY_INCOME && to == PRIMARY_SPENDINGS)`
 
 References:
+
 - `FieldValidator.validateTransferName/Amount/Accounts`
 
 ### Transfer type determination
 
 Use the same logic as desktop:
+
 - if `to` is a primary account -> expense (`1`)
 - else if `from` is a primary account -> earning (`2`)
 - else internal (`3`)
@@ -244,10 +274,12 @@ Rollback on any error.
 - Standing orders can auto-create transfers on desktop startup.
 
 Implication:
+
 - PWA and desktop should not be used concurrently on same DB file.
 - The user rule ("do not use PWA while desktop open") is consistent with desktop behavior.
 
 References:
+
 - `Database.java`
 - `Main.loadData()` + `StandingOrderExecute.performStandingOrderUpdates()`
 
@@ -268,6 +300,7 @@ Do not hardcode account IDs. Detect by `ac_type_id`.
 ## 6.2 Load account options for transfer form
 
 Spending (`from`) options (desktop equivalent intent):
+
 - visible accounts + primary income account
 
 ```sql
@@ -278,6 +311,7 @@ ORDER BY CASE WHEN ac_type_id = 1 THEN 0 ELSE 1 END, ac_order ASC, LOWER(name) A
 ```
 
 Income (`to`) options:
+
 - visible accounts + primary spendings account
 
 ```sql
@@ -300,10 +334,12 @@ Desktop UI has "No category" sentinel (`EMPTY_CAT`) that is **not** a DB row; re
 ## 6.4 Month presence list
 
 Desktop behavior:
+
 - derives months from transfer dates
 - ensures current month is present even if empty
 
 Simple approach in PWA:
+
 - query distinct dates from transfer
 - map to first day of month in app logic
 - add current month if absent
@@ -315,15 +351,18 @@ Simple approach in PWA:
 Important for safe PWA implementation:
 
 1. Schema artifacts differ:
+
 - `resources/conspectusDB.schema.sql` includes `constants` and category groups.
 - `DBInitialization.java` does not create `constants` or category-group tables.
 - `resources/DatabaseDDL.sql` has some old column names (example: `account_type.name` vs runtime usage `account_type_name`).
 
 2. Table constants are not universally reliable:
+
 - Example: `AccountTypeTable.TYPE_ID` is `account_type_id`, but runtime schema uses `ac_type_id`.
 - Runtime loaders typically use `ac_type_id` from `AccountTable`.
 
 Practical rule:
+
 - Treat live DB schema as source of truth.
 - Keep SQL in PWA minimal and explicit for required MVP operations.
 
@@ -361,6 +400,7 @@ Use this checklist during PWA implementation/testing:
 ## 10. Source File Map (Quick Reference)
 
 Business logic and rules:
+
 - `src/main/java/conspectus/data/FieldValidator.java`
 - `src/main/java/conspectus/data/entity/Transfer.java`
 - `src/main/java/conspectus/database/persistance/TransferExecute.java`
@@ -368,15 +408,18 @@ Business logic and rules:
 - `src/main/java/conspectus/ui/implementation/pane/TransferCreatorController.java`
 
 Load/query behavior:
+
 - `src/main/java/conspectus/database/loader/TransferLoader.java`
 - `src/main/java/conspectus/database/loader/AccountLoader.java`
 - `src/main/java/conspectus/database/loader/CategoryLoader.java`
 
 Schema references:
+
 - `resources/conspectusDB.schema.sql`
 - `src/main/java/conspectus/database/tables/*.java`
 - `src/main/java/conspectus/database/DBInitialization.java`
 
 Formatting and encoding:
+
 - `src/main/java/tools/MoneyFormat.java`
 - `src/main/java/tools/Formatters.java`

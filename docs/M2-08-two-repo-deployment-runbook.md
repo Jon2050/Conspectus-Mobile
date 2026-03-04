@@ -15,42 +15,47 @@ Hard rule: use CI automation only. Do not copy files manually to the live websit
 This runbook covers only the PWA artifact handoff path (`repository_dispatch`), not the website repo's normal `push` deploy path.
 
 Producer trigger conditions:
+
 1. `Quality` must finish successfully for a `push`.
 2. `Deploy Channels` runs from that successful `workflow_run`.
 3. Production artifact + dispatch run only when the producer branch is `main`.
 4. Dispatch target repo is read from `WEBSITE_REPO_FULL_NAME` (defaults to `Jon2050/Jon2050_Webpage`).
 
 Consumer trigger conditions:
+
 1. Website repo workflow `.github/workflows/deploy.yml` listens to `repository_dispatch` event type `conspectus-mobile-production-ready`.
 2. Consumer deploys only from dispatch payload identity fields (no manual artifact selection).
 
 Post-deploy verification trigger:
+
 1. Producer workflow `Website Deploy Smoke` runs after successful `Deploy Channels` runs on `main`.
 
 ## 2. Owner Responsibilities
 
-| Owner | Responsibilities |
-| --- | --- |
-| Producer operator (`Conspectus-Mobile`) | Ensure `Quality` and `Deploy Channels` pass on `main`, ensure dispatch payload identity is correct, and record deploy identity fields. |
+| Owner                                                    | Responsibilities                                                                                                                                       |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Producer operator (`Conspectus-Mobile`)                  | Ensure `Quality` and `Deploy Channels` pass on `main`, ensure dispatch payload identity is correct, and record deploy identity fields.                 |
 | Consumer operator (`WEBSITE_REPO_FULL_NAME` target repo) | Ensure `Deploy to FTP` (`repository_dispatch` run) succeeds, ensure fail-closed behavior is respected on errors, and confirm live promotion completed. |
-| Incident owner | Decide rollback trigger, choose known-good deploy identity, execute rollback dispatch replay, and verify live identity after rollback. |
+| Incident owner                                           | Decide rollback trigger, choose known-good deploy identity, execute rollback dispatch replay, and verify live identity after rollback.                 |
 
 ## 3. Contract Fields and Deterministic Identity
 
 Required fields:
 
-| Field | Meaning | Primary source |
-| --- | --- | --- |
-| `commitSha` | Producer commit that generated the artifact | `deploy-metadata.json`, dispatch payload, producer run data |
-| `deployRunId` | Producer `Deploy Channels` run ID that published artifact | `deploy-metadata.json`, dispatch payload |
-| `qualityRunId` | Producer `Quality` run ID paired to the deploy run | `deploy-metadata.json`, dispatch payload |
-| `artifactName` | Exact artifact name: `conspectus-mobile-production-<commitSha>` | Producer run artifacts + dispatch payload |
+| Field          | Meaning                                                         | Primary source                                              |
+| -------------- | --------------------------------------------------------------- | ----------------------------------------------------------- |
+| `commitSha`    | Producer commit that generated the artifact                     | `deploy-metadata.json`, dispatch payload, producer run data |
+| `deployRunId`  | Producer `Deploy Channels` run ID that published artifact       | `deploy-metadata.json`, dispatch payload                    |
+| `qualityRunId` | Producer `Quality` run ID paired to the deploy run              | `deploy-metadata.json`, dispatch payload                    |
+| `artifactName` | Exact artifact name: `conspectus-mobile-production-<commitSha>` | Producer run artifacts + dispatch payload                   |
 
 Artifact retention contract:
+
 1. Producer production artifacts are retained for 90 days (`actions/upload-artifact` retention setting).
 2. Rollback replay beyond that window requires a newer known-good deploy identity.
 
 Deterministic selection rule:
+
 1. Identify one producer `deployRunId`.
 2. List artifacts for that exact run.
 3. Select exact `artifactName` from that run.
@@ -81,8 +86,10 @@ Get-Content .tmp/m2-08-artifact/deploy-metadata.json
 1. Merge the PWA change PR into `main` in `Jon2050/Conspectus-Mobile`.
 2. Confirm producer `Quality` run is successful for the `main` push.
 3. Confirm producer `Deploy Channels` run is successful and includes:
+
 - `Publish Production Artifact` success
 - `Dispatch Production Ready` success
+
 4. Confirm consumer `Deploy to FTP` workflow (`repository_dispatch` event) completes successfully in `$ConsumerRepo`.
 5. Confirm producer `Website Deploy Smoke` run for the deploy commit is successful.
 6. Record deployment identity (`commitSha`, `deployRunId`, `qualityRunId`, `artifactName`) for rollback readiness.
@@ -119,17 +126,20 @@ Use this when only `conspectus/webapp` needs a correction.
 3. Verify using the same checks as standard deploy (producer runs + consumer run + website smoke checks).
 
 Reason this avoids full website regression:
+
 1. The consumer PWA job deploys only the `conspectus/webapp` subtree.
 2. Website non-PWA content is not selected as deployment input for this path.
 
 ## 6. Rollback Procedure (Automation Only)
 
 Trigger rollback when any of these hold:
+
 1. Production smoke checks fail for the new deployment.
 2. Critical user-facing regression is confirmed in deployed PWA.
 3. Post-deploy validation shows wrong identity or artifact mismatch.
 
 Rollback steps:
+
 1. Select last known-good deployment identity (`commitSha`, `deployRunId`, `qualityRunId`, `artifactName`).
 2. Replay the consumer dispatch event with that exact identity payload.
 3. Monitor the consumer run to completion.
@@ -170,29 +180,30 @@ node scripts/verify-production-deploy-smoke.mjs `
 ```
 
 Manual copy prohibition:
+
 1. Do not copy extracted artifact files into the live website filesystem.
 2. Do not bypass CI promotion steps.
 3. Use dispatch-driven deployment only.
 
 ## 7. Required Credentials and Permissions
 
-| Secret / token | Location | Minimum permission expectation |
-| --- | --- | --- |
-| `WEBSITE_REPO_DISPATCH_TOKEN` | Producer repo secrets (`Conspectus-Mobile`) | Ability to call `POST /repos/<website-repo>/dispatches` for `WEBSITE_REPO_FULL_NAME` target (default `Jon2050/Jon2050_Webpage`). |
-| `CONSPECTUS_MOBILE_ARTIFACT_TOKEN` | Consumer repo secrets (target repo from `WEBSITE_REPO_FULL_NAME`) | `actions:read` access to `Jon2050/Conspectus-Mobile` Actions artifacts. |
+| Secret / token                     | Location                                                          | Minimum permission expectation                                                                                                   |
+| ---------------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `WEBSITE_REPO_DISPATCH_TOKEN`      | Producer repo secrets (`Conspectus-Mobile`)                       | Ability to call `POST /repos/<website-repo>/dispatches` for `WEBSITE_REPO_FULL_NAME` target (default `Jon2050/Jon2050_Webpage`). |
+| `CONSPECTUS_MOBILE_ARTIFACT_TOKEN` | Consumer repo secrets (target repo from `WEBSITE_REPO_FULL_NAME`) | `actions:read` access to `Jon2050/Conspectus-Mobile` Actions artifacts.                                                          |
 
 If token validation fails, deployment must fail closed without live-file mutation.
 
 ## 8. Failure Handling Expectations (Fail Closed)
 
-| Failure point | Expected behavior | Operator action |
-| --- | --- | --- |
-| Producer artifact generation fails | No consumer dispatch occurs | Fix producer issue and redeploy from producer `main` flow. |
-| Producer dispatch fails | Consumer deployment not started | Fix dispatch token/permissions and rerun dispatch path. |
-| Consumer run identity/artifact lookup mismatch | Consumer exits with failure before publish | Correct payload identity fields and replay dispatch. |
-| Consumer metadata validation fails | Consumer exits with failure before publish | Use correct known-good payload and retry. |
-| Consumer promotion fails | Consumer attempts rollback of remote promotion and fails run | Investigate consumer logs and retry dispatch when safe. |
-| Post-deploy smoke fails | Deployment considered bad | Execute rollback dispatch replay with known-good identity. |
+| Failure point                                  | Expected behavior                                            | Operator action                                            |
+| ---------------------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------- |
+| Producer artifact generation fails             | No consumer dispatch occurs                                  | Fix producer issue and redeploy from producer `main` flow. |
+| Producer dispatch fails                        | Consumer deployment not started                              | Fix dispatch token/permissions and rerun dispatch path.    |
+| Consumer run identity/artifact lookup mismatch | Consumer exits with failure before publish                   | Correct payload identity fields and replay dispatch.       |
+| Consumer metadata validation fails             | Consumer exits with failure before publish                   | Use correct known-good payload and retry.                  |
+| Consumer promotion fails                       | Consumer attempts rollback of remote promotion and fails run | Investigate consumer logs and retry dispatch when safe.    |
+| Post-deploy smoke fails                        | Deployment considered bad                                    | Execute rollback dispatch replay with known-good identity. |
 
 ## 9. Operator Completion Checklist
 
