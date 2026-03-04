@@ -210,7 +210,7 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 27. ~~**CSP/security-header runtime validation** is not yet part of smoke checks (tracked naturally by future M8 security hardening).~~ **RESOLVED** - Added runtime response-header checks in `scripts/verify-production-deploy-smoke.mjs` for `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy` on the production app-route response, with unit-test coverage in `scripts/verify-production-deploy-smoke.test.ts`.
 
-28. **No `Content-Security-Policy` meta tag in `index.html`:** While CSP is tracked in M8-01, a basic restrictive CSP meta tag could be added now to establish the baseline and catch regressions early.
+28. ~~**No `Content-Security-Policy` meta tag in `index.html`:** While CSP is tracked in M8-01, a basic restrictive CSP meta tag could be added now to establish the baseline and catch regressions early.~~ **RESOLVED** - Added a restrictive baseline CSP meta tag to `index.html` and expanded `scripts/verify-build-channel.mjs` plus `scripts/verify-build-channel.test.ts` to fail CI when the CSP meta tag is missing or missing core directives.
 
 #### Testing
 
@@ -258,10 +258,10 @@ All remaining findings that are not yet fixed, organized by severity and categor
 | --- | --- | --- |
 | **High** | 0 | - |
 | **Medium** | 0 | - |
-| **Low** | 12 | CI build waste (1), security headers (1), test gaps (6), docs gaps (2), config gap (1), Playwright device profiles, script test isolation |
-| Resolved | 26 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication - shared module + contract test), #6 (empty deploy dir removed), #9 (website-repo contract validation), #10 (Workflow string interpolation), #11 (Unused src/lib directory), #12 (Inconsistent icon naming), #13 (vite.config.ts includeAssets vs manifest.icons asymmetry), #14 (CSS design variables), #15 (`viewport-fit=cover` in `index.html`), #16 (`meta description` in `index.html`), #17 (`meta theme-color` in `index.html`), #18 (noscript fallback), #19 (`%BASE_URL%` docs), #20 (redundant default quality build), #21 (Quality run triple-build reduction via dist artifact reuse), #22 (Playwright browser caching), #23 (workflow slug script contract coverage), #24 (preview-cleanup permissions), #25 (`website-deploy-smoke.yml` `npm ci`), #26 (smoke retry cap tuning), #27 (CSP/security-header runtime validation in production smoke checks), #40 (package.json version), #42 (ESLint ignores), #43 (engines field) |
+| **Low** | 11 | CI build waste (1), test gaps (6), docs gaps (2), config gap (1), Playwright device profiles, script test isolation |
+| Resolved | 27 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication - shared module + contract test), #6 (empty deploy dir removed), #9 (website-repo contract validation), #10 (Workflow string interpolation), #11 (Unused src/lib directory), #12 (Inconsistent icon naming), #13 (vite.config.ts includeAssets vs manifest.icons asymmetry), #14 (CSS design variables), #15 (`viewport-fit=cover` in `index.html`), #16 (`meta description` in `index.html`), #17 (`meta theme-color` in `index.html`), #18 (noscript fallback), #19 (`%BASE_URL%` docs), #20 (redundant default quality build), #21 (Quality run triple-build reduction via dist artifact reuse), #22 (Playwright browser caching), #23 (workflow slug script contract coverage), #24 (preview-cleanup permissions), #25 (`website-deploy-smoke.yml` `npm ci`), #26 (smoke retry cap tuning), #27 (CSP/security-header runtime validation in production smoke checks), #28 (index.html baseline CSP meta tag + build-channel CI guard), #40 (package.json version), #42 (ESLint ignores), #43 (engines field) |
 | Removed | 6 | #4, #7, #33, #37, #39, #44 |
-| **Total open** | 12 | |
+| **Total open** | 11 | |
 
 ---
 
