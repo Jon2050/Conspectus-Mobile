@@ -2,6 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!--
+      %BASE_URL% is replaced at build time by vite-plugin-pwa with the
+      configured Vite `base` path (channel-dependent: preview or production).
+      See vite.config.ts for the channel-aware base-path logic.
+    -->
     <link rel="icon" type="image/x-icon" href="%BASE_URL%icons/moneysack.ico" />
     <link rel="icon" type="image/png" sizes="32x32" href="%BASE_URL%icons/moneysack32x32.png" />
     <link rel="icon" type="image/png" sizes="64x64" href="%BASE_URL%icons/moneysack64x64.png" />
@@ -13,6 +18,12 @@
     <title>Conspectus Mobile</title>
   </head>
   <body>
+    <noscript>
+      <p>
+        Conspectus Mobile requires JavaScript to run. Please enable JavaScript in your browser
+        settings.
+      </p>
+    </noscript>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

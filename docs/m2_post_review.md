@@ -186,9 +186,9 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 17. ~~**No `<meta name="theme-color">` tag:** The `<head>` does not include a `<meta name="theme-color">` to match the manifest's `theme_color: '#dcdcdc'` (defined in `vite.config.ts` line 77). Browsers use this for address-bar coloring before manifest parsing. **Fix:** Add `<meta name="theme-color" content="#dcdcdc" />` to `<head>`.~~ **RESOLVED** - Added `<meta name="theme-color" content="#dcdcdc" />` to `index.html`. Local quality gates are green (`format`, `lint`, `test`, `test:e2e`, `typecheck`).
 
-18. **No `<noscript>` fallback:** A meaningful `<noscript>` message would improve the user experience for JavaScript-disabled contexts.
+18. ~~**No `<noscript>` fallback:**~~ **RESOLVED** — Added `<noscript>` tag in `<body>` with a user-friendly message explaining that JavaScript is required.
 
-19. **`%BASE_URL%` placeholder not documented:** `index.html` uses `%BASE_URL%` in icon `href` attributes. This works with `vite-plugin-pwa`'s HTML transformation, but the mechanism is not documented. A comment would help future contributors.
+19. ~~**`%BASE_URL%` placeholder not documented:**~~ **RESOLVED** — Added an HTML comment above the icon `href` attributes explaining the `%BASE_URL%` placeholder mechanism and pointing to `vite.config.ts` for channel-aware base-path logic.
 
 #### CI/CD
 
@@ -200,7 +200,7 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 23. **Branch slug Python logic in workflows is not tested:** The inline Python slugging code in `deploy-channels.yml` and `preview-cleanup.yml` has no automated tests. If it diverges from `toPreviewSlug` in `vite.config.ts`, preview cleanup could fail silently.
 
-24. **`preview-cleanup.yml` uses top-level `permissions: contents: write`** instead of job-level permissions. For consistency with the hardened `deploy-channels.yml`, this should be moved to job level.
+24. ~~**`preview-cleanup.yml` uses top-level `permissions: contents: write`**~~ **RESOLVED** — Moved `contents: write` to job-level permissions and set top-level to `contents: read`, matching the hardened pattern in `deploy-channels.yml`.
 
 25. **`website-deploy-smoke.yml` does not run `npm ci`** before running the smoke script. The script currently uses only Node built-ins, but if it ever imports a dependency, the workflow will silently break.
 
@@ -238,15 +238,15 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 39. REMOVED
 
-40. **Version `"0.0.0"` in `package.json`:** Still at the default. Setting a meaningful version (e.g., `0.2.0` for post-M2) would improve artifact traceability.
+40. ~~**Version `"0.0.0"` in `package.json`:**~~ **RESOLVED** — Updated to `"0.2.0"` for post-M2 traceability.
 
 #### Configuration
 
 41. **`.prettierignore` ignores all `*.md` files:** Documentation markdown files are not format-checked. Inconsistent formatting in docs won't be caught by `npm run format`. Consider removing `*.md` from `.prettierignore` and running `npm run format:write` to normalize existing docs, or narrowing the ignore to only generated markdown.
 
-42. **ESLint ignore list does not include `playwright-report/` or `test-results/`:** `eslint.config.js` (line 149) `ignores` block only excludes `dist`, `coverage`, `node_modules`. Running `npm run lint` locally after test failures picks up generated artifacts. Note: `.gitignore` already lists these directories (lines 15–16) so they won't be committed, but ESLint still scans them locally. **Fix:** Add `'playwright-report'` and `'test-results'` to the `ignores` array.
+42. ~~**ESLint ignore list does not include `playwright-report/` or `test-results/`:**~~ **RESOLVED** — Added `'playwright-report'` and `'test-results'` to the `ignores` array in `eslint.config.js`.
 
-43. **No `engines` field in `package.json`:** CI uses `node-version: 22` but `package.json` has no `engines` constraint. Adding `"engines": { "node": ">=22" }` would catch version mismatches in local development.
+43. ~~**No `engines` field in `package.json`:**~~ **RESOLVED** — Added `"engines": { "node": ">=22" }` to match CI's `node-version: 22`.
 
 44. REMOVED
 
@@ -258,10 +258,10 @@ All remaining findings that are not yet fixed, organized by severity and categor
 | --- | --- | --- |
 | **High** | 0 | — |
 | **Medium** | 2 | Quality concurrency, website-repo validation |
-| **Low** | 25 | index.html meta tags (1), icon naming, CSS design variables, CI build waste (4), security headers (2), test gaps (6), docs gaps (2), config gaps (3), `%BASE_URL%` docs, Playwright device profiles, script test isolation, retry caps, website-smoke npm ci |
-| Resolved | 12 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication — shared module + contract test), #6 (empty deploy dir removed), #10 (Workflow string interpolation), #11 (Unused src/lib directory), #12 (Inconsistent icon naming), #13 (vite.config.ts includeAssets vs manifest.icons asymmetry), #15 (`viewport-fit=cover` in `index.html`), #16 (`meta description` in `index.html`), #17 (`meta theme-color` in `index.html`) |
+| **Low** | 19 | CI build waste (4), security headers (2), test gaps (6), docs gaps (2), config gap (1), Playwright device profiles, script test isolation, retry caps, website-smoke npm ci |
+| Resolved | 18 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication — shared module + contract test), #6 (empty deploy dir removed), #10 (Workflow string interpolation), #11 (Unused src/lib directory), #12 (Inconsistent icon naming), #13 (vite.config.ts includeAssets vs manifest.icons asymmetry), #14 (CSS design variables), #15 (`viewport-fit=cover` in `index.html`), #16 (`meta description` in `index.html`), #17 (`meta theme-color` in `index.html`), #18 (noscript fallback), #19 (`%BASE_URL%` docs), #24 (preview-cleanup permissions), #40 (package.json version), #42 (ESLint ignores), #43 (engines field) |
 | Removed | 6 | #4, #7, #33, #37, #39, #44 |
-| **Total open** | 26 | |
+| **Total open** | 20 | |
 
 ---
 
