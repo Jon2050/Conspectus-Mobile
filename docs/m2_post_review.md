@@ -138,9 +138,7 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 #### Code Quality
 
-3. **`ErrorBoundaryPlaceholder.svelte` uses Svelte 4 `export let` syntax in a Svelte 5 project:**
-   - File: `src/features/app-shell/components/ErrorBoundaryPlaceholder.svelte` (line 2). The project uses Svelte 5 (`^5.45.2`) but this component still uses `export let message = ...`. Replace with `const { message = '...' } = $props<{ message?: string }>()` for consistency.
-   - Additionally, `hasErrorPlaceholder` in `src/features/app-shell/AppShell.svelte` (line 14) is set to `false` on every route change (line 18) but is **never set to `true`** anywhere — the entire `{#if hasErrorPlaceholder}` branch (line 43) is **dead code** with no trigger mechanism. Either implement a Svelte 5 `{#snippet}` error boundary that sets the flag on component render failure, or remove the dead branch and its import until a real error boundary is needed.
+3. ~~**`ErrorBoundaryPlaceholder.svelte` uses Svelte 4 `export let` syntax in a Svelte 5 project:**~~ **RESOLVED** — Migrated `ErrorBoundaryPlaceholder.svelte` to Svelte 5 `$props()` syntax. Removed dead error boundary code from `AppShell.svelte`: the `hasErrorPlaceholder` variable (never set to `true`), its reset in the route subscriber, the `{#if hasErrorPlaceholder}` template branch, and the unused import. Component file retained for future use. All quality gates pass.
 
 5. **`normalizeBasePath` / slug generation duplication across 3+ locations:**
    - `normalizeBasePath` exists in `vite.config.ts` (line 8) and `scripts/verify-build-channel.mjs` (line 6) — identical implementations.
@@ -260,11 +258,11 @@ All remaining findings that are not yet fixed, organized by severity and categor
 | Severity | Count | Key areas |
 | --- | --- | --- |
 | **High** | 0 | — |
-| **Medium** | 6 | Dead code / Svelte 5 migration, normalizeBasePath/slug duplication (3+ places), empty deploy dir, Quality concurrency, website-repo validation, secret interpolation |
+| **Medium** | 5 | normalizeBasePath/slug duplication (3+ places), empty deploy dir, Quality concurrency, website-repo validation, secret interpolation |
 | **Low** | 30 | index.html meta tags (4), icon naming, CSS design variables, CI build waste (4), security headers (2), test gaps (6), docs gaps (2), config gaps (3), `%BASE_URL%` docs, `src/lib/` leftover, icon asymmetry, Playwright device profiles, script test isolation, retry caps, website-smoke npm ci |
-| **Resolved** | 2 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch) |
+| **Resolved** | 3 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code) |
 | **Removed** | 6 | #4, #7, #33, #37, #39, #44 |
-| **Total open** | 36 | |
+| **Total open** | 35 | |
 
 ---
 
