@@ -176,7 +176,7 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 #### index.html
 
-15. **Missing `viewport-fit=cover`** in `index.html` line 10. The CSS already uses `env(safe-area-inset-bottom)` in `.app-shell` (line 48) and the `@media` block (line 148), which has no effect unless `viewport-fit=cover` is set. **Fix:** Change the viewport meta to `<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />`.
+15. ~~**Missing `viewport-fit=cover`** in `index.html` line 10. The CSS already uses `env(safe-area-inset-bottom)` in `.app-shell` (line 48) and the `@media` block (line 148), which has no effect unless `viewport-fit=cover` is set. **Fix:** Change the viewport meta to `<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />`.~~ **RESOLVED** — Updated `index.html` viewport meta to include `viewport-fit=cover`. All quality gates pass.
 
 16. **No `<meta name="description">` tag:** `index.html` lacks a description element. **Fix:** Add `<meta name="description" content="Mobile PWA for Conspectus personal finance tracking." />` to `<head>`.
 
@@ -254,10 +254,10 @@ All remaining findings that are not yet fixed, organized by severity and categor
 | --- | --- | --- |
 | **High** | 0 | — |
 | **Medium** | 2 | Quality concurrency, website-repo validation |
-| **Low** | 28 | index.html meta tags (4), icon naming, CSS design variables, CI build waste (4), security headers (2), test gaps (6), docs gaps (2), config gaps (3), `%BASE_URL%` docs, Playwright device profiles, script test isolation, retry caps, website-smoke npm ci |
-| Resolved | 9 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication — shared module + contract test), #6 (empty deploy dir removed), #10 (Workflow string interpolation), #11 (Unused src/lib directory), #12 (Inconsistent icon naming), #13 (vite.config.ts includeAssets vs manifest.icons asymmetry) |
+| **Low** | 27 | index.html meta tags (3), icon naming, CSS design variables, CI build waste (4), security headers (2), test gaps (6), docs gaps (2), config gaps (3), `%BASE_URL%` docs, Playwright device profiles, script test isolation, retry caps, website-smoke npm ci |
+| Resolved | 10 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication — shared module + contract test), #6 (empty deploy dir removed), #10 (Workflow string interpolation), #11 (Unused src/lib directory), #12 (Inconsistent icon naming), #13 (vite.config.ts includeAssets vs manifest.icons asymmetry), #15 (`viewport-fit=cover` in `index.html`) |
 | Removed | 6 | #4, #7, #33, #37, #39, #44 |
-| **Total open** | 29 | |
+| **Total open** | 28 | |
 
 ---
 
@@ -272,10 +272,9 @@ Ready:
 
 Not blocking M3 but should be tracked:
 1. Address slug-normalization duplication by centralizing normalization logic or adding a shared helper contract test.
-2. Fix `viewport-fit=cover` and missing `<meta>` tags in `index.html` before mobile testing begins.
+2. Fix remaining missing `<meta>` tags in `index.html` before mobile testing begins (`viewport-fit=cover` resolved).
 3. ~~Align `SyncState` type with architecture doc states before M4 implementation.~~ — **RESOLVED.**
 4. ~~Fix `renderStartupError` XSS vector~~ — **RESOLVED.**
 
 ---
-
 
