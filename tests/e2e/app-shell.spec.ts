@@ -4,6 +4,7 @@ test.use({ viewport: { width: 390, height: 844 } });
 
 const APP_BASE_PATH = '/conspectus/webapp/';
 const APP_BASE_PATH_WITHOUT_TRAILING_SLASH = APP_BASE_PATH.slice(0, -1);
+const PLAYWRIGHT_TEST_CLIENT_ID = 'playwright-test-client-id';
 const appPath = (suffix = ''): string => `${APP_BASE_PATH}${suffix}`;
 const REQUIRED_MANIFEST_ICONS = [
   {
@@ -15,6 +16,33 @@ const REQUIRED_MANIFEST_ICONS = [
     sizes: '512x512',
   },
 ];
+
+test('shows startup configuration error when required runtime env is missing', async ({ page }) => {
+  await page.route('**/*.js', async (route) => {
+    const response = await route.fetch();
+    const body = await response.text();
+
+    if (!body.includes(PLAYWRIGHT_TEST_CLIENT_ID)) {
+      await route.fulfill({ response, body });
+      return;
+    }
+
+    await route.fulfill({
+      response,
+      body: body.split(PLAYWRIGHT_TEST_CLIENT_ID).join('   '),
+    });
+  });
+
+  await page.goto(appPath());
+
+  await expect(
+    page.getByRole('heading', { level: 1, name: 'Startup configuration error' }),
+  ).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText(
+    'Missing required environment variable(s): VITE_AZURE_CLIENT_ID.',
+  );
+  await expect(page.getByTestId('app-shell')).toHaveCount(0);
+});
 
 test('loads a mobile app shell and navigates placeholder routes', async ({ page }) => {
   await page.goto(appPath('#/accounts'));
