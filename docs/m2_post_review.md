@@ -214,7 +214,7 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 #### Testing
 
-29. **Playwright only tests Desktop Chrome:** `playwright.config.ts` (line 18) has a single project using `devices['Desktop Chrome']`. Given the mobile-first PWA focus, add at least `devices['Pixel 5']` (Android viewport/UA) and/or `devices['iPhone 13']` (iOS Safari viewport/UA) as additional projects. Note: the E2E test already sets a mobile viewport override (`{ width: 390, height: 844 }` in `app-shell.spec.ts` line 3), but this doesn't affect UA string or touch emulation — adding device profiles would cover those.
+29. ~~**Playwright only tests Desktop Chrome:** `playwright.config.ts` (line 18) has a single project using `devices['Desktop Chrome']`. Given the mobile-first PWA focus, add at least `devices['Pixel 5']` (Android viewport/UA) and/or `devices['iPhone 13']` (iOS Safari viewport/UA) as additional projects. Note: the E2E test already sets a mobile viewport override (`{ width: 390, height: 844 }` in `app-shell.spec.ts` line 3), but this doesn't affect UA string or touch emulation - adding device profiles would cover those.~~ **RESOLVED** - Added a `pixel-5` Playwright project using `devices['Pixel 5']` in `playwright.config.ts`, so E2E now covers mobile UA/touch emulation in addition to Desktop Chrome.
 
 30. **E2E test for startup env-failure UI path** (`VITE_AZURE_CLIENT_ID` missing) does not exist.
 
@@ -258,10 +258,10 @@ All remaining findings that are not yet fixed, organized by severity and categor
 | --- | --- | --- |
 | **High** | 0 | - |
 | **Medium** | 0 | - |
-| **Low** | 11 | CI build waste (1), test gaps (6), docs gaps (2), config gap (1), Playwright device profiles, script test isolation |
-| Resolved | 27 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication - shared module + contract test), #6 (empty deploy dir removed), #9 (website-repo contract validation), #10 (Workflow string interpolation), #11 (Unused src/lib directory), #12 (Inconsistent icon naming), #13 (vite.config.ts includeAssets vs manifest.icons asymmetry), #14 (CSS design variables), #15 (`viewport-fit=cover` in `index.html`), #16 (`meta description` in `index.html`), #17 (`meta theme-color` in `index.html`), #18 (noscript fallback), #19 (`%BASE_URL%` docs), #20 (redundant default quality build), #21 (Quality run triple-build reduction via dist artifact reuse), #22 (Playwright browser caching), #23 (workflow slug script contract coverage), #24 (preview-cleanup permissions), #25 (`website-deploy-smoke.yml` `npm ci`), #26 (smoke retry cap tuning), #27 (CSP/security-header runtime validation in production smoke checks), #28 (index.html baseline CSP meta tag + build-channel CI guard), #40 (package.json version), #42 (ESLint ignores), #43 (engines field) |
+| **Low** | 10 | CI build waste (1), test gaps (6), docs gaps (2), config gap (1), script test isolation |
+| Resolved | 28 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication - shared module + contract test), #6 (empty deploy dir removed), #9 (website-repo contract validation), #10 (Workflow string interpolation), #11 (Unused src/lib directory), #12 (Inconsistent icon naming), #13 (vite.config.ts includeAssets vs manifest.icons asymmetry), #14 (CSS design variables), #15 (`viewport-fit=cover` in `index.html`), #16 (`meta description` in `index.html`), #17 (`meta theme-color` in `index.html`), #18 (noscript fallback), #19 (`%BASE_URL%` docs), #20 (redundant default quality build), #21 (Quality run triple-build reduction via dist artifact reuse), #22 (Playwright browser caching), #23 (workflow slug script contract coverage), #24 (preview-cleanup permissions), #25 (`website-deploy-smoke.yml` `npm ci`), #26 (smoke retry cap tuning), #27 (CSP/security-header runtime validation in production smoke checks), #28 (index.html baseline CSP meta tag + build-channel CI guard), #29 (Playwright mobile device profile coverage), #40 (package.json version), #42 (ESLint ignores), #43 (engines field) |
 | Removed | 6 | #4, #7, #33, #37, #39, #44 |
-| **Total open** | 11 | |
+| **Total open** | 10 | |
 
 ---
 
