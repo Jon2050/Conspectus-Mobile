@@ -290,8 +290,10 @@ jobs:
       contents: read
     steps:
       - name: Validate producer dispatch token
+        env:
+          DISPATCH_TOKEN: ${{ secrets.WEBSITE_REPO_DISPATCH_TOKEN }}
         run: |
-          if [ -z "${{ secrets.WEBSITE_REPO_DISPATCH_TOKEN }}" ]; then
+          if [ -z "${DISPATCH_TOKEN}" ]; then
             echo "Missing required secret WEBSITE_REPO_DISPATCH_TOKEN." >&2
             echo "This token must be scoped to trigger workflow events in ${WEBSITE_REPO_FULL_NAME}." >&2
             exit 1

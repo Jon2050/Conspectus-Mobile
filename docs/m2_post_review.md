@@ -156,7 +156,7 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 #### Security
 
-10. **`dispatch-production-ready` job validates the secret token with direct string interpolation in shell:**
+10. ~~**`dispatch-production-ready` job validates the secret token with direct string interpolation in shell:**~~ **RESOLVED** — Passed the secret to the step as an environment variable `DISPATCH_TOKEN` rather than interpolating it directly, thus preventing it from appearing in the expanded shell script.
     - `deploy-channels.yml` line 308 does `if [ -z "${{ secrets.WEBSITE_REPO_DISPATCH_TOKEN }}" ]`. GitHub Actions replaces `${{ secrets.* }}` at template expansion time, meaning the secret value briefly appears in the expanded shell script.
     - **Fix:** Add `env: DISPATCH_TOKEN: ${{ secrets.WEBSITE_REPO_DISPATCH_TOKEN }}` to the step (the same variable name is already used in the dispatch step on line 316), then change the check to `if [ -z "${DISPATCH_TOKEN}" ]`.
 
@@ -253,11 +253,11 @@ All remaining findings that are not yet fixed, organized by severity and categor
 | Severity | Count | Key areas |
 | --- | --- | --- |
 | **High** | 0 | — |
-| **Medium** | 3 | Quality concurrency, website-repo validation, secret interpolation |
+| **Medium** | 2 | Quality concurrency, website-repo validation |
 | **Low** | 30 | index.html meta tags (4), icon naming, CSS design variables, CI build waste (4), security headers (2), test gaps (6), docs gaps (2), config gaps (3), `%BASE_URL%` docs, `src/lib/` leftover, icon asymmetry, Playwright device profiles, script test isolation, retry caps, website-smoke npm ci |
-| **Resolved** | 5 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication — shared module + contract test), #6 (empty deploy dir removed) |
+| **Resolved** | 6 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication — shared module + contract test), #6 (empty deploy dir removed), #10 (Workflow string interpolation) |
 | **Removed** | 6 | #4, #7, #33, #37, #39, #44 |
-| **Total open** | 33 | |
+| **Total open** | 32 | |
 
 ---
 
