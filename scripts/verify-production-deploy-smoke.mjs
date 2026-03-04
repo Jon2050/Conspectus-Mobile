@@ -20,8 +20,8 @@ const normalizeBaseUrl = (value) => {
   const trimmedValue = value.trim();
   assert(trimmedValue.length > 0, 'Missing required --base-url argument.');
   assert(
-    trimmedValue.startsWith('http://') || trimmedValue.startsWith('https://'),
-    `Invalid --base-url value "${trimmedValue}". Use an absolute http/https URL.`,
+    trimmedValue.startsWith('https://'),
+    `Invalid --base-url value "${trimmedValue}". Use an absolute https URL.`,
   );
   return trimmedValue.endsWith('/') ? trimmedValue : `${trimmedValue}/`;
 };

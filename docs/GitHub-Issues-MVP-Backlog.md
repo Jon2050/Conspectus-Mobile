@@ -176,7 +176,7 @@ An issue is only considered done when:
 - Depends on: `M2-04`
 - GitHub: [#21](https://github.com/Jon2050/Conspectus-Mobile/issues/21)
 
-### :green_circle: M2-06 Add early public test page/link
+### :white_check_mark: M2-06 Add early public test page/link
 - Label: `feature`
 - Milestone: `M2 - Website Integration + Early Deploy`
 - Summary: Work includes website link entry for the PWA route and temporary "beta" marker if needed. It also covers routing from landing page to app path.

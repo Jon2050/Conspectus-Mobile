@@ -3,10 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const normalizeBasePath = (value) => {
-  const withLeadingSlash = value.startsWith('/') ? value : `/${value}`;
-  return withLeadingSlash.endsWith('/') ? withLeadingSlash : `${withLeadingSlash}/`;
-};
+import { normalizeBasePath } from './deploy-utils.mjs';
 
 const parseArgs = (argv) => {
   const args = {
@@ -214,14 +211,15 @@ const verifyServiceWorkerRegistration = (distDir, expectedBasePath) => {
 
   assert(hasServiceWorkerPath, `Service worker path is not scoped to ${expectedBasePath}.`);
 
-  const scopePatterns = [
-    `scope:"${expectedBasePath}"`,
-    `scope:"${expectedBasePath.slice(0, -1)}"`,
-    `scope:\\"${expectedBasePath}\\"`,
-    `scope:\\"${expectedBasePath.slice(0, -1)}\\"`,
+  const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const scopeRegexes = [
+    new RegExp(`scope\\s*:\\s*["']${escapeRegex(expectedBasePath)}["']`),
+    new RegExp(`scope\\s*:\\s*["']${escapeRegex(expectedBasePath.slice(0, -1))}["']`),
+    new RegExp(`scope\\\\\\s*:\\\\s*\\\\["']${escapeRegex(expectedBasePath)}\\\\["']`),
+    new RegExp(`scope\\\\\\s*:\\\\s*\\\\["']${escapeRegex(expectedBasePath.slice(0, -1))}\\\\["']`),
   ];
   const hasScopedRegistration = jsAssets.some((assetText) =>
-    scopePatterns.some((pattern) => assetText.includes(pattern)),
+    scopeRegexes.some((pattern) => pattern.test(assetText)),
   );
 
   assert(hasScopedRegistration, `Service worker scope is not restricted to ${expectedBasePath}.`);

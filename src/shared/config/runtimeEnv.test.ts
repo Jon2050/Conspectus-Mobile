@@ -30,4 +30,12 @@ describe('loadRuntimeEnv', () => {
       VITE_DEPLOY_PUBLIC_URL: 'https://jon2050.de/conspectus/webapp/',
     });
   });
+
+  it('omits optional keys when only the required variable is provided', () => {
+    const result = loadRuntimeEnv({ VITE_AZURE_CLIENT_ID: 'client-id' });
+
+    expect(result).toEqual({ VITE_AZURE_CLIENT_ID: 'client-id' });
+    expect(result).not.toHaveProperty('VITE_DEPLOY_BASE_PATH');
+    expect(result).not.toHaveProperty('VITE_DEPLOY_PUBLIC_URL');
+  });
 });

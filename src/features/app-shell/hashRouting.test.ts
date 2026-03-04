@@ -1,6 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { DEFAULT_ROUTE, resolveRouteFromHash, toRouteHash } from './hashRouting';
+import {
+  createHashRouteStore,
+  DEFAULT_ROUTE,
+  resolveRouteFromHash,
+  toRouteHash,
+} from './hashRouting';
 
 describe('hashRouting', () => {
   it('resolves known routes from hash URLs', () => {
@@ -31,5 +36,63 @@ describe('hashRouting', () => {
     expect(toRouteHash('transfers')).toBe('#/transfers');
     expect(toRouteHash('add')).toBe('#/add');
     expect(toRouteHash('settings')).toBe('#/settings');
+  });
+
+  it('subscribes to hash changes and unsubscribes cleanly', () => {
+    let hashChangeHandler: (() => void) | undefined;
+    const target = {
+      location: { hash: '#/accounts' },
+      addEventListener: vi.fn((event: string, handler: () => void) => {
+        if (event === 'hashchange') {
+          hashChangeHandler = handler;
+        }
+      }),
+      removeEventListener: vi.fn(),
+    };
+
+    const routeStore = createHashRouteStore(target);
+    const observedRoutes: string[] = [];
+    const unsubscribe = routeStore.subscribe((value) => {
+      observedRoutes.push(value);
+    });
+
+    expect(observedRoutes.at(-1)).toBe('accounts');
+    expect(target.addEventListener).toHaveBeenCalledWith('hashchange', expect.any(Function));
+
+    target.location.hash = '#/settings';
+    hashChangeHandler?.();
+    expect(observedRoutes.at(-1)).toBe('settings');
+
+    unsubscribe();
+    expect(target.removeEventListener).toHaveBeenCalledWith('hashchange', hashChangeHandler);
+  });
+
+  it('settles on the last route after rapid consecutive hash changes', () => {
+    let hashChangeHandler: (() => void) | undefined;
+    const target = {
+      location: { hash: '#/accounts' },
+      addEventListener: vi.fn((_event: string, handler: () => void) => {
+        hashChangeHandler = handler;
+      }),
+      removeEventListener: vi.fn(),
+    };
+
+    const routeStore = createHashRouteStore(target);
+    const observedRoutes: string[] = [];
+    const unsubscribe = routeStore.subscribe((value) => {
+      observedRoutes.push(value);
+    });
+
+    target.location.hash = '#/transfers';
+    hashChangeHandler?.();
+    target.location.hash = '#/add';
+    hashChangeHandler?.();
+    target.location.hash = '#/settings';
+    hashChangeHandler?.();
+
+    expect(observedRoutes.at(-1)).toBe('settings');
+    expect(observedRoutes).toEqual(['accounts', 'transfers', 'add', 'settings']);
+
+    unsubscribe();
   });
 });

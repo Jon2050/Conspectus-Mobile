@@ -1,0 +1,30 @@
+#!/usr/bin/env sh
+
+# Enforce that every commit message contains an "Agent:" trailer
+# identifying who or what created the commit.
+#
+# Valid examples:
+#   Agent: Claude
+#   Agent: Gemini
+#   Agent: Codex
+#   Agent: None
+#
+# This hook rejects the commit if the trailer is missing.
+
+COMMIT_MSG_FILE="$1"
+
+if ! grep -qiE "^Agent:[[:space:]]+[^[:space:]]" "$COMMIT_MSG_FILE"; then
+  echo ""
+  echo "ERROR: Missing required 'Agent:' trailer in commit message."
+  echo ""
+  echo "Every commit must identify its author agent. Add a trailer line"
+  echo "at the end of your commit message, for example:"
+  echo ""
+  echo "  feat: add login button"
+  echo ""
+  echo "  Agent: Claude"
+  echo ""
+  echo "Valid agent names: Claude, Gemini, Codex, None, or any identifier."
+  echo ""
+  exit 1
+fi

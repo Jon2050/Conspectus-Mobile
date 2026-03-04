@@ -48,10 +48,11 @@ export const resolveRouteFromHash = (hash: unknown): AppRouteKey => {
   return DEFAULT_ROUTE;
 };
 
-type HashRoutingWindowTarget = Pick<
-  Window,
-  'location' | 'addEventListener' | 'removeEventListener'
->;
+type HashRoutingWindowTarget = {
+  readonly location: Pick<Location, 'hash'>;
+  addEventListener: Window['addEventListener'];
+  removeEventListener: Window['removeEventListener'];
+};
 
 const hasBrowserTarget = (
   target: HashRoutingWindowTarget | undefined,

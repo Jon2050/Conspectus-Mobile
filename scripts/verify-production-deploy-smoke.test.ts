@@ -87,7 +87,7 @@ const createHealthyResponses = (): Record<string, MockHttpResponse> => ({
           type: 'image/png',
         },
         {
-          src: 'icons/moneysack256_256.png',
+          src: 'icons/moneysack256x256.png',
           sizes: '256x256',
           type: 'image/png',
         },
@@ -119,7 +119,7 @@ const createHealthyResponses = (): Record<string, MockHttpResponse> => ({
     status: 200,
     body: 'icon-bytes',
   },
-  'https://jon2050.de/conspectus/webapp/icons/moneysack256_256.png': {
+  'https://jon2050.de/conspectus/webapp/icons/moneysack256x256.png': {
     status: 200,
     body: 'icon-bytes',
   },
@@ -352,5 +352,18 @@ describe('verify-production-deploy-smoke script', () => {
       retryDelaySeconds: 10,
       requestTimeoutMs: 10000,
     });
+  });
+
+  it('rejects non-https base URLs', () => {
+    expect(() =>
+      parseArgs([
+        '--base-url',
+        'http://jon2050.de/conspectus/webapp',
+        '--commit-sha',
+        'abc123',
+        '--deploy-run-id',
+        '2002',
+      ]),
+    ).toThrow('Use an absolute https URL');
   });
 });

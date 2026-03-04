@@ -11,12 +11,19 @@ if (!appRoot) {
 }
 
 const renderStartupError = (message: string): void => {
-  appRoot.innerHTML = `
-    <section class="startup-error" role="alert" aria-live="assertive">
-      <h1>Startup configuration error</h1>
-      <p>${message}</p>
-    </section>
-  `.trim();
+  const section = document.createElement('section');
+  section.className = 'startup-error';
+  section.setAttribute('role', 'alert');
+  section.setAttribute('aria-live', 'assertive');
+
+  const heading = document.createElement('h1');
+  heading.textContent = 'Startup configuration error';
+
+  const paragraph = document.createElement('p');
+  paragraph.textContent = message;
+
+  section.append(heading, paragraph);
+  appRoot.replaceChildren(section);
 };
 
 const resolveStartupErrorMessage = (error: unknown): string => {

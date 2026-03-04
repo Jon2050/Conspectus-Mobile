@@ -1,5 +1,7 @@
 <script lang="ts">
-  export let message = 'A section failed to render. Try selecting another tab.';
+  const { message = 'A section failed to render. Try selecting another tab.' } = $props<{
+    message?: string;
+  }>();
 </script>
 
 <section

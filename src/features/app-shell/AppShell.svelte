@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
   import LoadingPlaceholder from './components/LoadingPlaceholder.svelte';
-  import ErrorBoundaryPlaceholder from './components/ErrorBoundaryPlaceholder.svelte';
   import AccountsRoute from './routes/AccountsRoute.svelte';
   import TransfersRoute from './routes/TransfersRoute.svelte';
   import AddRoute from './routes/AddRoute.svelte';
@@ -11,11 +10,9 @@
   const routeStore = createHashRouteStore();
   let currentRoute: AppRouteKey = DEFAULT_ROUTE;
   let showLoadingPlaceholder = true;
-  let hasErrorPlaceholder = false;
 
   const unsubscribe = routeStore.subscribe((route) => {
     currentRoute = route;
-    hasErrorPlaceholder = false;
   });
 
   onMount(() => {
@@ -40,9 +37,7 @@
   </header>
 
   <main class="app-content" aria-live="polite">
-    {#if hasErrorPlaceholder}
-      <ErrorBoundaryPlaceholder />
-    {:else if showLoadingPlaceholder}
+    {#if showLoadingPlaceholder}
       <LoadingPlaceholder />
     {:else if currentRoute === 'accounts'}
       <AccountsRoute />

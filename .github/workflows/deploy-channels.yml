@@ -12,7 +12,7 @@ env:
   WEBSITE_REPO_FULL_NAME: ${{ vars.WEBSITE_REPO_FULL_NAME || 'Jon2050/Jon2050_Webpage' }}
 
 permissions:
-  contents: write
+  contents: read
   actions: read
   pages: read
 
@@ -27,6 +27,8 @@ jobs:
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch != ''
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       branch_name: ${{ steps.context.outputs.branch_name }}
       branch_slug: ${{ steps.context.outputs.branch_slug }}
@@ -44,21 +46,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          branch_slug="$(python - <<'PY'
-          import os
-
-          branch_name = os.environ["BRANCH_NAME"].strip().lower()
-          encoded = []
-
-          for char in branch_name:
-              if ("a" <= char <= "z") or ("0" <= char <= "9") or char == "-":
-                  encoded.append(char)
-              else:
-                  encoded.append(f"_{ord(char):x}_")
-
-          print("".join(encoded).strip("-"))
-          PY
-          )"
+          branch_slug="$(python scripts/slugify-branch.py)"
 
           if [ -z "${branch_slug}" ]; then
             echo "Failed to derive preview slug from branch '${BRANCH_NAME}'." >&2
@@ -86,6 +74,10 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - prepare-context
+    permissions:
+      contents: write
+      actions: read
+      pages: read
     steps:
       - name: Checkout source commit
         uses: actions/checkout@v4
@@ -123,7 +115,7 @@ jobs:
           --base "${{ needs.prepare-context.outputs.preview_base_path }}"
 
       - name: Publish preview to gh-pages
-        uses: peaceiris/actions-gh-pages@v4
+        uses: peaceiris/actions-gh-pages@4f9cc6602d3f66b9c108549d475ec49e8ef4d45e # v4.0.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_branch: gh-pages
@@ -185,6 +177,9 @@ jobs:
     needs:
       - prepare-context
     if: needs.prepare-context.outputs.is_main == 'true'
+    permissions:
+      contents: read
+      actions: write
     outputs:
       artifact_name: ${{ steps.handoff.outputs.artifact_name }}
       commit_sha: ${{ steps.handoff.outputs.commit_sha }}
@@ -256,6 +251,7 @@ jobs:
         with:
           name: ${{ steps.handoff.outputs.artifact_name }}
           if-no-files-found: error
+          retention-days: 90
           path: dist
 
       - name: Verify production handoff outputs
@@ -290,10 +286,14 @@ jobs:
     needs:
       - publish-production-artifact
     if: needs.publish-production-artifact.result == 'success'
+    permissions:
+      contents: read
     steps:
       - name: Validate producer dispatch token
+        env:
+          DISPATCH_TOKEN: ${{ secrets.WEBSITE_REPO_DISPATCH_TOKEN }}
         run: |
-          if [ -z "${{ secrets.WEBSITE_REPO_DISPATCH_TOKEN }}" ]; then
+          if [ -z "${DISPATCH_TOKEN}" ]; then
             echo "Missing required secret WEBSITE_REPO_DISPATCH_TOKEN." >&2
             echo "This token must be scoped to trigger workflow events in ${WEBSITE_REPO_FULL_NAME}." >&2
             exit 1

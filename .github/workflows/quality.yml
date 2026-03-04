@@ -7,8 +7,76 @@ on:
 env:
   VITE_AZURE_CLIENT_ID: ${{ vars.VITE_AZURE_CLIENT_ID }}
 
+concurrency:
+  group: quality-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  detect-code-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code_changed: ${{ steps.detect.outputs.code_changed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect docs-only PR changes
+        id: detect
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+
+          if [ "${EVENT_NAME}" != 'pull_request' ]; then
+            echo "code_changed=true" >> "${GITHUB_OUTPUT}"
+            echo "Non-PR event detected; running full quality checks."
+            exit 0
+          fi
+
+          if [ -z "${BASE_SHA}" ] || [ -z "${HEAD_SHA}" ]; then
+            echo "Unable to resolve PR base/head SHAs; running full quality checks."
+            echo "code_changed=true" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          changed_files="$(git diff --name-only "${BASE_SHA}" "${HEAD_SHA}")"
+          if [ -z "${changed_files}" ]; then
+            echo "code_changed=false" >> "${GITHUB_OUTPUT}"
+            echo "No changed files detected; treating PR as docs-only."
+            exit 0
+          fi
+
+          code_changed='false'
+          while IFS= read -r file; do
+            if [ -z "${file}" ]; then
+              continue
+            fi
+
+            case "${file}" in
+              docs/*|*.md)
+                ;;
+              *)
+                code_changed='true'
+                break
+                ;;
+            esac
+          done <<EOF
+          ${changed_files}
+          EOF
+
+          echo "code_changed=${code_changed}" >> "${GITHUB_OUTPUT}"
+          if [ "${code_changed}" = 'false' ]; then
+            echo "Docs-only PR detected; lint/typecheck/tests/build jobs will be skipped."
+          fi
+
   lint-typecheck:
+    needs:
+      - detect-code-changes
+    if: needs.detect-code-changes.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -74,6 +142,9 @@ jobs:
             reports/vitest/
 
   e2e-smoke:
+    needs:
+      - detect-code-changes
+    if: needs.detect-code-changes.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

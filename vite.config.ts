@@ -3,12 +3,10 @@ import { fileURLToPath, URL } from 'node:url';
 import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig } from 'vitest/config';
 
-const DEFAULT_PRODUCTION_BASE_PATH = '/conspectus/webapp/';
+// @ts-expect-error -- .mjs import has no type declarations
+import { normalizeBasePath, toPreviewSlug } from './scripts/deploy-utils.mjs';
 
-const normalizeBasePath = (value: string): string => {
-  const withLeadingSlash = value.startsWith('/') ? value : `/${value}`;
-  return withLeadingSlash.endsWith('/') ? withLeadingSlash : `${withLeadingSlash}/`;
-};
+const DEFAULT_PRODUCTION_BASE_PATH = '/conspectus/webapp/';
 
 const normalizeBasePrefix = (value: string | undefined): string => {
   const trimmedValue = value?.trim();
@@ -19,14 +17,6 @@ const normalizeBasePrefix = (value: string | undefined): string => {
   const withLeadingSlash = trimmedValue.startsWith('/') ? trimmedValue : `/${trimmedValue}`;
   return withLeadingSlash.replace(/\/+$/g, '');
 };
-
-const toPreviewSlug = (value: string): string =>
-  value
-    .trim()
-    .toLowerCase()
-    .replace(/\//g, '_2f_')
-    .replace(/[^a-z0-9_-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
 
 const resolveBasePath = (): string => {
   const deployChannel = process.env.DEPLOY_CHANNEL?.trim().toLowerCase();
@@ -67,7 +57,7 @@ export default defineConfig({
         'icons/moneysack192x192.png',
         'icons/moneysack32x32.png',
         'icons/moneysack64x64.png',
-        'icons/moneysack256_256.png',
+        'icons/moneysack256x256.png',
         'icons/moneysack512x512.png',
       ],
       manifest: {
@@ -81,8 +71,23 @@ export default defineConfig({
         scope: basePath,
         icons: [
           {
+            src: 'icons/moneysack.ico',
+            sizes: 'any',
+            type: 'image/x-icon',
+          },
+          {
+            src: 'icons/moneysack32x32.png',
+            sizes: '32x32',
+            type: 'image/png',
+          },
+          {
             src: 'icons/moneysack64x64.png',
             sizes: '64x64',
+            type: 'image/png',
+          },
+          {
+            src: 'icons/moneysack180x180.png',
+            sizes: '180x180',
             type: 'image/png',
           },
           {
@@ -91,7 +96,7 @@ export default defineConfig({
             type: 'image/png',
           },
           {
-            src: 'icons/moneysack256_256.png',
+            src: 'icons/moneysack256x256.png',
             sizes: '256x256',
             type: 'image/png',
           },

@@ -15,6 +15,8 @@
   --accent-soft: #d7f2f3;
   --border: #c9c9c9;
   --error: #d03535;
+  --positive: #38a673;
+  --negative: #fa2828;
 }
 
 *,
