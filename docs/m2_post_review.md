@@ -130,11 +130,7 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 1. ~~**XSS vector in startup error rendering** (`src/main.ts`, `renderStartupError`):~~ **RESOLVED** — Replaced `innerHTML` template interpolation with `document.createElement` + `textContent` + `replaceChildren`. All quality gates pass.
 
-2. **`SyncState` type does not match Architecture-and-Implementation-Plan states** (`src/shared/state/syncStateStore.ts`):
-   - The store defines states: `idle`, `syncing`, `synced`, `error`.
-   - The Architecture doc (section 3.4 / M4-05) specifies: `syncing`, `synced`, `stale`, `offline`, `error`.
-   - Missing states: `stale` and `offline`. The current `idle` state has no doc counterpart.
-   - **Recommendation:** align the type definition early and add the missing states before M4, where the sync engine will depend on them.
+2. ~~**`SyncState` type does not match Architecture-and-Implementation-Plan states** (`src/shared/state/syncStateStore.ts`):~~ **RESOLVED** — Added `stale` and `offline` states to the `SyncState` type, `SyncStateStore` interface, and factory. Kept `idle` as the pre-sync startup state. Updated tests to cover all 6 states (transitions + parameterized initialization). All quality gates pass.
 
 ---
 
@@ -263,12 +259,12 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 | Severity | Count | Key areas |
 | --- | --- | --- |
-| **High** | 1 | SyncState type mismatch with architecture |
+| **High** | 0 | — |
 | **Medium** | 6 | Dead code / Svelte 5 migration, normalizeBasePath/slug duplication (3+ places), empty deploy dir, Quality concurrency, website-repo validation, secret interpolation |
 | **Low** | 30 | index.html meta tags (4), icon naming, CSS design variables, CI build waste (4), security headers (2), test gaps (6), docs gaps (2), config gaps (3), `%BASE_URL%` docs, `src/lib/` leftover, icon asymmetry, Playwright device profiles, script test isolation, retry caps, website-smoke npm ci |
-| **Resolved** | 1 | #1 (XSS vector in renderStartupError) |
+| **Resolved** | 2 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch) |
 | **Removed** | 6 | #4, #7, #33, #37, #39, #44 |
-| **Total open** | 37 | |
+| **Total open** | 36 | |
 
 ---
 
@@ -284,7 +280,7 @@ Ready:
 Not blocking M3 but should be tracked:
 1. Address slug-normalization duplication by centralizing normalization logic or adding a shared helper contract test.
 2. Fix `viewport-fit=cover` and missing `<meta>` tags in `index.html` before mobile testing begins.
-3. Align `SyncState` type with architecture doc states before M4 implementation.
+3. ~~Align `SyncState` type with architecture doc states before M4 implementation.~~ — **RESOLVED.**
 4. ~~Fix `renderStartupError` XSS vector~~ — **RESOLVED.**
 
 ---
