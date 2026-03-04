@@ -9,6 +9,7 @@ on:
 
 env:
   PRODUCTION_APP_BASE_URL: ${{ vars.PRODUCTION_APP_BASE_URL || 'https://jon2050.de/conspectus/webapp/' }}
+  WEBSITE_REPO_FULL_NAME: ${{ vars.WEBSITE_REPO_FULL_NAME || 'Jon2050/Jon2050_Webpage' }}
 
 permissions:
   contents: read
@@ -33,6 +34,35 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Verify website consumer handoff contract
+        env:
+          DISPATCH_TOKEN: ${{ secrets.WEBSITE_REPO_DISPATCH_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${DISPATCH_TOKEN}" ]; then
+            echo "Missing required secret WEBSITE_REPO_DISPATCH_TOKEN." >&2
+            echo "This token must be scoped to read ${WEBSITE_REPO_FULL_NAME} workflow contents." >&2
+            exit 1
+          fi
+
+          workflow_api_url="https://api.github.com/repos/${WEBSITE_REPO_FULL_NAME}/contents/.github/workflows/deploy.yml?ref=master"
+          workflow_status="$(curl -sS -L -o website-deploy-workflow.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${DISPATCH_TOKEN}" \
+            -H 'Accept: application/vnd.github+json' \
+            "${workflow_api_url}")"
+
+          if [ "${workflow_status}" != '200' ]; then
+            echo "Failed to read website deploy workflow from ${WEBSITE_REPO_FULL_NAME}." >&2
+            echo "Workflow API status: ${workflow_status}" >&2
+            cat website-deploy-workflow.json >&2 || true
+            exit 1
+          fi
+
+          node scripts/verify-website-consumer-contract.mjs \
+            --workflow-json website-deploy-workflow.json \
+            --producer-repo "${GITHUB_REPOSITORY}"
 
       - name: Run production deployment smoke checks
         run: >-

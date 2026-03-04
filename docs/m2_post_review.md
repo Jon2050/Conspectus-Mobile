@@ -156,7 +156,7 @@ All remaining findings that are not yet fixed, organized by severity and categor
    - Without `cancel-in-progress`, multiple pushes to the same branch queue redundant Quality runs. This wastes CI minutes and delays feedback.
    - **Fix:** Add a `concurrency` block at the workflow top level, matching the pattern used in `deploy-channels.yml` (line 19). Use `group: quality-${{ github.head_ref || github.ref }}` with `cancel-in-progress: true`.
 
-9. **Website-repo-side expectations (M2-04/M2-06) cannot be fully validated from this repository alone.**
+9. ~~**Website-repo-side expectations (M2-04/M2-06) cannot be fully validated from this repository alone.**~~ **RESOLVED** - Added `scripts/verify-website-consumer-contract.mjs` with unit tests and wired it into `.github/workflows/website-deploy-smoke.yml` to validate consumer workflow contract markers (dispatch trigger/type, payload identity fields, producer repo binding, metadata validation step, and `conspectus/webapp` target path) against `Jon2050/Jon2050_Webpage/.github/workflows/deploy.yml` on successful `main` deploy flows.
 
 #### Security
 
@@ -256,12 +256,12 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 | Severity | Count | Key areas |
 | --- | --- | --- |
-| **High** | 0 | — |
-| **Medium** | 2 | Quality concurrency, website-repo validation |
+| **High** | 0 | - |
+| **Medium** | 0 | - |
 | **Low** | 19 | CI build waste (4), security headers (2), test gaps (6), docs gaps (2), config gap (1), Playwright device profiles, script test isolation, retry caps, website-smoke npm ci |
-| Resolved | 18 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication — shared module + contract test), #6 (empty deploy dir removed), #10 (Workflow string interpolation), #11 (Unused src/lib directory), #12 (Inconsistent icon naming), #13 (vite.config.ts includeAssets vs manifest.icons asymmetry), #14 (CSS design variables), #15 (`viewport-fit=cover` in `index.html`), #16 (`meta description` in `index.html`), #17 (`meta theme-color` in `index.html`), #18 (noscript fallback), #19 (`%BASE_URL%` docs), #24 (preview-cleanup permissions), #40 (package.json version), #42 (ESLint ignores), #43 (engines field) |
+| Resolved | 19 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication - shared module + contract test), #6 (empty deploy dir removed), #9 (website-repo contract validation), #10 (Workflow string interpolation), #11 (Unused src/lib directory), #12 (Inconsistent icon naming), #13 (vite.config.ts includeAssets vs manifest.icons asymmetry), #14 (CSS design variables), #15 (`viewport-fit=cover` in `index.html`), #16 (`meta description` in `index.html`), #17 (`meta theme-color` in `index.html`), #18 (noscript fallback), #19 (`%BASE_URL%` docs), #24 (preview-cleanup permissions), #40 (package.json version), #42 (ESLint ignores), #43 (engines field) |
 | Removed | 6 | #4, #7, #33, #37, #39, #44 |
-| **Total open** | 20 | |
+| **Total open** | 19 | |
 
 ---
 
@@ -281,3 +281,4 @@ Not blocking M3 but should be tracked:
 4. ~~Fix `renderStartupError` XSS vector~~ — **RESOLVED.**
 
 ---
+
