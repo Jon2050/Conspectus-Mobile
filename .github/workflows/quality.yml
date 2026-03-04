@@ -111,7 +111,8 @@ jobs:
         run: |
           mkdir -p reports/vitest
           set -o pipefail
-          npx vitest run --reporter=default --reporter=junit --outputFile=reports/vitest/junit.xml | tee reports/vitest/vitest.log
+          npx vitest run --config vite.config.ts --reporter=default --reporter=junit --outputFile=reports/vitest/junit-app.xml | tee reports/vitest/vitest-app.log
+          npx vitest run --config vitest.scripts.config.ts --reporter=default --reporter=junit --outputFile=reports/vitest/junit-scripts.xml | tee reports/vitest/vitest-scripts.log
 
       - name: Build and verify production channel paths/scope
         env:
