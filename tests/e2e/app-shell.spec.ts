@@ -5,6 +5,12 @@ test.use({ viewport: { width: 390, height: 844 } });
 const APP_BASE_PATH = '/conspectus/webapp/';
 const APP_BASE_PATH_WITHOUT_TRAILING_SLASH = APP_BASE_PATH.slice(0, -1);
 const PLAYWRIGHT_TEST_CLIENT_ID = 'playwright-test-client-id';
+const RUNTIME_CLIENT_ID_TOKENS = [
+  process.env.VITE_AZURE_CLIENT_ID,
+  PLAYWRIGHT_TEST_CLIENT_ID,
+].filter(
+  (value, index, values): value is string => Boolean(value) && values.indexOf(value) === index,
+);
 const appPath = (suffix = ''): string => `${APP_BASE_PATH}${suffix}`;
 const REQUIRED_MANIFEST_ICONS = [
   {
@@ -22,14 +28,15 @@ test('shows startup configuration error when required runtime env is missing', a
     const response = await route.fetch();
     const body = await response.text();
 
-    if (!body.includes(PLAYWRIGHT_TEST_CLIENT_ID)) {
+    const tokenToReplace = RUNTIME_CLIENT_ID_TOKENS.find((token) => body.includes(token));
+    if (!tokenToReplace) {
       await route.fulfill({ response, body });
       return;
     }
 
     await route.fulfill({
       response,
-      body: body.split(PLAYWRIGHT_TEST_CLIENT_ID).join('   '),
+      body: body.split(tokenToReplace).join('   '),
     });
   });
 
