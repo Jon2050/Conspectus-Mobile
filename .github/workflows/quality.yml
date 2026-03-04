@@ -113,9 +113,6 @@ jobs:
           set -o pipefail
           npx vitest run --reporter=default --reporter=junit --outputFile=reports/vitest/junit.xml | tee reports/vitest/vitest.log
 
-      - name: Build
-        run: npm run build
-
       - name: Build and verify production channel paths/scope
         env:
           DEPLOY_CHANNEL: production
