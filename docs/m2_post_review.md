@@ -234,7 +234,7 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 37. REMOVED
 
-38. **Module README files are minimal:** `auth`, `graph`, `db`, and `cache` modules have empty barrel exports (`export {}`) and minimal READMEs. These should be updated before M3 to clarify responsibilities and expected interfaces.
+38. ~~**Module README files are minimal:** `auth`, `graph`, `db`, and `cache` modules have empty barrel exports (`export {}`) and minimal READMEs. These should be updated before M3 to clarify responsibilities and expected interfaces.~~ **RESOLVED** - Expanded `src/{auth,graph,db,cache}/README.md` with explicit expected public interfaces and implementation targets, and replaced `export {}` placeholders in each module barrel with typed contract exports to document the intended M3/M4/M5 APIs.
 
 39. REMOVED
 
@@ -258,10 +258,10 @@ All remaining findings that are not yet fixed, organized by severity and categor
 | --- | --- | --- |
 | **High** | 0 | - |
 | **Medium** | 0 | - |
-| **Low** | 2 | docs gap (1), config gap (1) |
-| Resolved | 36 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication - shared module + contract test), #6 (empty deploy dir removed), #9 (website-repo contract validation), #10 (Workflow string interpolation), #11 (Unused src/lib directory), #12 (Inconsistent icon naming), #13 (vite.config.ts includeAssets vs manifest.icons asymmetry), #14 (CSS design variables), #15 (`viewport-fit=cover` in `index.html`), #16 (`meta description` in `index.html`), #17 (`meta theme-color` in `index.html`), #18 (noscript fallback), #19 (`%BASE_URL%` docs), #20 (redundant default quality build), #21 (Quality run triple-build reduction via dist artifact reuse), #22 (Playwright browser caching), #23 (workflow slug script contract coverage), #24 (preview-cleanup permissions), #25 (`website-deploy-smoke.yml` `npm ci`), #26 (smoke retry cap tuning), #27 (CSP/security-header runtime validation in production smoke checks), #28 (index.html baseline CSP meta tag + build-channel CI guard), #29 (Playwright mobile device profile coverage), #30 (startup env-failure E2E coverage), #31 (route placeholder component unit tests), #32 (app-shell loading/transition and loading/error placeholder component tests), #34 (`sumCents` edge-case test coverage), #35 (alias key parity contract test between `vite.config.ts` and `tsconfig.app.json`), #36 (script/app Vitest config isolation), #40 (package.json version), #42 (ESLint ignores), #43 (engines field) |
+| **Low** | 1 | config gap (1) |
+| Resolved | 37 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication - shared module + contract test), #6 (empty deploy dir removed), #9 (website-repo contract validation), #10 (Workflow string interpolation), #11 (Unused src/lib directory), #12 (Inconsistent icon naming), #13 (vite.config.ts includeAssets vs manifest.icons asymmetry), #14 (CSS design variables), #15 (`viewport-fit=cover` in `index.html`), #16 (`meta description` in `index.html`), #17 (`meta theme-color` in `index.html`), #18 (noscript fallback), #19 (`%BASE_URL%` docs), #20 (redundant default quality build), #21 (Quality run triple-build reduction via dist artifact reuse), #22 (Playwright browser caching), #23 (workflow slug script contract coverage), #24 (preview-cleanup permissions), #25 (`website-deploy-smoke.yml` `npm ci`), #26 (smoke retry cap tuning), #27 (CSP/security-header runtime validation in production smoke checks), #28 (index.html baseline CSP meta tag + build-channel CI guard), #29 (Playwright mobile device profile coverage), #30 (startup env-failure E2E coverage), #31 (route placeholder component unit tests), #32 (app-shell loading/transition and loading/error placeholder component tests), #34 (`sumCents` edge-case test coverage), #35 (alias key parity contract test between `vite.config.ts` and `tsconfig.app.json`), #36 (script/app Vitest config isolation), #38 (module README/barrel interface contracts), #40 (package.json version), #42 (ESLint ignores), #43 (engines field) |
 | Removed | 6 | #4, #7, #33, #37, #39, #44 |
-| **Total open** | 2 | |
+| **Total open** | 1 | |
 
 ---
 
