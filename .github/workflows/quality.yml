@@ -7,6 +7,10 @@ on:
 env:
   VITE_AZURE_CLIENT_ID: ${{ vars.VITE_AZURE_CLIENT_ID }}
 
+concurrency:
+  group: quality-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   detect-code-changes:
     runs-on: ubuntu-latest

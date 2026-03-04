@@ -148,7 +148,7 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 #### CI/CD
 
-8. **`Quality` workflow has no `concurrency` group** (`.github/workflows/quality.yml`):
+8. ~~**`Quality` workflow has no `concurrency` group** (`.github/workflows/quality.yml`):~~ **RESOLVED** — Added a `concurrency` block with `cancel-in-progress: true` at the workflow top level.
    - Without `cancel-in-progress`, multiple pushes to the same branch queue redundant Quality runs. This wastes CI minutes and delays feedback.
    - **Fix:** Add a `concurrency` block at the workflow top level, matching the pattern used in `deploy-channels.yml` (line 19). Use `group: quality-${{ github.head_ref || github.ref }}` with `cancel-in-progress: true`.
 
