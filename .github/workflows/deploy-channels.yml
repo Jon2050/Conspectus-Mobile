@@ -10,6 +10,8 @@ on:
 env:
   VITE_AZURE_CLIENT_ID: ${{ vars.VITE_AZURE_CLIENT_ID }}
   WEBSITE_REPO_FULL_NAME: ${{ vars.WEBSITE_REPO_FULL_NAME || 'Jon2050/Jon2050_Webpage' }}
+  PREVIEW_SMOKE_MAX_ATTEMPTS: '18'
+  PREVIEW_SMOKE_RETRY_DELAY_SECONDS: '10'
 
 permissions:
   contents: read
@@ -148,7 +150,19 @@ jobs:
           fi
 
           preview_index_url="${PREVIEW_URL}index.html"
-          max_attempts=30
+          max_attempts="${PREVIEW_SMOKE_MAX_ATTEMPTS}"
+          retry_delay_seconds="${PREVIEW_SMOKE_RETRY_DELAY_SECONDS}"
+
+          if ! [[ "${max_attempts}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "PREVIEW_SMOKE_MAX_ATTEMPTS must be a positive integer; got '${max_attempts}'." >&2
+            exit 1
+          fi
+
+          if ! [[ "${retry_delay_seconds}" =~ ^[0-9]+$ ]]; then
+            echo "PREVIEW_SMOKE_RETRY_DELAY_SECONDS must be a non-negative integer; got '${retry_delay_seconds}'." >&2
+            exit 1
+          fi
+
           for attempt in $(seq 1 "${max_attempts}"); do
             preview_status="$(curl -sS -L -o preview-index.html -w '%{http_code}' "${preview_index_url}")"
             if [ "${preview_status}" = '200' ] && grep -q 'id="app"' preview-index.html; then
@@ -157,8 +171,8 @@ jobs:
             fi
 
             if [ "${attempt}" -lt "${max_attempts}" ]; then
-              echo "Preview check attempt ${attempt}/${max_attempts} not ready (status ${preview_status}); retrying in 10s..."
-              sleep 10
+              echo "Preview check attempt ${attempt}/${max_attempts} not ready (status ${preview_status}); retrying in ${retry_delay_seconds}s..."
+              sleep "${retry_delay_seconds}"
             fi
           done
 

@@ -10,6 +10,8 @@ on:
 env:
   PRODUCTION_APP_BASE_URL: ${{ vars.PRODUCTION_APP_BASE_URL || 'https://jon2050.de/conspectus/webapp/' }}
   WEBSITE_REPO_FULL_NAME: ${{ vars.WEBSITE_REPO_FULL_NAME || 'Jon2050/Jon2050_Webpage' }}
+  PRODUCTION_SMOKE_MAX_ATTEMPTS: '24'
+  PRODUCTION_SMOKE_RETRY_DELAY_SECONDS: '10'
 
 permissions:
   contents: read
@@ -73,6 +75,6 @@ jobs:
           --base-url "${{ env.PRODUCTION_APP_BASE_URL }}"
           --commit-sha "${{ github.event.workflow_run.head_sha }}"
           --deploy-run-id "${{ github.event.workflow_run.id }}"
-          --max-attempts 36
-          --retry-delay-seconds 10
+          --max-attempts ${{ env.PRODUCTION_SMOKE_MAX_ATTEMPTS }}
+          --retry-delay-seconds ${{ env.PRODUCTION_SMOKE_RETRY_DELAY_SECONDS }}
           --request-timeout-ms 10000

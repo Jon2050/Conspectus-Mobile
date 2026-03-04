@@ -204,7 +204,7 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 25. ~~**`website-deploy-smoke.yml` does not run `npm ci`** before running the smoke script.~~ **RESOLVED** - Added an explicit `Install dependencies` step (`npm ci`) to `.github/workflows/website-deploy-smoke.yml` before running repository smoke scripts.
 
-26. **Revisit retry caps** in preview/prod smoke checks to balance reliability and quota usage on long-tail failures.
+26. ~~**Revisit retry caps** in preview/prod smoke checks to balance reliability and quota usage on long-tail failures.~~ **RESOLVED** - Reduced preview availability polling to `18` attempts with `10s` delay (from `30` attempts) in `.github/workflows/deploy-channels.yml` and reduced production smoke retries to `24` attempts with `10s` delay (from `36` attempts) in `.github/workflows/website-deploy-smoke.yml`. Both retry caps are now workflow-level env values for easier future tuning.
 
 #### Security
 
@@ -258,10 +258,10 @@ All remaining findings that are not yet fixed, organized by severity and categor
 | --- | --- | --- |
 | **High** | 0 | - |
 | **Medium** | 0 | - |
-| **Low** | 14 | CI build waste (1), security headers (2), test gaps (6), docs gaps (2), config gap (1), Playwright device profiles, script test isolation, retry caps |
-| Resolved | 24 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication - shared module + contract test), #6 (empty deploy dir removed), #9 (website-repo contract validation), #10 (Workflow string interpolation), #11 (Unused src/lib directory), #12 (Inconsistent icon naming), #13 (vite.config.ts includeAssets vs manifest.icons asymmetry), #14 (CSS design variables), #15 (`viewport-fit=cover` in `index.html`), #16 (`meta description` in `index.html`), #17 (`meta theme-color` in `index.html`), #18 (noscript fallback), #19 (`%BASE_URL%` docs), #20 (redundant default quality build), #21 (Quality run triple-build reduction via dist artifact reuse), #22 (Playwright browser caching), #23 (workflow slug script contract coverage), #24 (preview-cleanup permissions), #25 (`website-deploy-smoke.yml` `npm ci`), #40 (package.json version), #42 (ESLint ignores), #43 (engines field) |
+| **Low** | 13 | CI build waste (1), security headers (2), test gaps (6), docs gaps (2), config gap (1), Playwright device profiles, script test isolation |
+| Resolved | 25 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication - shared module + contract test), #6 (empty deploy dir removed), #9 (website-repo contract validation), #10 (Workflow string interpolation), #11 (Unused src/lib directory), #12 (Inconsistent icon naming), #13 (vite.config.ts includeAssets vs manifest.icons asymmetry), #14 (CSS design variables), #15 (`viewport-fit=cover` in `index.html`), #16 (`meta description` in `index.html`), #17 (`meta theme-color` in `index.html`), #18 (noscript fallback), #19 (`%BASE_URL%` docs), #20 (redundant default quality build), #21 (Quality run triple-build reduction via dist artifact reuse), #22 (Playwright browser caching), #23 (workflow slug script contract coverage), #24 (preview-cleanup permissions), #25 (`website-deploy-smoke.yml` `npm ci`), #26 (smoke retry cap tuning), #40 (package.json version), #42 (ESLint ignores), #43 (engines field) |
 | Removed | 6 | #4, #7, #33, #37, #39, #44 |
-| **Total open** | 14 | |
+| **Total open** | 13 | |
 
 ---
 
