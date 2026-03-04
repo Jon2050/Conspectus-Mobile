@@ -120,6 +120,13 @@ jobs:
           npm run build
           node scripts/verify-build-channel.mjs --dist dist --channel production --base /conspectus/webapp/
 
+      - name: Upload production dist for e2e smoke
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-dist
+          if-no-files-found: error
+          path: dist
+
       - name: Build and verify preview channel paths/scope
         env:
           DEPLOY_CHANNEL: preview
@@ -141,6 +148,7 @@ jobs:
   e2e-smoke:
     needs:
       - detect-code-changes
+      - lint-typecheck
     if: needs.detect-code-changes.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -163,10 +171,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Download production dist for e2e smoke
+        uses: actions/download-artifact@v4
+        with:
+          name: production-dist
+          path: .
+
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
       - name: Run E2E smoke tests
+        env:
+          PLAYWRIGHT_WEB_SERVER_BUILD: '0'
         run: npm run test:e2e
 
       - name: Upload Playwright failure artifacts
