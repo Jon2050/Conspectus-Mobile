@@ -143,4 +143,110 @@ describe('verify-build-channel script', () => {
       rmSync(fixturePath, { force: true, recursive: true });
     }
   });
+
+  it('accepts valid preview channel output with branch-slug base path', () => {
+    const fixturePath = createFixtureDirectory();
+    const previewBase = '/Conspectus-Mobile/previews/feature_2f_login/';
+
+    try {
+      const distPath = path.join(fixturePath, 'dist');
+
+      writeText(
+        path.join(distPath, 'index.html'),
+        `<!doctype html>
+<html lang="en">
+  <head>
+    <link rel="manifest" href="${previewBase}manifest.webmanifest" />
+    <link rel="stylesheet" href="${previewBase}assets/index.css" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="${previewBase}assets/index.js"></script>
+  </body>
+</html>`,
+      );
+
+      writeText(
+        path.join(distPath, 'manifest.webmanifest'),
+        JSON.stringify({ name: 'Conspectus Mobile', start_url: previewBase, scope: previewBase }),
+      );
+
+      writeText(path.join(distPath, 'assets', 'index.css'), '.app { color: #111; }');
+      writeText(
+        path.join(distPath, 'assets', 'index.js'),
+        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('${previewBase}sw.js', { scope: '${previewBase}' }); }`,
+      );
+
+      const result = runVerifier([
+        '--dist',
+        distPath,
+        '--channel',
+        'preview',
+        '--base',
+        previewBase,
+      ]);
+
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain(
+        `[verify-build-channel] preview build output is valid for base path ${previewBase}`,
+      );
+    } finally {
+      rmSync(fixturePath, { force: true, recursive: true });
+    }
+  });
+
+  it('fails when manifest start_url does not match the expected base path', () => {
+    const fixturePath = createFixtureDirectory();
+
+    try {
+      const distPath = path.join(fixturePath, 'dist');
+      const basePath = '/conspectus/webapp/';
+
+      writeText(
+        path.join(distPath, 'index.html'),
+        `<!doctype html>
+<html lang="en">
+  <head>
+    <link rel="manifest" href="${basePath}manifest.webmanifest" />
+    <link rel="stylesheet" href="${basePath}assets/index.css" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="${basePath}assets/index.js"></script>
+  </body>
+</html>`,
+      );
+
+      writeText(
+        path.join(distPath, 'manifest.webmanifest'),
+        JSON.stringify({
+          name: 'Conspectus Mobile',
+          start_url: '/wrong-path/',
+          scope: basePath,
+        }),
+      );
+
+      writeText(path.join(distPath, 'assets', 'index.css'), '.app { color: #111; }');
+      writeText(
+        path.join(distPath, 'assets', 'index.js'),
+        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('${basePath}sw.js', { scope: '${basePath}' }); }`,
+      );
+
+      const result = runVerifier([
+        '--dist',
+        distPath,
+        '--channel',
+        'production',
+        '--base',
+        basePath,
+      ]);
+
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('Manifest start_url mismatch');
+    } finally {
+      rmSync(fixturePath, { force: true, recursive: true });
+    }
+  });
 });

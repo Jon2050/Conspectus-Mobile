@@ -38,6 +38,18 @@ describe('normalizeBasePath', () => {
   it('handles nested paths', () => {
     expect(normalizeBasePath('/conspectus/webapp')).toBe('/conspectus/webapp/');
   });
+
+  it('normalizes an empty string to a single slash', () => {
+    expect(normalizeBasePath('')).toBe('/');
+  });
+
+  it('returns root slash unchanged', () => {
+    expect(normalizeBasePath('/')).toBe('/');
+  });
+
+  it('preserves double-slash interior segments', () => {
+    expect(normalizeBasePath('//foo')).toBe('//foo/');
+  });
 });
 
 describe('toPreviewSlug', () => {

@@ -41,4 +41,21 @@ describe('createSyncStateStore', () => {
       expect(get(store)).toBe(state);
     },
   );
+
+  it('notifies subscribers on each state transition', () => {
+    const store = createSyncStateStore('idle');
+    const observed: SyncState[] = [];
+
+    const unsubscribe = store.subscribe((value) => {
+      observed.push(value);
+    });
+
+    store.setSyncing();
+    store.setSynced();
+    store.setError();
+
+    unsubscribe();
+
+    expect(observed).toEqual(['idle', 'syncing', 'synced', 'error']);
+  });
 });
