@@ -129,8 +129,8 @@ All remaining findings that are not yet fixed, organized by severity and categor
 #### Code Quality / Security
 
 1. **XSS vector in startup error rendering** (`src/main.ts`, `renderStartupError`):
-   - `renderStartupError` sets `appRoot.innerHTML` with the error message string. Although current callers only produce safe static strings, the function accepts an arbitrary `string`. If any future caller passes user-controlled or external data, it could be injected as HTML.
-   - **Recommendation:** use `textContent` or DOM API instead of `innerHTML`, or explicitly sanitize/escape the input.
+   - `renderStartupError` (line 13) sets `appRoot.innerHTML` with the error message string via `${message}` interpolation. Although `resolveStartupErrorMessage` (line 22) currently only produces safe static strings, the function signature accepts an arbitrary `string`. If any future caller passes user-controlled or external data, it could be injected as HTML.
+   - **Fix:** Replace the `innerHTML` assignment with DOM API calls. Build the `<section>`, `<h1>`, and `<p>` elements via `document.createElement`, set the message via `textContent` on the `<p>` element, and append the subtree to `appRoot`. This eliminates the injection vector entirely without changing the visual result.
 
 2. **`SyncState` type does not match Architecture-and-Implementation-Plan states** (`src/shared/state/syncStateStore.ts`):
    - The store defines states: `idle`, `syncing`, `synced`, `error`.
@@ -145,24 +145,25 @@ All remaining findings that are not yet fixed, organized by severity and categor
 #### Code Quality
 
 3. **`ErrorBoundaryPlaceholder.svelte` uses Svelte 4 `export let` syntax in a Svelte 5 project:**
-   - The project uses Svelte 5 (`^5.45.2`) but `ErrorBoundaryPlaceholder.svelte` still uses `export let message = ...`. The rest of the codebase should target the runes API (`$props()`) for consistency and future-proofing.
-   - Additionally, `hasErrorPlaceholder` in `AppShell.svelte` is set to `false` on every route change but is never set to `true` anywhere — the entire error-boundary branch is **dead code** with no trigger mechanism.
+   - File: `src/features/app-shell/components/ErrorBoundaryPlaceholder.svelte` (line 2). The project uses Svelte 5 (`^5.45.2`) but this component still uses `export let message = ...`. Replace with `const { message = '...' } = $props<{ message?: string }>()` for consistency.
+   - Additionally, `hasErrorPlaceholder` in `src/features/app-shell/AppShell.svelte` (line 14) is set to `false` on every route change (line 18) but is **never set to `true`** anywhere — the entire `{#if hasErrorPlaceholder}` branch (line 43) is **dead code** with no trigger mechanism. Either implement a Svelte 5 `{#snippet}` error boundary that sets the flag on component render failure, or remove the dead branch and its import until a real error boundary is needed.
 
 5. **`normalizeBasePath` / slug generation duplication across 3+ locations:**
-   - `normalizeBasePath` logic exists with slight variations in: `vite.config.ts`, `scripts/verify-build-channel.mjs`.
-   - Slug generation logic is duplicated in Python across `deploy-channels.yml` and `preview-cleanup.yml`, with a JavaScript version in `vite.config.ts` (`toPreviewSlug`).
-   - Total: **3 implementations of path normalization, 3 implementations of slug generation** (2 Python + 1 JS) — all must stay in sync manually.
+   - `normalizeBasePath` exists in `vite.config.ts` (line 8) and `scripts/verify-build-channel.mjs` (line 6) — identical implementations.
+   - Slug generation is in Python: `deploy-channels.yml` (lines 49–62) and `preview-cleanup.yml` (lines 27–41) — identical copies. A JavaScript version exists in `vite.config.ts` (`toPreviewSlug`, line 23) with equivalent but syntactically different logic.
+   - Total: **2 implementations of path normalization** (JS), **3 implementations of slug generation** (2 Python + 1 JS) — all must stay in sync manually.
    - Risk: drift/regression if one implementation changes independently.
+   - **Fix options:** (a) Extract `normalizeBasePath` into a shared Node script that both `vite.config.ts` and `verify-build-channel.mjs` import. (b) For slug generation, add a contract test that runs `toPreviewSlug` (JS) against the same inputs as the Python version and asserts identical outputs, so drift is caught in CI.
 
 6. **Empty `src/shared/deploy/` directory:** has no files and no clear purpose. Either remove it or add a README explaining its intended future use.
 
-7. **`dev-server.err.log` and `dev-server.out.log`** are present in the repository root but not in `.gitignore`. These appear to be development server artifacts that should not be committed.
+7. REMOVED
 
 #### CI/CD
 
-8. **`Quality` workflow has no `concurrency` group:**
+8. **`Quality` workflow has no `concurrency` group** (`.github/workflows/quality.yml`):
    - Without `cancel-in-progress`, multiple pushes to the same branch queue redundant Quality runs. This wastes CI minutes and delays feedback.
-   - **Recommendation:** add `concurrency` with `cancel-in-progress: true` per branch/PR.
+   - **Fix:** Add a `concurrency` block at the workflow top level, matching the pattern used in `deploy-channels.yml` (line 19). Use `group: quality-${{ github.head_ref || github.ref }}` with `cancel-in-progress: true`.
 
 9. **Website-repo-side expectations (M2-04/M2-06) cannot be fully validated from this repository alone.**
 
@@ -170,7 +171,7 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 10. **`dispatch-production-ready` job validates the secret token with direct string interpolation in shell:**
     - `deploy-channels.yml` line 308 does `if [ -z "${{ secrets.WEBSITE_REPO_DISPATCH_TOKEN }}" ]`. GitHub Actions replaces `${{ secrets.* }}` at template expansion time, meaning the secret value briefly appears in the expanded shell script.
-    - **Recommendation:** use an `env:` variable and reference `${VAR}` (matching the pattern already used for the dispatch step itself).
+    - **Fix:** Add `env: DISPATCH_TOKEN: ${{ secrets.WEBSITE_REPO_DISPATCH_TOKEN }}` to the step (the same variable name is already used in the dispatch step on line 316), then change the check to `if [ -z "${DISPATCH_TOKEN}" ]`.
 
 ---
 
@@ -178,21 +179,21 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 #### Code Quality
 
-11. **`src/lib/` directory** contains a single file but is not listed as an architecture module in README's `## Architecture Modules` section and has no `README.md` or barrel `index.ts`. It appears to be a leftover from the Vite scaffold.
+11. **`src/lib/` directory** contains only `Counter.svelte` (the Vite scaffold default component). It is not listed as an architecture module in README's `## Architecture Modules` section and has no `README.md` or barrel `index.ts`. **Fix:** Delete `src/lib/` and `Counter.svelte` entirely — neither is imported anywhere in the project.
 
 12. **Inconsistent icon naming:** `moneysack256_256.png` uses underscores while all other icons use `moneysack{W}x{H}.png` (lowercase-x convention).
 
 13. **`vite.config.ts` `includeAssets` / `manifest.icons` cross-check:** `moneysack.ico` and `moneysack180x180.png` are in `includeAssets` but not in `manifest.icons`. While technically correct, this asymmetry could confuse future maintainers.
 
-14. **Positive/negative money-value CSS variables** (`#38a673`, `#fa2828`) are defined in the Architecture doc (section 4.2) but not present in `app.css`. The CSS defines `--error: #d03535` but no `--positive` or `--negative` variables. These should be added before M5.
+14. **Positive/negative money-value CSS variables** (`#38a673`, `#fa2828`) are defined in `docs/Architecture-and-Implementation-Plan.md` (line 163: `Positive text: #38a673`) but not present in `src/app.css`. The CSS `:root` block defines `--error: #d03535` but no `--positive` or `--negative` variables. **Fix:** Add `--positive: #38a673;` and `--negative: #fa2828;` to the `:root` block in `app.css` before M5 when these colors will be needed for account balance and transfer amount rendering.
 
 #### index.html
 
-15. **Missing `viewport-fit=cover`** in the viewport meta tag. The CSS already uses `env(safe-area-inset-bottom)` in `.app-shell`, which has no effect unless `viewport-fit=cover` is set. Should be fixed now.
+15. **Missing `viewport-fit=cover`** in `index.html` line 10. The CSS already uses `env(safe-area-inset-bottom)` in `.app-shell` (line 48) and the `@media` block (line 148), which has no effect unless `viewport-fit=cover` is set. **Fix:** Change the viewport meta to `<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />`.
 
-16. **No `<meta name="description">` tag:** `index.html` lacks a description element. Add a brief description for search engines and share previews.
+16. **No `<meta name="description">` tag:** `index.html` lacks a description element. **Fix:** Add `<meta name="description" content="Mobile PWA for Conspectus personal finance tracking." />` to `<head>`.
 
-17. **No `<meta name="theme-color">` tag:** The `<head>` does not include a `<meta name="theme-color">` to match the manifest's `theme_color: '#dcdcdc'`. Browsers use this for address-bar coloring before manifest parsing.
+17. **No `<meta name="theme-color">` tag:** The `<head>` does not include a `<meta name="theme-color">` to match the manifest's `theme_color: '#dcdcdc'` (defined in `vite.config.ts` line 77). Browsers use this for address-bar coloring before manifest parsing. **Fix:** Add `<meta name="theme-color" content="#dcdcdc" />` to `<head>`.
 
 18. **No `<noscript>` fallback:** A meaningful `<noscript>` message would improve the user experience for JavaScript-disabled contexts.
 
@@ -200,7 +201,7 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 #### CI/CD
 
-20. **Triple full build in `lint-typecheck` job:** The job runs three separate Vite builds (default, production, preview). Consider dropping the default build since it's superseded by the channel-specific builds.
+20. **Triple full build in `lint-typecheck` job** (`quality.yml` lines 112–129): The job runs three separate Vite builds: (1) default build (line 113, no `DEPLOY_CHANNEL`), (2) production build (line 119, `DEPLOY_CHANNEL=production`), (3) preview build (line 128, `DEPLOY_CHANNEL=preview`). **Fix:** Drop the default build (line 112–113) — the production and preview builds already exercise all code paths and additionally verify channel-specific path/scope constraints.
 
 21. **Quadruple build per Quality run overall:** `e2e-smoke` builds via `playwright.config.ts` `webServer.command`. Combined with the triple build in `lint-typecheck`, a single Quality run produces **four full Vite builds**. Restructuring to share build artifacts across jobs would significantly reduce CI time.
 
@@ -222,7 +223,7 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 #### Testing
 
-29. **Playwright only tests Desktop Chrome:** `playwright.config.ts` has a single project using `devices['Desktop Chrome']`. Given the mobile-first PWA focus, at least `'Pixel 5'` and/or `'iPhone 13'` device profiles should be added.
+29. **Playwright only tests Desktop Chrome:** `playwright.config.ts` (line 18) has a single project using `devices['Desktop Chrome']`. Given the mobile-first PWA focus, add at least `devices['Pixel 5']` (Android viewport/UA) and/or `devices['iPhone 13']` (iOS Safari viewport/UA) as additional projects. Note: the E2E test already sets a mobile viewport override (`{ width: 390, height: 844 }` in `app-shell.spec.ts` line 3), but this doesn't affect UA string or touch emulation — adding device profiles would cover those.
 
 30. **E2E test for startup env-failure UI path** (`VITE_AZURE_CLIENT_ID` missing) does not exist.
 
@@ -230,13 +231,13 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 32. **More component-level tests for app shell transition and loading/error rendering states** are recommended.
 
-33. **`hashRouting.test.ts` does not test `resolveRouteFromHash` directly:** The exported utility function has no standalone unit tests for edge cases (deeply nested hashes, query strings, empty string, non-string inputs).
+33. REMOVED
 
-34. **No test for `sumCents` edge cases:** `sumCents.test.ts` should also cover empty arrays, single-element arrays, and very large numbers for integer safety.
+34. **Missing `sumCents` edge-case tests:** `src/shared/utils/sumCents.test.ts` covers empty arrays and mixed positive/negative values but is missing: (a) single-element arrays, (b) very large numbers near `Number.MAX_SAFE_INTEGER` to verify integer safety. Add these cases to prevent silent precision loss on high-value accounts.
 
-35. **`src/architectureAliases.test.ts`** does not verify that aliases in `vite.config.ts` match `tsconfig.app.json` paths. A comparison test would catch drift.
+35. **`src/architectureAliases.test.ts`** only checks that alias imports resolve and return defined objects. It does not verify that the alias set in `vite.config.ts` (lines 112–118, 6 aliases) matches the `paths` in `tsconfig.app.json` (lines 9–15, 6 paths). A comparison test reading both config files and asserting identical alias keys would catch drift if one config is updated without the other.
 
-36. **Script tests share Vitest config with app tests** (`scripts/**/*.test.ts` under `tsconfig.node.json`). Script tests can accidentally import browser-only modules without TypeScript catching it.
+36. **Script tests share Vitest config with app tests:** `vite.config.ts` (line 108) sets Vitest `include` to `['src/**/*.test.ts', 'scripts/**/*.test.ts']` under a single `environment: 'node'` setting. Meanwhile `tsconfig.node.json` (line 25) includes `scripts/**/*.test.ts` with Node-only libs (`ES2023` + `node` types), and `tsconfig.app.json` (line 35) includes `src/**/*.test.ts` with browser libs. Risk: a script test that accidentally imports a browser-only module (e.g., from `src/`) will pass TypeScript checks under the app tsconfig but fail at runtime in CI's Node environment.
 
 #### Documentation
 
@@ -250,13 +251,13 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 #### Configuration
 
-41. **`.prettierignore` ignores all `*.md` files:** Documentation markdown files are not format-checked. Inconsistent formatting in docs won't be caught by `npm run format`.
+41. **`.prettierignore` ignores all `*.md` files:** Documentation markdown files are not format-checked. Inconsistent formatting in docs won't be caught by `npm run format`. Consider removing `*.md` from `.prettierignore` and running `npm run format:write` to normalize existing docs, or narrowing the ignore to only generated markdown.
 
-42. **ESLint ignore list does not include `playwright-report/` or `test-results/`:** The ignore block only excludes `dist`, `coverage`, `node_modules`. Running `npm run lint` locally after test failures could pick up generated artifacts.
+42. **ESLint ignore list does not include `playwright-report/` or `test-results/`:** `eslint.config.js` (line 149) `ignores` block only excludes `dist`, `coverage`, `node_modules`. Running `npm run lint` locally after test failures picks up generated artifacts. Note: `.gitignore` already lists these directories (lines 15–16) so they won't be committed, but ESLint still scans them locally. **Fix:** Add `'playwright-report'` and `'test-results'` to the `ignores` array.
 
 43. **No `engines` field in `package.json`:** CI uses `node-version: 22` but `package.json` has no `engines` constraint. Adding `"engines": { "node": ">=22" }` would catch version mismatches in local development.
 
-44. **`vite-env.d.ts` does not declare optional env variables:** Adding `VITE_DEPLOY_BASE_PATH` and `VITE_DEPLOY_PUBLIC_URL` to the `ImportMetaEnv` interface would improve autocomplete and type safety.
+44. REMOVED
 
 ---
 
@@ -265,9 +266,10 @@ All remaining findings that are not yet fixed, organized by severity and categor
 | Severity | Count | Key areas |
 | --- | --- | --- |
 | **High** | 2 | XSS vector in startup error, SyncState type mismatch with architecture |
-| **Medium** | 7 | Dead code / Svelte 5 migration, normalizeBasePath/slug duplication (3+ places), empty deploy dir, dev log files, Quality concurrency, website-repo validation, secret interpolation |
-| **Low** | 17 | index.html meta tags (4), icon naming, CSS design variables, CI build waste (4), security headers (2), test gaps (8), docs gaps (4), config gaps (4) |
-| **Total** | 26 | |
+| **Medium** | 6 | Dead code / Svelte 5 migration, normalizeBasePath/slug duplication (3+ places), empty deploy dir, Quality concurrency, website-repo validation, secret interpolation |
+| **Low** | 30 | index.html meta tags (4), icon naming, CSS design variables, CI build waste (4), security headers (2), test gaps (6), docs gaps (2), config gaps (3), `%BASE_URL%` docs, `src/lib/` leftover, icon asymmetry, Playwright device profiles, script test isolation, retry caps, website-smoke npm ci |
+| **Removed** | 6 | #4, #7, #33, #37, #39, #44 |
+| **Total** | 38 | |
 
 ---
 
