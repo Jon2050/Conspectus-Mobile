@@ -142,7 +142,7 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 5. ~~**`normalizeBasePath` / slug generation duplication across 3+ locations:**~~ **RESOLVED** — Extracted `normalizeBasePath` and `toPreviewSlug` into `scripts/deploy-utils.mjs`; `vite.config.ts` and `verify-build-channel.mjs` now import from this shared module. Consolidated inline Python slug logic from `deploy-channels.yml` and `preview-cleanup.yml` into `scripts/slugify-branch.py`. Added `scripts/deploy-utils.test.ts` with unit tests for both functions and a JS/Python contract test that verifies identical output across 9 diverse branch-name inputs, catching any future drift in CI. Also fixed a latent bug: the original JS `toPreviewSlug` preserved underscores while Python hex-encoded them — the JS implementation now uses per-character encoding matching Python exactly. All quality gates pass.
 
-6. **Empty `src/shared/deploy/` directory:** has no files and no clear purpose. Either remove it or add a README explaining its intended future use.
+6. ~~**Empty `src/shared/deploy/` directory:** has no files and no clear purpose. Either remove it or add a README explaining its intended future use.~~ **RESOLVED** — Removed the empty directory.
 
 7. REMOVED
 
@@ -253,11 +253,11 @@ All remaining findings that are not yet fixed, organized by severity and categor
 | Severity | Count | Key areas |
 | --- | --- | --- |
 | **High** | 0 | — |
-| **Medium** | 4 | empty deploy dir, Quality concurrency, website-repo validation, secret interpolation |
+| **Medium** | 3 | Quality concurrency, website-repo validation, secret interpolation |
 | **Low** | 30 | index.html meta tags (4), icon naming, CSS design variables, CI build waste (4), security headers (2), test gaps (6), docs gaps (2), config gaps (3), `%BASE_URL%` docs, `src/lib/` leftover, icon asymmetry, Playwright device profiles, script test isolation, retry caps, website-smoke npm ci |
-| **Resolved** | 4 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication — shared module + contract test) |
+| **Resolved** | 5 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication — shared module + contract test), #6 (empty deploy dir removed) |
 | **Removed** | 6 | #4, #7, #33, #37, #39, #44 |
-| **Total open** | 34 | |
+| **Total open** | 33 | |
 
 ---
 
