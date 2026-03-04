@@ -172,7 +172,7 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 13. ~~**`vite.config.ts` `includeAssets` / `manifest.icons` cross-check:** `moneysack.ico` and `moneysack180x180.png` are in `includeAssets` but not in `manifest.icons`. While technically correct, this asymmetry could confuse future maintainers.~~ **RESOLVED** — Added missing icons (`moneysack.ico`, `moneysack32x32.png`, `moneysack180x180.png`) to `manifest.icons` to exactly mirror `includeAssets`. All quality gates pass.
 
-14. **Positive/negative money-value CSS variables** (`#38a673`, `#fa2828`) are defined in `docs/Architecture-and-Implementation-Plan.md` (line 163: `Positive text: #38a673`) but not present in `src/app.css`. The CSS `:root` block defines `--error: #d03535` but no `--positive` or `--negative` variables. **Fix:** Add `--positive: #38a673;` and `--negative: #fa2828;` to the `:root` block in `app.css` before M5 when these colors will be needed for account balance and transfer amount rendering.
+14. ~~**Positive/negative money-value CSS variables** (`#38a673`, `#fa2828`) are defined in `docs/Architecture-and-Implementation-Plan.md` (line 163: `Positive text: #38a673`) but not present in `src/app.css`. The CSS `:root` block defines `--error: #d03535` but no `--positive` or `--negative` variables. **Fix:** Add `--positive: #38a673;` and `--negative: #fa2828;` to the `:root` block in `app.css` before M5 when these colors will be needed for account balance and transfer amount rendering.~~ **RESOLVED** — Added `--positive` and `--negative` to the `:root` block in `src/app.css`.
 
 #### index.html
 
