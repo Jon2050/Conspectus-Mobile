@@ -36,20 +36,24 @@ Provide fast mobile access to a personal Conspectus SQLite database stored in On
 Create a `.env` file in the repository root. Use `.env.example` as the template.
 
 Required variable:
+
 - `VITE_AZURE_CLIENT_ID`: Microsoft Entra SPA client ID used for MSAL login.
   - CI/CD requirement: this repository variable must also be set in GitHub Actions repository variables.
 
 Optional deployment variables:
+
 - `VITE_DEPLOY_BASE_PATH`: Optional base-path override for non-channel/local builds.
 - `VITE_DEPLOY_PUBLIC_URL`: Optional full public app URL for deployment/reference tooling.
 
 Startup validation:
+
 - App startup fails fast when required variables are missing.
 - A clear startup message is shown in the UI and explains how to fix the configuration.
 
 ## Documentation Ownership
 
 Canonical source-of-truth by topic:
+
 - Environment variables and defaults: this `README.md` (`## Environment Setup`).
 - Module import conventions and aliases: this `README.md` (`## Architecture Modules`).
 - Sync/caching model (`eTag`, `If-Match`, conflict recovery): `docs/Architecture-and-Implementation-Plan.md` (`## 3.4 Sync and Caching Strategy`).
@@ -98,6 +102,7 @@ Import convention:
 ## Quality Tooling
 
 Local quality scripts:
+
 - `npm run format` - verifies deterministic formatting with Prettier.
 - `npm run lint` - runs ESLint and fails on warnings/errors.
 - `npm run test` - runs baseline unit tests with Vitest.
@@ -117,6 +122,7 @@ Deployment is split into two CI-gated channels:
 - Main branch runs additionally publish a production artifact for website-repo consumption, built for `/conspectus/webapp/`.
 
 Operational notes:
+
 - Preview builds use `DEPLOY_CHANNEL=preview` with deterministic path-safe branch slugging (single path segment, no nested branch folders) and isolate service worker scope/assets under `/<repo>/previews/<branch-slug>/`.
 - Production artifact builds use `DEPLOY_CHANNEL=production` and enforce `/conspectus/webapp/` for Vite `base`, PWA manifest `start_url`, and service worker scope.
 - Failed `Quality` runs do not produce preview deployments or production artifacts.
@@ -129,9 +135,11 @@ Operational notes:
 ## Issue Labeling Rules
 
 Backlog source of truth:
+
 - `docs/GitHub-Issues-MVP-Backlog.md`
 
 Required project labels:
+
 - `feature`: user-visible functionality or behavior changes in the app.
 - `infra`: repository, CI/CD, tooling, workflow, or deployment plumbing.
 - `bug`: defect fixes for incorrect current behavior.
@@ -140,6 +148,7 @@ Required project labels:
 - `security`: security, auth hardening, scopes, headers, dependency risk mitigation.
 
 Usage rules:
+
 - Apply exactly one primary label from the required project labels on each issue.
 - If an issue spans multiple areas, choose the dominant work type and capture secondary concerns in the issue body.
 - Assign a milestone to all milestone delivery issues (`M1-*` through `M8-*`).
@@ -151,31 +160,39 @@ Use this as a starting point when creating GitHub issues (especially `feature` w
 
 ```md
 ## Context / Problem
+
 What is the user/dev problem and why does it matter? Link any prior issues/PRs.
 
 ## Goals
+
 - ...
 
 ## Non-Goals
+
 - ...
 
 ## Scope
+
 - Code areas likely touched (modules/paths): ...
 - Config/infra changes (if any): ...
 - Dependencies / prerequisites (if any): ...
 
 ## Proposed Approach
+
 High-level steps or design constraints. Keep detailed implementation decisions in the PR when possible.
 
 ## Acceptance Criteria
+
 - Observable behavior outcomes (user-visible and/or internal).
 - Edge cases worth explicitly covering.
 
 ## Test Plan
+
 - Unit/integration: ...
 - E2E/manual: ...
 
 ## Notes / Rollout
+
 - Risks, migration notes, or compatibility concerns.
 - Rollout or verification steps (if relevant).
 ```
@@ -185,6 +202,7 @@ High-level steps or design constraints. Keep detailed implementation decisions i
 Every commit by an AI Agent must include an `Agent:` trailer at the end of the commit message identifying who or what created it. This is enforced by a `commit-msg` hook and commits without the trailer are rejected.
 
 Example:
+
 ```
 feat: add login button
 
@@ -198,6 +216,7 @@ This enables filtering by agent: `git log --grep="Agent: Claude"`.
 ## Issue Delivery Workflow
 
 Issue completion definition (required):
+
 - Every issue must be implemented from a dedicated issue branch and merged through a PR.
 - All scoped code/tests/docs changes are committed and pushed.
 - Local quality gates pass (`format`, `lint`, `typecheck`, `test`, `build`, and `test:e2e` when relevant).

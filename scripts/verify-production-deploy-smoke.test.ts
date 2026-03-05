@@ -28,11 +28,12 @@ const validDeployMetadata = JSON.stringify({
   deployRunId: '2002',
 });
 
-const asResponse = (status: number, body: string) =>
+const asResponse = (status: number, body: string, headers: Record<string, string> = {}) =>
   new Response(body, {
     status,
     headers: {
       'content-type': 'text/plain; charset=utf-8',
+      ...headers,
     },
   });
 
@@ -40,6 +41,7 @@ type FetchMock = ReturnType<typeof vi.fn> & typeof fetch;
 type MockHttpResponse = {
   status: number;
   body: string;
+  headers?: Record<string, string>;
 };
 
 const resolveUrl = (input: string | URL | Request) => {
@@ -59,7 +61,7 @@ const createFetchByUrl = (responses: Record<string, MockHttpResponse>): FetchMoc
     const resolvedUrl = resolveUrl(input);
     const response = responses[resolvedUrl];
     if (response) {
-      return asResponse(response.status, response.body);
+      return asResponse(response.status, response.body, response.headers);
     }
 
     return asResponse(404, 'not found');
@@ -69,6 +71,11 @@ const createHealthyResponses = (): Record<string, MockHttpResponse> => ({
   'https://jon2050.de/conspectus/webapp/': {
     status: 200,
     body: appHtml,
+    headers: {
+      'content-security-policy': "default-src 'self'; frame-ancestors 'none'",
+      'x-content-type-options': 'nosniff',
+      'referrer-policy': 'strict-origin-when-cross-origin',
+    },
   },
   'https://jon2050.de/conspectus/webapp/manifest.webmanifest': {
     status: 200,
@@ -218,6 +225,39 @@ describe('verify-production-deploy-smoke script', () => {
     );
   });
 
+  it('fails when app-route response is missing Content-Security-Policy header', async () => {
+    const responses = createHealthyResponses();
+    responses['https://jon2050.de/conspectus/webapp/'].headers = {
+      'x-content-type-options': 'nosniff',
+      'referrer-policy': 'strict-origin-when-cross-origin',
+    };
+    const fetchMock = createFetchByUrl(responses);
+    const sleepMock = vi.fn(async () => undefined);
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await expect(runSmokeChecks(baseOptions, fetchMock, sleepMock)).rejects.toThrow(
+      'Content-Security-Policy',
+    );
+  });
+
+  it('fails when app-route response has invalid X-Content-Type-Options header', async () => {
+    const responses = createHealthyResponses();
+    responses['https://jon2050.de/conspectus/webapp/'].headers = {
+      'content-security-policy': "default-src 'self'; frame-ancestors 'none'",
+      'x-content-type-options': 'invalid',
+      'referrer-policy': 'strict-origin-when-cross-origin',
+    };
+    const fetchMock = createFetchByUrl(responses);
+    const sleepMock = vi.fn(async () => undefined);
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await expect(runSmokeChecks(baseOptions, fetchMock, sleepMock)).rejects.toThrow(
+      'X-Content-Type-Options',
+    );
+  });
+
   it('fails when apple touch icon URL is not reachable', async () => {
     const responses = createHealthyResponses();
     responses['https://jon2050.de/conspectus/webapp/icons/moneysack180x180.png'] = {
@@ -268,7 +308,7 @@ describe('verify-production-deploy-smoke script', () => {
 
       const response = responses[resolvedUrl];
       if (response) {
-        return asResponse(response.status, response.body);
+        return asResponse(response.status, response.body, response.headers);
       }
 
       return asResponse(404, 'not found');

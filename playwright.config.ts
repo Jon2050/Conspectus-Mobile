@@ -1,5 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const webServerCommand =
+  process.env.PLAYWRIGHT_WEB_SERVER_BUILD === '0'
+    ? 'npm run preview -- --host=127.0.0.1 --port=4173 --strictPort'
+    : 'npm run build && npm run preview -- --host=127.0.0.1 --port=4173 --strictPort';
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
@@ -17,9 +22,13 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    {
+      name: 'pixel-5',
+      use: { ...devices['Pixel 5'] },
+    },
   ],
   webServer: {
-    command: 'npm run build && npm run preview -- --host=127.0.0.1 --port=4173 --strictPort',
+    command: webServerCommand,
     env: {
       ...process.env,
       DEPLOY_CHANNEL: 'production',

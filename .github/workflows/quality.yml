@@ -111,10 +111,8 @@ jobs:
         run: |
           mkdir -p reports/vitest
           set -o pipefail
-          npx vitest run --reporter=default --reporter=junit --outputFile=reports/vitest/junit.xml | tee reports/vitest/vitest.log
-
-      - name: Build
-        run: npm run build
+          npx vitest run --config vite.config.ts --reporter=default --reporter=junit --outputFile=reports/vitest/junit-app.xml | tee reports/vitest/vitest-app.log
+          npx vitest run --config vitest.scripts.config.ts --reporter=default --reporter=junit --outputFile=reports/vitest/junit-scripts.xml | tee reports/vitest/vitest-scripts.log
 
       - name: Build and verify production channel paths/scope
         env:
@@ -122,6 +120,13 @@ jobs:
         run: |
           npm run build
           node scripts/verify-build-channel.mjs --dist dist --channel production --base /conspectus/webapp/
+
+      - name: Upload production dist for e2e smoke
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-dist
+          if-no-files-found: error
+          path: dist
 
       - name: Build and verify preview channel paths/scope
         env:
@@ -144,6 +149,7 @@ jobs:
   e2e-smoke:
     needs:
       - detect-code-changes
+      - lint-typecheck
     if: needs.detect-code-changes.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -166,10 +172,35 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Resolve Playwright version
+        id: playwright-version
+        run: |
+          playwright_version="$(node -p "require('@playwright/test/package.json').version")"
+          echo "version=${playwright_version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+
+      - name: Download production dist for e2e smoke
+        uses: actions/download-artifact@v4
+        with:
+          name: production-dist
+          path: dist
+
+      - name: Install Playwright OS dependencies
+        run: npx playwright install-deps chromium
+
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
 
       - name: Run E2E smoke tests
+        env:
+          PLAYWRIGHT_WEB_SERVER_BUILD: '0'
         run: npm run test:e2e
 
       - name: Upload Playwright failure artifacts

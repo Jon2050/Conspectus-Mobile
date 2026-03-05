@@ -7,6 +7,7 @@ This document is the deep source-of-truth for architecture decisions, sync/write
 Use `README.md` as the quick-entry document for goal, MVP/non-goal summary, local setup, environment variables, and module import conventions.
 
 Core product constraints remain:
+
 - OneDrive-hosted personal SQLite file per user.
 - No backend server.
 - No required desktop-app changes.
@@ -15,6 +16,7 @@ Core product constraints remain:
 ## 1.1 Documentation Ownership
 
 Canonical sections by topic:
+
 - Sync/caching model (`eTag`, `If-Match`, conflict recovery): this document, `## 3.4 Sync and Caching Strategy`.
 - Environment variable definitions/defaults: `README.md`, `## Environment Setup`.
 - Module import conventions and aliases: `README.md`, `## Architecture Modules`.
@@ -50,6 +52,7 @@ Canonical sections by topic:
 - Testing: **Vitest**, **Playwright**, ESLint, Prettier
 
 Rationale:
+
 - Minimal runtime and code size.
 - Strong mobile performance.
 - Simple deployment (static assets only).
@@ -57,30 +60,37 @@ Rationale:
 ## 3.2 Runtime Components
 
 1. `UI Layer`
+
 - Mobile-first screens and components.
 - Gesture handling for month swipe.
 - Online/offline state and sync status indicators.
 
 2. `Auth Module`
+
 - Sign in/out with MSAL.
 - Silent token acquisition where possible.
 - Controlled fallback to interactive login.
 
 3. `OneDrive/Graph Module`
+
 - Metadata fetch (`driveId`, `itemId`, `eTag`).
 - File download and full-file upload.
 - Conditional upload using `If-Match` eTag.
 
 4. `DB Engine Module`
+
 - Open DB bytes in sql.js.
 - Run read queries for accounts/transfers.
 - Run write transaction for add-transfer flow.
 - Export updated DB bytes for upload.
 
 5. `Local Cache Module`
+
 - Persist DB blob + metadata (`eTag`, file IDs, last sync).
 - Provide offline read when network unavailable.
+
 6. `App State Module`
+
 - Selected month.
 - Sync lifecycle states.
 - Cached file identity (including fallback path/name) and sync metadata state.
@@ -88,6 +98,7 @@ Rationale:
 ## 3.3 Data Model Parity
 
 The PWA must mirror desktop behavior for transfer creation:
+
 - Insert into `transfer`.
 - Update both affected `account.amount` values.
 - Use same field-level validation rules as desktop:
@@ -100,6 +111,7 @@ The PWA must mirror desktop behavior for transfer creation:
 This section is the canonical sync behavior definition for the repository.
 
 Read flow on app startup:
+
 1. Resolve user auth.
 2. Resolve stored file binding (`driveId`, `itemId`, `parentReference/path`, `name`).
 3. Fetch file metadata (including `eTag`).
@@ -109,6 +121,7 @@ Read flow on app startup:
 Cache loss is non-critical: if the local IndexedDB cache is evicted (e.g. by iOS after inactivity), the app simply re-downloads the DB from OneDrive on next online startup. No data is lost because OneDrive is always the authoritative source.
 
 Write flow for "Add Transfer":
+
 1. Require online state.
 2. Validate fields.
 3. Execute local SQL transaction.
@@ -117,11 +130,13 @@ Write flow for "Add Transfer":
 6. Cache uploaded DB and returned new eTag.
 
 Conflict policy:
+
 - User agreement says desktop and mobile won't be used concurrently.
 - Still keep eTag conditional upload for protection.
 - If an eTag conflict occurs, the in-memory `sql.js` database instance MUST be completely destroyed and re-initialized with the freshly downloaded bytes before the user is allowed to retry the transfer save.
 
 Data recovery:
+
 - OneDrive automatically keeps version history for uploaded files (30 days for personal accounts).
 - Every PWA upload creates a recoverable version in OneDrive.
 - If a write corrupts data or the user makes a mistake, previous versions can be restored via OneDrive's web UI.
@@ -130,17 +145,20 @@ Data recovery:
 ## 3.5 Performance and Data Traffic
 
 Given ~700 KB DB:
+
 - First load per device/profile: ~700 KB download.
 - Each successful save: ~700 KB upload.
 - Unchanged open: metadata check only, no full download.
 
 Optimization strategy (simple):
+
 - Cache DB locally.
 - Avoid background polling.
 - Manual/foreground sync triggers.
 - Optional `VACUUM` cadence (e.g., every N writes) to keep DB size compact.
 
 Compression note:
+
 - No backend means no practical custom compressed transport pipeline.
 - OneDrive stores bytes as uploaded; raw `.db` is the supported path here.
 
@@ -158,6 +176,7 @@ Compression note:
 ## 4.2 Visual System (aligned with desktop colors)
 
 Base palette derived from desktop CSS:
+
 - App background: `#dcdcdc`
 - Card/surface: `whitesmoke`
 - Positive text: `#38a673`
@@ -166,9 +185,11 @@ Base palette derived from desktop CSS:
 - Accent interaction (swipe/highlight): cyan/teal family
 
 Typography:
+
 - Clean modern sans-serif stack with readable numeric rendering.
 
 Core UI patterns:
+
 - Bottom navigation (Accounts, Transfers, Add, Settings).
 - Floating primary action for quick add.
 - Bottom-sheet form for adding transfer.
@@ -193,6 +214,7 @@ Core UI patterns:
 Goal: create a clean, production-ready technical baseline.
 
 Substeps:
+
 1. Use repository `Conspectus-Mobile`.
 2. Bootstrap Svelte + TS + Vite project.
 3. Add lint/format/typecheck scripts.
@@ -218,11 +240,13 @@ Substeps:
    - build
 
 Deliverables:
+
 - Compilable app shell.
 - PWA install prompt possible.
 - CI green on main branch.
 
 Exit criteria:
+
 - App builds and runs on localhost and on test hosting path.
 - Lint/typecheck/test/build scripts all pass.
 
@@ -233,6 +257,7 @@ Exit criteria:
 Goal: integrate the PWA into the existing static website as early as possible for real-device testing.
 
 Substeps:
+
 1. Define deployment channel architecture (M2-00 foundation):
    - branch preview channel on GitHub-hosted URLs for every branch push after `Quality` passes
    - main-only production channel for `jon2050.de` deployment eligibility
@@ -265,6 +290,7 @@ Substeps:
    - track discovered installability defects as `bug` issues (current follow-up: icon cropping/centering issue `#106`)
 
 Deliverables:
+
 - Publicly reachable PWA shell on `jon2050.de` for iOS/Android testing.
 - Repeatable early deploy process independent of feature completion.
 - Branch preview URLs for development and QA on every branch.
@@ -272,6 +298,7 @@ Deliverables:
 - Installability verification record with explicit bug-tracking linkage.
 
 Exit criteria:
+
 - Successful branch pushes produce isolated preview URLs.
 - PWA opens correctly at `https://jon2050.de/conspectus/webapp/`.
 - Install prompt/service worker/manifest behavior is testable on mobile devices.
@@ -284,6 +311,7 @@ Exit criteria:
 Goal: user can authenticate and bind a DB file once.
 
 Substeps:
+
 1. Register Entra app for SPA redirect flow (personal accounts).
 2. Configure redirect URIs:
    - production path
@@ -300,10 +328,12 @@ Substeps:
    - "Reset local app data"
 
 Deliverables:
+
 - Stable login flow with persisted session where possible.
 - One-time DB file binding retained across app restarts.
 
 Exit criteria:
+
 - User can reopen app and access same file without reselecting.
 - Reset clears binding and forces fresh selection.
 
@@ -314,6 +344,7 @@ Exit criteria:
 Goal: robust online/offline read behavior with minimal traffic.
 
 Substeps:
+
 1. Implement Graph metadata fetch for current file.
 2. Implement eTag-based freshness decision.
 3. Implement DB blob download and cache persist.
@@ -335,10 +366,12 @@ Substeps:
 7. Add robust retry strategy with exponential backoff for transient failures.
 
 Deliverables:
+
 - Reliable DB availability for read-only mode offline.
 - Minimal repeated data transfers.
 
 Exit criteria:
+
 - Airplane mode still shows cached accounts/transfers.
 - Online resume refreshes when eTag changed.
 
@@ -349,6 +382,7 @@ Exit criteria:
 Goal: deliver high-quality fast browsing experience.
 
 Substeps:
+
 1. Implement account query:
    - visible account set
    - sorted order consistent with DB fields
@@ -369,9 +403,11 @@ Substeps:
    - memoize derived values where useful
 
 Deliverables:
+
 - Production-ready viewing experience for accounts and monthly transfers.
 
 Exit criteria:
+
 - Month switching feels immediate on modern phones.
 - Lists remain usable and readable on narrow screens.
 
@@ -382,6 +418,7 @@ Exit criteria:
 Goal: safe and desktop-compatible transfer creation.
 
 Substeps:
+
 1. Build "Add Transfer" bottom sheet form:
    - date
    - name
@@ -409,9 +446,11 @@ Substeps:
    - run `VACUUM` every N writes or manual trigger in settings.
 
 Deliverables:
+
 - End-to-end write feature with clear success/error behavior.
 
 Exit criteria:
+
 - Created transfer appears immediately in PWA.
 - Desktop app later sees same transfer after OneDrive sync.
 
@@ -422,6 +461,7 @@ Exit criteria:
 Goal: make small app self-maintainable by end users.
 
 Substeps:
+
 1. Settings page sections:
    - bound OneDrive file info
    - last sync timestamp
@@ -443,9 +483,11 @@ Substeps:
    - last error code
 
 Deliverables:
+
 - Clear operational controls and troubleshooting path.
 
 Exit criteria:
+
 - User can recover from wrong file binding without developer help.
 
 ---
@@ -455,6 +497,7 @@ Exit criteria:
 Goal: release with confidence on iOS and Android.
 
 Substeps:
+
 1. Security hardening:
    - strict CSP
    - no secrets in frontend
@@ -468,9 +511,11 @@ Substeps:
 6. Deploy pipeline to production path.
 
 Deliverables:
+
 - Release candidate and production deployment.
 
 Exit criteria:
+
 - All release gates green and smoke tests pass on both platforms.
 
 ---
@@ -487,17 +532,20 @@ Exit criteria:
 ## 6.2 Test Pyramid
 
 1. Unit tests (high volume, fast)
+
 - Validation rules.
 - Month boundary calculations.
 - SQL builder/helpers.
 - Cache freshness decision logic.
 
 2. Integration tests (medium)
+
 - DB module + sql.js with fixture DB.
 - Graph client wrappers with mocked responses.
 - Auth state transitions.
 
 3. End-to-end tests (focused)
+
 - Login flow (mocked tokens in CI if needed).
 - File binding and app restart persistence.
 - View accounts and month transfers.
@@ -514,14 +562,17 @@ Exit criteria:
 ## 6.4 Manual Device Test Matrix
 
 Required minimum:
+
 - iPhone Safari (latest iOS)
 - Android Chrome (latest stable)
 
 Recommended additional:
+
 - iPad Safari
 - Samsung Internet (recent)
 
 Manual scenarios:
+
 - Install to home screen.
 - App reopen after token expiration.
 - Network drops during upload.
@@ -531,6 +582,7 @@ Manual scenarios:
 ## 6.5 Regression and Release Gates
 
 Hard gates before release:
+
 1. Unit/integration/e2e suites pass.
 2. Typecheck and lint pass.
 3. Bundle size within budget.
@@ -563,6 +615,7 @@ Hard gates before release:
 ## 8.1 Separate Repo + Website Integration
 
 Recommended:
+
 1. Keep `Conspectus-Mobile` as independent git repository.
 2. Use dual deployment channels:
    - branch previews hosted from this repo on GitHub paths for development validation
@@ -572,6 +625,7 @@ Recommended:
 4. Keep website repo independent; add simple link to PWA route.
 
 Rejected alternatives for MVP (authoritative decision is section `8.3`):
+
 - Git submodule with website-side build/copy steps.
 - Git subtree syncing of mobile source into website repository.
 - Package-registry pull flow for static assets.
@@ -579,6 +633,7 @@ Rejected alternatives for MVP (authoritative decision is section `8.3`):
 ## 8.2 CI/CD
 
 Pipeline stages:
+
 1. Build/test on push and PR.
 2. `Deploy Channels` listens to successful `Quality` push runs only.
 3. Deploy/update branch preview URL on `gh-pages` path `/previews/<branch-slug>/`.
@@ -591,16 +646,19 @@ Pipeline stages:
 ## 8.3 Approved Cross-Repo Deployment Architecture (M2-01)
 
 Decision status:
+
 - Approved for MVP Milestone 2.
 - Selected strategy: artifact handoff (PWA repo produces immutable build artifacts; website repo consumes artifacts in CI).
 
 Options reviewed:
+
 - Artifact handoff (selected): clean repo separation, immutable versioned outputs, simple rollback to known-good artifact, no cross-repo working-tree coupling.
 - Submodule (rejected): pins source code commit, not compiled output; adds submodule update overhead and failure modes that are unrelated to deployment correctness.
 - Subtree (rejected): duplicates source history into website repo and increases merge/maintenance complexity for routine deploys.
 - Package pull (rejected for MVP): adds package publish/registry lifecycle that is unnecessary for static-site artifact delivery.
 
 Producer/consumer CI contract (automation-only, no manual copy):
+
 1. Producer (`Conspectus-Mobile`):
    - Source workflow: `Deploy Channels` after successful `Quality` push runs.
    - Production artifact is published only for `main`.
@@ -636,6 +694,7 @@ Producer/consumer CI contract (automation-only, no manual copy):
    - Consumer credential note (M2-04): website repo secret `CONSPECTUS_MOBILE_ARTIFACT_TOKEN` must provide `actions:read` access to `Jon2050/Conspectus-Mobile` artifacts.
 
 Failure and rollback behavior:
+
 1. If producer artifact generation fails, website deployment does not run for that revision.
 2. If consumer artifact retrieval or validation fails, website deployment fails without changing live files.
 3. Rollback re-deploys the last known-good `deployRunId` artifact via consumer CI automation by replaying the `repository_dispatch` handoff payload with known-good identity fields; rollback must use CI automation only (no manual filesystem copy steps).
@@ -648,22 +707,26 @@ Failure and rollback behavior:
 MVP status: concept only.
 
 Option A (no-cost local-first):
+
 - Capture receipt image in browser.
 - Run OCR on-device (`tesseract.js`).
 - Extract totals/date/vendor with heuristics.
 - Suggest prefilled transfer form.
 
 Option B (better extraction, possible free tier limits):
+
 - Cloud OCR/vision API then parse/classify lines.
 - Suggest category-based split into multiple transfers.
 
 Auto-split concept:
+
 1. Parse line items.
 2. Classify by keyword/category mapping.
 3. Group into transfer candidates.
 4. User confirms/edits before save.
 
 Privacy principle:
+
 - Keep local-first by default.
 - If cloud processing is enabled later, require explicit user opt-in.
 
@@ -672,6 +735,7 @@ Privacy principle:
 ## 10. Implementation Deliverables Summary
 
 MVP deliverables:
+
 1. Installable PWA on iOS/Android.
 2. Early integrated deployment on `jon2050.de/conspectus/webapp/` for device testing.
 3. OneDrive-authenticated access to selected SQLite DB.

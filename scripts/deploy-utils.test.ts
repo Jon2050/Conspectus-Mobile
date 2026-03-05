@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -8,7 +9,16 @@ import { normalizeBasePath, toPreviewSlug } from './deploy-utils.mjs';
 
 const thisFilePath = fileURLToPath(import.meta.url);
 const scriptsDirectoryPath = path.dirname(thisFilePath);
+const repositoryRootPath = path.resolve(scriptsDirectoryPath, '..');
 const slugifyScriptPath = path.resolve(scriptsDirectoryPath, 'slugify-branch.py');
+const deployChannelsWorkflowPath = path.resolve(
+  repositoryRootPath,
+  '.github/workflows/deploy-channels.yml',
+);
+const previewCleanupWorkflowPath = path.resolve(
+  repositoryRootPath,
+  '.github/workflows/preview-cleanup.yml',
+);
 
 const runPythonSlugify = (branchName: string): string => {
   const result = execSync('python ' + JSON.stringify(slugifyScriptPath), {
@@ -98,6 +108,21 @@ describe('JS/Python slug parity (contract test)', () => {
       const jsResult = toPreviewSlug(branchName);
       const pyResult = runPythonSlugify(branchName);
       expect(jsResult).toBe(pyResult);
+    });
+  }
+});
+
+describe('workflow slug-script contract', () => {
+  const workflowFilePaths = [deployChannelsWorkflowPath, previewCleanupWorkflowPath];
+
+  for (const workflowFilePath of workflowFilePaths) {
+    const workflowRelativePath = path.relative(repositoryRootPath, workflowFilePath);
+
+    it(`uses shared slugify script in ${workflowRelativePath}`, () => {
+      const workflowSource = fs.readFileSync(workflowFilePath, 'utf8');
+      expect(workflowSource).toContain('BRANCH_NAME:');
+      expect(workflowSource).toContain('branch_slug="$(python scripts/slugify-branch.py)"');
+      expect(workflowSource).not.toMatch(/python\s+-\s*<<\s*['"]?PY['"]?/);
     });
   }
 });

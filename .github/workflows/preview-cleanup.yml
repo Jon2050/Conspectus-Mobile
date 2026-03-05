@@ -4,12 +4,14 @@ on:
   delete:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   cleanup-preview:
     if: github.event.ref_type == 'branch'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

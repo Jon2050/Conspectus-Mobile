@@ -17,15 +17,28 @@ const writeText = (filePath: string, value: string) => {
   writeFileSync(filePath, value, 'utf8');
 };
 
-const createDistFixture = (fixtureRootPath: string, jsAssetContent: string) => {
+type DistFixtureOptions = {
+  includeCspMeta?: boolean;
+};
+
+const createDistFixture = (
+  fixtureRootPath: string,
+  jsAssetContent: string,
+  options: DistFixtureOptions = {},
+) => {
   const distPath = path.join(fixtureRootPath, 'dist');
   const basePath = '/conspectus/webapp/';
+  const includeCspMeta = options.includeCspMeta ?? true;
+  const cspMetaTag = includeCspMeta
+    ? `<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'" />`
+    : '';
 
   writeText(
     path.join(distPath, 'index.html'),
     `<!doctype html>
 <html lang="en">
   <head>
+    ${cspMetaTag}
     <link rel="manifest" href="${basePath}manifest.webmanifest" />
     <link rel="stylesheet" href="${basePath}assets/index.css" />
   </head>
@@ -85,6 +98,33 @@ describe('verify-build-channel script', () => {
       expect(result.stdout).toContain(
         '[verify-build-channel] production build output is valid for base path /conspectus/webapp/',
       );
+    } finally {
+      rmSync(fixturePath, { force: true, recursive: true });
+    }
+  });
+
+  it('fails when index.html is missing the CSP meta tag', () => {
+    const fixturePath = createFixtureDirectory();
+
+    try {
+      const distPath = createDistFixture(
+        fixturePath,
+        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/conspectus/webapp/sw.js', { scope: '/conspectus/webapp/' }); }`,
+        { includeCspMeta: false },
+      );
+
+      const result = runVerifier([
+        '--dist',
+        distPath,
+        '--channel',
+        'production',
+        '--base',
+        '/conspectus/webapp/',
+      ]);
+
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('Missing Content-Security-Policy meta tag in index.html.');
     } finally {
       rmSync(fixturePath, { force: true, recursive: true });
     }
@@ -156,6 +196,7 @@ describe('verify-build-channel script', () => {
         `<!doctype html>
 <html lang="en">
   <head>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'" />
     <link rel="manifest" href="${previewBase}manifest.webmanifest" />
     <link rel="stylesheet" href="${previewBase}assets/index.css" />
   </head>
@@ -208,6 +249,7 @@ describe('verify-build-channel script', () => {
         `<!doctype html>
 <html lang="en">
   <head>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'" />
     <link rel="manifest" href="${basePath}manifest.webmanifest" />
     <link rel="stylesheet" href="${basePath}assets/index.css" />
   </head>

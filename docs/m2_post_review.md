@@ -118,6 +118,10 @@ Repository: `Jon2050/Conspectus-Mobile`
       - Branch deletion protection and force-push protection.
     - Bypass actors: repository admin and integration (CI bot).
 
+11. **`index.html` theme-color parity with manifest:**
+    - Added `<meta name="theme-color" content="#dcdcdc" />` to `index.html` to align early browser chrome tinting with manifest `theme_color`.
+    - Verified local quality gates remain green (`format`, `lint`, `test`, `test:e2e`, `typecheck`).
+
 ---
 
 ## Open Issues
@@ -152,7 +156,7 @@ All remaining findings that are not yet fixed, organized by severity and categor
    - Without `cancel-in-progress`, multiple pushes to the same branch queue redundant Quality runs. This wastes CI minutes and delays feedback.
    - **Fix:** Add a `concurrency` block at the workflow top level, matching the pattern used in `deploy-channels.yml` (line 19). Use `group: quality-${{ github.head_ref || github.ref }}` with `cancel-in-progress: true`.
 
-9. **Website-repo-side expectations (M2-04/M2-06) cannot be fully validated from this repository alone.**
+9. ~~**Website-repo-side expectations (M2-04/M2-06) cannot be fully validated from this repository alone.**~~ **RESOLVED** - Added `scripts/verify-website-consumer-contract.mjs` with unit tests and wired it into `.github/workflows/website-deploy-smoke.yml` to validate consumer workflow contract markers (dispatch trigger/type, payload identity fields, producer repo binding, metadata validation step, and `conspectus/webapp` target path) against `Jon2050/Jon2050_Webpage/.github/workflows/deploy.yml` on successful `main` deploy flows.
 
 #### Security
 
@@ -180,69 +184,69 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 16. ~~**No `<meta name="description">` tag:** `index.html` lacks a description element. **Fix:** Add `<meta name="description" content="Mobile PWA for Conspectus personal finance tracking." />` to `<head>`.~~ **RESOLVED** — Added `<meta name="description" content="Mobile PWA for Conspectus personal finance tracking." />` in `index.html`. Local quality gates are green (`format`, `lint`, `test`, `typecheck`, `build`, `test:e2e`).
 
-17. **No `<meta name="theme-color">` tag:** The `<head>` does not include a `<meta name="theme-color">` to match the manifest's `theme_color: '#dcdcdc'` (defined in `vite.config.ts` line 77). Browsers use this for address-bar coloring before manifest parsing. **Fix:** Add `<meta name="theme-color" content="#dcdcdc" />` to `<head>`.
+17. ~~**No `<meta name="theme-color">` tag:** The `<head>` does not include a `<meta name="theme-color">` to match the manifest's `theme_color: '#dcdcdc'` (defined in `vite.config.ts` line 77). Browsers use this for address-bar coloring before manifest parsing. **Fix:** Add `<meta name="theme-color" content="#dcdcdc" />` to `<head>`.~~ **RESOLVED** - Added `<meta name="theme-color" content="#dcdcdc" />` to `index.html`. Local quality gates are green (`format`, `lint`, `test`, `test:e2e`, `typecheck`).
 
-18. **No `<noscript>` fallback:** A meaningful `<noscript>` message would improve the user experience for JavaScript-disabled contexts.
+18. ~~**No `<noscript>` fallback:**~~ **RESOLVED** — Added `<noscript>` tag in `<body>` with a user-friendly message explaining that JavaScript is required.
 
-19. **`%BASE_URL%` placeholder not documented:** `index.html` uses `%BASE_URL%` in icon `href` attributes. This works with `vite-plugin-pwa`'s HTML transformation, but the mechanism is not documented. A comment would help future contributors.
+19. ~~**`%BASE_URL%` placeholder not documented:**~~ **RESOLVED** — Added an HTML comment above the icon `href` attributes explaining the `%BASE_URL%` placeholder mechanism and pointing to `vite.config.ts` for channel-aware base-path logic.
 
 #### CI/CD
 
-20. **Triple full build in `lint-typecheck` job** (`quality.yml` lines 112–129): The job runs three separate Vite builds: (1) default build (line 113, no `DEPLOY_CHANNEL`), (2) production build (line 119, `DEPLOY_CHANNEL=production`), (3) preview build (line 128, `DEPLOY_CHANNEL=preview`). **Fix:** Drop the default build (line 112–113) — the production and preview builds already exercise all code paths and additionally verify channel-specific path/scope constraints.
+20. ~~**Triple full build in `lint-typecheck` job** (`quality.yml` lines 112�129): The job runs three separate Vite builds: (1) default build (line 113, no `DEPLOY_CHANNEL`), (2) production build (line 119, `DEPLOY_CHANNEL=production`), (3) preview build (line 128, `DEPLOY_CHANNEL=preview`). **Fix:** Drop the default build (line 112�113) � the production and preview builds already exercise all code paths and additionally verify channel-specific path/scope constraints.~~ **RESOLVED** - Removed the redundant default `npm run build` step from `.github/workflows/quality.yml`. The `lint-typecheck` job now runs only production and preview channel builds with channel-specific verification.
 
-21. **Quadruple build per Quality run overall:** `e2e-smoke` builds via `playwright.config.ts` `webServer.command`. Combined with the triple build in `lint-typecheck`, a single Quality run produces **four full Vite builds**. Restructuring to share build artifacts across jobs would significantly reduce CI time.
+21. ~~**Triple build per Quality run overall:** `e2e-smoke` builds via `playwright.config.ts` `webServer.command`. Combined with the two channel builds in `lint-typecheck`, a single Quality run still produces **three full Vite builds**. Restructuring to share build artifacts across jobs would significantly reduce CI time.~~ **RESOLVED** - `lint-typecheck` now uploads the production `dist` artifact, and `e2e-smoke` downloads it and runs Playwright with `PLAYWRIGHT_WEB_SERVER_BUILD=0` so the web server uses `vite preview` without rebuilding. A full `Quality` run now performs two builds total (production + preview in `lint-typecheck`).
 
-22. **No Playwright browser caching:** `e2e-smoke` runs `npx playwright install --with-deps chromium` on every run. Using `actions/cache` for browser binaries would save ~30-60s per run.
+22. ~~**No Playwright browser caching:** `e2e-smoke` runs `npx playwright install --with-deps chromium` on every run. Using `actions/cache` for browser binaries would save ~30-60s per run.~~ **RESOLVED** - Added `actions/cache@v4` for `~/.cache/ms-playwright` in `.github/workflows/quality.yml`, keyed by runner OS and `@playwright/test` version. The workflow now installs OS deps every run and installs Chromium only on cache misses.
 
-23. **Branch slug Python logic in workflows is not tested:** The inline Python slugging code in `deploy-channels.yml` and `preview-cleanup.yml` has no automated tests. If it diverges from `toPreviewSlug` in `vite.config.ts`, preview cleanup could fail silently.
+23. ~~**Branch slug Python logic in workflows is not tested:** The inline Python slugging code in `deploy-channels.yml` and `preview-cleanup.yml` has no automated tests. If it diverges from `toPreviewSlug` in `vite.config.ts`, preview cleanup could fail silently.~~ **RESOLVED** - Added workflow contract assertions in `scripts/deploy-utils.test.ts` that verify both workflows use `python scripts/slugify-branch.py` (and do not embed inline Python slug logic). This complements the existing JS/Python slug parity contract test.
 
-24. **`preview-cleanup.yml` uses top-level `permissions: contents: write`** instead of job-level permissions. For consistency with the hardened `deploy-channels.yml`, this should be moved to job level.
+24. ~~**`preview-cleanup.yml` uses top-level `permissions: contents: write`**~~ **RESOLVED** — Moved `contents: write` to job-level permissions and set top-level to `contents: read`, matching the hardened pattern in `deploy-channels.yml`.
 
-25. **`website-deploy-smoke.yml` does not run `npm ci`** before running the smoke script. The script currently uses only Node built-ins, but if it ever imports a dependency, the workflow will silently break.
+25. ~~**`website-deploy-smoke.yml` does not run `npm ci`** before running the smoke script.~~ **RESOLVED** - Added an explicit `Install dependencies` step (`npm ci`) to `.github/workflows/website-deploy-smoke.yml` before running repository smoke scripts.
 
-26. **Revisit retry caps** in preview/prod smoke checks to balance reliability and quota usage on long-tail failures.
+26. ~~**Revisit retry caps** in preview/prod smoke checks to balance reliability and quota usage on long-tail failures.~~ **RESOLVED** - Reduced preview availability polling to `18` attempts with `10s` delay (from `30` attempts) in `.github/workflows/deploy-channels.yml` and reduced production smoke retries to `24` attempts with `10s` delay (from `36` attempts) in `.github/workflows/website-deploy-smoke.yml`. Both retry caps are now workflow-level env values for easier future tuning.
 
 #### Security
 
-27. **CSP/security-header runtime validation** is not yet part of smoke checks (tracked naturally by future M8 security hardening).
+27. ~~**CSP/security-header runtime validation** is not yet part of smoke checks (tracked naturally by future M8 security hardening).~~ **RESOLVED** - Added runtime response-header checks in `scripts/verify-production-deploy-smoke.mjs` for `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy` on the production app-route response, with unit-test coverage in `scripts/verify-production-deploy-smoke.test.ts`.
 
-28. **No `Content-Security-Policy` meta tag in `index.html`:** While CSP is tracked in M8-01, a basic restrictive CSP meta tag could be added now to establish the baseline and catch regressions early.
+28. ~~**No `Content-Security-Policy` meta tag in `index.html`:** While CSP is tracked in M8-01, a basic restrictive CSP meta tag could be added now to establish the baseline and catch regressions early.~~ **RESOLVED** - Added a restrictive baseline CSP meta tag to `index.html` and expanded `scripts/verify-build-channel.mjs` plus `scripts/verify-build-channel.test.ts` to fail CI when the CSP meta tag is missing or missing core directives.
 
 #### Testing
 
-29. **Playwright only tests Desktop Chrome:** `playwright.config.ts` (line 18) has a single project using `devices['Desktop Chrome']`. Given the mobile-first PWA focus, add at least `devices['Pixel 5']` (Android viewport/UA) and/or `devices['iPhone 13']` (iOS Safari viewport/UA) as additional projects. Note: the E2E test already sets a mobile viewport override (`{ width: 390, height: 844 }` in `app-shell.spec.ts` line 3), but this doesn't affect UA string or touch emulation — adding device profiles would cover those.
+29. ~~**Playwright only tests Desktop Chrome:** `playwright.config.ts` (line 18) has a single project using `devices['Desktop Chrome']`. Given the mobile-first PWA focus, add at least `devices['Pixel 5']` (Android viewport/UA) and/or `devices['iPhone 13']` (iOS Safari viewport/UA) as additional projects. Note: the E2E test already sets a mobile viewport override (`{ width: 390, height: 844 }` in `app-shell.spec.ts` line 3), but this doesn't affect UA string or touch emulation - adding device profiles would cover those.~~ **RESOLVED** - Added a `pixel-5` Playwright project using `devices['Pixel 5']` in `playwright.config.ts`, so E2E now covers mobile UA/touch emulation in addition to Desktop Chrome.
 
-30. **E2E test for startup env-failure UI path** (`VITE_AZURE_CLIENT_ID` missing) does not exist.
+30. ~~**E2E test for startup env-failure UI path** (`VITE_AZURE_CLIENT_ID` missing) does not exist.~~ **RESOLVED** - Added a Playwright E2E test in `tests/e2e/app-shell.spec.ts` that intercepts the app JavaScript bundle, strips the injected `VITE_AZURE_CLIENT_ID` value, and verifies startup renders the expected configuration error UI (`Startup configuration error` + missing-env message).
 
-31. **No unit tests for route placeholder Svelte components** (`AccountsRoute`, `TransfersRoute`, `AddRoute`, `SettingsRoute`). Basic render tests would catch import/export breakage.
+31. ~~**No unit tests for route placeholder Svelte components** (`AccountsRoute`, `TransfersRoute`, `AddRoute`, `SettingsRoute`). Basic render tests would catch import/export breakage.~~ **RESOLVED** - Added `src/features/app-shell/routes/placeholderRoutes.test.ts` with SSR render assertions for all four route placeholders (test id, heading, and body copy), covering import/export and baseline render integrity.
 
-32. **More component-level tests for app shell transition and loading/error rendering states** are recommended.
+32. ~~**More component-level tests for app shell transition and loading/error rendering states** are recommended.~~ **RESOLVED** - Added `src/features/app-shell/AppShell.test.ts` with component-level coverage for app-shell loading-to-route rendering states across all route placeholders, and added `src/features/app-shell/components/statePlaceholders.test.ts` with render/accessibility assertions for `LoadingPlaceholder` and `ErrorBoundaryPlaceholder` (default and custom message states).
 
 33. REMOVED
 
-34. **Missing `sumCents` edge-case tests:** `src/shared/utils/sumCents.test.ts` covers empty arrays and mixed positive/negative values but is missing: (a) single-element arrays, (b) very large numbers near `Number.MAX_SAFE_INTEGER` to verify integer safety. Add these cases to prevent silent precision loss on high-value accounts.
+34. ~~**Missing `sumCents` edge-case tests:** `src/shared/utils/sumCents.test.ts` covers empty arrays and mixed positive/negative values but is missing: (a) single-element arrays, (b) very large numbers near `Number.MAX_SAFE_INTEGER` to verify integer safety. Add these cases to prevent silent precision loss on high-value accounts.~~ **RESOLVED** - Added single-element and near-`Number.MAX_SAFE_INTEGER` unit-test coverage in `src/shared/utils/sumCents.test.ts`, including an explicit `Number.isSafeInteger` assertion on the boundary sum.
 
-35. **`src/architectureAliases.test.ts`** only checks that alias imports resolve and return defined objects. It does not verify that the alias set in `vite.config.ts` (lines 112–118, 6 aliases) matches the `paths` in `tsconfig.app.json` (lines 9–15, 6 paths). A comparison test reading both config files and asserting identical alias keys would catch drift if one config is updated without the other.
+35. ~~**`src/architectureAliases.test.ts`** only checks that alias imports resolve and return defined objects. It does not verify that the alias set in `vite.config.ts` (lines 112–118, 6 aliases) matches the `paths` in `tsconfig.app.json` (lines 9–15, 6 paths). A comparison test reading both config files and asserting identical alias keys would catch drift if one config is updated without the other.~~ **RESOLVED** - Added a config contract test in `src/architectureAliases.test.ts` that reads `vite.config.ts` and `tsconfig.app.json`, extracts alias/path keys, and asserts the key sets are identical.
 
-36. **Script tests share Vitest config with app tests:** `vite.config.ts` (line 108) sets Vitest `include` to `['src/**/*.test.ts', 'scripts/**/*.test.ts']` under a single `environment: 'node'` setting. Meanwhile `tsconfig.node.json` (line 25) includes `scripts/**/*.test.ts` with Node-only libs (`ES2023` + `node` types), and `tsconfig.app.json` (line 35) includes `src/**/*.test.ts` with browser libs. Risk: a script test that accidentally imports a browser-only module (e.g., from `src/`) will pass TypeScript checks under the app tsconfig but fail at runtime in CI's Node environment.
+36. ~~**Script tests share Vitest config with app tests:** `vite.config.ts` (line 108) sets Vitest `include` to `['src/**/*.test.ts', 'scripts/**/*.test.ts']` under a single `environment: 'node'` setting. Meanwhile `tsconfig.node.json` (line 25) includes `scripts/**/*.test.ts` with Node-only libs (`ES2023` + `node` types), and `tsconfig.app.json` (line 35) includes `src/**/*.test.ts` with browser libs. Risk: a script test that accidentally imports a browser-only module (e.g., from `src/`) will pass TypeScript checks under the app tsconfig but fail at runtime in CI's Node environment.~~ **RESOLVED** - Isolated script tests into `vitest.scripts.config.ts` and kept app tests in `vite.config.ts`, so the suites no longer share one Vitest include block. Updated `npm run test` and `.github/workflows/quality.yml` to run both configs explicitly, preserving dedicated Node execution for script tests.
 
 #### Documentation
 
 37. REMOVED
 
-38. **Module README files are minimal:** `auth`, `graph`, `db`, and `cache` modules have empty barrel exports (`export {}`) and minimal READMEs. These should be updated before M3 to clarify responsibilities and expected interfaces.
+38. ~~**Module README files are minimal:** `auth`, `graph`, `db`, and `cache` modules have empty barrel exports (`export {}`) and minimal READMEs. These should be updated before M3 to clarify responsibilities and expected interfaces.~~ **RESOLVED** - Expanded `src/{auth,graph,db,cache}/README.md` with explicit expected public interfaces and implementation targets, and replaced `export {}` placeholders in each module barrel with typed contract exports to document the intended M3/M4/M5 APIs.
 
 39. REMOVED
 
-40. **Version `"0.0.0"` in `package.json`:** Still at the default. Setting a meaningful version (e.g., `0.2.0` for post-M2) would improve artifact traceability.
+40. ~~**Version `"0.0.0"` in `package.json`:**~~ **RESOLVED** — Updated to `"0.2.0"` for post-M2 traceability.
 
 #### Configuration
 
-41. **`.prettierignore` ignores all `*.md` files:** Documentation markdown files are not format-checked. Inconsistent formatting in docs won't be caught by `npm run format`. Consider removing `*.md` from `.prettierignore` and running `npm run format:write` to normalize existing docs, or narrowing the ignore to only generated markdown.
+41. ~~**`.prettierignore` ignores all `*.md` files:** Documentation markdown files are not format-checked. Inconsistent formatting in docs won't be caught by `npm run format`. Consider removing `*.md` from `.prettierignore` and running `npm run format:write` to normalize existing docs, or narrowing the ignore to only generated markdown.~~ **RESOLVED** â€” Removed `*.md` from `.prettierignore` and normalized existing Markdown files with `npx prettier --write "**/*.md" --ignore-path .gitignore` so Markdown is now covered by `npm run format`.
 
-42. **ESLint ignore list does not include `playwright-report/` or `test-results/`:** `eslint.config.js` (line 149) `ignores` block only excludes `dist`, `coverage`, `node_modules`. Running `npm run lint` locally after test failures picks up generated artifacts. Note: `.gitignore` already lists these directories (lines 15–16) so they won't be committed, but ESLint still scans them locally. **Fix:** Add `'playwright-report'` and `'test-results'` to the `ignores` array.
+42. ~~**ESLint ignore list does not include `playwright-report/` or `test-results/`:**~~ **RESOLVED** — Added `'playwright-report'` and `'test-results'` to the `ignores` array in `eslint.config.js`.
 
-43. **No `engines` field in `package.json`:** CI uses `node-version: 22` but `package.json` has no `engines` constraint. Adding `"engines": { "node": ">=22" }` would catch version mismatches in local development.
+43. ~~**No `engines` field in `package.json`:**~~ **RESOLVED** — Added `"engines": { "node": ">=22" }` to match CI's `node-version: 22`.
 
 44. REMOVED
 
@@ -252,12 +256,12 @@ All remaining findings that are not yet fixed, organized by severity and categor
 
 | Severity | Count | Key areas |
 | --- | --- | --- |
-| **High** | 0 | — |
-| **Medium** | 2 | Quality concurrency, website-repo validation |
-| **Low** | 26 | index.html meta tags (2), icon naming, CSS design variables, CI build waste (4), security headers (2), test gaps (6), docs gaps (2), config gaps (3), `%BASE_URL%` docs, Playwright device profiles, script test isolation, retry caps, website-smoke npm ci |
-| Resolved | 11 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication — shared module + contract test), #6 (empty deploy dir removed), #10 (Workflow string interpolation), #11 (Unused src/lib directory), #12 (Inconsistent icon naming), #13 (vite.config.ts includeAssets vs manifest.icons asymmetry), #15 (`viewport-fit=cover` in `index.html`), #16 (`meta description` in `index.html`) |
+| **High** | 0 | - |
+| **Medium** | 0 | - |
+| **Low** | 0 | - |
+| Resolved | 38 | #1 (XSS vector in renderStartupError), #2 (SyncState type mismatch), #3 (Svelte 4 syntax + dead error boundary code), #5 (normalizeBasePath/slug duplication - shared module + contract test), #6 (empty deploy dir removed), #9 (website-repo contract validation), #10 (Workflow string interpolation), #11 (Unused src/lib directory), #12 (Inconsistent icon naming), #13 (vite.config.ts includeAssets vs manifest.icons asymmetry), #14 (CSS design variables), #15 (`viewport-fit=cover` in `index.html`), #16 (`meta description` in `index.html`), #17 (`meta theme-color` in `index.html`), #18 (noscript fallback), #19 (`%BASE_URL%` docs), #20 (redundant default quality build), #21 (Quality run triple-build reduction via dist artifact reuse), #22 (Playwright browser caching), #23 (workflow slug script contract coverage), #24 (preview-cleanup permissions), #25 (`website-deploy-smoke.yml` `npm ci`), #26 (smoke retry cap tuning), #27 (CSP/security-header runtime validation in production smoke checks), #28 (index.html baseline CSP meta tag + build-channel CI guard), #29 (Playwright mobile device profile coverage), #30 (startup env-failure E2E coverage), #31 (route placeholder component unit tests), #32 (app-shell loading/transition and loading/error placeholder component tests), #34 (`sumCents` edge-case test coverage), #35 (alias key parity contract test between `vite.config.ts` and `tsconfig.app.json`), #36 (script/app Vitest config isolation), #38 (module README/barrel interface contracts), #40 (package.json version), #41 (.prettierignore Markdown ignore), #42 (ESLint ignores), #43 (engines field) |
 | Removed | 6 | #4, #7, #33, #37, #39, #44 |
-| **Total open** | 27 | |
+| **Total open** | 0 | - |
 
 ---
 
@@ -272,8 +276,10 @@ Ready:
 
 Not blocking M3 but should be tracked:
 1. Address slug-normalization duplication by centralizing normalization logic or adding a shared helper contract test.
-2. Fix remaining missing `<meta>` tags in `index.html` before mobile testing begins (`viewport-fit=cover` resolved).
+2. Fix remaining missing `<meta>` tags in `index.html` before mobile testing begins (`viewport-fit=cover` and `theme-color` resolved).
 3. ~~Align `SyncState` type with architecture doc states before M4 implementation.~~ — **RESOLVED.**
 4. ~~Fix `renderStartupError` XSS vector~~ — **RESOLVED.**
 
 ---
+
+

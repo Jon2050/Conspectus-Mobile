@@ -1,4 +1,4 @@
 dist
 coverage
 node_modules
-*.md
+docs/m2_post_review.md

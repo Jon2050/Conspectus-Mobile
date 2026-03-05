@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
+  import type { Readable } from 'svelte/store';
   import LoadingPlaceholder from './components/LoadingPlaceholder.svelte';
   import AccountsRoute from './routes/AccountsRoute.svelte';
   import TransfersRoute from './routes/TransfersRoute.svelte';
@@ -7,18 +8,24 @@
   import SettingsRoute from './routes/SettingsRoute.svelte';
   import { APP_ROUTES, createHashRouteStore, DEFAULT_ROUTE, type AppRouteKey } from './hashRouting';
 
-  const routeStore = createHashRouteStore();
-  let currentRoute: AppRouteKey = DEFAULT_ROUTE;
-  let showLoadingPlaceholder = true;
+  export let routeStore: Readable<AppRouteKey> = createHashRouteStore();
+  export let loadingDelayMs = 160;
+  export let showLoadingPlaceholder = true;
 
+  let currentRoute: AppRouteKey = DEFAULT_ROUTE;
   const unsubscribe = routeStore.subscribe((route) => {
     currentRoute = route;
   });
 
   onMount(() => {
+    if (!showLoadingPlaceholder || loadingDelayMs <= 0) {
+      showLoadingPlaceholder = false;
+      return;
+    }
+
     const timerId = window.setTimeout(() => {
       showLoadingPlaceholder = false;
-    }, 160);
+    }, loadingDelayMs);
 
     return () => {
       window.clearTimeout(timerId);

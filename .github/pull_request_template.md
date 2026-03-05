@@ -1,16 +1,20 @@
 # Pull Request
 
 ## Linked Issue (Required)
+
 - Closes #<issue-id>
 
 ## Context
+
 - Problem:
 - Goal:
 
 ## Changes
-- 
+
+-
 
 ## Test Plan
+
 - [ ] `npm run lint`
 - [ ] `npm run typecheck`
 - [ ] `npm run test`
@@ -18,14 +22,17 @@
 - Notes:
 
 ## Screenshots
+
 - [ ] UI change: screenshots attached
 - [ ] No UI change
 
 ## Risk Notes
+
 - User impact:
 - Rollback plan:
 
 ## QS Checklist
+
 - [ ] Linked issue ID is included in this PR.
 - [ ] Lint, typecheck, tests, and build were run and pass.
 - [ ] Screenshots are included for UI changes.
@@ -34,6 +41,7 @@
 - [ ] No breaking path/base URL changes were introduced (must preserve `/conspectus/webapp/` deployment path behavior).
 
 ## Merge And Cleanup (PR Path)
+
 - [ ] Required GitHub checks are green.
 - [ ] PR will be merged into `main` once checks/review requirements are satisfied.
 - [ ] Head branch will be deleted after merge.

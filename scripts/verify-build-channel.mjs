@@ -225,6 +225,48 @@ const verifyServiceWorkerRegistration = (distDir, expectedBasePath) => {
   assert(hasScopedRegistration, `Service worker scope is not restricted to ${expectedBasePath}.`);
 };
 
+const extractCspMetaContent = (indexHtml) => {
+  const cspMetaTagMatch = indexHtml.match(
+    /<meta\s+[^>]*http-equiv=["']Content-Security-Policy["'][^>]*>/i,
+  );
+  assert(cspMetaTagMatch, 'Missing Content-Security-Policy meta tag in index.html.');
+
+  const cspMetaTag = cspMetaTagMatch[0];
+  const doubleQuotedContentMatch = cspMetaTag.match(/content="([^"]+)"/i);
+  const singleQuotedContentMatch = cspMetaTag.match(/content='([^']+)'/i);
+  const cspContent = doubleQuotedContentMatch?.[1] ?? singleQuotedContentMatch?.[1] ?? '';
+
+  assert(
+    Boolean(cspContent.trim()),
+    'Content-Security-Policy meta tag must define a non-empty content value.',
+  );
+
+  return cspContent;
+};
+
+const hasDirective = (policyText, directiveName) =>
+  new RegExp(`(?:^|;)\\s*${directiveName}\\s+[^;]+`).test(policyText);
+
+const verifyCspMetaTag = (indexHtml) => {
+  const cspContent = extractCspMetaContent(indexHtml);
+  const requiredDirectives = [
+    'default-src',
+    'script-src',
+    'style-src',
+    'img-src',
+    'object-src',
+    'base-uri',
+  ];
+  const missingDirectives = requiredDirectives.filter(
+    (directiveName) => !hasDirective(cspContent, directiveName),
+  );
+
+  assert(
+    missingDirectives.length === 0,
+    `Content-Security-Policy meta tag is missing required directive(s): ${missingDirectives.join(', ')}.`,
+  );
+};
+
 const main = () => {
   const args = parseArgs(process.argv.slice(2));
   const distDir = path.resolve(process.cwd(), args.dist);
@@ -234,6 +276,7 @@ const main = () => {
   const indexHtml = readTextFile(indexPath);
   const manifestText = readTextFile(manifestPath);
 
+  verifyCspMetaTag(indexHtml);
   verifyAbsolutePathReferences(indexHtml, args.base);
   verifyNoRootPathLeakage(distDir, args.base);
   verifyManifest(manifestText, args.base);

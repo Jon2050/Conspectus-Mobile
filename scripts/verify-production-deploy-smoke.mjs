@@ -87,6 +87,27 @@ const buildContextLabel = ({ commitSha, deployRunId }) =>
 
 const toPathname = (urlOrPath, baseUrl) => new URL(urlOrPath, baseUrl).pathname;
 
+const ensureSecurityHeaders = (headers, checkName) => {
+  const contentSecurityPolicy = headers.get('content-security-policy');
+  assert(
+    typeof contentSecurityPolicy === 'string' && contentSecurityPolicy.trim().length > 0,
+    `${checkName} response missing required Content-Security-Policy header.`,
+  );
+
+  const xContentTypeOptions = headers.get('x-content-type-options');
+  assert(
+    typeof xContentTypeOptions === 'string' &&
+      xContentTypeOptions.trim().toLowerCase() === 'nosniff',
+    `${checkName} response must set X-Content-Type-Options to "nosniff".`,
+  );
+
+  const referrerPolicy = headers.get('referrer-policy');
+  assert(
+    typeof referrerPolicy === 'string' && referrerPolicy.trim().length > 0,
+    `${checkName} response missing required Referrer-Policy header.`,
+  );
+};
+
 const ensureBootstrapMarkers = (html, options) => {
   assert(
     /id=["']app["']/.test(html),
@@ -215,6 +236,9 @@ const createChecks = (options, setManifestIconUrls, setAppleTouchIconUrl) => [
   {
     name: 'app-route',
     url: options.baseUrl,
+    validateResponse: (response) => {
+      ensureSecurityHeaders(response.headers, 'app-route');
+    },
     validateBody: (bodyText) => {
       const appleTouchIconUrl = ensureBootstrapMarkers(bodyText, options);
       setAppleTouchIconUrl(appleTouchIconUrl);
@@ -264,6 +288,10 @@ export const runSmokeChecks = async (options, fetchImpl = fetch, sleepImpl = del
       try {
         const response = await fetchWithTimeout(fetchImpl, check.url, options.requestTimeoutMs);
         assert(response.status === 200, `${check.name} returned HTTP ${response.status}.`);
+
+        if (check.validateResponse) {
+          check.validateResponse(response);
+        }
 
         if (check.validateBody) {
           const bodyText = await response.text();
