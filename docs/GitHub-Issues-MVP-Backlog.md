@@ -220,7 +220,7 @@ An issue is only considered done when:
 - Depends on: `M2-04, M2-05`
 - GitHub: [#27](https://github.com/Jon2050/Conspectus-Mobile/issues/27)
 
-### :green_circle: M3-01 Create Microsoft Entra app registration (SPA, personal accounts)
+### :white_check_mark: M3-01 Create Microsoft Entra app registration (SPA, personal accounts)
 
 - Label: `feature`
 - Milestone: `M3 - Auth + OneDrive Binding`

@@ -19,6 +19,7 @@ Canonical sections by topic:
 
 - Sync/caching model (`eTag`, `If-Match`, conflict recovery): this document, `## 3.4 Sync and Caching Strategy`.
 - Environment variable definitions/defaults: `README.md`, `## Environment Setup`.
+- Entra app registration contract (SPA account type + redirect URIs): `docs/auth/Entra-App-Registration.md`.
 - Module import conventions and aliases: `README.md`, `## Architecture Modules`.
 
 ---
@@ -314,8 +315,8 @@ Substeps:
 
 1. Register Entra app for SPA redirect flow (personal accounts).
 2. Configure redirect URIs:
-   - production path
-   - local dev path
+   - `https://jon2050.de/conspectus/webapp/` (production)
+   - `http://localhost:5173/` (local development)
 3. Implement MSAL bootstrapping and login state store.
 4. Implement sign-in and sign-out UX.
 5. Implement OneDrive file picker/select flow (or Graph file browse fallback).
@@ -326,6 +327,10 @@ Substeps:
 7. Add settings actions:
    - "Change DB file"
    - "Reset local app data"
+
+M3 sequencing note:
+
+- `M3-01` defines the app registration contract (`docs/auth/Entra-App-Registration.md`) and is required before `M3-02` (Graph scopes) and `M3-03` (MSAL bootstrap implementation).
 
 Deliverables:
 
