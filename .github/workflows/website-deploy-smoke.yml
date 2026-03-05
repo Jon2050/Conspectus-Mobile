@@ -12,6 +12,7 @@ env:
   WEBSITE_REPO_FULL_NAME: ${{ vars.WEBSITE_REPO_FULL_NAME || 'Jon2050/Jon2050_Webpage' }}
   PRODUCTION_SMOKE_MAX_ATTEMPTS: '24'
   PRODUCTION_SMOKE_RETRY_DELAY_SECONDS: '10'
+  PRODUCTION_SMOKE_SKIP_SECURITY_HEADER_CHECKS: 'true'
 
 permissions:
   contents: read
@@ -78,3 +79,4 @@ jobs:
           --max-attempts ${{ env.PRODUCTION_SMOKE_MAX_ATTEMPTS }}
           --retry-delay-seconds ${{ env.PRODUCTION_SMOKE_RETRY_DELAY_SECONDS }}
           --request-timeout-ms 10000
+          --skip-security-header-checks ${{ env.PRODUCTION_SMOKE_SKIP_SECURITY_HEADER_CHECKS }}

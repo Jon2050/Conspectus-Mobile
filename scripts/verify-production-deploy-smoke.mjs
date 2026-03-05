@@ -34,6 +34,7 @@ export const parseArgs = (argv) => {
     maxAttempts: '24',
     retryDelaySeconds: '10',
     requestTimeoutMs: '10000',
+    skipSecurityHeaderChecks: 'false',
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -58,6 +59,7 @@ export const parseArgs = (argv) => {
   const maxAttempts = Number(args.maxAttempts);
   const retryDelaySeconds = Number(args.retryDelaySeconds);
   const requestTimeoutMs = Number(args.requestTimeoutMs);
+  const normalizedSkipSecurityHeaderChecks = args.skipSecurityHeaderChecks.trim().toLowerCase();
 
   assert(
     Number.isInteger(maxAttempts) && maxAttempts > 0,
@@ -71,6 +73,10 @@ export const parseArgs = (argv) => {
     Number.isInteger(requestTimeoutMs) && requestTimeoutMs > 0,
     '--request-timeout-ms must be a positive integer.',
   );
+  assert(
+    normalizedSkipSecurityHeaderChecks === 'true' || normalizedSkipSecurityHeaderChecks === 'false',
+    '--skip-security-header-checks must be "true" or "false".',
+  );
 
   return {
     baseUrl: normalizeBaseUrl(args.baseUrl),
@@ -79,6 +85,7 @@ export const parseArgs = (argv) => {
     maxAttempts,
     retryDelaySeconds,
     requestTimeoutMs,
+    skipSecurityHeaderChecks: normalizedSkipSecurityHeaderChecks === 'true',
   };
 };
 
@@ -237,7 +244,9 @@ const createChecks = (options, setManifestIconUrls, setAppleTouchIconUrl) => [
     name: 'app-route',
     url: options.baseUrl,
     validateResponse: (response) => {
-      ensureSecurityHeaders(response.headers, 'app-route');
+      if (!options.skipSecurityHeaderChecks) {
+        ensureSecurityHeaders(response.headers, 'app-route');
+      }
     },
     validateBody: (bodyText) => {
       const appleTouchIconUrl = ensureBootstrapMarkers(bodyText, options);

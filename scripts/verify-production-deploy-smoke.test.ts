@@ -8,6 +8,7 @@ const baseOptions = {
   maxAttempts: 1,
   retryDelaySeconds: 0,
   requestTimeoutMs: 1000,
+  skipSecurityHeaderChecks: false,
 };
 
 const appHtml = `<!doctype html>
@@ -241,6 +242,25 @@ describe('verify-production-deploy-smoke script', () => {
     );
   });
 
+  it('skips security header validation when explicitly disabled', async () => {
+    const responses = createHealthyResponses();
+    responses['https://jon2050.de/conspectus/webapp/'].headers = {};
+    const fetchMock = createFetchByUrl(responses);
+    const sleepMock = vi.fn(async () => undefined);
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await expect(
+      runSmokeChecks(
+        {
+          ...baseOptions,
+          skipSecurityHeaderChecks: true,
+        },
+        fetchMock,
+        sleepMock,
+      ),
+    ).resolves.toBeUndefined();
+  });
+
   it('fails when app-route response has invalid X-Content-Type-Options header', async () => {
     const responses = createHealthyResponses();
     responses['https://jon2050.de/conspectus/webapp/'].headers = {
@@ -391,7 +411,23 @@ describe('verify-production-deploy-smoke script', () => {
       maxAttempts: 24,
       retryDelaySeconds: 10,
       requestTimeoutMs: 10000,
+      skipSecurityHeaderChecks: false,
     });
+  });
+
+  it('accepts explicit security-header check skip flag', () => {
+    const args = parseArgs([
+      '--base-url',
+      'https://jon2050.de/conspectus/webapp',
+      '--commit-sha',
+      'abc123',
+      '--deploy-run-id',
+      '2002',
+      '--skip-security-header-checks',
+      'true',
+    ]);
+
+    expect(args.skipSecurityHeaderChecks).toBe(true);
   });
 
   it('rejects non-https base URLs', () => {
