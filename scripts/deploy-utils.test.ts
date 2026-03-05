@@ -126,3 +126,32 @@ describe('workflow slug-script contract', () => {
     });
   }
 });
+
+describe('fixed preview slot workflow contract', () => {
+  it('routes preview deployments to fixed main/test slots', () => {
+    const workflowSource = fs.readFileSync(deployChannelsWorkflowPath, 'utf8');
+    expect(workflowSource).toContain("preview_slot='test'");
+    expect(workflowSource).toContain("preview_slot='main'");
+    expect(workflowSource).toContain(
+      'destination_dir: previews/${{ needs.prepare-context.outputs.preview_slot }}',
+    );
+    expect(workflowSource).toContain(
+      '/previews/${{ needs.prepare-context.outputs.preview_slot }}/',
+    );
+  });
+
+  it('serializes preview deployments by fixed slot', () => {
+    const workflowSource = fs.readFileSync(deployChannelsWorkflowPath, 'utf8');
+    expect(workflowSource).toContain(
+      "group: deploy-channels-${{ github.event.workflow_run.head_branch == 'main' && 'main' || 'test' }}",
+    );
+  });
+
+  it('preserves fixed preview slots during cleanup', () => {
+    const workflowSource = fs.readFileSync(previewCleanupWorkflowPath, 'utf8');
+    expect(workflowSource).toContain(
+      'if [ "${BRANCH_SLUG}" = \'main\' ] || [ "${BRANCH_SLUG}" = \'test\' ]; then',
+    );
+    expect(workflowSource).toContain('Skipping cleanup for fixed preview slot');
+  });
+});

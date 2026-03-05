@@ -9,6 +9,7 @@ Non-negotiable rules:
 - Use web research when needed (framework/tool questions or blockers).
 - Ask questions to the user only for unresolved blockers or if something important is really unclear. Also if there are steps that definitely cannot be done by you.
 - Keep changes minimal but fully sufficient for all acceptance criteria.
+- DO NOT close an issue in GitHub or mark it as done if not everything is done. Even if there are only tasks left for the user.
 
 Execution workflow:
 

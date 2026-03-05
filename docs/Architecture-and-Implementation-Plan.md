@@ -262,12 +262,13 @@ Substeps:
 1. Define deployment channel architecture (M2-00 foundation):
    - branch preview channel on GitHub-hosted URLs for every branch push after `Quality` passes
    - main-only production channel for `jon2050.de` deployment eligibility
-   - branch preview path convention (`/previews/<branch-slug>/`) with cleanup on branch deletion
-   - deterministic branch slugging (`branch-name` -> lowercase path-safe single-segment slug) for stable preview URLs and safe cleanup behavior
+   - fixed preview path slots:
+     - `main` branch -> `/previews/main/`
+     - every non-`main` branch -> `/previews/test/`
 2. Confirm final public route:
    - `jon2050.de/conspectus/webapp/`
 3. Configure Vite/PWA build paths per channel:
-   - preview: branch-scoped base path and `start_url`
+   - preview: fixed-slot base path and `start_url` (`/previews/main/` or `/previews/test/`)
    - production: `/conspectus/webapp/` base path and `start_url`
    - service worker scope isolation for both channels
 4. Add deploy target structure compatible with existing website static hosting.
@@ -279,11 +280,13 @@ Substeps:
 6. Add website navigation entry/link to the PWA route (or temporary test link).
 7. Add CI deployment workflows:
    - `Deploy Channels` workflow runs from successful `Quality` push runs (`workflow_run`)
-   - publish/update preview on successful branch builds (including `main`)
+   - publish/update preview on successful branch builds:
+     - `main` branch updates `/previews/main/`
+     - non-`main` branches update `/previews/test/`
    - publish production artifact only on successful `main` builds
    - run build-output path/scope assertions for preview and production channels
    - run the same channel path/scope assertions in `Quality` to catch regressions before deploy workflows execute
-   - `Preview Cleanup` workflow removes branch preview path on delete event
+   - `Preview Cleanup` workflow removes legacy branch-specific preview paths on delete events and preserves fixed `main`/`test` slots
    - keep production website rollout as a separate follow-up in website repo
 8. Verify production installability contract (`M2-07`):
    - enforce install icon contract in automated checks (`manifest` includes moneybag `192x192` and `512x512`, HTML includes moneybag `apple-touch-icon`)
@@ -294,13 +297,13 @@ Deliverables:
 
 - Publicly reachable PWA shell on `jon2050.de` for iOS/Android testing.
 - Repeatable early deploy process independent of feature completion.
-- Branch preview URLs for development and QA on every branch.
+- Fixed preview URLs for development and QA (`/previews/main/` and `/previews/test/`).
 - Main-only production artifact handoff contract for website deployment.
 - Installability verification record with explicit bug-tracking linkage.
 
 Exit criteria:
 
-- Successful branch pushes produce isolated preview URLs.
+- Successful `main` pushes update `/previews/main/`; successful non-`main` pushes update `/previews/test/`.
 - PWA opens correctly at `https://jon2050.de/conspectus/webapp/`.
 - Install prompt/service worker/manifest behavior is testable on mobile devices.
 - Successful `main` builds produce traceable production artifacts for website consumption.
@@ -641,9 +644,11 @@ Pipeline stages:
 
 1. Build/test on push and PR.
 2. `Deploy Channels` listens to successful `Quality` push runs only.
-3. Deploy/update branch preview URL on `gh-pages` path `/previews/<branch-slug>/`.
+3. Deploy/update fixed preview slots on `gh-pages` paths:
+   - `/previews/main/` for `main`
+   - `/previews/test/` for non-`main` branches.
 4. On successful `main` quality runs, publish a production artifact with deployment metadata (`commit SHA`, UTC build time, run IDs).
-5. `Preview Cleanup` removes stale preview paths when branches are deleted.
+5. `Preview Cleanup` removes stale legacy branch-specific preview paths when branches are deleted while preserving fixed `main`/`test` preview slots.
 6. Website repo consumes main artifact and deploys to `jon2050.de/conspectus/webapp/`.
 7. `Deploy Channels` publishes preview/artifact outputs and dispatches the production-ready event to the website repository.
 8. `Website Deploy Smoke` (separate workflow) runs after successful `Deploy Channels` main runs and validates deployed app route, manifest, service worker URL, HTML bootstrap markers, and `deploy-metadata.json` identity fields.

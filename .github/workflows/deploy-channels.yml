@@ -19,7 +19,7 @@ permissions:
   pages: read
 
 concurrency:
-  group: deploy-channels-${{ github.event.workflow_run.head_branch || github.run_id }}
+  group: deploy-channels-${{ github.event.workflow_run.head_branch == 'main' && 'main' || 'test' }}
   cancel-in-progress: true
 
 jobs:
@@ -34,6 +34,7 @@ jobs:
     outputs:
       branch_name: ${{ steps.context.outputs.branch_name }}
       branch_slug: ${{ steps.context.outputs.branch_slug }}
+      preview_slot: ${{ steps.context.outputs.preview_slot }}
       head_sha: ${{ steps.context.outputs.head_sha }}
       is_main: ${{ steps.context.outputs.is_main }}
       preview_base_prefix: ${{ steps.context.outputs.preview_base_prefix }}
@@ -61,17 +62,20 @@ jobs:
           preview_base_prefix="/${REPO_NAME}"
 
           is_main='false'
+          preview_slot='test'
           if [ "${BRANCH_NAME}" = 'main' ]; then
             is_main='true'
+            preview_slot='main'
           fi
 
           {
             echo "branch_name=${BRANCH_NAME}"
             echo "branch_slug=${branch_slug}"
+            echo "preview_slot=${preview_slot}"
             echo "head_sha=${HEAD_SHA}"
             echo "is_main=${is_main}"
             echo "preview_base_prefix=${preview_base_prefix}"
-            echo "preview_base_path=${preview_base_prefix}/previews/${branch_slug}/"
+            echo "preview_base_path=${preview_base_prefix}/previews/${preview_slot}/"
           } >> "${GITHUB_OUTPUT}"
 
   deploy-preview:
@@ -108,7 +112,7 @@ jobs:
       - name: Build preview channel
         env:
           DEPLOY_CHANNEL: preview
-          DEPLOY_PREVIEW_SLUG: ${{ needs.prepare-context.outputs.branch_slug }}
+          DEPLOY_PREVIEW_SLUG: ${{ needs.prepare-context.outputs.preview_slot }}
           DEPLOY_PREVIEW_BASE_PREFIX: ${{ needs.prepare-context.outputs.preview_base_prefix }}
         run: npm run build
 
@@ -125,7 +129,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_branch: gh-pages
           publish_dir: ./dist
-          destination_dir: previews/${{ needs.prepare-context.outputs.branch_slug }}
+          destination_dir: previews/${{ needs.prepare-context.outputs.preview_slot }}
           keep_files: true
           full_commit_message: >-
             deploy(preview): ${{ needs.prepare-context.outputs.branch_name }}
@@ -135,7 +139,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PREVIEW_URL: >-
-            https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/previews/${{ needs.prepare-context.outputs.branch_slug }}/
+            https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/previews/${{ needs.prepare-context.outputs.preview_slot }}/
         run: |
           set -euo pipefail
 
@@ -186,7 +190,7 @@ jobs:
 
       - name: Preview URL (reachable)
         run: |
-          echo "Preview URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/previews/${{ needs.prepare-context.outputs.branch_slug }}/"
+          echo "Preview URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/previews/${{ needs.prepare-context.outputs.preview_slot }}/"
 
   publish-production-artifact:
     name: Publish Production Artifact
