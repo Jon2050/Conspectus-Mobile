@@ -7,7 +7,7 @@ Non-negotiable rules:
 - Work only in this repository; do not modify unrelated files.
 - If requirements are ambiguous, infer from architecture/backlog docs and state assumptions explicitly.
 - Use web research when needed (framework/tool questions or blockers).
-- Ask questions only for unresolved blockers.
+- Ask questions to the user only for unresolved blockers or if something important is really unclear. Also if there are steps that definitely cannot be done by you.
 - Keep changes minimal but fully sufficient for all acceptance criteria.
 
 Execution workflow:
@@ -27,7 +27,7 @@ Execution workflow:
    - `npm run test`
    - `npm run build`
    - `npm run test:e2e` when changed behavior is e2e-relevant.
-5. Run review gate with one reviewer subagent against acceptance criteria and code review best practices. If gaps are found, fix and repeat steps 4-5 until satisfied.
+5. Run review gate with one reviewer subagent against acceptance criteria and code review best practices. The reviewer must be told to explicitly look out for the testing, documentation, duplication, keep it simple (no over-engineering, no "backup" solutions, no fallbacks, no technical debts) guidelines. Also about general code quality and best practices. If gaps are found, fix and repeat steps 4-5 until satisfied.
 6. Git + GitHub flow:
    - Create/use a dedicated issue branch (one branch per issue).
    - Open a PR to `main` from the issue branch (direct-main is not allowed for issue delivery).
@@ -63,4 +63,5 @@ Execution workflow:
 1. **Documentation**: Code must be properly documented. Code should speak for itself, but when it cannot, it should be documented. This includes inline comments, function documentation, and any other relevant documentation.
 2. **Testing**: Code and functionality must be accompanied by appropriate tests.
 3. **Duplication**: Do not duplicate code. If you find yourself writing the same code in multiple places, refactor it into a reusable function or component. Do also not implement multiple ways or "backup" ways of doing things. Pick the one way that is intended and implement it well.
-4. **Overview considerations**: Before implementing a feature, assure that the preparation and foundation for it that should be done by previous tasks is completed and matches the plan for the current issue. Also have a look to following Issues, that are related to the current one, to assure that the implementation is a good and matching foundation for them.
+4. **Keep it simple**: Do not over-engineer solutions. Also do not implement "backup" solutions or "fallbacks"! NEVER! Also do not add technical debts.
+5. **Overview considerations**: Before implementing a feature, assure that the preparation and foundation for it that should be done by previous tasks is completed and matches the plan for the current issue. Also have a look to following Issues, that are related to the current one, to assure that the implementation is a good and matching foundation for them.
