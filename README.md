@@ -129,17 +129,17 @@ Deployment is split into two CI-gated channels:
 - `Quality` remains the only gate for deploy eligibility.
 - `Deploy Channels` runs only from successful `Quality` push runs (`workflow_run` trigger).
 - Fixed deployment URLs:
-  - `https://jon2050.github.io/Conspectus-Mobile/previews/main/` (`main` preview slot)
-  - `https://jon2050.github.io/Conspectus-Mobile/previews/test/` (shared preview slot for every non-`main` branch)
-  - `https://jon2050.de/conspectus/webapp/` (production)
+  - [https://jon2050.github.io/Conspectus-Mobile/previews/main/](https://jon2050.github.io/Conspectus-Mobile/previews/main/) (`main` preview slot)
+  - [https://jon2050.github.io/Conspectus-Mobile/previews/test/](https://jon2050.github.io/Conspectus-Mobile/previews/test/) (shared preview slot for every non-`main` branch)
+  - [https://jon2050.de/conspectus/webapp/](https://jon2050.de/conspectus/webapp/) (production)
 - Main branch runs additionally publish a production artifact for website-repo consumption.
 
 Operational notes:
 
 - Preview builds use `DEPLOY_CHANNEL=preview` with fixed `DEPLOY_PREVIEW_SLUG` values (`main` for `main`, `test` for non-`main`) and isolate service worker scope/assets under `/<repo>/previews/<slot>/`.
 - If MSAL login should work on GitHub Pages previews, add both fixed preview URLs
-  (`https://jon2050.github.io/Conspectus-Mobile/previews/main/` and
-  `https://jon2050.github.io/Conspectus-Mobile/previews/test/`) as SPA redirect URIs in Entra app registration.
+  ([https://jon2050.github.io/Conspectus-Mobile/previews/main/](https://jon2050.github.io/Conspectus-Mobile/previews/main/) and
+  [https://jon2050.github.io/Conspectus-Mobile/previews/test/](https://jon2050.github.io/Conspectus-Mobile/previews/test/)) as SPA redirect URIs in Entra app registration.
 - Production artifact builds use `DEPLOY_CHANNEL=production` and enforce `/conspectus/webapp/` for Vite `base`, PWA manifest `start_url`, and service worker scope.
 - Failed `Quality` runs do not produce preview deployments or production artifacts.
 - `Deploy Channels` includes a hard post-deploy preview availability check; if GitHub Pages is unavailable or the preview URL is not reachable, the workflow fails.
