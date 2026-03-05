@@ -335,6 +335,16 @@ M3 sequencing note:
 
 - `M3-01` defines the app registration contract (`docs/auth/Entra-App-Registration.md`) and is required before `M3-02` (Graph scopes) and `M3-03` (MSAL bootstrap implementation).
 
+M3-03 implementation clarification:
+
+- Auth bootstrap is implemented in `src/auth/msalAuthClient.ts` and exposed through `@auth` as `createAuthClient`.
+- Login/logout interactive actions use MSAL redirect flow (`loginRedirect`/`logoutRedirect`) with personal-account authority (`https://login.microsoftonline.com/consumers`).
+- Startup initialization restores active account in deterministic order:
+  1. account returned by `handleRedirectPromise()`
+  2. currently active account in MSAL cache
+  3. deterministic fallback from cached accounts (username + homeAccountId sort)
+- Access token acquisition uses a silent-first strategy (`acquireTokenSilent`) and normalizes failures into stable app-level auth error codes (`interaction_required`, `network_error`, `no_active_account`, etc.).
+
 Deliverables:
 
 - Stable login flow with persisted session where possible.

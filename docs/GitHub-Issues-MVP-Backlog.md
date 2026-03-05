@@ -236,7 +236,7 @@ An issue is only considered done when:
 - Depends on: `M3-01`
 - GitHub: [#31](https://github.com/Jon2050/Conspectus-Mobile/issues/31)
 
-### :green_circle: M3-03 Implement MSAL bootstrap module
+### :white_check_mark: M3-03 Implement MSAL bootstrap module
 
 - Label: `feature`
 - Milestone: `M3 - Auth + OneDrive Binding`
