@@ -62,6 +62,19 @@ function detectStatus(testcaseBody) {
   return 'passed';
 }
 
+function parseDurationMilliseconds(durationSecondsValue) {
+  if (!durationSecondsValue) {
+    return null;
+  }
+
+  const seconds = Number.parseFloat(durationSecondsValue);
+  if (!Number.isFinite(seconds) || seconds < 0) {
+    return null;
+  }
+
+  return Math.round(seconds * 1000);
+}
+
 function parseJunitFile(filePath) {
   if (!fs.existsSync(filePath)) {
     return {
@@ -82,12 +95,13 @@ function parseJunitFile(filePath) {
     const testName = readAttribute(attributeBlock, 'name');
     const durationSeconds = readAttribute(attributeBlock, 'time');
     const status = detectStatus(testcaseBody);
+    const durationMilliseconds = parseDurationMilliseconds(durationSeconds);
 
     testCases.push({
       filePath,
       suiteName,
       testName,
-      durationSeconds,
+      durationMilliseconds,
       status,
     });
   }
@@ -115,12 +129,40 @@ function countByStatus(testCases, status) {
   return testCases.filter((testCase) => testCase.status === status).length;
 }
 
+function statusPriority(status) {
+  if (status === 'failed') {
+    return 0;
+  }
+
+  if (status === 'skipped') {
+    return 1;
+  }
+
+  return 2;
+}
+
+function sortTestCasesForDisplay(testCases) {
+  return testCases
+    .map((testCase, index) => ({ testCase, index }))
+    .sort((left, right) => {
+      const statusDelta =
+        statusPriority(left.testCase.status) - statusPriority(right.testCase.status);
+      if (statusDelta !== 0) {
+        return statusDelta;
+      }
+
+      return left.index - right.index;
+    })
+    .map((entry) => entry.testCase);
+}
+
 function toMarkdownTableRows(testCases) {
   return testCases
     .map((testCase) => {
       const suiteDisplay = testCase.suiteName || '(no suite)';
       const testDisplay = testCase.testName || '(unnamed testcase)';
-      const durationDisplay = testCase.durationSeconds || '-';
+      const durationDisplay =
+        testCase.durationMilliseconds === null ? '-' : `${testCase.durationMilliseconds} ms`;
       const fileDisplay = path.relative(process.cwd(), testCase.filePath);
       return `| ${statusIcon(testCase.status)} | ${suiteDisplay} | ${testDisplay} | ${durationDisplay} | ${fileDisplay} |`;
     })
@@ -135,6 +177,7 @@ function buildSummaryMarkdown(title, parsedFiles) {
   const failedCount = countByStatus(testCases, 'failed');
   const skippedCount = countByStatus(testCases, 'skipped');
   const parsedCount = parsedFiles.length - missingFiles.length;
+  const sortedTestCases = sortTestCasesForDisplay(testCases);
 
   const lines = [];
   lines.push(`## ${title}`);
@@ -158,9 +201,9 @@ function buildSummaryMarkdown(title, parsedFiles) {
     return lines.join('\n');
   }
 
-  lines.push('| Status | Suite | Test Case | Duration (s) | Report File |');
+  lines.push('| Status | Suite | Test Case | Duration (ms) | Report File |');
   lines.push('| --- | --- | --- | ---: | --- |');
-  lines.push(toMarkdownTableRows(testCases));
+  lines.push(toMarkdownTableRows(sortedTestCases));
   lines.push('');
 
   return lines.join('\n');

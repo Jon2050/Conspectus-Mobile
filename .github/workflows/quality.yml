@@ -121,16 +121,6 @@ jobs:
           --title "Unit Test Report"
           --files reports/vitest/junit-app.xml reports/vitest/junit-scripts.xml
 
-      - name: Upload unit test reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: unit-test-reports
-          if-no-files-found: ignore
-          retention-days: 30
-          path: |
-            reports/vitest/
-
       - name: Build and verify production channel paths/scope
         env:
           DEPLOY_CHANNEL: production
@@ -220,15 +210,3 @@ jobs:
           node scripts/publish-test-summary.mjs
           --title "E2E Test Report"
           --files reports/playwright/junit.xml
-
-      - name: Upload e2e test reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: e2e-test-reports
-          if-no-files-found: ignore
-          retention-days: 30
-          path: |
-            reports/playwright/
-            playwright-report/
-            test-results/

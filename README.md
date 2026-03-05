@@ -119,11 +119,6 @@ CI test report view in GitHub:
   - `Unit Test Report` (all parsed Vitest test cases from JUnit XML)
   - `E2E Test Report` (all parsed Playwright test cases from JUnit XML)
 
-CI test report artifacts (raw files):
-
-- `unit-test-reports`: Vitest JUnit XML + logs from app and scripts test suites.
-- `e2e-test-reports`: Playwright JUnit XML + HTML report + raw test result attachments.
-
 ## Deployment Channels
 
 Deployment is split into two CI-gated channels:
