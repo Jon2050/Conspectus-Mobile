@@ -30,7 +30,7 @@ Repository: `Jon2050/Conspectus-Mobile`
 
 ### Pass 2 — Independent Full-Codebase Review
 
-1. Read all project documentation including `docs/M2-07-installability-verification.md`, `docs/M2-08-two-repo-deployment-runbook.md`, and `docs/Task-Prompt-Snippet.md`.
+1. Read all project documentation and issue records for M2-07 ([#25](https://github.com/Jon2050/Conspectus-Mobile/issues/25)) and M2-08 ([#27](https://github.com/Jon2050/Conspectus-Mobile/issues/27)), plus `docs/Task-Prompt-Snippet.md`.
 2. Read GitHub issue #108 body and comments via `gh issue view 108 --json`.
 3. Reviewed **every file** in the repository:
    - All source modules: `src/auth`, `src/graph`, `src/db`, `src/cache`, `src/features`, `src/shared`, `src/lib`.
@@ -69,7 +69,7 @@ Repository: `Jon2050/Conspectus-Mobile`
 | #19 | M2-04 Consumer artifact integration | ⚠️ Producer-side contract verified; consumer-side implementation in website repo is external to this repository. |
 | #21 | M2-05 Deployment smoke checks | ✅ Verified complete (script + website smoke workflow). |
 | #23 | M2-06 Early public test page/link | ✅ GitHub issue is closed; this repo cannot verify website navigation entry directly. Backlog marker mismatch fixed. |
-| #25 | M2-07 Installability verification | ✅ Verified complete (`docs/M2-07-installability-verification.md`). |
+| #25 | M2-07 Installability verification | ✅ Verified complete (issue [#25](https://github.com/Jon2050/Conspectus-Mobile/issues/25)). |
 | #27 | M2-08 Two-repo runbook | ✅ Verified complete; improved with explicit artifact retention contract. |
 
 ---
@@ -89,7 +89,7 @@ Repository: `Jon2050/Conspectus-Mobile`
 
 4. **Artifact rollback durability:**
    - Set explicit artifact retention (`retention-days: 90`) in production artifact upload.
-   - Documented retention expectation in `docs/M2-08-two-repo-deployment-runbook.md`.
+   - Documented retention expectation in issue [#27](https://github.com/Jon2050/Conspectus-Mobile/issues/27).
 
 5. **Missing PM-02 repository artifacts:**
    - Added issue templates:
@@ -281,5 +281,4 @@ Not blocking M3 but should be tracked:
 4. ~~Fix `renderStartupError` XSS vector~~ — **RESOLVED.**
 
 ---
-
 
