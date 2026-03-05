@@ -29,3 +29,6 @@ export interface AuthError {
   readonly message: string;
   readonly cause?: unknown;
 }
+
+export { AUTH_OIDC_SCOPES, GRAPH_ONEDRIVE_FILE_SCOPES, AUTH_REQUEST_SCOPES } from './scopes';
+export type { AuthRequestScope } from './scopes';

@@ -610,6 +610,7 @@ Hard gates before release:
 
 - SPA auth with PKCE via MSAL.
 - Delegated Graph scopes only; least privilege.
+- Approved MVP scope baseline (`openid`, `profile`, `offline_access`, `Files.ReadWrite`) is maintained in `docs/auth/Entra-App-Registration.md` (M3-02 source of truth).
 - No client secret in frontend code.
 - HTTPS-only deployment.
 - MFA recommended/required on both Microsoft accounts.
