@@ -112,7 +112,14 @@ Local quality scripts:
 
 CI runs these checks on every push and every pull request.
 
-CI test report artifacts:
+CI test report view in GitHub:
+
+- Open a `Quality` run and use the `Summary` tab.
+- The run summary includes:
+  - `Unit Test Report` (all parsed Vitest test cases from JUnit XML)
+  - `E2E Test Report` (all parsed Playwright test cases from JUnit XML)
+
+CI test report artifacts (raw files):
 
 - `unit-test-reports`: Vitest JUnit XML + logs from app and scripts test suites.
 - `e2e-test-reports`: Playwright JUnit XML + HTML report + raw test result attachments.

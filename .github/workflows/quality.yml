@@ -114,6 +114,13 @@ jobs:
           npx vitest run --config vite.config.ts --reporter=default --reporter=junit --outputFile=reports/vitest/junit-app.xml | tee reports/vitest/vitest-app.log
           npx vitest run --config vitest.scripts.config.ts --reporter=default --reporter=junit --outputFile=reports/vitest/junit-scripts.xml | tee reports/vitest/vitest-scripts.log
 
+      - name: Publish unit test report summary
+        if: always()
+        run: >-
+          node scripts/publish-test-summary.mjs
+          --title "Unit Test Report"
+          --files reports/vitest/junit-app.xml reports/vitest/junit-scripts.xml
+
       - name: Upload unit test reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -206,6 +213,13 @@ jobs:
         env:
           PLAYWRIGHT_WEB_SERVER_BUILD: '0'
         run: npm run test:e2e
+
+      - name: Publish e2e test report summary
+        if: always()
+        run: >-
+          node scripts/publish-test-summary.mjs
+          --title "E2E Test Report"
+          --files reports/playwright/junit.xml
 
       - name: Upload e2e test reports
         if: always()
