@@ -66,4 +66,33 @@ describe('hashRouting', () => {
     unsubscribe();
     expect(target.removeEventListener).toHaveBeenCalledWith('hashchange', hashChangeHandler);
   });
+
+  it('settles on the last route after rapid consecutive hash changes', () => {
+    let hashChangeHandler: (() => void) | undefined;
+    const target = {
+      location: { hash: '#/accounts' },
+      addEventListener: vi.fn((_event: string, handler: () => void) => {
+        hashChangeHandler = handler;
+      }),
+      removeEventListener: vi.fn(),
+    };
+
+    const routeStore = createHashRouteStore(target);
+    const observedRoutes: string[] = [];
+    const unsubscribe = routeStore.subscribe((value) => {
+      observedRoutes.push(value);
+    });
+
+    target.location.hash = '#/transfers';
+    hashChangeHandler?.();
+    target.location.hash = '#/add';
+    hashChangeHandler?.();
+    target.location.hash = '#/settings';
+    hashChangeHandler?.();
+
+    expect(observedRoutes.at(-1)).toBe('settings');
+    expect(observedRoutes).toEqual(['accounts', 'transfers', 'add', 'settings']);
+
+    unsubscribe();
+  });
 });

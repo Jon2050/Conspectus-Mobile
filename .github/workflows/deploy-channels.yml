@@ -39,6 +39,9 @@ jobs:
       preview_base_prefix: ${{ steps.context.outputs.preview_base_prefix }}
       preview_base_path: ${{ steps.context.outputs.preview_base_path }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Resolve deployment context
         id: context
         env:

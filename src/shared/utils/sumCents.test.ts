@@ -20,4 +20,16 @@ describe('sumCents', () => {
     expect(total).toBe(Number.MAX_SAFE_INTEGER);
     expect(Number.isSafeInteger(total)).toBe(true);
   });
+
+  it('returns the value itself for a single-element list', () => {
+    expect(sumCents([4200])).toBe(4200);
+  });
+
+  it('sums all-negative values correctly', () => {
+    expect(sumCents([-100, -200, -300])).toBe(-600);
+  });
+
+  it('handles large cent values without overflow', () => {
+    expect(sumCents([Number.MAX_SAFE_INTEGER, -1])).toBe(Number.MAX_SAFE_INTEGER - 1);
+  });
 });
