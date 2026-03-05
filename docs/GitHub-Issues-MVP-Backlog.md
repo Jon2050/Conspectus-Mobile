@@ -228,7 +228,7 @@ An issue is only considered done when:
 - Depends on: `M1-07`
 - GitHub: [#29](https://github.com/Jon2050/Conspectus-Mobile/issues/29)
 
-### :green_circle: M3-02 Configure Graph scopes and consent documentation
+### :white_check_mark: M3-02 Configure Graph scopes and consent documentation
 
 - Label: `security`
 - Milestone: `M3 - Auth + OneDrive Binding`

@@ -1,6 +1,9 @@
-# M3-01 Entra App Registration (SPA, Personal Accounts)
+# Entra App Registration Contract (M3-01 + M3-02)
 
-This document is the repository contract for issue [#29](https://github.com/Jon2050/Conspectus-Mobile/issues/29).
+This document is the repository contract for:
+
+- [#29](https://github.com/Jon2050/Conspectus-Mobile/issues/29): app registration (SPA, personal accounts)
+- [#31](https://github.com/Jon2050/Conspectus-Mobile/issues/31): Graph scopes and consent documentation
 
 Goal:
 
@@ -34,10 +37,53 @@ After registration, copy the `Application (client) ID` and configure:
 2. CI/CD:
    - GitHub repository variable `VITE_AZURE_CLIENT_ID=<application-client-id>`
 
-Notes:
+## Graph Delegated Scope Contract (M3-02)
+
+Authentication and Graph requests MUST use only this combined scope set:
+
+- `openid`
+- `profile`
+- `offline_access`
+- `Files.ReadWrite`
+
+Scope rationale:
+
+- `openid`: required for OpenID Connect sign-in.
+- `profile`: required for basic account claims used in session UI/state.
+- `offline_access`: enables refresh-token based silent session continuation.
+- `Files.ReadWrite`: minimum delegated Graph permission for OneDrive DB metadata read, DB download, and conditional DB upload.
+
+Explicitly not requested:
+
+- `User.Read`: not required because MVP does not call Graph `/me` profile APIs.
+- `Files.Read`: redundant because `Files.ReadWrite` already includes read capability.
+- `Files.Read.All`, `Files.ReadWrite.All`: broader-than-required permissions.
+
+## Consent Model
+
+- Consent type is delegated user consent for personal Microsoft accounts.
+- No tenant-wide or admin-consent scope is part of the MVP contract.
+- "Scope list approved" means this document and its matching code/tests are reviewed and merged in the M3-02 PR.
+
+## Entra Configuration and Verification Steps
+
+Portal configuration:
+
+1. Open the app registration.
+2. Go to `API permissions`.
+3. Ensure `Microsoft Graph` delegated permissions include `Files.ReadWrite`.
+4. Ensure no broader `Files.*.All` permission is configured.
+
+CLI verification (optional):
+
+1. Run `az login` with an account that can view the app registration.
+2. Run `az ad app permission list --id <application-client-id>`.
+3. Confirm delegated Graph permissions include only `Files.ReadWrite` for OneDrive file operations.
+
+Operational notes:
 
 - The client ID is public metadata, not a secret.
-- Graph API delegated scopes and consent details are handled in `M3-02` (issue [#31](https://github.com/Jon2050/Conspectus-Mobile/issues/31)).
+- OIDC scopes (`openid`, `profile`, `offline_access`) are requested by the SPA auth flow and may not be listed as Graph API permissions in the Entra portal.
 
 ## Verification Checklist (Issue Close Gate)
 
@@ -46,3 +92,6 @@ Notes:
 - SPA platform is configured.
 - Both redirect URIs listed above are configured exactly.
 - The same `Application (client) ID` is set in local `.env` and repository variable `VITE_AZURE_CLIENT_ID`.
+- Graph delegated permission for file operations is `Files.ReadWrite`.
+- Broader file permissions (`Files.Read.All`, `Files.ReadWrite.All`) are absent.
+- SPA scope request contract is exactly: `openid profile offline_access Files.ReadWrite`.
