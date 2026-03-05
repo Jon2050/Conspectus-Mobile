@@ -232,7 +232,7 @@ An issue is only considered done when:
 
 - Label: `security`
 - Milestone: `M3 - Auth + OneDrive Binding`
-- Summary: Work includes least-privilege delegated scopes required for file read/write and scopes in Entra app. It also covers consent and rationale.
+- Summary: Work includes least-privilege delegated scopes required for file read/write and scopes in Entra app. It also covers consent and rationale. Any Entra registration change in this issue must update `docs/auth/Entra-App-Registration.md` in the same PR.
 - Depends on: `M3-01`
 - GitHub: [#31](https://github.com/Jon2050/Conspectus-Mobile/issues/31)
 
@@ -240,7 +240,7 @@ An issue is only considered done when:
 
 - Label: `feature`
 - Milestone: `M3 - Auth + OneDrive Binding`
-- Summary: Work includes MSAL initialization with PKCE flow and token acquisition helper with silent-first strategy. It also covers account selection and active account restoration.
+- Summary: Work includes MSAL initialization with PKCE flow and token acquisition helper with silent-first strategy. It also covers account selection and active account restoration. If implementation requires Entra registration adjustments (redirect URIs, platform/account settings), update `docs/auth/Entra-App-Registration.md` in the same PR.
 - Depends on: `M3-01`
 - GitHub: [#33](https://github.com/Jon2050/Conspectus-Mobile/issues/33)
 
