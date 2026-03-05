@@ -34,10 +34,11 @@ Provide fast mobile access to a personal Conspectus SQLite database stored in On
 ## Environment Setup
 
 Create a `.env` file in the repository root. Use `.env.example` as the template.
+Before setting env values, complete the Entra registration contract in `docs/auth/Entra-App-Registration.md`.
 
 Required variable:
 
-- `VITE_AZURE_CLIENT_ID`: Microsoft Entra SPA client ID used for MSAL login.
+- `VITE_AZURE_CLIENT_ID`: Microsoft Entra `Application (client) ID` from the SPA registration in `docs/auth/Entra-App-Registration.md`.
   - CI/CD requirement: this repository variable must also be set in GitHub Actions repository variables.
 
 Optional deployment variables:
@@ -55,6 +56,7 @@ Startup validation:
 Canonical source-of-truth by topic:
 
 - Environment variables and defaults: this `README.md` (`## Environment Setup`).
+- Entra app registration contract (account type, SPA platform, redirect URIs): `docs/auth/Entra-App-Registration.md`.
 - Module import conventions and aliases: this `README.md` (`## Architecture Modules`).
 - Sync/caching model (`eTag`, `If-Match`, conflict recovery): `docs/Architecture-and-Implementation-Plan.md` (`## 3.4 Sync and Caching Strategy`).
 
@@ -70,6 +72,7 @@ Canonical source-of-truth by topic:
 - Architecture and implementation plan: `docs/Architecture-and-Implementation-Plan.md`
 - Desktop parity reference used for DB/business-rule alignment: `docs/Conspectus-Desktop-Info.md`
 - MVP tracker/index of milestone issues: `docs/GitHub-Issues-MVP-Backlog.md`
+- Entra app registration runbook (`M3-01`): `docs/auth/Entra-App-Registration.md`
 - M2-07 installability verification record: [#25](https://github.com/Jon2050/Conspectus-Mobile/issues/25)
 - M2-08 two-repo deployment runbook record: [#27](https://github.com/Jon2050/Conspectus-Mobile/issues/27)
 
