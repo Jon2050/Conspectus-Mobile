@@ -70,7 +70,8 @@ Canonical source-of-truth by topic:
 - Architecture and implementation plan: `docs/Architecture-and-Implementation-Plan.md`
 - Desktop parity reference used for DB/business-rule alignment: `docs/Conspectus-Desktop-Info.md`
 - MVP tracker/index of milestone issues: `docs/GitHub-Issues-MVP-Backlog.md`
-- Two-repo deploy/rollback operator runbook: `docs/M2-08-two-repo-deployment-runbook.md`
+- M2-07 installability verification record: [#25](https://github.com/Jon2050/Conspectus-Mobile/issues/25)
+- M2-08 two-repo deployment runbook record: [#27](https://github.com/Jon2050/Conspectus-Mobile/issues/27)
 
 ## Architecture Modules
 
@@ -110,6 +111,11 @@ Local quality scripts:
 - `npm run typecheck` - runs Svelte + TypeScript checks in strict mode.
 
 CI runs these checks on every push and every pull request.
+
+CI test report artifacts:
+
+- `unit-test-reports`: Vitest JUnit XML + logs from app and scripts test suites.
+- `e2e-test-reports`: Playwright JUnit XML + HTML report + raw test result attachments.
 
 ## Deployment Channels
 

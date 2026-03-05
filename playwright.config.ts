@@ -9,7 +9,11 @@ export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
-  reporter: [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }]],
+  reporter: [
+    ['list'],
+    ['html', { open: 'never', outputFolder: 'playwright-report' }],
+    ['junit', { outputFile: 'reports/playwright/junit.xml' }],
+  ],
   outputDir: 'test-results',
   use: {
     baseURL: 'http://127.0.0.1:4173',

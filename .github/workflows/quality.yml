@@ -114,6 +114,16 @@ jobs:
           npx vitest run --config vite.config.ts --reporter=default --reporter=junit --outputFile=reports/vitest/junit-app.xml | tee reports/vitest/vitest-app.log
           npx vitest run --config vitest.scripts.config.ts --reporter=default --reporter=junit --outputFile=reports/vitest/junit-scripts.xml | tee reports/vitest/vitest-scripts.log
 
+      - name: Upload unit test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          if-no-files-found: ignore
+          retention-days: 30
+          path: |
+            reports/vitest/
+
       - name: Build and verify production channel paths/scope
         env:
           DEPLOY_CHANNEL: production
@@ -136,15 +146,6 @@ jobs:
         run: |
           npm run build
           node scripts/verify-build-channel.mjs --dist dist --channel preview --base "/${{ github.event.repository.name }}/previews/quality-smoke/"
-
-      - name: Upload unit test failure artifacts
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: unit-test-failure-artifacts
-          if-no-files-found: ignore
-          path: |
-            reports/vitest/
 
   e2e-smoke:
     needs:
@@ -198,17 +199,22 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install chromium
 
+      - name: Prepare e2e report directories
+        run: mkdir -p reports/playwright
+
       - name: Run E2E smoke tests
         env:
           PLAYWRIGHT_WEB_SERVER_BUILD: '0'
         run: npm run test:e2e
 
-      - name: Upload Playwright failure artifacts
-        if: failure()
+      - name: Upload e2e test reports
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-failure-artifacts
+          name: e2e-test-reports
           if-no-files-found: ignore
+          retention-days: 30
           path: |
+            reports/playwright/
             playwright-report/
             test-results/

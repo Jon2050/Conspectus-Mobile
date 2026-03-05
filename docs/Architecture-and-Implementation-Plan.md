@@ -286,7 +286,7 @@ Substeps:
    - keep production website rollout as a separate follow-up in website repo
 8. Verify production installability contract (`M2-07`):
    - enforce install icon contract in automated checks (`manifest` includes moneybag `192x192` and `512x512`, HTML includes moneybag `apple-touch-icon`)
-   - keep manual iOS Safari / Android Chrome Add to Home Screen checklist in repo docs (`docs/M2-07-installability-verification.md`)
+   - keep manual iOS Safari / Android Chrome Add to Home Screen checklist and evidence in GitHub issue [#25](https://github.com/Jon2050/Conspectus-Mobile/issues/25)
    - track discovered installability defects as `bug` issues (current follow-up: icon cropping/centering issue `#106`)
 
 Deliverables:
@@ -698,7 +698,7 @@ Failure and rollback behavior:
 1. If producer artifact generation fails, website deployment does not run for that revision.
 2. If consumer artifact retrieval or validation fails, website deployment fails without changing live files.
 3. Rollback re-deploys the last known-good `deployRunId` artifact via consumer CI automation by replaying the `repository_dispatch` handoff payload with known-good identity fields; rollback must use CI automation only (no manual filesystem copy steps).
-4. Detailed operator runbook steps are documented in `docs/M2-08-two-repo-deployment-runbook.md`; expanded rollback coverage remains tracked in `M8-09`.
+4. Operator runbook history for M2 is maintained in GitHub issue [#27](https://github.com/Jon2050/Conspectus-Mobile/issues/27); expanded rollback coverage remains tracked in `M8-09`.
 
 ---
 
