@@ -9,6 +9,7 @@ Non-negotiable rules:
 - Use web research when needed (framework/tool questions or blockers).
 - Ask questions to the user only for unresolved blockers or if something important is really unclear. Also if there are steps that definitely cannot be done by you.
 - Keep changes minimal but fully sufficient for all acceptance criteria.
+- DO NOT close an issue in GitHub or mark it as done if not everything is done. Even if there are only tasks left for the user.
 
 Execution workflow:
 
@@ -41,6 +42,7 @@ Execution workflow:
    - Update `docs/GitHub-Issues-MVP-Backlog.md` status marker to done.
    - Update `docs/Architecture-and-Implementation-Plan.md` with implementation changes/clarifications (source of truth).
    - Provide final report with changed files, commands/results, CI status, acceptance criteria checklist, and assumptions.
+     You are not fully done before step 8 is not completed and all CI pipelines, checks and tests are green. You have to confirm this always after every push or merge!
 
 ### Test Cases and Scenarios
 

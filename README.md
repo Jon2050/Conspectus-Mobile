@@ -128,17 +128,22 @@ Deployment is split into two CI-gated channels:
 
 - `Quality` remains the only gate for deploy eligibility.
 - `Deploy Channels` runs only from successful `Quality` push runs (`workflow_run` trigger).
-- Branch previews (including `main`) publish to:
-  - `https://<owner>.github.io/<repo>/previews/<branch-slug>/`
-- Main branch runs additionally publish a production artifact for website-repo consumption, built for `/conspectus/webapp/`.
+- Fixed deployment URLs:
+  - [https://jon2050.github.io/Conspectus-Mobile/previews/main/](https://jon2050.github.io/Conspectus-Mobile/previews/main/) (`main` preview slot)
+  - [https://jon2050.github.io/Conspectus-Mobile/previews/test/](https://jon2050.github.io/Conspectus-Mobile/previews/test/) (shared preview slot for every non-`main` branch)
+  - [https://jon2050.de/conspectus/webapp/](https://jon2050.de/conspectus/webapp/) (production)
+- Main branch runs additionally publish a production artifact for website-repo consumption.
 
 Operational notes:
 
-- Preview builds use `DEPLOY_CHANNEL=preview` with deterministic path-safe branch slugging (single path segment, no nested branch folders) and isolate service worker scope/assets under `/<repo>/previews/<branch-slug>/`.
+- Preview builds use `DEPLOY_CHANNEL=preview` with fixed `DEPLOY_PREVIEW_SLUG` values (`main` for `main`, `test` for non-`main`) and isolate service worker scope/assets under `/<repo>/previews/<slot>/`.
+- If MSAL login should work on GitHub Pages previews, add both fixed preview URLs
+  ([https://jon2050.github.io/Conspectus-Mobile/previews/main/](https://jon2050.github.io/Conspectus-Mobile/previews/main/) and
+  [https://jon2050.github.io/Conspectus-Mobile/previews/test/](https://jon2050.github.io/Conspectus-Mobile/previews/test/)) as SPA redirect URIs in Entra app registration.
 - Production artifact builds use `DEPLOY_CHANNEL=production` and enforce `/conspectus/webapp/` for Vite `base`, PWA manifest `start_url`, and service worker scope.
 - Failed `Quality` runs do not produce preview deployments or production artifacts.
 - `Deploy Channels` includes a hard post-deploy preview availability check; if GitHub Pages is unavailable or the preview URL is not reachable, the workflow fails.
-- `Preview Cleanup` removes stale `gh-pages/previews/<branch-slug>/` content when a branch is deleted.
+- `Preview Cleanup` removes legacy branch-specific preview paths for deleted branches and keeps fixed `main`/`test` preview slots intact.
 - Production handoff dispatch requires repository secret `WEBSITE_REPO_DISPATCH_TOKEN` (scoped to trigger workflow events in the website repo).
 - Production handoff target repository defaults to `Jon2050/Jon2050_Webpage` and can be overridden with repository variable `WEBSITE_REPO_FULL_NAME`.
 - Canonical cross-repo producer/consumer architecture decision (M2-01): `docs/Architecture-and-Implementation-Plan.md` section `8.3`.

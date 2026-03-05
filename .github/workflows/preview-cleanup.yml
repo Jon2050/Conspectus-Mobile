@@ -42,6 +42,11 @@ jobs:
         run: |
           set -euo pipefail
 
+          if [ "${BRANCH_SLUG}" = 'main' ] || [ "${BRANCH_SLUG}" = 'test' ]; then
+            echo "Skipping cleanup for fixed preview slot '${BRANCH_SLUG}'."
+            exit 0
+          fi
+
           if ! git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
             echo "No gh-pages branch found. Nothing to clean up."
             exit 0

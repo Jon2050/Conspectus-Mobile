@@ -20,6 +20,11 @@ Create or update an app registration with the following values:
    - `http://localhost:5173/`
    - `https://jon2050.de/conspectus/webapp/`
 
+Optional for GitHub Pages preview login:
+
+- `https://jon2050.github.io/Conspectus-Mobile/previews/main/`
+- `https://jon2050.github.io/Conspectus-Mobile/previews/test/`
+
 ## Frontend Configuration Contract
 
 After registration, copy the `Application (client) ID` and configure:
