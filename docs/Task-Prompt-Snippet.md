@@ -42,6 +42,7 @@ Execution workflow:
    - Update `docs/GitHub-Issues-MVP-Backlog.md` status marker to done.
    - Update `docs/Architecture-and-Implementation-Plan.md` with implementation changes/clarifications (source of truth).
    - Provide final report with changed files, commands/results, CI status, acceptance criteria checklist, and assumptions.
+     You are not fully done before step 8 is not completed and all CI pipelines, checks and tests are green. You have to confirm this always after every push or merge!
 
 ### Test Cases and Scenarios
 
