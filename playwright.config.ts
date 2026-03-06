@@ -1,8 +1,23 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const resolveAppBasePath = (): string => {
+  const configuredBasePath = process.env.PLAYWRIGHT_APP_BASE_PATH?.trim();
+  if (!configuredBasePath) {
+    return '/conspectus/webapp/';
+  }
+
+  const withLeadingSlash = configuredBasePath.startsWith('/')
+    ? configuredBasePath
+    : `/${configuredBasePath}`;
+  return withLeadingSlash.endsWith('/') ? withLeadingSlash : `${withLeadingSlash}/`;
+};
+
+const appBasePath = resolveAppBasePath();
+const webServerUrl = new URL(appBasePath, 'http://127.0.0.1:4173').toString();
+
 const webServerCommand =
   process.env.PLAYWRIGHT_WEB_SERVER_BUILD === '0'
-    ? 'npm run preview -- --host=127.0.0.1 --port=4173 --strictPort'
+    ? 'node scripts/serve-static-dist.mjs'
     : 'npm run build && npm run preview -- --host=127.0.0.1 --port=4173 --strictPort';
 const includeIosWebkitProject = process.env.PLAYWRIGHT_INCLUDE_IOS_WEBKIT === '1';
 
@@ -46,9 +61,11 @@ export default defineConfig({
     env: {
       ...process.env,
       DEPLOY_CHANNEL: 'production',
+      PLAYWRIGHT_WEB_SERVER_HOST: '127.0.0.1',
+      PLAYWRIGHT_WEB_SERVER_PORT: '4173',
       VITE_AZURE_CLIENT_ID: process.env.VITE_AZURE_CLIENT_ID ?? 'playwright-test-client-id',
     },
-    url: 'http://127.0.0.1:4173',
+    url: webServerUrl,
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
   },
