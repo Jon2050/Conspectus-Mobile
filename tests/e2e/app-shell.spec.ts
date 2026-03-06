@@ -2,7 +2,19 @@ import { expect, test } from '@playwright/test';
 
 test.use({ viewport: { width: 390, height: 844 } });
 
-const APP_BASE_PATH = '/conspectus/webapp/';
+const resolveAppBasePath = (): string => {
+  const configuredBasePath = process.env.PLAYWRIGHT_APP_BASE_PATH?.trim();
+  if (!configuredBasePath) {
+    return '/conspectus/webapp/';
+  }
+
+  const withLeadingSlash = configuredBasePath.startsWith('/')
+    ? configuredBasePath
+    : `/${configuredBasePath}`;
+  return withLeadingSlash.endsWith('/') ? withLeadingSlash : `${withLeadingSlash}/`;
+};
+
+const APP_BASE_PATH = resolveAppBasePath();
 const APP_BASE_PATH_WITHOUT_TRAILING_SLASH = APP_BASE_PATH.slice(0, -1);
 const PLAYWRIGHT_TEST_CLIENT_ID = 'playwright-test-client-id';
 const RUNTIME_CLIENT_ID_TOKENS = [
@@ -304,18 +316,18 @@ test('exposes manifest and registers service worker', async ({ page }) => {
   await expect
     .poll(
       async () =>
-        page.evaluate(async () => {
+        page.evaluate(async (appBasePath) => {
           if (!('serviceWorker' in navigator)) {
             return '';
           }
 
-          const registration = await navigator.serviceWorker.getRegistration('/conspectus/webapp/');
+          const registration = await navigator.serviceWorker.getRegistration(appBasePath);
           if (!registration?.active) {
             return '';
           }
 
           return registration.scope;
-        }),
+        }, APP_BASE_PATH),
       { timeout: 15_000 },
     )
     .toBe(expectedServiceWorkerScope);
@@ -330,14 +342,14 @@ test('does not register service worker for parent-site routes outside the app ba
   await expect
     .poll(
       async () =>
-        page.evaluate(async () => {
+        page.evaluate(async (appBasePath) => {
           if (!('serviceWorker' in navigator)) {
             return false;
           }
 
-          const registration = await navigator.serviceWorker.getRegistration('/conspectus/webapp/');
+          const registration = await navigator.serviceWorker.getRegistration(appBasePath);
           return Boolean(registration?.active);
-        }),
+        }, APP_BASE_PATH),
       { timeout: 15_000 },
     )
     .toBeTruthy();
@@ -349,10 +361,10 @@ test('does not register service worker for parent-site routes outside the app ba
 
   expect(parentRouteRegistrationScope).toBeNull();
 
-  const registrationScope = await page.evaluate(async () => {
-    const registration = await navigator.serviceWorker.getRegistration('/conspectus/webapp/');
+  const appRegistrationScope = await page.evaluate(async (appBasePath) => {
+    const registration = await navigator.serviceWorker.getRegistration(appBasePath);
     return registration?.scope ?? '';
-  });
+  }, APP_BASE_PATH);
 
-  expect(registrationScope).toContain(`${APP_BASE_PATH_WITHOUT_TRAILING_SLASH}/`);
+  expect(appRegistrationScope).toContain(`${APP_BASE_PATH_WITHOUT_TRAILING_SLASH}/`);
 });

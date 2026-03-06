@@ -27,8 +27,15 @@ flowchart TD
 - File: [`.github/workflows/quality.yml`](../.github/workflows/quality.yml)
 - Trigger: every push to every branch except `gh-pages`
 - Purpose:
-  - validate formatting, linting, type safety, unit tests, build-channel correctness, and Playwright smoke
-  - produce reusable `quality-production-dist` and `quality-preview-dist` artifacts after successful build verification
+  - validate formatting, linting, type safety, unit tests, preview build correctness, and Playwright smoke
+  - produce the reusable `quality-preview-dist` artifact after `Build App (Preview)`
+- Stage order:
+  - `Detect Relevant Changes`
+  - `Format, Lint, and Typecheck`
+  - `Unit Tests`
+  - `Build App (Preview)`
+  - `Build Verification`
+  - `E2E Smoke Tests`
 - Depends on: none
 - Downstream dependencies:
   - `Deploy Preview Channel`
@@ -39,6 +46,7 @@ flowchart TD
 - Notes:
   - uses `actions/setup-node` npm cache and Playwright browser cache
   - cancels in-progress runs for the same ref via workflow concurrency
+  - `Build Verification` checks preview build output base-path correctness, manifest `start_url` and `scope`, service worker scope, CSP presence, and root-path leakage
 
 ### `Deploy Preview Channel`
 
@@ -64,16 +72,15 @@ flowchart TD
 - File: [`.github/workflows/publish-production-artifact.yml`](../.github/workflows/publish-production-artifact.yml)
 - Trigger: successful `Quality` `workflow_run` events for push runs on `main`
 - Purpose:
-  - reuse the verified production build from `Quality`
+  - build the production app from the successful `main` commit after `Quality` passes
+  - verify the production build output for the production base path and scope contract
   - append `deploy-metadata.json`
   - publish exactly one immutable artifact named `conspectus-mobile-production-<commitSha>`
 - Depends on:
   - a successful `Quality` run on `main`
-  - the presence of the `quality-production-dist` artifact on that `Quality` run
 - Failure behavior:
   - if metadata generation or artifact verification fails, the workflow fails and no production handoff artifact is published
   - if the triggering `Quality` run is no longer the current `main` tip, the workflow exits cleanly without publishing
-  - if the triggering `Quality` run did not produce a production artifact, the workflow exits cleanly without publishing
 - Notes:
   - this workflow is the producer for the website repo handoff contract
   - artifact retention is 90 days
@@ -106,14 +113,8 @@ flowchart TD
 ### `quality-preview-dist`
 
 - Producer: `Quality`
-- Consumer: `Deploy Preview Channel`
-- Contents: verified preview `dist/` for the fixed slot of the triggering branch
-
-### `quality-production-dist`
-
-- Producer: `Quality`
-- Consumer: `Publish Production Artifact`
-- Contents: verified production `dist/` before handoff metadata is appended
+- Consumer: `Deploy Preview Channel` and `Quality` `E2E Smoke Tests`
+- Contents: preview `dist/` for the fixed slot of the triggering branch
 
 ### `conspectus-mobile-production-<commitSha>`
 

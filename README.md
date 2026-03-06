@@ -127,9 +127,9 @@ CI test report view in GitHub:
 
 Deployment is split into preview delivery and production-artifact handoff stages:
 
-- `Quality` remains the only gate for deploy eligibility and produces reusable verified `dist/` artifacts.
+- `Quality` remains the only gate for deploy eligibility and produces the reusable preview build artifact used for preview deploys and E2E smoke tests.
 - `Deploy Preview Channel` runs only from successful `Quality` push runs (`workflow_run` trigger).
-- `Publish Production Artifact` runs only from successful `Quality` push runs on `main`.
+- `Publish Production Artifact` runs only from successful `Quality` push runs on `main` and performs the production build there.
 - `Deploy Production Website` is a manual workflow (`workflow_dispatch`) that deploys the already-published artifact for the current `main` commit to the website repo and runs production smoke checks.
 - Fixed deployment URLs:
   - [https://jon2050.github.io/Conspectus-Mobile/previews/main/](https://jon2050.github.io/Conspectus-Mobile/previews/main/) (`main` preview slot)
@@ -140,11 +140,13 @@ Deployment is split into preview delivery and production-artifact handoff stages
 Operational notes:
 
 - Preview builds use `DEPLOY_CHANNEL=preview` with fixed `DEPLOY_PREVIEW_SLUG` values (`main` for `main`, `test` for non-`main`) and isolate service worker scope/assets under `/<repo>/previews/<slot>/`.
-- `Quality` uploads `quality-preview-dist` and `quality-production-dist`; downstream workflows reuse those artifacts instead of rebuilding.
+- `Quality` stage order is: `Detect Relevant Changes` -> `Format, Lint, and Typecheck` -> `Unit Tests` -> `Build App (Preview)` -> `Build Verification` -> `E2E Smoke Tests`.
+- `Build Verification` checks the built preview output for the expected base path, manifest `start_url` and `scope`, service worker scope, CSP presence, and root-path leakage.
+- `Quality` uploads `quality-preview-dist`; downstream preview deploys and E2E smoke tests reuse that artifact instead of rebuilding.
 - If MSAL login should work on GitHub Pages previews, add both fixed preview URLs
   ([https://jon2050.github.io/Conspectus-Mobile/previews/main/](https://jon2050.github.io/Conspectus-Mobile/previews/main/) and
   [https://jon2050.github.io/Conspectus-Mobile/previews/test/](https://jon2050.github.io/Conspectus-Mobile/previews/test/)) as SPA redirect URIs in Entra app registration.
-- Production artifact builds use `DEPLOY_CHANNEL=production` and enforce `/conspectus/webapp/` for Vite `base`, PWA manifest `start_url`, and service worker scope.
+- `Publish Production Artifact` builds the production artifact from the successful `main` commit, then enforces `/conspectus/webapp/` for Vite `base`, PWA manifest `start_url`, and service worker scope.
 - Failed `Quality` runs do not produce preview deployments or production artifacts.
 - `Deploy Preview Channel` includes a hard post-deploy preview availability check; if GitHub Pages is unavailable or the preview URL is not reachable, the workflow fails.
 - `Deploy Production Website` fails closed when the current `main` commit has no successful published production artifact, when the website consumer contract is incompatible, or when the production smoke checks do not observe the expected deploy identity.

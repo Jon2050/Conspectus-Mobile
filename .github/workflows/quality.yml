@@ -118,7 +118,7 @@ jobs:
         run: npm run typecheck
 
   unit-tests:
-    name: Unit Tests and Build Verification
+    name: Unit Tests
     needs:
       - detect-code-changes
       - lint-typecheck
@@ -168,31 +168,45 @@ jobs:
           --title "Unit Test Report"
           --files reports/vitest/junit-app.xml reports/vitest/junit-scripts.xml
 
-      - name: Build and verify production channel paths/scope
-        env:
-          DEPLOY_CHANNEL: production
+  build:
+    name: Build App (Preview)
+    needs:
+      - detect-code-changes
+      - unit-tests
+    if: needs.detect-code-changes.outputs.code_changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required runtime env
         run: |
-          npm run build
-          node scripts/verify-build-channel.mjs --dist dist --channel production --base /conspectus/webapp/
+          if [ -z "${VITE_AZURE_CLIENT_ID}" ]; then
+            echo "Missing repository variable VITE_AZURE_CLIENT_ID." >&2
+            exit 1
+          fi
 
-      - name: Upload production dist for downstream workflows and e2e smoke
-        uses: actions/upload-artifact@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          name: quality-production-dist
-          if-no-files-found: error
-          path: dist
-          retention-days: 7
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
 
-      - name: Build and verify preview channel paths/scope
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Build app (preview)
         env:
           DEPLOY_CHANNEL: preview
           DEPLOY_PREVIEW_SLUG: ${{ github.ref_name == 'main' && 'main' || 'test' }}
           DEPLOY_PREVIEW_BASE_PREFIX: /${{ github.event.repository.name }}
-        run: |
-          npm run build
-          node scripts/verify-build-channel.mjs --dist dist --channel preview --base "/${{ github.event.repository.name }}/previews/${{ github.ref_name == 'main' && 'main' || 'test' }}/"
+        run: npm run build
 
-      - name: Upload preview dist for downstream preview deploy
+      - name: Upload preview build artifact
         uses: actions/upload-artifact@v4
         with:
           name: quality-preview-dist
@@ -200,11 +214,43 @@ jobs:
           path: dist
           retention-days: 7
 
+  build-verification:
+    name: Build Verification
+    needs:
+      - detect-code-changes
+      - build
+    if: needs.detect-code-changes.outputs.code_changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Download preview build artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: quality-preview-dist
+          path: dist
+
+      - name: Verify preview build output paths and scope
+        run: >-
+          node scripts/verify-build-channel.mjs
+          --dist dist
+          --channel preview
+          --base "/${{ github.event.repository.name }}/previews/${{ github.ref_name == 'main' && 'main' || 'test' }}/"
+
   e2e-tests:
     name: E2E Smoke Tests
     needs:
       - detect-code-changes
-      - unit-tests
+      - build-verification
     if: needs.detect-code-changes.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -244,10 +290,10 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
 
-      - name: Download production dist for e2e smoke
+      - name: Download preview build artifact for e2e smoke
         uses: actions/download-artifact@v5
         with:
-          name: quality-production-dist
+          name: quality-preview-dist
           path: dist
 
       - name: Install Playwright OS dependencies
@@ -262,6 +308,7 @@ jobs:
 
       - name: Run E2E smoke tests
         env:
+          PLAYWRIGHT_APP_BASE_PATH: /${{ github.event.repository.name }}/previews/${{ github.ref_name == 'main' && 'main' || 'test' }}/
           PLAYWRIGHT_WEB_SERVER_BUILD: '0'
         run: npm run test:e2e
 
