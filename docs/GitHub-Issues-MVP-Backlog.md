@@ -660,6 +660,14 @@ An issue is only considered done when:
 - Depends on: `all milestone issues`
 - GitHub: [#92](https://github.com/Jon2050/Conspectus-Mobile/issues/92)
 
+### :white_check_mark: M8-12 Clean GitHub Actions, CI/CD pipeline
+
+- Label: `infra`
+- Milestone: `M8 - Hardening + QA + Release`
+- Summary: Work includes clarifying GitHub Actions names and responsibilities and ensuring preview deploys only run after successful `Quality` runs. It also covers reusable `Quality` deploy artifacts, a manual production deploy workflow that reuses the published artifact for the current `main` commit, and maintained CI/CD documentation in `docs/CI-CD-Pipelines.md`.
+- Depends on: `M1-08, M2-00, M2-08`
+- GitHub: [#131](https://github.com/Jon2050/Conspectus-Mobile/issues/131)
+
 ## Suggested Issue Creation Order
 
 1. Create all `PM-*` issues.

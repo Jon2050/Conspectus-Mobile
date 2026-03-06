@@ -1,4 +1,3 @@
-import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,24 +9,19 @@ import { normalizeBasePath, toPreviewSlug } from './deploy-utils.mjs';
 const thisFilePath = fileURLToPath(import.meta.url);
 const scriptsDirectoryPath = path.dirname(thisFilePath);
 const repositoryRootPath = path.resolve(scriptsDirectoryPath, '..');
-const slugifyScriptPath = path.resolve(scriptsDirectoryPath, 'slugify-branch.py');
-const deployChannelsWorkflowPath = path.resolve(
+const deployPreviewWorkflowPath = path.resolve(
   repositoryRootPath,
-  '.github/workflows/deploy-channels.yml',
+  '.github/workflows/deploy-preview.yml',
+);
+const publishProductionArtifactWorkflowPath = path.resolve(
+  repositoryRootPath,
+  '.github/workflows/publish-production-artifact.yml',
+);
+const deployProductionWebsiteWorkflowPath = path.resolve(
+  repositoryRootPath,
+  '.github/workflows/deploy-production-website.yml',
 );
 const qualityWorkflowPath = path.resolve(repositoryRootPath, '.github/workflows/quality.yml');
-const previewCleanupWorkflowPath = path.resolve(
-  repositoryRootPath,
-  '.github/workflows/preview-cleanup.yml',
-);
-
-const runPythonSlugify = (branchName: string): string => {
-  const result = execSync('python ' + JSON.stringify(slugifyScriptPath), {
-    encoding: 'utf8',
-    env: { ...process.env, BRANCH_NAME: branchName },
-  });
-  return result.trim();
-};
 
 describe('normalizeBasePath', () => {
   it('adds leading slash when missing', () => {
@@ -91,75 +85,31 @@ describe('toPreviewSlug', () => {
   });
 });
 
-describe('JS/Python slug parity (contract test)', () => {
-  const branchNames = [
-    'main',
-    'feature/add-login',
-    'my-branch',
-    'UPPER/Case',
-    'dots.and_underscores',
-    'feature/UPPER-Case/dots.and_underscores',
-    'bugfix/fix-123',
-    'release/v1.0.0',
-    'user/name@special',
-  ];
-
-  for (const branchName of branchNames) {
-    it(`produces identical output for "${branchName}"`, () => {
-      const jsResult = toPreviewSlug(branchName);
-      const pyResult = runPythonSlugify(branchName);
-      expect(jsResult).toBe(pyResult);
-    });
-  }
-});
-
-describe('workflow slug-script contract', () => {
-  const workflowFilePaths = [deployChannelsWorkflowPath, previewCleanupWorkflowPath];
-
-  for (const workflowFilePath of workflowFilePaths) {
-    const workflowRelativePath = path.relative(repositoryRootPath, workflowFilePath);
-
-    it(`uses shared slugify script in ${workflowRelativePath}`, () => {
-      const workflowSource = fs.readFileSync(workflowFilePath, 'utf8');
-      expect(workflowSource).toContain('BRANCH_NAME:');
-      expect(workflowSource).toContain('branch_slug="$(python scripts/slugify-branch.py)"');
-      expect(workflowSource).not.toMatch(/python\s+-\s*<<\s*['"]?PY['"]?/);
-    });
-  }
-});
-
 describe('fixed preview slot workflow contract', () => {
-  it('routes preview deployments to fixed main/test slots', () => {
-    const workflowSource = fs.readFileSync(deployChannelsWorkflowPath, 'utf8');
+  it('routes preview deployments to fixed main/test slots from Quality workflow_run events', () => {
+    const workflowSource = fs.readFileSync(deployPreviewWorkflowPath, 'utf8');
+    expect(workflowSource).toContain('on:\n  workflow_run:');
+    expect(workflowSource).toContain('workflows:\n      - Quality');
+    expect(workflowSource).toContain(
+      'name: Confirm trigger commit is still the current branch tip',
+    );
+    expect(workflowSource).toContain('steps.branch-head.outputs.is_current_branch_head');
     expect(workflowSource).toContain("preview_slot='test'");
     expect(workflowSource).toContain("preview_slot='main'");
+    expect(workflowSource).toContain("event == 'push'");
+    expect(workflowSource).toContain('name: quality-preview-dist');
+    expect(workflowSource).toContain('run-id: ${{ github.event.workflow_run.id }}');
     expect(workflowSource).toContain(
       'destination_dir: previews/${{ needs.prepare-context.outputs.preview_slot }}',
     );
-    expect(workflowSource).toContain(
-      '/previews/${{ needs.prepare-context.outputs.preview_slot }}/',
-    );
   });
 
-  it('serializes preview deployments by fixed slot', () => {
-    const workflowSource = fs.readFileSync(deployChannelsWorkflowPath, 'utf8');
+  it('serializes preview deployments by fixed slot and no longer polls Quality', () => {
+    const workflowSource = fs.readFileSync(deployPreviewWorkflowPath, 'utf8');
     expect(workflowSource).toContain(
-      "group: deploy-channels-push-${{ github.ref_name == 'main' && 'main' || 'test' }}",
+      "group: deploy-preview-${{ github.event.workflow_run.head_branch == 'main' && 'main' || 'test' }}",
     );
-    expect(workflowSource).toContain('on:\n  push:');
-    expect(workflowSource).toContain('branches-ignore:\n      - gh-pages');
-    expect(workflowSource).toContain('wait-for-quality:');
-    expect(workflowSource).toContain(
-      `quality_conclusion="$(jq -r '.conclusion // ""' "\${run_file}")"`,
-    );
-  });
-
-  it('preserves fixed preview slots during cleanup', () => {
-    const workflowSource = fs.readFileSync(previewCleanupWorkflowPath, 'utf8');
-    expect(workflowSource).toContain(
-      'if [ "${BRANCH_SLUG}" = \'main\' ] || [ "${BRANCH_SLUG}" = \'test\' ]; then',
-    );
-    expect(workflowSource).toContain('Skipping cleanup for fixed preview slot');
+    expect(workflowSource).not.toContain('wait-for-quality');
   });
 });
 
@@ -171,14 +121,51 @@ describe('quality workflow contract', () => {
     expect(workflowSource).not.toContain('pull_request:');
   });
 
-  it('splits quality stages into detect -> lint/typecheck -> unit -> e2e', () => {
+  it('splits quality stages into detect -> lint/typecheck -> unit -> e2e and uploads reusable dist artifacts', () => {
     const workflowSource = fs.readFileSync(qualityWorkflowPath, 'utf8');
-    expect(workflowSource).toContain('lint-typecheck:\n    needs:\n      - detect-code-changes');
-    expect(workflowSource).toContain(
-      'unit-tests:\n    needs:\n      - detect-code-changes\n      - lint-typecheck',
+    expect(workflowSource).toContain('lint-typecheck:');
+    expect(workflowSource).toMatch(
+      /lint-typecheck:\n(?:.*\n)*?\s+needs:\n\s+- detect-code-changes/,
     );
-    expect(workflowSource).toContain(
-      'e2e-tests:\n    needs:\n      - detect-code-changes\n      - unit-tests',
+    expect(workflowSource).toContain('unit-tests:');
+    expect(workflowSource).toMatch(
+      /unit-tests:\n(?:.*\n)*?\s+needs:\n\s+- detect-code-changes\n\s+- lint-typecheck/,
     );
+    expect(workflowSource).toContain('e2e-tests:');
+    expect(workflowSource).toMatch(
+      /e2e-tests:\n(?:.*\n)*?\s+needs:\n\s+- detect-code-changes\n\s+- unit-tests/,
+    );
+    expect(workflowSource).toContain('name: quality-production-dist');
+    expect(workflowSource).toContain('name: quality-preview-dist');
+    expect(workflowSource).toContain(
+      "DEPLOY_PREVIEW_SLUG: ${{ github.ref_name == 'main' && 'main' || 'test' }}",
+    );
+  });
+});
+
+describe('production workflow contracts', () => {
+  it('publishes the main production artifact from successful Quality workflow_run events', () => {
+    const workflowSource = fs.readFileSync(publishProductionArtifactWorkflowPath, 'utf8');
+    expect(workflowSource).toContain('on:\n  workflow_run:');
+    expect(workflowSource).toContain('workflows:\n      - Quality');
+    expect(workflowSource).toContain("head_branch == 'main'");
+    expect(workflowSource).toContain('name: Confirm trigger commit is still the current main tip');
+    expect(workflowSource).toContain('steps.branch-head.outputs.is_current_main_head');
+    expect(workflowSource).toContain('name: quality-production-dist');
+    expect(workflowSource).toContain('run-id: ${{ github.event.workflow_run.id }}');
+    expect(workflowSource).toContain(
+      'artifact_name="conspectus-mobile-production-${{ github.event.workflow_run.head_sha }}"',
+    );
+  });
+
+  it('deploys production manually from the current main commit artifact and paginates publish-run lookup', () => {
+    const workflowSource = fs.readFileSync(deployProductionWebsiteWorkflowPath, 'utf8');
+    expect(workflowSource).toContain('on:\n  workflow_dispatch:');
+    expect(workflowSource).toContain('name: Resolve current main commit target');
+    expect(workflowSource).toContain('head_sha=${TARGET_COMMIT_SHA}');
+    expect(workflowSource).toContain('per_page=100&page=${page}');
+    expect(workflowSource).toMatch(/actions\/download-artifact@v[45]/);
+    expect(workflowSource).toContain('conspectus-mobile-production-ready');
+    expect(workflowSource).toContain('node scripts/verify-production-deploy-smoke.mjs');
   });
 });

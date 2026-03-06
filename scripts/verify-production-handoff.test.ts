@@ -134,6 +134,49 @@ describe('verify-production-handoff script', () => {
     }
   });
 
+  it('accepts a valid artifact when qualityRunId is only checked for presence', () => {
+    const fixturePath = createFixtureDirectory();
+    const artifactsPath = path.join(fixturePath, 'artifacts.json');
+    const metadataPath = path.join(fixturePath, 'deploy-metadata.json');
+    const artifactName = 'conspectus-mobile-production-abc123';
+
+    try {
+      writeJson(artifactsPath, {
+        artifacts: [{ name: artifactName }],
+      });
+      writeJson(metadataPath, {
+        channel: 'production',
+        basePath: '/conspectus/webapp/',
+        sourceBranch: 'main',
+        commitSha: 'abc123',
+        buildTimeUtc: '2026-03-01T10:20:30Z',
+        qualityRunId: '1001',
+        deployRunId: '2002',
+      });
+
+      const result = runVerifierOrThrow([
+        '--artifacts-json',
+        artifactsPath,
+        '--metadata',
+        metadataPath,
+        '--artifact-name',
+        artifactName,
+        '--commit-sha',
+        'abc123',
+        '--deploy-run-id',
+        '2002',
+        '--source-branch',
+        'main',
+      ]);
+
+      expect(result.stdout).toContain(
+        '[verify-production-handoff] commitSha=abc123 deployRunId=2002 verified artifact',
+      );
+    } finally {
+      rmSync(fixturePath, { force: true, recursive: true });
+    }
+  });
+
   it('fails when traceability identifiers do not match expected values', () => {
     const fixturePath = createFixtureDirectory();
     const artifactsPath = path.join(fixturePath, 'artifacts.json');
@@ -171,6 +214,49 @@ describe('verify-production-handoff script', () => {
 
       expect(result.stderr).toContain(
         'Metadata commitSha mismatch. Expected "abc123", got "wrong-sha".',
+      );
+    } finally {
+      rmSync(fixturePath, { force: true, recursive: true });
+    }
+  });
+
+  it('fails when sourceBranch does not match the expected branch', () => {
+    const fixturePath = createFixtureDirectory();
+    const artifactsPath = path.join(fixturePath, 'artifacts.json');
+    const metadataPath = path.join(fixturePath, 'deploy-metadata.json');
+    const artifactName = 'conspectus-mobile-production-abc123';
+
+    try {
+      writeJson(artifactsPath, {
+        artifacts: [{ name: artifactName }],
+      });
+      writeJson(metadataPath, {
+        channel: 'production',
+        basePath: '/conspectus/webapp/',
+        sourceBranch: 'feature/test',
+        commitSha: 'abc123',
+        buildTimeUtc: '2026-03-01T10:20:30Z',
+        qualityRunId: '1001',
+        deployRunId: '2002',
+      });
+
+      const result = runVerifierFailure([
+        '--artifacts-json',
+        artifactsPath,
+        '--metadata',
+        metadataPath,
+        '--artifact-name',
+        artifactName,
+        '--commit-sha',
+        'abc123',
+        '--deploy-run-id',
+        '2002',
+        '--source-branch',
+        'main',
+      ]);
+
+      expect(result.stderr).toContain(
+        'Metadata sourceBranch mismatch. Expected "main", got "feature/test".',
       );
     } finally {
       rmSync(fixturePath, { force: true, recursive: true });

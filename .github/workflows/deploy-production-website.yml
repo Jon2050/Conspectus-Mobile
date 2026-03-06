@@ -1,0 +1,233 @@
+name: Deploy Production Website
+
+on:
+  workflow_dispatch:
+
+env:
+  PRODUCTION_APP_BASE_URL: ${{ vars.PRODUCTION_APP_BASE_URL || 'https://jon2050.de/conspectus/webapp/' }}
+  WEBSITE_REPO_FULL_NAME: ${{ vars.WEBSITE_REPO_FULL_NAME || 'Jon2050/Jon2050_Webpage' }}
+  PRODUCTION_SMOKE_MAX_ATTEMPTS: '24'
+  PRODUCTION_SMOKE_RETRY_DELAY_SECONDS: '10'
+  PRODUCTION_SMOKE_SKIP_SECURITY_HEADER_CHECKS: 'true'
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: deploy-production-website
+  cancel-in-progress: false
+
+jobs:
+  deploy-production-website:
+    name: Dispatch Production Artifact and Verify Live Site
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Require main branch
+        run: |
+          if [ "${GITHUB_REF_NAME}" != 'main' ]; then
+            echo "This workflow must be started from the main branch." >&2
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Resolve current main commit target
+        id: target
+        run: |
+          set -euo pipefail
+          echo "commit_sha=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Resolve published production artifact for current main commit
+        id: source-run
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET_COMMIT_SHA: ${{ steps.target.outputs.commit_sha }}
+        run: |
+          set -euo pipefail
+
+          source_run_id=''
+          source_commit_sha=''
+          artifact_name=''
+          page='1'
+
+          while :; do
+            runs_status="$(curl -sS -o workflow-runs-response.json -w '%{http_code}' \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H 'Accept: application/vnd.github+json' \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/publish-production-artifact.yml/runs?branch=main&event=workflow_run&head_sha=${TARGET_COMMIT_SHA}&per_page=100&page=${page}")"
+
+            if [ "${runs_status}" != '200' ]; then
+              echo "Failed to query Publish Production Artifact workflow runs." >&2
+              cat workflow-runs-response.json >&2 || true
+              exit 1
+            fi
+
+            workflow_run_count="$(jq '.workflow_runs | length' workflow-runs-response.json)"
+            if [ "${workflow_run_count}" -eq '0' ]; then
+              break
+            fi
+
+            while IFS=$'\t' read -r candidate_run_id candidate_commit_sha; do
+              [ -n "${candidate_run_id}" ] || continue
+              if [ "${candidate_commit_sha}" != "${TARGET_COMMIT_SHA}" ]; then
+                continue
+              fi
+
+              artifacts_status="$(curl -sS -o artifacts-response.json -w '%{http_code}' \
+                -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                -H 'Accept: application/vnd.github+json' \
+                "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${candidate_run_id}/artifacts")"
+
+              if [ "${artifacts_status}" != '200' ]; then
+                echo "Failed to list artifacts for Publish Production Artifact run ${candidate_run_id}." >&2
+                cat artifacts-response.json >&2 || true
+                exit 1
+              fi
+
+              artifact_count="$(jq '[.artifacts[] | select(.expired == false and (.name | startswith("conspectus-mobile-production-")))] | length' artifacts-response.json)"
+              if [ "${artifact_count}" -ne '1' ]; then
+                continue
+              fi
+
+              artifact_name="$(jq -r '[.artifacts[] | select(.expired == false and (.name | startswith("conspectus-mobile-production-")))] | .[0].name' artifacts-response.json)"
+              source_run_id="${candidate_run_id}"
+              source_commit_sha="${candidate_commit_sha}"
+              break
+            done < <(jq -r '.workflow_runs[] | select(.conclusion == "success") | [.id, .head_sha] | @tsv' workflow-runs-response.json)
+
+            if [ -n "${source_run_id}" ]; then
+              break
+            fi
+
+            if [ "${workflow_run_count}" -lt '100' ]; then
+              break
+            fi
+
+            page="$((page + 1))"
+          done
+
+          if [ -z "${source_run_id}" ] || [ -z "${source_commit_sha}" ] || [ -z "${artifact_name}" ]; then
+            echo "No successful Publish Production Artifact run with a reusable production artifact was found for current main commit ${TARGET_COMMIT_SHA}." >&2
+            exit 1
+          fi
+
+          {
+            echo "source_run_id=${source_run_id}"
+            echo "source_commit_sha=${source_commit_sha}"
+            echo "artifact_name=${artifact_name}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Download published production artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ steps.source-run.outputs.artifact_name }}
+          path: pwa-artifact
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.source-run.outputs.source_run_id }}
+
+      - name: Verify downloaded production artifact metadata
+        run: |
+          node scripts/verify-production-handoff.mjs \
+            --artifacts-json artifacts-response.json \
+            --metadata pwa-artifact/deploy-metadata.json \
+            --artifact-name "${{ steps.source-run.outputs.artifact_name }}" \
+            --commit-sha "${{ steps.source-run.outputs.source_commit_sha }}" \
+            --deploy-run-id "${{ steps.source-run.outputs.source_run_id }}" \
+            --source-branch main
+
+      - name: Read production deploy metadata
+        id: metadata
+        run: |
+          set -euo pipefail
+          {
+            echo "commit_sha=$(jq -r '.commitSha' pwa-artifact/deploy-metadata.json)"
+            echo "deploy_run_id=$(jq -r '.deployRunId' pwa-artifact/deploy-metadata.json)"
+            echo "quality_run_id=$(jq -r '.qualityRunId' pwa-artifact/deploy-metadata.json)"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Verify website consumer handoff contract
+        env:
+          DISPATCH_TOKEN: ${{ secrets.WEBSITE_REPO_DISPATCH_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${DISPATCH_TOKEN}" ]; then
+            echo "Missing required secret WEBSITE_REPO_DISPATCH_TOKEN." >&2
+            echo "This token must be scoped to read ${WEBSITE_REPO_FULL_NAME} workflow contents and trigger repository_dispatch." >&2
+            exit 1
+          fi
+
+          workflow_api_url="https://api.github.com/repos/${WEBSITE_REPO_FULL_NAME}/contents/.github/workflows/deploy.yml?ref=master"
+          workflow_status="$(curl -sS -L -o website-deploy-workflow.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${DISPATCH_TOKEN}" \
+            -H 'Accept: application/vnd.github+json' \
+            "${workflow_api_url}")"
+
+          if [ "${workflow_status}" != '200' ]; then
+            echo "Failed to read website deploy workflow from ${WEBSITE_REPO_FULL_NAME}." >&2
+            echo "Workflow API status: ${workflow_status}" >&2
+            cat website-deploy-workflow.json >&2 || true
+            exit 1
+          fi
+
+          node scripts/verify-website-consumer-contract.mjs \
+            --workflow-json website-deploy-workflow.json \
+            --producer-repo "${GITHUB_REPOSITORY}"
+
+      - name: Trigger deterministic website handoff event
+        env:
+          DISPATCH_TOKEN: ${{ secrets.WEBSITE_REPO_DISPATCH_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          cat > dispatch-payload.json <<EOF
+          {
+            "event_type": "conspectus-mobile-production-ready",
+            "client_payload": {
+              "commitSha": "${{ steps.metadata.outputs.commit_sha }}",
+              "deployRunId": "${{ steps.metadata.outputs.deploy_run_id }}",
+              "qualityRunId": "${{ steps.metadata.outputs.quality_run_id }}",
+              "artifactName": "${{ steps.source-run.outputs.artifact_name }}"
+            }
+          }
+          EOF
+
+          dispatch_status="$(curl -sS -o dispatch-response.txt -w '%{http_code}' \
+            -X POST \
+            -H "Authorization: Bearer ${DISPATCH_TOKEN}" \
+            -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/${WEBSITE_REPO_FULL_NAME}/dispatches" \
+            --data-binary @dispatch-payload.json)"
+
+          if [ "${dispatch_status}" != '204' ]; then
+            echo "Failed to dispatch production-ready event to ${WEBSITE_REPO_FULL_NAME}." >&2
+            echo "Dispatch API status: ${dispatch_status}" >&2
+            cat dispatch-response.txt >&2 || true
+            exit 1
+          fi
+
+          echo "Dispatched conspectus-mobile-production-ready to ${WEBSITE_REPO_FULL_NAME}."
+
+      - name: Run production deployment smoke checks
+        run: >-
+          node scripts/verify-production-deploy-smoke.mjs
+          --base-url "${{ env.PRODUCTION_APP_BASE_URL }}"
+          --commit-sha "${{ steps.metadata.outputs.commit_sha }}"
+          --deploy-run-id "${{ steps.metadata.outputs.deploy_run_id }}"
+          --max-attempts ${{ env.PRODUCTION_SMOKE_MAX_ATTEMPTS }}
+          --retry-delay-seconds ${{ env.PRODUCTION_SMOKE_RETRY_DELAY_SECONDS }}
+          --request-timeout-ms 10000
+          --skip-security-header-checks ${{ env.PRODUCTION_SMOKE_SKIP_SECURITY_HEADER_CHECKS }}
