@@ -17,7 +17,7 @@ permissions:
   pages: read
 
 concurrency:
-  group: deploy-channels-${{ github.ref_name == 'main' && 'main' || 'test' }}
+  group: deploy-channels-push-${{ github.ref_name == 'main' && 'main' || 'test' }}
   cancel-in-progress: true
 
 jobs:
