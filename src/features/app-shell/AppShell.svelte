@@ -6,6 +6,7 @@
   import TransfersRoute from './routes/TransfersRoute.svelte';
   import AddRoute from './routes/AddRoute.svelte';
   import SettingsRoute from './routes/SettingsRoute.svelte';
+  import { initializeAppAuthClient } from './authClientResolver';
   import { APP_ROUTES, createHashRouteStore, DEFAULT_ROUTE, type AppRouteKey } from './hashRouting';
 
   export let routeStore: Readable<AppRouteKey> = createHashRouteStore();
@@ -18,6 +19,10 @@
   });
 
   onMount(() => {
+    void initializeAppAuthClient().catch((error) => {
+      console.warn('Auth bootstrap initialization failed at app-shell startup.', error);
+    });
+
     if (!showLoadingPlaceholder || loadingDelayMs <= 0) {
       showLoadingPlaceholder = false;
       return;

@@ -27,6 +27,7 @@ type MockAuthClientOptions = {
   readonly initializeDelayMs?: number;
   readonly signInDelayMs?: number;
   readonly signOutDelayMs?: number;
+  readonly consumeRedirectHashOnInitialize?: boolean;
   readonly failInitialize?: boolean;
   readonly failSignIn?: boolean;
   readonly failSignOut?: boolean;
@@ -66,6 +67,15 @@ const installMockAuthClient = async (
             message: 'Mock initialize failure.',
           };
         }
+
+        if (mockOptions.consumeRedirectHashOnInitialize) {
+          const hasRedirectAuthHash =
+            window.location.hash.includes('code=') && window.location.hash.includes('state=');
+          if (hasRedirectAuthHash) {
+            isAuthenticated = true;
+          }
+        }
+
         isInitialized = true;
       },
       getSession() {
@@ -182,6 +192,23 @@ test('supports sign-in and sign-out auth UX states in settings', async ({ page }
   await expect(signOutButton).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Sign in with Microsoft' })).toBeVisible();
   await expect(statusMessage).toContainText('Signed out.');
+});
+
+test('processes redirect auth hash before route navigation and keeps signed-in status', async ({
+  page,
+}) => {
+  await installMockAuthClient(page, {
+    consumeRedirectHashOnInitialize: true,
+  });
+
+  await page.goto(appPath('#code=mock-auth-code&state=mock-auth-state'));
+
+  await expect(page.getByRole('heading', { level: 2, name: 'Accounts' })).toBeVisible();
+
+  await page.getByRole('link', { name: 'Settings' }).click();
+  await expect(page).toHaveURL(/#\/settings$/);
+  await expect(page.getByTestId('signed-in-account-summary')).toBeVisible();
+  await expect(page.getByTestId('auth-status-message')).toContainText('Signed in.');
 });
 
 test('shows auth error UI when sign-in fails in settings', async ({ page }) => {
