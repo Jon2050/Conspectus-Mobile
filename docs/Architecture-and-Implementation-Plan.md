@@ -348,6 +348,7 @@ M3-03 implementation clarification:
 M3-04 implementation clarification:
 
 - Sign-in/sign-out UX is implemented in `src/features/app-shell/routes/SettingsRoute.svelte` and wired to `@auth` via `createSettingsAuthController`.
+- Redirect-response auth bootstrap is also triggered at app-shell startup (`src/features/app-shell/AppShell.svelte`) so `handleRedirectPromise()` runs before hash-route navigation can discard redirect fragments.
 - Settings auth UI includes explicit pending/success/error states and a signed-in account summary (`displayName`, `username`, `homeAccountId`).
 - Controller operations are initialization-safe: `signIn`/`signOut` trigger auth initialization first when needed and block duplicate in-flight actions.
 - E2E auth mocking is enabled only on localhost hosts (`127.0.0.1`/`localhost`) used by Playwright; production hosts always use the real auth client.
