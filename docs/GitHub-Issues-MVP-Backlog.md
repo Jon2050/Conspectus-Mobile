@@ -666,7 +666,7 @@ An issue is only considered done when:
 - Milestone: `M8 - Hardening + QA + Release`
 - Summary: Work includes clarifying GitHub Actions names and responsibilities and ensuring preview deploys only run after successful `Quality` runs. It also covers reusable `Quality` deploy artifacts, a manual production deploy workflow that reuses the latest successful `main` artifact, and maintained CI/CD documentation in `docs/CI-CD-Pipelines.md`.
 - Depends on: `M1-08, M2-00, M2-08`
-- GitHub: `pending creation`
+- GitHub: [#131](https://github.com/Jon2050/Conspectus-Mobile/issues/131)
 
 ## Suggested Issue Creation Order
 
