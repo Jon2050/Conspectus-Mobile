@@ -15,6 +15,7 @@ const deployChannelsWorkflowPath = path.resolve(
   repositoryRootPath,
   '.github/workflows/deploy-channels.yml',
 );
+const qualityWorkflowPath = path.resolve(repositoryRootPath, '.github/workflows/quality.yml');
 const previewCleanupWorkflowPath = path.resolve(
   repositoryRootPath,
   '.github/workflows/preview-cleanup.yml',
@@ -143,7 +144,13 @@ describe('fixed preview slot workflow contract', () => {
   it('serializes preview deployments by fixed slot', () => {
     const workflowSource = fs.readFileSync(deployChannelsWorkflowPath, 'utf8');
     expect(workflowSource).toContain(
-      "group: deploy-channels-${{ github.event.workflow_run.head_branch == 'main' && 'main' || 'test' }}",
+      "group: deploy-channels-${{ github.ref_name == 'main' && 'main' || 'test' }}",
+    );
+    expect(workflowSource).toContain('on:\n  push:');
+    expect(workflowSource).toContain('branches-ignore:\n      - gh-pages');
+    expect(workflowSource).toContain('wait-for-quality:');
+    expect(workflowSource).toContain(
+      `quality_conclusion="$(jq -r '.conclusion // ""' "\${run_file}")"`,
     );
   });
 
@@ -153,5 +160,25 @@ describe('fixed preview slot workflow contract', () => {
       'if [ "${BRANCH_SLUG}" = \'main\' ] || [ "${BRANCH_SLUG}" = \'test\' ]; then',
     );
     expect(workflowSource).toContain('Skipping cleanup for fixed preview slot');
+  });
+});
+
+describe('quality workflow contract', () => {
+  it('runs on push only and ignores gh-pages deploy commits', () => {
+    const workflowSource = fs.readFileSync(qualityWorkflowPath, 'utf8');
+    expect(workflowSource).toContain('on:\n  push:');
+    expect(workflowSource).toContain('branches-ignore:\n      - gh-pages');
+    expect(workflowSource).not.toContain('pull_request:');
+  });
+
+  it('splits quality stages into detect -> lint/typecheck -> unit -> e2e', () => {
+    const workflowSource = fs.readFileSync(qualityWorkflowPath, 'utf8');
+    expect(workflowSource).toContain('lint-typecheck:\n    needs:\n      - detect-code-changes');
+    expect(workflowSource).toContain(
+      'unit-tests:\n    needs:\n      - detect-code-changes\n      - lint-typecheck',
+    );
+    expect(workflowSource).toContain(
+      'e2e-tests:\n    needs:\n      - detect-code-changes\n      - unit-tests',
+    );
   });
 });
