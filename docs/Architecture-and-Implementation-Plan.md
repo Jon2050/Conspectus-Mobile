@@ -350,7 +350,7 @@ M3-04 implementation clarification:
 - Sign-in/sign-out UX is implemented in `src/features/app-shell/routes/SettingsRoute.svelte` and wired to `@auth` via `createSettingsAuthController`.
 - Settings auth UI includes explicit pending/success/error states and a signed-in account summary (`displayName`, `username`, `homeAccountId`).
 - Controller operations are initialization-safe: `signIn`/`signOut` trigger auth initialization first when needed and block duplicate in-flight actions.
-- E2E auth mocking is available only when `VITE_E2E_AUTH_MOCK_ENABLED=1` (used by Playwright), reducing production runtime surface for test hooks.
+- E2E auth mocking is enabled only on localhost hosts (`127.0.0.1`/`localhost`) used by Playwright; production hosts always use the real auth client.
 - Platform verification is covered by Playwright Chromium + Pixel 5 by default, with optional iPhone WebKit runs enabled through `PLAYWRIGHT_INCLUDE_IOS_WEBKIT=1`.
 
 Deliverables:

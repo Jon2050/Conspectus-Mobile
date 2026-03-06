@@ -7,13 +7,14 @@ declare global {
 }
 
 export const resolveSettingsAuthClient = (): AuthClient => {
-  const isE2eAuthMockEnabled = import.meta.env.VITE_E2E_AUTH_MOCK_ENABLED === '1';
-
   if (typeof window === 'undefined') {
     return createAuthClient();
   }
 
-  if (isE2eAuthMockEnabled && window.__CONSPECTUS_AUTH_CLIENT__ !== undefined) {
+  const isLocalAuthMockHost =
+    window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
+
+  if (isLocalAuthMockHost && window.__CONSPECTUS_AUTH_CLIENT__ !== undefined) {
     return window.__CONSPECTUS_AUTH_CLIENT__;
   }
 

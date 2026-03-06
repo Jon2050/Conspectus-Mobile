@@ -47,7 +47,6 @@ export default defineConfig({
       ...process.env,
       DEPLOY_CHANNEL: 'production',
       VITE_AZURE_CLIENT_ID: process.env.VITE_AZURE_CLIENT_ID ?? 'playwright-test-client-id',
-      VITE_E2E_AUTH_MOCK_ENABLED: '1',
     },
     url: 'http://127.0.0.1:4173',
     reuseExistingServer: !process.env.CI,
