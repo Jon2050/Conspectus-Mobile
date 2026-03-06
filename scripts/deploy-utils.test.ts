@@ -144,7 +144,7 @@ describe('fixed preview slot workflow contract', () => {
   it('serializes preview deployments by fixed slot', () => {
     const workflowSource = fs.readFileSync(deployChannelsWorkflowPath, 'utf8');
     expect(workflowSource).toContain(
-      "group: deploy-channels-${{ github.ref_name == 'main' && 'main' || 'test' }}",
+      "group: deploy-channels-push-${{ github.ref_name == 'main' && 'main' || 'test' }}",
     );
     expect(workflowSource).toContain('on:\n  push:');
     expect(workflowSource).toContain('branches-ignore:\n      - gh-pages');
