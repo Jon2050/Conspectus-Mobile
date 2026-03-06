@@ -121,7 +121,7 @@ describe('quality workflow contract', () => {
     expect(workflowSource).not.toContain('pull_request:');
   });
 
-  it('splits quality stages into detect -> lint/typecheck -> unit -> e2e and uploads reusable dist artifacts', () => {
+  it('splits quality stages into detect -> lint/typecheck -> unit -> build preview -> build verification -> e2e', () => {
     const workflowSource = fs.readFileSync(qualityWorkflowPath, 'utf8');
     expect(workflowSource).toContain('lint-typecheck:');
     expect(workflowSource).toMatch(
@@ -131,15 +131,25 @@ describe('quality workflow contract', () => {
     expect(workflowSource).toMatch(
       /unit-tests:\n(?:.*\n)*?\s+needs:\n\s+- detect-code-changes\n\s+- lint-typecheck/,
     );
+    expect(workflowSource).toContain('build:');
+    expect(workflowSource).toMatch(/build:\n(?:.*\n)*?\s+name: Build App \(Preview\)/);
+    expect(workflowSource).toMatch(
+      /build:\n(?:.*\n)*?\s+needs:\n\s+- detect-code-changes\n\s+- unit-tests/,
+    );
+    expect(workflowSource).toContain('build-verification:');
+    expect(workflowSource).toMatch(
+      /build-verification:\n(?:.*\n)*?\s+needs:\n\s+- detect-code-changes\n\s+- build/,
+    );
     expect(workflowSource).toContain('e2e-tests:');
     expect(workflowSource).toMatch(
-      /e2e-tests:\n(?:.*\n)*?\s+needs:\n\s+- detect-code-changes\n\s+- unit-tests/,
+      /e2e-tests:\n(?:.*\n)*?\s+needs:\n\s+- detect-code-changes\n\s+- build-verification/,
     );
-    expect(workflowSource).toContain('name: quality-production-dist');
     expect(workflowSource).toContain('name: quality-preview-dist');
+    expect(workflowSource).not.toContain('name: quality-production-dist');
     expect(workflowSource).toContain(
       "DEPLOY_PREVIEW_SLUG: ${{ github.ref_name == 'main' && 'main' || 'test' }}",
     );
+    expect(workflowSource).toContain('PLAYWRIGHT_APP_BASE_PATH:');
   });
 });
 
@@ -151,8 +161,9 @@ describe('production workflow contracts', () => {
     expect(workflowSource).toContain("head_branch == 'main'");
     expect(workflowSource).toContain('name: Confirm trigger commit is still the current main tip');
     expect(workflowSource).toContain('steps.branch-head.outputs.is_current_main_head');
-    expect(workflowSource).toContain('name: quality-production-dist');
-    expect(workflowSource).toContain('run-id: ${{ github.event.workflow_run.id }}');
+    expect(workflowSource).toContain('name: Build production artifact');
+    expect(workflowSource).toContain('DEPLOY_CHANNEL: production');
+    expect(workflowSource).toContain('name: Verify production build output paths and scope');
     expect(workflowSource).toContain(
       'artifact_name="conspectus-mobile-production-${{ github.event.workflow_run.head_sha }}"',
     );

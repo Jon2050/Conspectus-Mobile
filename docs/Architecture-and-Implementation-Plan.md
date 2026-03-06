@@ -285,7 +285,7 @@ Substeps:
      - non-`main` branches update `/previews/test/`
    - `Publish Production Artifact` publishes the immutable production handoff artifact only on successful `main` builds
    - run build-output path/scope assertions for preview and production channels
-   - run the same channel path/scope assertions in `Quality` to catch regressions before deploy workflows execute and to produce reusable preview/production `dist` artifacts
+   - run the same channel path/scope assertions in `Quality` and `Publish Production Artifact` to catch regressions before deploy workflows execute and to keep preview and production artifacts validated at their own stage boundaries
    - keep production website rollout manual in this repository via `Deploy Production Website`, which reuses the published production artifact for the current `main` commit without rebuilding
 8. Verify production installability contract (`M2-07`):
    - enforce install icon contract in automated checks (`manifest` includes moneybag `192x192` and `512x512`, HTML includes moneybag `apple-touch-icon`)
@@ -662,11 +662,11 @@ Rejected alternatives for MVP (authoritative decision is section `8.3`):
 Pipeline stages:
 
 1. Build/test on push.
-2. `Quality` uploads reusable preview and production `dist` artifacts only when code changes require the heavy jobs.
+2. `Quality` uploads the reusable preview `dist` artifact only when code changes require the heavy jobs.
 3. `Deploy Preview Channel` listens to successful `Quality` push runs only and deploys fixed preview slots on `gh-pages` paths:
    - `/previews/main/` for `main`
    - `/previews/test/` for non-`main` branches.
-4. `Publish Production Artifact` listens to successful `Quality` push runs on `main`, reuses the verified production `dist`, adds deployment metadata, and publishes one immutable production artifact.
+4. `Publish Production Artifact` listens to successful `Quality` push runs on `main`, builds and verifies the production `dist`, adds deployment metadata, and publishes one immutable production artifact.
 5. Website repo consumes the published production artifact and deploys to `jon2050.de/conspectus/webapp/`.
 6. `Deploy Production Website` is started manually from `main`, dispatches the published production artifact for the current `main` commit to the website repository, and runs production smoke checks against the live site.
 
@@ -687,7 +687,7 @@ Options reviewed:
 Producer/consumer CI contract (automation-only, no manual copy):
 
 1. Producer (`Conspectus-Mobile`):
-   - `Quality` is the only build/test gate and produces reusable preview/production `dist` artifacts for downstream workflows.
+   - `Quality` is the only build/test gate and produces the reusable preview `dist` artifact for downstream preview deploys and E2E smoke tests.
    - Source workflow for the immutable production handoff artifact: `Publish Production Artifact` after successful `Quality` push runs on `main`.
    - Production artifact is published only for `main`.
    - Every successful `main` production-artifact run MUST emit exactly one deployable production artifact; the producer workflow enforces this before handoff dispatch.
