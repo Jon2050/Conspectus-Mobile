@@ -72,6 +72,7 @@ Canonical source-of-truth by topic:
 - Architecture and implementation plan: `docs/Architecture-and-Implementation-Plan.md`
 - Desktop parity reference used for DB/business-rule alignment: `docs/Conspectus-Desktop-Info.md`
 - MVP tracker/index of milestone issues: `docs/GitHub-Issues-MVP-Backlog.md`
+- CI/CD workflow reference: `docs/CI-CD-Pipelines.md`
 - Entra app registration runbook (`M3-01`): `docs/auth/Entra-App-Registration.md`
 - M2-07 installability verification record: [#25](https://github.com/Jon2050/Conspectus-Mobile/issues/25)
 - M2-08 two-repo deployment runbook record: [#27](https://github.com/Jon2050/Conspectus-Mobile/issues/27)
@@ -113,7 +114,7 @@ Local quality scripts:
 - `npm run test:e2e` - runs baseline Playwright app-shell smoke tests.
 - `npm run typecheck` - runs Svelte + TypeScript checks in strict mode.
 
-CI runs these checks on every push and every pull request.
+CI runs these checks on every push to non-`gh-pages` branches.
 
 CI test report view in GitHub:
 
@@ -124,29 +125,33 @@ CI test report view in GitHub:
 
 ## Deployment Channels
 
-Deployment is split into two CI-gated channels:
+Deployment is split into preview delivery and production-artifact handoff stages:
 
-- `Quality` remains the only gate for deploy eligibility.
-- `Deploy Channels` runs only from successful `Quality` push runs (`workflow_run` trigger).
+- `Quality` remains the only gate for deploy eligibility and produces reusable verified `dist/` artifacts.
+- `Deploy Preview Channel` runs only from successful `Quality` push runs (`workflow_run` trigger).
+- `Publish Production Artifact` runs only from successful `Quality` push runs on `main`.
+- `Deploy Production Website` is a manual workflow (`workflow_dispatch`) that deploys the latest successful published `main` artifact to the website repo and runs production smoke checks.
 - Fixed deployment URLs:
   - [https://jon2050.github.io/Conspectus-Mobile/previews/main/](https://jon2050.github.io/Conspectus-Mobile/previews/main/) (`main` preview slot)
   - [https://jon2050.github.io/Conspectus-Mobile/previews/test/](https://jon2050.github.io/Conspectus-Mobile/previews/test/) (shared preview slot for every non-`main` branch)
   - [https://jon2050.de/conspectus/webapp/](https://jon2050.de/conspectus/webapp/) (production)
-- Main branch runs additionally publish a production artifact for website-repo consumption.
+- Successful `main` Quality runs additionally publish an immutable production artifact for website-repo consumption.
 
 Operational notes:
 
 - Preview builds use `DEPLOY_CHANNEL=preview` with fixed `DEPLOY_PREVIEW_SLUG` values (`main` for `main`, `test` for non-`main`) and isolate service worker scope/assets under `/<repo>/previews/<slot>/`.
+- `Quality` uploads `quality-preview-dist` and `quality-production-dist`; downstream workflows reuse those artifacts instead of rebuilding.
 - If MSAL login should work on GitHub Pages previews, add both fixed preview URLs
   ([https://jon2050.github.io/Conspectus-Mobile/previews/main/](https://jon2050.github.io/Conspectus-Mobile/previews/main/) and
   [https://jon2050.github.io/Conspectus-Mobile/previews/test/](https://jon2050.github.io/Conspectus-Mobile/previews/test/)) as SPA redirect URIs in Entra app registration.
 - Production artifact builds use `DEPLOY_CHANNEL=production` and enforce `/conspectus/webapp/` for Vite `base`, PWA manifest `start_url`, and service worker scope.
 - Failed `Quality` runs do not produce preview deployments or production artifacts.
-- `Deploy Channels` includes a hard post-deploy preview availability check; if GitHub Pages is unavailable or the preview URL is not reachable, the workflow fails.
-- `Preview Cleanup` removes legacy branch-specific preview paths for deleted branches and keeps fixed `main`/`test` preview slots intact.
+- `Deploy Preview Channel` includes a hard post-deploy preview availability check; if GitHub Pages is unavailable or the preview URL is not reachable, the workflow fails.
+- `Deploy Production Website` fails closed when no successful published production artifact exists on `main`, when the website consumer contract is incompatible, or when the production smoke checks do not observe the expected deploy identity.
 - Production handoff dispatch requires repository secret `WEBSITE_REPO_DISPATCH_TOKEN` (scoped to trigger workflow events in the website repo).
 - Production handoff target repository defaults to `Jon2050/Jon2050_Webpage` and can be overridden with repository variable `WEBSITE_REPO_FULL_NAME`.
 - Canonical cross-repo producer/consumer architecture decision (M2-01): `docs/Architecture-and-Implementation-Plan.md` section `8.3`.
+- Detailed workflow catalog, dependency graph, and failure behavior: `docs/CI-CD-Pipelines.md`.
 
 ## Issue Labeling Rules
 

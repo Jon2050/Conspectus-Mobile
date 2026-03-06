@@ -279,15 +279,14 @@ Substeps:
    - e2e smoke asserts production base-path manifest fields (`start_url`, `scope`) and that parent-site routes outside app scope are not service-worker-controlled
 6. Add website navigation entry/link to the PWA route (or temporary test link).
 7. Add CI deployment workflows:
-   - `Deploy Channels` workflow runs from successful `Quality` push runs (`workflow_run`)
+   - `Deploy Preview Channel` workflow runs from successful `Quality` push runs (`workflow_run`)
    - publish/update preview on successful branch builds:
      - `main` branch updates `/previews/main/`
      - non-`main` branches update `/previews/test/`
-   - publish production artifact only on successful `main` builds
+   - `Publish Production Artifact` publishes the immutable production handoff artifact only on successful `main` builds
    - run build-output path/scope assertions for preview and production channels
-   - run the same channel path/scope assertions in `Quality` to catch regressions before deploy workflows execute
-   - `Preview Cleanup` workflow removes legacy branch-specific preview paths on delete events and preserves fixed `main`/`test` slots
-   - keep production website rollout as a separate follow-up in website repo
+   - run the same channel path/scope assertions in `Quality` to catch regressions before deploy workflows execute and to produce reusable preview/production `dist` artifacts
+   - keep production website rollout manual in this repository via `Deploy Production Website`, which reuses the latest published production artifact from `main` without rebuilding
 8. Verify production installability contract (`M2-07`):
    - enforce install icon contract in automated checks (`manifest` includes moneybag `192x192` and `512x512`, HTML includes moneybag `apple-touch-icon`)
    - keep manual iOS Safari / Android Chrome Add to Home Screen checklist and evidence in GitHub issue [#25](https://github.com/Jon2050/Conspectus-Mobile/issues/25)
@@ -662,16 +661,14 @@ Rejected alternatives for MVP (authoritative decision is section `8.3`):
 
 Pipeline stages:
 
-1. Build/test on push and PR.
-2. `Deploy Channels` listens to successful `Quality` push runs only.
-3. Deploy/update fixed preview slots on `gh-pages` paths:
+1. Build/test on push.
+2. `Quality` uploads reusable preview and production `dist` artifacts only when code changes require the heavy jobs.
+3. `Deploy Preview Channel` listens to successful `Quality` push runs only and deploys fixed preview slots on `gh-pages` paths:
    - `/previews/main/` for `main`
    - `/previews/test/` for non-`main` branches.
-4. On successful `main` quality runs, publish a production artifact with deployment metadata (`commit SHA`, UTC build time, run IDs).
-5. `Preview Cleanup` removes stale legacy branch-specific preview paths when branches are deleted while preserving fixed `main`/`test` preview slots.
-6. Website repo consumes main artifact and deploys to `jon2050.de/conspectus/webapp/`.
-7. `Deploy Channels` publishes preview/artifact outputs and dispatches the production-ready event to the website repository.
-8. `Website Deploy Smoke` (separate workflow) runs after successful `Deploy Channels` main runs and validates deployed app route, manifest, service worker URL, HTML bootstrap markers, and `deploy-metadata.json` identity fields.
+4. `Publish Production Artifact` listens to successful `Quality` push runs on `main`, reuses the verified production `dist`, adds deployment metadata, and publishes one immutable production artifact.
+5. Website repo consumes the published production artifact and deploys to `jon2050.de/conspectus/webapp/`.
+6. `Deploy Production Website` is started manually from `main`, dispatches the latest successful published production artifact to the website repository, and runs production smoke checks against the live site.
 
 ## 8.3 Approved Cross-Repo Deployment Architecture (M2-01)
 
@@ -690,9 +687,10 @@ Options reviewed:
 Producer/consumer CI contract (automation-only, no manual copy):
 
 1. Producer (`Conspectus-Mobile`):
-   - Source workflow: `Deploy Channels` after successful `Quality` push runs.
+   - `Quality` is the only build/test gate and produces reusable preview/production `dist` artifacts for downstream workflows.
+   - Source workflow for the immutable production handoff artifact: `Publish Production Artifact` after successful `Quality` push runs on `main`.
    - Production artifact is published only for `main`.
-   - Every successful `main` deploy run MUST emit exactly one deployable production artifact; the producer workflow enforces this before handoff dispatch.
+   - Every successful `main` production-artifact run MUST emit exactly one deployable production artifact; the producer workflow enforces this before handoff dispatch.
    - Artifact name format: `conspectus-mobile-production-<commitSha>`.
    - Artifact payload is `dist/` and MUST include `deploy-metadata.json` with:
      - `channel` (`production`)
@@ -702,13 +700,13 @@ Producer/consumer CI contract (automation-only, no manual copy):
      - `buildTimeUtc`
      - `qualityRunId`
      - `deployRunId`
-   - Deterministic handoff event to website repo (no human selection):
+   - Deterministic handoff event to website repo is triggered manually from `Deploy Production Website` (no rebuild, latest successful published `main` artifact only):
      - Trigger `repository_dispatch` with event type `conspectus-mobile-production-ready`.
      - Payload MUST include `commitSha`, `deployRunId`, `qualityRunId`, and `artifactName`.
      - Producer dispatch token MUST be scoped to trigger workflow events in the website repository.
-     - Producer workflow secret `WEBSITE_REPO_DISPATCH_TOKEN` is required for dispatch.
+     - Producer workflow secret `WEBSITE_REPO_DISPATCH_TOKEN` is required for contract verification and dispatch.
      - Producer workflow variable `WEBSITE_REPO_FULL_NAME` may override the default consumer target (`Jon2050/Jon2050_Webpage`).
-   - Post-deploy production smoke checks MUST run in separate workflow `Website Deploy Smoke`, triggered by successful `Deploy Channels` runs on `main`.
+   - Post-deploy production smoke checks MUST run inside `Deploy Production Website` after the handoff dispatch succeeds.
    - Smoke checks MUST target the production app base URL (`https://jon2050.de/conspectus/webapp/` by default; override via `PRODUCTION_APP_BASE_URL` repository variable), fail closed, verify deployed `deploy-metadata.json` identity fields (`commitSha`, `deployRunId`) against expected handoff context, and include deploy identity context in logs.
 2. Consumer (website repository):
    - Trigger on `repository_dispatch` (`conspectus-mobile-production-ready`) and read payload fields as the single source of artifact identity.

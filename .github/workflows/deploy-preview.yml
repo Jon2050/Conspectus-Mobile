@@ -1,0 +1,186 @@
+name: Deploy Preview Channel
+
+on:
+  workflow_run:
+    workflows:
+      - Quality
+    types:
+      - completed
+
+env:
+  PREVIEW_SMOKE_MAX_ATTEMPTS: '18'
+  PREVIEW_SMOKE_RETRY_DELAY_SECONDS: '10'
+
+permissions:
+  actions: read
+  contents: read
+  pages: read
+
+concurrency:
+  group: deploy-preview-${{ github.event.workflow_run.head_branch == 'main' && 'main' || 'test' }}
+  cancel-in-progress: true
+
+jobs:
+  prepare-context:
+    name: Prepare Preview Context
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      branch_name: ${{ steps.context.outputs.branch_name }}
+      head_sha: ${{ steps.context.outputs.head_sha }}
+      preview_base_path: ${{ steps.context.outputs.preview_base_path }}
+      preview_slot: ${{ steps.context.outputs.preview_slot }}
+      has_preview_artifact: ${{ steps.artifact.outputs.has_preview_artifact }}
+    steps:
+      - name: Resolve deployment context
+        id: context
+        env:
+          BRANCH_NAME: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          REPO_NAME: ${{ github.event.repository.name }}
+        run: |
+          set -euo pipefail
+
+          preview_slot='test'
+          if [ "${BRANCH_NAME}" = 'main' ]; then
+            preview_slot='main'
+          fi
+
+          preview_base_path="/${REPO_NAME}/previews/${preview_slot}/"
+
+          {
+            echo "branch_name=${BRANCH_NAME}"
+            echo "head_sha=${HEAD_SHA}"
+            echo "preview_base_path=${preview_base_path}"
+            echo "preview_slot=${preview_slot}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Detect reusable preview artifact
+        id: artifact
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          QUALITY_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+
+          artifacts_status="$(curl -sS -o artifacts-response.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${QUALITY_RUN_ID}/artifacts")"
+
+          if [ "${artifacts_status}" != '200' ]; then
+            echo "Failed to query Quality artifacts for run ${QUALITY_RUN_ID}." >&2
+            cat artifacts-response.json >&2 || true
+            exit 1
+          fi
+
+          preview_artifact_count="$(jq '[.artifacts[] | select(.name == "quality-preview-dist" and .expired == false)] | length' artifacts-response.json)"
+          has_preview_artifact='false'
+          if [ "${preview_artifact_count}" -gt '0' ]; then
+            has_preview_artifact='true'
+          fi
+
+          echo "has_preview_artifact=${has_preview_artifact}" >> "${GITHUB_OUTPUT}"
+
+          if [ "${has_preview_artifact}" = 'false' ]; then
+            echo "No reusable preview artifact found on Quality run ${QUALITY_RUN_ID}; skipping preview deployment."
+          fi
+
+  deploy-preview:
+    name: Publish Preview
+    needs:
+      - prepare-context
+    if: needs.prepare-context.outputs.has_preview_artifact == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+      pages: read
+    steps:
+      - name: Checkout source commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare-context.outputs.head_sha }}
+
+      - name: Download preview dist from Quality
+        uses: actions/download-artifact@v5
+        with:
+          name: quality-preview-dist
+          path: dist
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Publish preview to gh-pages
+        uses: peaceiris/actions-gh-pages@4f9cc6602d3f66b9c108549d475ec49e8ef4d45e # v4.0.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages
+          publish_dir: ./dist
+          destination_dir: previews/${{ needs.prepare-context.outputs.preview_slot }}
+          keep_files: true
+          full_commit_message: >-
+            deploy(preview): ${{ needs.prepare-context.outputs.branch_name }}
+            (${{ needs.prepare-context.outputs.head_sha }})
+
+      - name: Verify preview deployment availability
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PREVIEW_URL: >-
+            https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/previews/${{ needs.prepare-context.outputs.preview_slot }}/
+        run: |
+          set -euo pipefail
+
+          pages_api_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/pages"
+          pages_status="$(curl -sS -o pages-response.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H 'Accept: application/vnd.github+json' \
+            "${pages_api_url}")"
+
+          if [ "${pages_status}" != '200' ]; then
+            echo "GitHub Pages site is not configured/available for this repository." >&2
+            echo "Pages API status: ${pages_status}" >&2
+            cat pages-response.json >&2 || true
+            exit 1
+          fi
+
+          preview_index_url="${PREVIEW_URL}index.html"
+          max_attempts="${PREVIEW_SMOKE_MAX_ATTEMPTS}"
+          retry_delay_seconds="${PREVIEW_SMOKE_RETRY_DELAY_SECONDS}"
+
+          if ! [[ "${max_attempts}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "PREVIEW_SMOKE_MAX_ATTEMPTS must be a positive integer; got '${max_attempts}'." >&2
+            exit 1
+          fi
+
+          if ! [[ "${retry_delay_seconds}" =~ ^[0-9]+$ ]]; then
+            echo "PREVIEW_SMOKE_RETRY_DELAY_SECONDS must be a non-negative integer; got '${retry_delay_seconds}'." >&2
+            exit 1
+          fi
+
+          for attempt in $(seq 1 "${max_attempts}"); do
+            preview_status="$(curl -sS -L -o preview-index.html -w '%{http_code}' "${preview_index_url}")"
+            if [ "${preview_status}" = '200' ] && grep -q 'id="app"' preview-index.html; then
+              echo "Preview deployment is reachable at ${PREVIEW_URL}"
+              exit 0
+            fi
+
+            if [ "${attempt}" -lt "${max_attempts}" ]; then
+              echo "Preview check attempt ${attempt}/${max_attempts} not ready (status ${preview_status}); retrying in ${retry_delay_seconds}s..."
+              sleep "${retry_delay_seconds}"
+            fi
+          done
+
+          echo "Preview deployment did not become reachable in time: ${PREVIEW_URL}" >&2
+          echo "Last response status: ${preview_status}" >&2
+          cat preview-index.html >&2 || true
+          exit 1
+
+      - name: Preview URL (reachable)
+        run: |
+          echo "Preview URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/previews/${{ needs.prepare-context.outputs.preview_slot }}/"

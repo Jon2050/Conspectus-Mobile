@@ -8,7 +8,6 @@ const REQUIRED_ARGS = new Set([
   'metadata',
   'artifactName',
   'commitSha',
-  'qualityRunId',
   'deployRunId',
 ]);
 
@@ -26,8 +25,9 @@ const parseArgs = (argv) => {
     metadata: '',
     artifactName: '',
     commitSha: '',
-    qualityRunId: '',
     deployRunId: '',
+    qualityRunId: '',
+    sourceBranch: '',
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -83,6 +83,12 @@ const verifyMetadata = (metadata, expectedValues) => {
     `Metadata basePath mismatch. Expected "/conspectus/webapp/", got "${metadata.basePath}".`,
   );
   assert(metadata.sourceBranch, 'Metadata sourceBranch is required.');
+  if (expectedValues.sourceBranch) {
+    assert(
+      metadata.sourceBranch === expectedValues.sourceBranch,
+      `Metadata sourceBranch mismatch. Expected "${expectedValues.sourceBranch}", got "${metadata.sourceBranch}".`,
+    );
+  }
   assert(
     metadata.commitSha === expectedValues.commitSha,
     `Metadata commitSha mismatch. Expected "${expectedValues.commitSha}", got "${metadata.commitSha}".`,
@@ -92,9 +98,15 @@ const verifyMetadata = (metadata, expectedValues) => {
     `Metadata buildTimeUtc must use ISO UTC format (YYYY-MM-DDTHH:mm:ssZ). Got "${metadata.buildTimeUtc}".`,
   );
   assert(
-    String(metadata.qualityRunId) === expectedValues.qualityRunId,
-    `Metadata qualityRunId mismatch. Expected "${expectedValues.qualityRunId}", got "${metadata.qualityRunId}".`,
+    String(metadata.qualityRunId ?? '').trim().length > 0,
+    'Metadata qualityRunId is required.',
   );
+  if (expectedValues.qualityRunId) {
+    assert(
+      String(metadata.qualityRunId) === expectedValues.qualityRunId,
+      `Metadata qualityRunId mismatch. Expected "${expectedValues.qualityRunId}", got "${metadata.qualityRunId}".`,
+    );
+  }
   assert(
     String(metadata.deployRunId) === expectedValues.deployRunId,
     `Metadata deployRunId mismatch. Expected "${expectedValues.deployRunId}", got "${metadata.deployRunId}".`,
@@ -111,6 +123,7 @@ const main = () => {
     commitSha: args.commitSha,
     qualityRunId: args.qualityRunId,
     deployRunId: args.deployRunId,
+    sourceBranch: args.sourceBranch,
   });
 
   console.log(

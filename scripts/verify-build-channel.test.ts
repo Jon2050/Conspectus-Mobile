@@ -184,9 +184,9 @@ describe('verify-build-channel script', () => {
     }
   });
 
-  it('accepts valid preview channel output with branch-slug base path', () => {
+  it('accepts valid preview channel output with the shared fixed-slot base path', () => {
     const fixturePath = createFixtureDirectory();
-    const previewBase = '/Conspectus-Mobile/previews/feature_2f_login/';
+    const previewBase = '/Conspectus-Mobile/previews/test/';
 
     try {
       const distPath = path.join(fixturePath, 'dist');

@@ -1,6 +1,5 @@
 /**
- * Shared deployment utilities used by vite.config.ts, verify-build-channel.mjs,
- * and contract-tested against scripts/slugify-branch.py for parity.
+ * Shared deployment utilities used by vite.config.ts and build/deploy verification.
  */
 
 /**
@@ -15,8 +14,7 @@ export const normalizeBasePath = (value) => {
 
 /**
  * Converts a branch name into a path-safe preview slug.
- * Uses per-character encoding identical to scripts/slugify-branch.py:
- * only [a-z0-9-] pass through; everything else becomes _{hex}_.
+ * Only [a-z0-9-] pass through; everything else becomes _{hex}_.
  * @param {string} value - The branch name.
  * @returns {string} The path-safe slug.
  */
