@@ -1,14 +1,15 @@
 name: Quality
 
 on:
-  pull_request:
   push:
+    branches-ignore:
+      - gh-pages
 
 env:
   VITE_AZURE_CLIENT_ID: ${{ vars.VITE_AZURE_CLIENT_ID }}
 
 concurrency:
-  group: quality-${{ github.head_ref || github.ref }}
+  group: quality-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -22,31 +23,35 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Detect docs-only PR changes
+      - name: Detect docs-only push changes
         id: detect
         env:
-          EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          BEFORE_SHA: ${{ github.event.before || '' }}
+          AFTER_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
 
-          if [ "${EVENT_NAME}" != 'pull_request' ]; then
+          if [ -z "${BEFORE_SHA}" ] || [ "${BEFORE_SHA}" = '0000000000000000000000000000000000000000' ]; then
             echo "code_changed=true" >> "${GITHUB_OUTPUT}"
-            echo "Non-PR event detected; running full quality checks."
+            echo "Unable to resolve previous commit SHA; running full quality checks."
             exit 0
           fi
 
-          if [ -z "${BASE_SHA}" ] || [ -z "${HEAD_SHA}" ]; then
-            echo "Unable to resolve PR base/head SHAs; running full quality checks."
+          if ! git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null; then
             echo "code_changed=true" >> "${GITHUB_OUTPUT}"
+            echo "Previous commit SHA is unavailable locally; running full quality checks."
             exit 0
           fi
 
-          changed_files="$(git diff --name-only "${BASE_SHA}" "${HEAD_SHA}")"
+          if ! changed_files="$(git diff --name-only "${BEFORE_SHA}" "${AFTER_SHA}")"; then
+            echo "code_changed=true" >> "${GITHUB_OUTPUT}"
+            echo "Unable to compute changed files; running full quality checks."
+            exit 0
+          fi
+
           if [ -z "${changed_files}" ]; then
             echo "code_changed=false" >> "${GITHUB_OUTPUT}"
-            echo "No changed files detected; treating PR as docs-only."
+            echo "No changed files detected; treating push as docs-only."
             exit 0
           fi
 
@@ -70,7 +75,7 @@ jobs:
 
           echo "code_changed=${code_changed}" >> "${GITHUB_OUTPUT}"
           if [ "${code_changed}" = 'false' ]; then
-            echo "Docs-only PR detected; lint/typecheck/tests/build jobs will be skipped."
+            echo "Docs-only push detected; lint/typecheck/tests/build jobs will be skipped."
           fi
 
   lint-typecheck:
@@ -106,6 +111,32 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
+
+  unit-tests:
+    needs:
+      - detect-code-changes
+      - lint-typecheck
+    if: needs.detect-code-changes.outputs.code_changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate required runtime env
+        run: |
+          if [ -z "${VITE_AZURE_CLIENT_ID}" ]; then
+            echo "Missing repository variable VITE_AZURE_CLIENT_ID." >&2
+            exit 1
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Unit tests
         run: |
@@ -144,10 +175,10 @@ jobs:
           npm run build
           node scripts/verify-build-channel.mjs --dist dist --channel preview --base "/${{ github.event.repository.name }}/previews/quality-smoke/"
 
-  e2e-smoke:
+  e2e-tests:
     needs:
       - detect-code-changes
-      - lint-typecheck
+      - unit-tests
     if: needs.detect-code-changes.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
     steps:
