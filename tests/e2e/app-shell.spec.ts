@@ -23,6 +23,88 @@ const REQUIRED_MANIFEST_ICONS = [
   },
 ];
 
+type MockAuthClientOptions = {
+  readonly initializeDelayMs?: number;
+  readonly signInDelayMs?: number;
+  readonly signOutDelayMs?: number;
+  readonly failInitialize?: boolean;
+  readonly failSignIn?: boolean;
+  readonly failSignOut?: boolean;
+  readonly startAuthenticated?: boolean;
+};
+
+const installMockAuthClient = async (
+  page: import('@playwright/test').Page,
+  options: MockAuthClientOptions = {},
+): Promise<void> => {
+  await page.addInitScript((mockOptions: MockAuthClientOptions) => {
+    const resolveDelay = (delayMs: number | undefined): Promise<void> =>
+      new Promise((resolve) => {
+        setTimeout(resolve, delayMs ?? 0);
+      });
+
+    const account = {
+      homeAccountId: 'mock-home-account',
+      username: 'mock-user@example.com',
+      displayName: 'Mock User',
+    };
+
+    let isInitialized = false;
+    let isAuthenticated = mockOptions.startAuthenticated ?? false;
+
+    const toSession = () => ({
+      isAuthenticated,
+      account: isAuthenticated ? account : null,
+    });
+
+    (window as Window & { __CONSPECTUS_AUTH_CLIENT__?: unknown }).__CONSPECTUS_AUTH_CLIENT__ = {
+      async initialize() {
+        await resolveDelay(mockOptions.initializeDelayMs);
+        if (mockOptions.failInitialize) {
+          throw {
+            code: 'network_error',
+            message: 'Mock initialize failure.',
+          };
+        }
+        isInitialized = true;
+      },
+      getSession() {
+        if (!isInitialized) {
+          return {
+            isAuthenticated: false,
+            account: null,
+          };
+        }
+
+        return toSession();
+      },
+      async signIn() {
+        await resolveDelay(mockOptions.signInDelayMs);
+        if (mockOptions.failSignIn) {
+          throw {
+            code: 'network_error',
+            message: 'Mock sign-in failure.',
+          };
+        }
+        isAuthenticated = true;
+      },
+      async signOut() {
+        await resolveDelay(mockOptions.signOutDelayMs);
+        if (mockOptions.failSignOut) {
+          throw {
+            code: 'network_error',
+            message: 'Mock sign-out failure.',
+          };
+        }
+        isAuthenticated = false;
+      },
+      async getAccessToken() {
+        return 'mock-access-token';
+      },
+    };
+  }, options);
+};
+
 test('shows startup configuration error when required runtime env is missing', async ({ page }) => {
   await page.route('**/*.js', async (route) => {
     const response = await route.fetch();
@@ -69,6 +151,53 @@ test('loads a mobile app shell and navigates placeholder routes', async ({ page 
   await page.getByRole('link', { name: 'Settings' }).click();
   await expect(page).toHaveURL(/#\/settings$/);
   await expect(page.getByRole('heading', { level: 2, name: 'Settings' })).toBeVisible();
+});
+
+test('supports sign-in and sign-out auth UX states in settings', async ({ page }) => {
+  await installMockAuthClient(page, {
+    signInDelayMs: 250,
+    signOutDelayMs: 250,
+  });
+
+  await page.goto(appPath('#/settings'));
+
+  const statusMessage = page.getByTestId('auth-status-message');
+  await expect(page.getByRole('heading', { level: 2, name: 'Settings' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sign in with Microsoft' })).toBeVisible();
+  await expect(statusMessage).toContainText('Signed out.');
+
+  const signInButton = page.getByRole('button', { name: 'Sign in with Microsoft' });
+  await signInButton.click();
+
+  await expect(statusMessage).toContainText('Opening Microsoft sign-in...');
+  await expect(signInButton).toBeDisabled();
+  await expect(page.getByTestId('signed-in-account-summary')).toBeVisible();
+  await expect(page.getByText('mock-user@example.com')).toBeVisible();
+  await expect(statusMessage).toContainText('Signed in.');
+
+  const signOutButton = page.getByRole('button', { name: 'Sign out' });
+  await signOutButton.click();
+
+  await expect(statusMessage).toContainText('Signing out...');
+  await expect(signOutButton).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Sign in with Microsoft' })).toBeVisible();
+  await expect(statusMessage).toContainText('Signed out.');
+});
+
+test('shows auth error UI when sign-in fails in settings', async ({ page }) => {
+  await installMockAuthClient(page, {
+    failSignIn: true,
+  });
+
+  await page.goto(appPath('#/settings'));
+
+  await page.getByRole('button', { name: 'Sign in with Microsoft' }).click();
+
+  await expect(page.getByRole('alert')).toContainText('Mock sign-in failure.');
+  await expect(page.getByTestId('auth-status-message')).toContainText(
+    'Authentication error. Mock sign-in failure.',
+  );
+  await expect(page.getByRole('button', { name: 'Sign in with Microsoft' })).toBeVisible();
 });
 
 test('keeps hash route stable across direct loads and reloads', async ({ page }) => {

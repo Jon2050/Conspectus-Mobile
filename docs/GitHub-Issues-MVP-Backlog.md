@@ -244,7 +244,7 @@ An issue is only considered done when:
 - Depends on: `M3-01`
 - GitHub: [#33](https://github.com/Jon2050/Conspectus-Mobile/issues/33)
 
-### :green_circle: M3-04 Build sign-in/sign-out UX
+### :white_check_mark: M3-04 Build sign-in/sign-out UX
 
 - Label: `feature`
 - Milestone: `M3 - Auth + OneDrive Binding`
