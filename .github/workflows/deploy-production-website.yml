@@ -38,60 +38,88 @@ jobs:
         with:
           ref: main
 
+      - name: Resolve current main commit target
+        id: target
+        run: |
+          set -euo pipefail
+          echo "commit_sha=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Resolve latest successful published production artifact
+      - name: Resolve published production artifact for current main commit
         id: source-run
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET_COMMIT_SHA: ${{ steps.target.outputs.commit_sha }}
         run: |
           set -euo pipefail
-
-          runs_status="$(curl -sS -o workflow-runs-response.json -w '%{http_code}' \
-            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-            -H 'Accept: application/vnd.github+json' \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/publish-production-artifact.yml/runs?branch=main&event=workflow_run&per_page=20")"
-
-          if [ "${runs_status}" != '200' ]; then
-            echo "Failed to query Publish Production Artifact workflow runs." >&2
-            cat workflow-runs-response.json >&2 || true
-            exit 1
-          fi
 
           source_run_id=''
           source_commit_sha=''
           artifact_name=''
+          page='1'
 
-          while IFS=$'\t' read -r candidate_run_id candidate_commit_sha; do
-            [ -n "${candidate_run_id}" ] || continue
-
-            artifacts_status="$(curl -sS -o artifacts-response.json -w '%{http_code}' \
+          while :; do
+            runs_status="$(curl -sS -o workflow-runs-response.json -w '%{http_code}' \
               -H "Authorization: Bearer ${GITHUB_TOKEN}" \
               -H 'Accept: application/vnd.github+json' \
-              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${candidate_run_id}/artifacts")"
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/publish-production-artifact.yml/runs?branch=main&event=workflow_run&head_sha=${TARGET_COMMIT_SHA}&per_page=100&page=${page}")"
 
-            if [ "${artifacts_status}" != '200' ]; then
-              echo "Failed to list artifacts for Publish Production Artifact run ${candidate_run_id}." >&2
-              cat artifacts-response.json >&2 || true
+            if [ "${runs_status}" != '200' ]; then
+              echo "Failed to query Publish Production Artifact workflow runs." >&2
+              cat workflow-runs-response.json >&2 || true
               exit 1
             fi
 
-            artifact_count="$(jq '[.artifacts[] | select(.expired == false and (.name | startswith("conspectus-mobile-production-")))] | length' artifacts-response.json)"
-            if [ "${artifact_count}" -ne '1' ]; then
-              continue
+            workflow_run_count="$(jq '.workflow_runs | length' workflow-runs-response.json)"
+            if [ "${workflow_run_count}" -eq '0' ]; then
+              break
             fi
 
-            artifact_name="$(jq -r '[.artifacts[] | select(.expired == false and (.name | startswith("conspectus-mobile-production-")))] | .[0].name' artifacts-response.json)"
-            source_run_id="${candidate_run_id}"
-            source_commit_sha="${candidate_commit_sha}"
-            break
-          done < <(jq -r '.workflow_runs[] | select(.conclusion == "success") | [.id, .head_sha] | @tsv' workflow-runs-response.json)
+            while IFS=$'\t' read -r candidate_run_id candidate_commit_sha; do
+              [ -n "${candidate_run_id}" ] || continue
+              if [ "${candidate_commit_sha}" != "${TARGET_COMMIT_SHA}" ]; then
+                continue
+              fi
+
+              artifacts_status="$(curl -sS -o artifacts-response.json -w '%{http_code}' \
+                -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+                -H 'Accept: application/vnd.github+json' \
+                "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${candidate_run_id}/artifacts")"
+
+              if [ "${artifacts_status}" != '200' ]; then
+                echo "Failed to list artifacts for Publish Production Artifact run ${candidate_run_id}." >&2
+                cat artifacts-response.json >&2 || true
+                exit 1
+              fi
+
+              artifact_count="$(jq '[.artifacts[] | select(.expired == false and (.name | startswith("conspectus-mobile-production-")))] | length' artifacts-response.json)"
+              if [ "${artifact_count}" -ne '1' ]; then
+                continue
+              fi
+
+              artifact_name="$(jq -r '[.artifacts[] | select(.expired == false and (.name | startswith("conspectus-mobile-production-")))] | .[0].name' artifacts-response.json)"
+              source_run_id="${candidate_run_id}"
+              source_commit_sha="${candidate_commit_sha}"
+              break
+            done < <(jq -r '.workflow_runs[] | select(.conclusion == "success") | [.id, .head_sha] | @tsv' workflow-runs-response.json)
+
+            if [ -n "${source_run_id}" ]; then
+              break
+            fi
+
+            if [ "${workflow_run_count}" -lt '100' ]; then
+              break
+            fi
+
+            page="$((page + 1))"
+          done
 
           if [ -z "${source_run_id}" ] || [ -z "${source_commit_sha}" ] || [ -z "${artifact_name}" ]; then
-            echo "No successful Publish Production Artifact run with a reusable production artifact was found on main." >&2
+            echo "No successful Publish Production Artifact run with a reusable production artifact was found for current main commit ${TARGET_COMMIT_SHA}." >&2
             exit 1
           fi
 

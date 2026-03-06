@@ -286,7 +286,7 @@ Substeps:
    - `Publish Production Artifact` publishes the immutable production handoff artifact only on successful `main` builds
    - run build-output path/scope assertions for preview and production channels
    - run the same channel path/scope assertions in `Quality` to catch regressions before deploy workflows execute and to produce reusable preview/production `dist` artifacts
-   - keep production website rollout manual in this repository via `Deploy Production Website`, which reuses the latest published production artifact from `main` without rebuilding
+   - keep production website rollout manual in this repository via `Deploy Production Website`, which reuses the published production artifact for the current `main` commit without rebuilding
 8. Verify production installability contract (`M2-07`):
    - enforce install icon contract in automated checks (`manifest` includes moneybag `192x192` and `512x512`, HTML includes moneybag `apple-touch-icon`)
    - keep manual iOS Safari / Android Chrome Add to Home Screen checklist and evidence in GitHub issue [#25](https://github.com/Jon2050/Conspectus-Mobile/issues/25)
@@ -668,7 +668,7 @@ Pipeline stages:
    - `/previews/test/` for non-`main` branches.
 4. `Publish Production Artifact` listens to successful `Quality` push runs on `main`, reuses the verified production `dist`, adds deployment metadata, and publishes one immutable production artifact.
 5. Website repo consumes the published production artifact and deploys to `jon2050.de/conspectus/webapp/`.
-6. `Deploy Production Website` is started manually from `main`, dispatches the latest successful published production artifact to the website repository, and runs production smoke checks against the live site.
+6. `Deploy Production Website` is started manually from `main`, dispatches the published production artifact for the current `main` commit to the website repository, and runs production smoke checks against the live site.
 
 ## 8.3 Approved Cross-Repo Deployment Architecture (M2-01)
 
@@ -700,7 +700,7 @@ Producer/consumer CI contract (automation-only, no manual copy):
      - `buildTimeUtc`
      - `qualityRunId`
      - `deployRunId`
-   - Deterministic handoff event to website repo is triggered manually from `Deploy Production Website` (no rebuild, latest successful published `main` artifact only):
+   - Deterministic handoff event to website repo is triggered manually from `Deploy Production Website` (no rebuild, published artifact for the current `main` commit only):
      - Trigger `repository_dispatch` with event type `conspectus-mobile-production-ready`.
      - Payload MUST include `commitSha`, `deployRunId`, `qualityRunId`, and `artifactName`.
      - Producer dispatch token MUST be scoped to trigger workflow events in the website repository.

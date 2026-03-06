@@ -53,6 +53,7 @@ flowchart TD
   - the presence of the `quality-preview-dist` artifact on that `Quality` run
 - Failure behavior:
   - if GitHub Pages is unavailable or the preview URL does not become reachable in time, the workflow fails
+  - if the triggering `Quality` run is no longer the current tip of its branch, the workflow exits cleanly without deploying
   - if the triggering `Quality` run did not produce a preview artifact, the workflow exits cleanly without deploying
 - Notes:
   - reuses the built artifact from `Quality`; it does not rebuild
@@ -71,6 +72,7 @@ flowchart TD
   - the presence of the `quality-production-dist` artifact on that `Quality` run
 - Failure behavior:
   - if metadata generation or artifact verification fails, the workflow fails and no production handoff artifact is published
+  - if the triggering `Quality` run is no longer the current `main` tip, the workflow exits cleanly without publishing
   - if the triggering `Quality` run did not produce a production artifact, the workflow exits cleanly without publishing
 - Notes:
   - this workflow is the producer for the website repo handoff contract
@@ -81,7 +83,7 @@ flowchart TD
 - File: [`.github/workflows/deploy-production-website.yml`](../.github/workflows/deploy-production-website.yml)
 - Trigger: manual `workflow_dispatch`
 - Purpose:
-  - resolve the latest successful `Publish Production Artifact` run on `main`
+  - resolve the successful `Publish Production Artifact` run for the current `main` commit
   - verify artifact metadata and website consumer contract
   - dispatch the deterministic handoff event to `Jon2050/Jon2050_Webpage`
   - wait for the live production site to expose the expected deploy identity
@@ -91,7 +93,7 @@ flowchart TD
   - repository secret `WEBSITE_REPO_DISPATCH_TOKEN`
 - Failure behavior:
   - fails if started from a branch other than `main`
-  - fails if no successful published production artifact is available
+  - fails if the current `main` commit has no successful published production artifact
   - fails if the website repo workflow contract is incompatible
   - fails if dispatch is rejected or if production smoke verification does not observe the expected `deploy-metadata.json`
 - Notes:

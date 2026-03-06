@@ -130,7 +130,7 @@ Deployment is split into preview delivery and production-artifact handoff stages
 - `Quality` remains the only gate for deploy eligibility and produces reusable verified `dist/` artifacts.
 - `Deploy Preview Channel` runs only from successful `Quality` push runs (`workflow_run` trigger).
 - `Publish Production Artifact` runs only from successful `Quality` push runs on `main`.
-- `Deploy Production Website` is a manual workflow (`workflow_dispatch`) that deploys the latest successful published `main` artifact to the website repo and runs production smoke checks.
+- `Deploy Production Website` is a manual workflow (`workflow_dispatch`) that deploys the already-published artifact for the current `main` commit to the website repo and runs production smoke checks.
 - Fixed deployment URLs:
   - [https://jon2050.github.io/Conspectus-Mobile/previews/main/](https://jon2050.github.io/Conspectus-Mobile/previews/main/) (`main` preview slot)
   - [https://jon2050.github.io/Conspectus-Mobile/previews/test/](https://jon2050.github.io/Conspectus-Mobile/previews/test/) (shared preview slot for every non-`main` branch)
@@ -147,7 +147,7 @@ Operational notes:
 - Production artifact builds use `DEPLOY_CHANNEL=production` and enforce `/conspectus/webapp/` for Vite `base`, PWA manifest `start_url`, and service worker scope.
 - Failed `Quality` runs do not produce preview deployments or production artifacts.
 - `Deploy Preview Channel` includes a hard post-deploy preview availability check; if GitHub Pages is unavailable or the preview URL is not reachable, the workflow fails.
-- `Deploy Production Website` fails closed when no successful published production artifact exists on `main`, when the website consumer contract is incompatible, or when the production smoke checks do not observe the expected deploy identity.
+- `Deploy Production Website` fails closed when the current `main` commit has no successful published production artifact, when the website consumer contract is incompatible, or when the production smoke checks do not observe the expected deploy identity.
 - Production handoff dispatch requires repository secret `WEBSITE_REPO_DISPATCH_TOKEN` (scoped to trigger workflow events in the website repo).
 - Production handoff target repository defaults to `Jon2050/Jon2050_Webpage` and can be overridden with repository variable `WEBSITE_REPO_FULL_NAME`.
 - Canonical cross-repo producer/consumer architecture decision (M2-01): `docs/Architecture-and-Implementation-Plan.md` section `8.3`.

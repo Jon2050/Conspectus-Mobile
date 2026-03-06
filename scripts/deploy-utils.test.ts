@@ -90,6 +90,10 @@ describe('fixed preview slot workflow contract', () => {
     const workflowSource = fs.readFileSync(deployPreviewWorkflowPath, 'utf8');
     expect(workflowSource).toContain('on:\n  workflow_run:');
     expect(workflowSource).toContain('workflows:\n      - Quality');
+    expect(workflowSource).toContain(
+      'name: Confirm trigger commit is still the current branch tip',
+    );
+    expect(workflowSource).toContain('steps.branch-head.outputs.is_current_branch_head');
     expect(workflowSource).toContain("preview_slot='test'");
     expect(workflowSource).toContain("preview_slot='main'");
     expect(workflowSource).toContain("event == 'push'");
@@ -145,6 +149,8 @@ describe('production workflow contracts', () => {
     expect(workflowSource).toContain('on:\n  workflow_run:');
     expect(workflowSource).toContain('workflows:\n      - Quality');
     expect(workflowSource).toContain("head_branch == 'main'");
+    expect(workflowSource).toContain('name: Confirm trigger commit is still the current main tip');
+    expect(workflowSource).toContain('steps.branch-head.outputs.is_current_main_head');
     expect(workflowSource).toContain('name: quality-production-dist');
     expect(workflowSource).toContain('run-id: ${{ github.event.workflow_run.id }}');
     expect(workflowSource).toContain(
@@ -152,10 +158,12 @@ describe('production workflow contracts', () => {
     );
   });
 
-  it('deploys production manually from the latest published artifact and runs smoke checks', () => {
+  it('deploys production manually from the current main commit artifact and paginates publish-run lookup', () => {
     const workflowSource = fs.readFileSync(deployProductionWebsiteWorkflowPath, 'utf8');
     expect(workflowSource).toContain('on:\n  workflow_dispatch:');
-    expect(workflowSource).toContain('actions/workflows/publish-production-artifact.yml/runs');
+    expect(workflowSource).toContain('name: Resolve current main commit target');
+    expect(workflowSource).toContain('head_sha=${TARGET_COMMIT_SHA}');
+    expect(workflowSource).toContain('per_page=100&page=${page}');
     expect(workflowSource).toMatch(/actions\/download-artifact@v[45]/);
     expect(workflowSource).toContain('conspectus-mobile-production-ready');
     expect(workflowSource).toContain('node scripts/verify-production-deploy-smoke.mjs');

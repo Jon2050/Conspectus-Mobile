@@ -23,8 +23,47 @@ jobs:
       actions: write
       contents: read
     steps:
+      - name: Confirm trigger commit is still the current main tip
+        id: branch-head
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+
+          branch_status="$(curl -sS -o branch-response.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/branches/main")"
+
+          if [ "${branch_status}" != '200' ]; then
+            echo "Failed to resolve the current main branch tip." >&2
+            cat branch-response.json >&2 || true
+            exit 1
+          fi
+
+          current_main_head_sha="$(jq -r '.commit.sha // empty' branch-response.json)"
+          if [ -z "${current_main_head_sha}" ]; then
+            echo 'Unable to read the current main branch tip SHA.' >&2
+            cat branch-response.json >&2 || true
+            exit 1
+          fi
+
+          is_current_main_head='false'
+          if [ "${current_main_head_sha}" = "${HEAD_SHA}" ]; then
+            is_current_main_head='true'
+          else
+            echo "Quality run commit ${HEAD_SHA} is stale for main; current main tip is ${current_main_head_sha}. Skipping production artifact publication."
+          fi
+
+          {
+            echo "current_main_head_sha=${current_main_head_sha}"
+            echo "is_current_main_head=${is_current_main_head}"
+          } >> "${GITHUB_OUTPUT}"
+
       - name: Detect reusable production artifact
         id: source-artifact
+        if: steps.branch-head.outputs.is_current_main_head == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           QUALITY_RUN_ID: ${{ github.event.workflow_run.id }}
@@ -55,13 +94,17 @@ jobs:
           fi
 
       - name: Checkout source commit
-        if: steps.source-artifact.outputs.has_production_artifact == 'true'
+        if: >-
+          steps.branch-head.outputs.is_current_main_head == 'true' &&
+          steps.source-artifact.outputs.has_production_artifact == 'true'
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Download production dist from Quality
-        if: steps.source-artifact.outputs.has_production_artifact == 'true'
+        if: >-
+          steps.branch-head.outputs.is_current_main_head == 'true' &&
+          steps.source-artifact.outputs.has_production_artifact == 'true'
         uses: actions/download-artifact@v5
         with:
           name: quality-production-dist
@@ -71,7 +114,9 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
 
       - name: Resolve production handoff identity
-        if: steps.source-artifact.outputs.has_production_artifact == 'true'
+        if: >-
+          steps.branch-head.outputs.is_current_main_head == 'true' &&
+          steps.source-artifact.outputs.has_production_artifact == 'true'
         id: handoff
         run: |
           build_time_utc="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
@@ -82,7 +127,9 @@ jobs:
           } >> "${GITHUB_OUTPUT}"
 
       - name: Add production artifact metadata
-        if: steps.source-artifact.outputs.has_production_artifact == 'true'
+        if: >-
+          steps.branch-head.outputs.is_current_main_head == 'true' &&
+          steps.source-artifact.outputs.has_production_artifact == 'true'
         run: |
           cat > dist/deploy-metadata.json <<EOF
           {
@@ -97,7 +144,9 @@ jobs:
           EOF
 
       - name: Upload production artifact
-        if: steps.source-artifact.outputs.has_production_artifact == 'true'
+        if: >-
+          steps.branch-head.outputs.is_current_main_head == 'true' &&
+          steps.source-artifact.outputs.has_production_artifact == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.handoff.outputs.artifact_name }}
@@ -106,7 +155,9 @@ jobs:
           path: dist
 
       - name: Verify production handoff outputs
-        if: steps.source-artifact.outputs.has_production_artifact == 'true'
+        if: >-
+          steps.branch-head.outputs.is_current_main_head == 'true' &&
+          steps.source-artifact.outputs.has_production_artifact == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
