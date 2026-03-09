@@ -293,7 +293,7 @@ test('allows selecting a OneDrive .db file from the settings browser', async ({ 
     'No DB file selected yet.',
   );
 
-  await page.getByRole('button', { name: 'Choose OneDrive DB file' }).click();
+  await page.getByRole('button', { name: 'Select DB File' }).click();
 
   await expect(page.getByTestId('db-file-browser')).toBeVisible();
   await expect(page.getByText('Finance')).toBeVisible();
@@ -326,7 +326,7 @@ test('keeps the selected DB file after reload', async ({ page }) => {
   await installMockGraphClient(page);
 
   await page.goto(appPath('#/settings'));
-  await page.getByRole('button', { name: 'Choose OneDrive DB file' }).click();
+  await page.getByRole('button', { name: 'Select DB File' }).click();
   await page.getByTestId('select-file-file-root-db').click();
 
   await expect(page.getByTestId('binding-status-message')).toContainText('DB file selected.');
@@ -351,7 +351,7 @@ test('shows browse errors without pretending the OneDrive folder is empty', asyn
 
   await page.goto(appPath('#/settings'));
 
-  await page.getByRole('button', { name: 'Choose OneDrive DB file' }).click();
+  await page.getByRole('button', { name: 'Select DB File' }).click();
 
   await expect(page.getByRole('alert')).toContainText('Mock OneDrive browse failure.');
   await expect(page.getByTestId('binding-status-message')).toContainText(

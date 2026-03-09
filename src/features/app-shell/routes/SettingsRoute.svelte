@@ -207,12 +207,10 @@
         on:click={handleBrowseClick}
         disabled={authOperationIsPending || bindingState.operation !== 'idle'}
       >
-        {bindingState.selectedBinding === null
-          ? 'Choose OneDrive DB file'
-          : 'Choose another DB file'}
+        Select DB File
       </button>
 
-      {#if bindingState.canGoBack}
+      {#if bindingState.selectedBinding === null && bindingState.canGoBack}
         <button
           class="settings-screen__button settings-screen__button--secondary"
           type="button"
@@ -237,7 +235,7 @@
       </dl>
     {/if}
 
-    {#if bindingState.browserIsOpen && bindingState.hasLoaded}
+    {#if bindingState.selectedBinding === null && bindingState.browserIsOpen && bindingState.hasLoaded}
       <section class="settings-screen__browser" data-testid="db-file-browser">
         <header class="settings-screen__browser-header">
           <h4>Current folder</h4>
