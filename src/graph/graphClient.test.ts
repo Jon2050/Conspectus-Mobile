@@ -204,6 +204,28 @@ describe('createGraphClient', () => {
     });
   });
 
+  it('maps JSON body read failures after a successful response to network_error', async () => {
+    const authClient = createAuthClient();
+    const response = new Response(null, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    const json = vi.fn(async () => {
+      throw new TypeError('body stream aborted');
+    });
+    Object.defineProperty(response, 'json', {
+      value: json,
+    });
+    const fetchFn = vi.fn(async () => response);
+    const client = createGraphClient({ authClient, fetchFn });
+
+    await expect(client.getFileMetadata(DRIVE_ITEM_BINDING)).rejects.toMatchObject({
+      code: 'network_error',
+    });
+  });
+
   it('rejects invalid metadata payloads with an unknown Graph error', async () => {
     const authClient = createAuthClient();
     const fetchFn = vi.fn(async () =>
@@ -217,6 +239,25 @@ describe('createGraphClient', () => {
     await expect(client.getFileMetadata(DRIVE_ITEM_BINDING)).rejects.toMatchObject({
       code: 'unknown',
       message: 'Microsoft Graph metadata response did not include the required file fields.',
+    });
+  });
+
+  it('maps arrayBuffer body read failures after a successful response to network_error', async () => {
+    const authClient = createAuthClient();
+    const response = new Response(null, {
+      status: 200,
+    });
+    const arrayBuffer = vi.fn(async () => {
+      throw new TypeError('body stream aborted');
+    });
+    Object.defineProperty(response, 'arrayBuffer', {
+      value: arrayBuffer,
+    });
+    const fetchFn = vi.fn(async () => response);
+    const client = createGraphClient({ authClient, fetchFn });
+
+    await expect(client.downloadFile(DRIVE_ITEM_BINDING)).rejects.toMatchObject({
+      code: 'network_error',
     });
   });
 
