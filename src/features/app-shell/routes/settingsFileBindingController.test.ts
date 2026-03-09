@@ -34,15 +34,15 @@ const ROOT_ITEMS: readonly GraphDriveItem[] = [
   ROOT_NON_DB_FILE_ITEM,
 ];
 
-const FINANCE_ITEMS: readonly GraphDriveItem[] = [
-  {
-    driveId: 'drive-123',
-    itemId: 'file-3',
-    name: 'budget.db',
-    parentPath: '/Finance',
-    kind: 'file',
-  },
-];
+const FINANCE_DB_FILE_ITEM: GraphDriveItem = {
+  driveId: 'drive-123',
+  itemId: 'file-3',
+  name: 'budget.db',
+  parentPath: '/Finance',
+  kind: 'file',
+};
+
+const FINANCE_ITEMS: readonly GraphDriveItem[] = [FINANCE_DB_FILE_ITEM];
 
 const createDeferred = <T>(): { promise: Promise<T>; resolve(value: T): void } => {
   let resolvePromise: (value: T) => void = () => {};
@@ -309,6 +309,37 @@ describe('settings file binding controller', () => {
     expect(controller.getState().items).toEqual([ROOT_FOLDER_ITEM, ROOT_DB_FILE_ITEM]);
     expect(controller.getState().hasLoaded).toBe(true);
     expect(controller.getState().canGoBack).toBe(false);
+  });
+
+  it('rebinds to a different database file from an already selected binding', async () => {
+    const controller = createSettingsFileBindingController(harness.graphClient, {
+      onBindingChange,
+    });
+
+    await controller.browseRoot();
+    controller.selectFile(ROOT_DB_FILE_ITEM);
+    await controller.browseRoot();
+    await controller.openFolder(ROOT_FOLDER_ITEM);
+    controller.selectFile(FINANCE_DB_FILE_ITEM);
+
+    expect(controller.getState().selectedBinding).toEqual({
+      driveId: 'drive-123',
+      itemId: 'file-3',
+      name: 'budget.db',
+      parentPath: '/Finance',
+    });
+    expect(onBindingChange).toHaveBeenNthCalledWith(1, {
+      driveId: 'drive-123',
+      itemId: 'file-1',
+      name: 'conspectus.db',
+      parentPath: '/',
+    });
+    expect(onBindingChange).toHaveBeenNthCalledWith(2, {
+      driveId: 'drive-123',
+      itemId: 'file-3',
+      name: 'budget.db',
+      parentPath: '/Finance',
+    });
   });
 
   it('captures graph browse failures as controller errors', async () => {

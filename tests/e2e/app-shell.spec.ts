@@ -45,6 +45,11 @@ type MockGraphClientOptions = {
   readonly failListChildren?: boolean;
 };
 
+type MockCacheStoreOptions = {
+  readonly failClearAll?: boolean;
+  readonly clearAllDelayMs?: number;
+};
+
 const installMockAuthClient = async (
   page: import('@playwright/test').Page,
   options: MockAuthClientOptions = {},
@@ -209,6 +214,38 @@ const installMockGraphClient = async (
   }, options);
 };
 
+const installMockCacheStore = async (
+  page: import('@playwright/test').Page,
+  options: MockCacheStoreOptions = {},
+): Promise<void> => {
+  await page.addInitScript((mockOptions: MockCacheStoreOptions) => {
+    let clearAllCallCount = 0;
+
+    (window as Window & { __CONSPECTUS_CACHE_STORE__?: unknown }).__CONSPECTUS_CACHE_STORE__ = {
+      async clearAll() {
+        clearAllCallCount += 1;
+        (
+          window as Window & { __CONSPECTUS_CACHE_CLEAR_ALL_CALL_COUNT__?: number }
+        ).__CONSPECTUS_CACHE_CLEAR_ALL_CALL_COUNT__ = clearAllCallCount;
+
+        if (typeof mockOptions.clearAllDelayMs === 'number' && mockOptions.clearAllDelayMs > 0) {
+          await new Promise((resolve) => {
+            setTimeout(resolve, mockOptions.clearAllDelayMs);
+          });
+        }
+
+        if (mockOptions.failClearAll) {
+          throw new Error('Mock cache clear failure.');
+        }
+      },
+    };
+
+    (
+      window as Window & { __CONSPECTUS_CACHE_CLEAR_ALL_CALL_COUNT__?: number }
+    ).__CONSPECTUS_CACHE_CLEAR_ALL_CALL_COUNT__ = clearAllCallCount;
+  }, options);
+};
+
 const getGraphListChildrenCallCount = async (
   page: import('@playwright/test').Page,
 ): Promise<number> =>
@@ -218,6 +255,16 @@ const getGraphListChildrenCallCount = async (
         __CONSPECTUS_GRAPH_LIST_CHILDREN_CALL_COUNT__?: unknown;
       }
     ).__CONSPECTUS_GRAPH_LIST_CHILDREN_CALL_COUNT__;
+    return typeof value === 'number' ? value : 0;
+  });
+
+const getCacheClearAllCallCount = async (page: import('@playwright/test').Page): Promise<number> =>
+  page.evaluate(() => {
+    const value = (
+      window as Window & {
+        __CONSPECTUS_CACHE_CLEAR_ALL_CALL_COUNT__?: unknown;
+      }
+    ).__CONSPECTUS_CACHE_CLEAR_ALL_CALL_COUNT__;
     return typeof value === 'number' ? value : 0;
   });
 
@@ -330,6 +377,7 @@ test('allows selecting a OneDrive .db file from the settings browser', async ({ 
   await expect(page.getByTestId('db-file-browser')).toHaveCount(0);
   await expect(page.getByTestId('selected-db-file-summary')).toContainText('budget.db');
   await expect(page.getByTestId('selected-db-file-summary')).toContainText('/Finance');
+  await expect(page.getByRole('button', { name: 'Change DB file' })).toBeVisible();
 
   await page.getByRole('link', { name: 'Accounts' }).click();
   await expect(page.getByRole('heading', { level: 2, name: 'Accounts' })).toBeVisible();
@@ -338,10 +386,14 @@ test('allows selecting a OneDrive .db file from the settings browser', async ({ 
   await expect(page.getByTestId('binding-status-message')).toContainText('DB file selected.');
   await expect(page.getByTestId('selected-db-file-summary')).toContainText('budget.db');
 
-  await page.getByRole('button', { name: 'Select DB File' }).click();
+  await page.getByRole('button', { name: 'Change DB file' }).click();
   await expect(page.getByTestId('db-file-browser')).toBeVisible();
   await expect(page.getByTestId('open-folder-folder-finance')).toBeVisible();
   await expect(page.getByTestId('select-file-file-root-db')).toBeVisible();
+
+  await page.getByTestId('select-file-file-root-db').click();
+  await expect(page.getByTestId('selected-db-file-summary')).toContainText('conspectus.db');
+  await expect(page.getByTestId('selected-db-file-summary')).toContainText('/');
 });
 
 test('keeps the selected DB file after reload', async ({ page }) => {
@@ -366,6 +418,55 @@ test('keeps the selected DB file after reload', async ({ page }) => {
   await expect(page.getByTestId('selected-db-file-summary')).toContainText('/');
   await expect(page.getByTestId('db-file-browser')).toHaveCount(0);
   expect(await getGraphListChildrenCallCount(page)).toBe(0);
+});
+
+test('resets local app data only after destructive confirmation', async ({ page }) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page);
+  await installMockCacheStore(page, {
+    clearAllDelayMs: 250,
+  });
+
+  await page.goto(appPath('#/settings'));
+  await page.getByRole('button', { name: 'Select DB File' }).click();
+  await page.getByTestId('select-file-file-root-db').click();
+  await expect(page.getByTestId('selected-db-file-summary')).toContainText('conspectus.db');
+
+  await page.getByTestId('reset-local-app-data-button').click();
+  await expect(page.getByTestId('reset-local-app-data-confirmation')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sign out' })).toBeDisabled();
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByTestId('reset-local-app-data-confirmation')).not.toBeVisible();
+  await expect(page.getByTestId('selected-db-file-summary')).toContainText('conspectus.db');
+  expect(await getCacheClearAllCallCount(page)).toBe(0);
+
+  await page.getByTestId('reset-local-app-data-button').click();
+  await page.getByTestId('confirm-reset-local-app-data-button').click();
+  await expect(page.getByTestId('reset-local-app-data-confirmation')).toContainText(
+    'Resetting local app data...',
+  );
+  await expect(page.getByRole('button', { name: 'Sign out' })).toBeDisabled();
+
+  await expect(page.getByTestId('reset-local-app-data-confirmation')).not.toBeVisible();
+  await expect(page.getByTestId('signed-in-account-summary')).toBeVisible();
+  await expect(page.getByTestId('binding-status-message')).toContainText(
+    'No DB file selected yet.',
+  );
+  await expect(page.getByTestId('selected-db-file-summary')).toHaveCount(0);
+  expect(await getCacheClearAllCallCount(page)).toBe(1);
+
+  const persistedBindingValue = await page.evaluate(() =>
+    window.localStorage.getItem('conspectus.selectedDriveItemBinding'),
+  );
+  expect(persistedBindingValue).toBeNull();
+
+  await page.reload();
+  await expect(page.getByTestId('binding-status-message')).toContainText(
+    'No DB file selected yet.',
+  );
+  await expect(page.getByTestId('selected-db-file-summary')).toHaveCount(0);
 });
 
 test('restores selected DB file after startup on a non-settings route', async ({ page }) => {

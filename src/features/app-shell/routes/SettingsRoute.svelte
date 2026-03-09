@@ -3,6 +3,7 @@
   import { onDestroy, onMount } from 'svelte';
   import { get } from 'svelte/store';
   import type { AuthClient } from '@auth';
+  import type { CacheStore } from '@cache';
   import type { GraphClient, GraphDriveItem } from '@graph';
   import { appSelectedDriveItemBindingStore } from '@shared';
 
@@ -15,10 +16,16 @@
     createSettingsFileBindingController,
     type SettingsFileBindingState,
   } from './settingsFileBindingController';
+  import {
+    createSettingsLocalDataController,
+    type SettingsLocalDataResetState,
+  } from './settingsLocalDataController';
   import { resolveSettingsAuthClient } from './settingsAuthClientResolver';
+  import { resolveSettingsCacheStore } from './settingsCacheStoreResolver';
   import { resolveSettingsGraphClient } from './settingsGraphClientResolver';
 
   export let authClient: AuthClient = resolveSettingsAuthClient();
+  export let cacheStore: Pick<CacheStore, 'clearAll'> = resolveSettingsCacheStore();
   export let graphClient: GraphClient = resolveSettingsGraphClient();
 
   let state: SettingsAuthState = {
@@ -42,6 +49,11 @@
     canGoBack: false,
   };
   let bindingStatusMessage = 'Sign in to browse and choose a .db file.';
+  let localDataResetState: SettingsLocalDataResetState = {
+    operation: 'idle',
+    error: null,
+  };
+  let localDataResetDialogElement: HTMLDialogElement | null = null;
 
   const statusMessageByOperation: Record<SettingsAuthOperation, string> = {
     initializing: 'Checking authentication status...',
@@ -103,6 +115,12 @@
       appSelectedDriveItemBindingStore.setBinding(binding);
     },
   });
+  const localDataController = createSettingsLocalDataController(cacheStore, {
+    onLocalDataReset: () => {
+      appSelectedDriveItemBindingStore.clear();
+      fileBindingController.reset();
+    },
+  });
   const unsubscribe = authController.subscribe((nextState) => {
     const previousAccountId = state.session.account?.homeAccountId ?? null;
     const wasAuthenticated = state.session.isAuthenticated;
@@ -119,6 +137,7 @@
 
     if (!nextState.session.isAuthenticated) {
       appSelectedDriveItemBindingStore.setActiveAccountId(null);
+      localDataController.cancelReset();
     }
 
     if (wasAuthenticated && !nextState.session.isAuthenticated) {
@@ -128,6 +147,9 @@
   const unsubscribeFileBinding = fileBindingController.subscribe((nextState) => {
     bindingState = nextState;
     bindingStatusMessage = buildBindingStatusMessage(nextState);
+  });
+  const unsubscribeLocalDataReset = localDataController.subscribe((nextState) => {
+    localDataResetState = nextState;
   });
 
   const handleSignInClick = (): void => {
@@ -140,6 +162,22 @@
 
   const handleBrowseClick = (): void => {
     void fileBindingController.browseRoot();
+  };
+  const handleRequestLocalResetClick = (): void => {
+    localDataController.requestReset();
+  };
+
+  const handleCancelLocalResetClick = (): void => {
+    localDataController.cancelReset();
+  };
+
+  const handleConfirmLocalResetClick = (): void => {
+    void localDataController.confirmReset();
+  };
+
+  const handleLocalResetDialogCancel = (event: Event): void => {
+    event.preventDefault();
+    localDataController.cancelReset();
   };
 
   const handleBackClick = (): void => {
@@ -154,6 +192,16 @@
     fileBindingController.selectFile(item);
   };
 
+  $: if (localDataResetDialogElement !== null) {
+    if (localDataResetState.operation === 'idle') {
+      if (localDataResetDialogElement.open) {
+        localDataResetDialogElement.close();
+      }
+    } else if (!localDataResetDialogElement.open) {
+      localDataResetDialogElement.showModal();
+    }
+  }
+
   onMount(() => {
     void authController.initialize();
   });
@@ -161,6 +209,7 @@
   onDestroy(() => {
     unsubscribe();
     unsubscribeFileBinding();
+    unsubscribeLocalDataReset();
   });
 </script>
 
@@ -215,9 +264,11 @@
         class="settings-screen__button settings-screen__button--primary"
         type="button"
         on:click={handleBrowseClick}
-        disabled={authOperationIsPending || bindingState.operation !== 'idle'}
+        disabled={authOperationIsPending ||
+          bindingState.operation !== 'idle' ||
+          localDataResetState.operation !== 'idle'}
       >
-        Select DB File
+        {bindingState.selectedBinding === null ? 'Select DB File' : 'Change DB file'}
       </button>
 
       {#if bindingState.browserIsOpen && bindingState.canGoBack}
@@ -231,6 +282,66 @@
         </button>
       {/if}
     </div>
+
+    <div class="settings-screen__actions">
+      <button
+        class="settings-screen__button settings-screen__button--danger"
+        type="button"
+        data-testid="reset-local-app-data-button"
+        on:click={handleRequestLocalResetClick}
+        disabled={authOperationIsPending ||
+          bindingState.operation !== 'idle' ||
+          localDataResetState.operation !== 'idle'}
+      >
+        Reset local app data
+      </button>
+    </div>
+
+    <dialog
+      bind:this={localDataResetDialogElement}
+      class="settings-screen__confirmation"
+      aria-labelledby="reset-local-data-title"
+      data-testid="reset-local-app-data-confirmation"
+      on:cancel={handleLocalResetDialogCancel}
+    >
+      <h4 id="reset-local-data-title">Reset local app data?</h4>
+      <p>
+        This clears local DB file binding and cached app data on this device for the signed-in
+        account.
+      </p>
+
+      {#if localDataResetState.error !== null}
+        <p class="settings-screen__confirmation-error" role="alert">
+          {localDataResetState.error.message}
+        </p>
+      {/if}
+
+      {#if localDataResetState.operation === 'resetting'}
+        <p class="settings-screen__confirmation-status" aria-live="polite">
+          Resetting local app data...
+        </p>
+      {/if}
+
+      <div class="settings-screen__actions">
+        <button
+          class="settings-screen__button settings-screen__button--secondary"
+          type="button"
+          on:click={handleCancelLocalResetClick}
+          disabled={localDataResetState.operation === 'resetting'}
+        >
+          Cancel
+        </button>
+        <button
+          class="settings-screen__button settings-screen__button--danger"
+          type="button"
+          data-testid="confirm-reset-local-app-data-button"
+          on:click={handleConfirmLocalResetClick}
+          disabled={localDataResetState.operation === 'resetting'}
+        >
+          Confirm reset
+        </button>
+      </div>
+    </dialog>
 
     {#if bindingState.selectedBinding !== null}
       <dl class="settings-screen__binding-summary" data-testid="selected-db-file-summary">
@@ -309,7 +420,7 @@
         class="settings-screen__button settings-screen__button--secondary"
         type="button"
         on:click={handleSignOutClick}
-        disabled={authOperationIsPending}
+        disabled={authOperationIsPending || localDataResetState.operation !== 'idle'}
       >
         Sign out
       </button>
@@ -432,6 +543,45 @@
     color: var(--text-primary);
     background: var(--surface);
     border-color: var(--border);
+  }
+
+  .settings-screen__button--danger {
+    color: #ffffff;
+    background: color-mix(in srgb, var(--error) 92%, black);
+    border-color: color-mix(in srgb, var(--error) 55%, black);
+  }
+
+  .settings-screen__confirmation {
+    display: grid;
+    gap: 0.65rem;
+    width: min(32rem, calc(100vw - 2rem));
+    max-width: 100%;
+    margin: auto;
+    padding: 0.8rem;
+    border: 1px solid color-mix(in srgb, var(--error) 40%, var(--border));
+    border-radius: 0.9rem;
+    background: #fff2f2;
+  }
+
+  .settings-screen__confirmation:not([open]) {
+    display: none;
+  }
+
+  .settings-screen__confirmation::backdrop {
+    background: color-mix(in srgb, black 40%, transparent);
+  }
+
+  .settings-screen__confirmation h4,
+  .settings-screen__confirmation p {
+    margin: 0;
+  }
+
+  .settings-screen__confirmation-status {
+    color: var(--text-secondary);
+  }
+
+  .settings-screen__confirmation-error {
+    color: #7d1111;
   }
 
   .settings-screen__browser {

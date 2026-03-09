@@ -372,6 +372,13 @@ M3-07 implementation clarification:
 - Startup binding hydration is triggered at app initialization in `src/features/app-shell/AppShell.svelte` and synchronized through `src/features/app-shell/startupBindingSync.ts`, so the active account binding is resolved before entering Settings.
 - Legacy persisted payloads from pre-versioned and v1 single-binding formats are migrated on read into the current schema during hydration.
 
+M3-08 implementation clarification:
+
+- Settings now exposes explicit DB rebind and local reset actions in `src/features/app-shell/routes/SettingsRoute.svelte`: `Change DB file` (when a binding exists) and `Reset local app data`.
+- Destructive local reset behavior is orchestrated by `src/features/app-shell/routes/settingsLocalDataController.ts` with explicit confirmation state, in-flight protection, and surfaced failure messaging.
+- Reset execution is wired through `src/features/app-shell/routes/settingsCacheStoreResolver.ts`, which clears app-owned local storage/session storage keys, service-worker cache entries with `conspectus` naming, and IndexedDB databases matching `conspectus` before binding removal completes.
+- The reset confirmation is rendered as a modal `dialog` and blocks sign-out/reset/rebind controls while confirmation or reset is active to prevent account-context race conditions during binding clearance.
+
 Deliverables:
 
 - Stable login flow with persisted session where possible.

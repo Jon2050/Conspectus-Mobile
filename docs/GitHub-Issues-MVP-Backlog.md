@@ -276,7 +276,7 @@ An issue is only considered done when:
 - Depends on: `M3-06`
 - GitHub: [#41](https://github.com/Jon2050/Conspectus-Mobile/issues/41)
 
-### :green_circle: M3-08 Add settings actions for rebind and local reset
+### :white_check_mark: M3-08 Add settings actions for rebind and local reset
 
 - Label: `feature`
 - Milestone: `M3 - Auth + OneDrive Binding`
