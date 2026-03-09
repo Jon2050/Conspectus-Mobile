@@ -365,6 +365,13 @@ M3-06 implementation clarification:
 - The file browser surfaces folders plus `.db` files only, and validated selections return `driveId`, `itemId`, `name`, and `parentPath` for later persistence/recovery work.
 - File selection state is session-local in M3-06; durable storage of the selected binding remains scoped to `M3-07`.
 
+M3-07 implementation clarification:
+
+- Durable file binding persistence is implemented in `src/shared/state/selectedDriveItemBindingStore.ts` with schema-versioned local metadata payloads (`version` field).
+- Current payload schema stores bindings per authenticated account (`bindingsByAccountId`) so account switches do not overwrite previously persisted bindings for other accounts on the same device/profile.
+- Startup binding hydration is triggered at app initialization in `src/features/app-shell/AppShell.svelte` and synchronized through `src/features/app-shell/startupBindingSync.ts`, so the active account binding is resolved before entering Settings.
+- Legacy persisted payloads from pre-versioned and v1 single-binding formats are migrated on read into the current schema during hydration.
+
 Deliverables:
 
 - Stable login flow with persisted session where possible.

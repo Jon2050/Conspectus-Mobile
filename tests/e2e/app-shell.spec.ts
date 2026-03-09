@@ -131,6 +131,7 @@ const installMockGraphClient = async (
   options: MockGraphClientOptions = {},
 ): Promise<void> => {
   await page.addInitScript((mockOptions: MockGraphClientOptions) => {
+    let listChildrenCallCount = 0;
     const rootItems = [
       {
         driveId: 'drive-123',
@@ -167,6 +168,10 @@ const installMockGraphClient = async (
 
     (window as Window & { __CONSPECTUS_GRAPH_CLIENT__?: unknown }).__CONSPECTUS_GRAPH_CLIENT__ = {
       async listChildren(folder?: { itemId?: string }) {
+        listChildrenCallCount += 1;
+        (
+          window as Window & { __CONSPECTUS_GRAPH_LIST_CHILDREN_CALL_COUNT__?: number }
+        ).__CONSPECTUS_GRAPH_LIST_CHILDREN_CALL_COUNT__ = listChildrenCallCount;
         if (mockOptions.failListChildren) {
           throw {
             code: 'network_error',
@@ -198,8 +203,23 @@ const installMockGraphClient = async (
         };
       },
     };
+    (
+      window as Window & { __CONSPECTUS_GRAPH_LIST_CHILDREN_CALL_COUNT__?: number }
+    ).__CONSPECTUS_GRAPH_LIST_CHILDREN_CALL_COUNT__ = listChildrenCallCount;
   }, options);
 };
+
+const getGraphListChildrenCallCount = async (
+  page: import('@playwright/test').Page,
+): Promise<number> =>
+  page.evaluate(() => {
+    const value = (
+      window as Window & {
+        __CONSPECTUS_GRAPH_LIST_CHILDREN_CALL_COUNT__?: unknown;
+      }
+    ).__CONSPECTUS_GRAPH_LIST_CHILDREN_CALL_COUNT__;
+    return typeof value === 'number' ? value : 0;
+  });
 
 test('shows startup configuration error when required runtime env is missing', async ({ page }) => {
   await page.route('**/*.js', async (route) => {
@@ -333,6 +353,7 @@ test('keeps the selected DB file after reload', async ({ page }) => {
   await page.goto(appPath('#/settings'));
   await page.getByRole('button', { name: 'Select DB File' }).click();
   await page.getByTestId('select-file-file-root-db').click();
+  expect(await getGraphListChildrenCallCount(page)).toBe(1);
 
   await expect(page.getByTestId('binding-status-message')).toContainText('DB file selected.');
   await expect(page.getByTestId('selected-db-file-summary')).toContainText('conspectus.db');
@@ -344,6 +365,29 @@ test('keeps the selected DB file after reload', async ({ page }) => {
   await expect(page.getByTestId('selected-db-file-summary')).toContainText('conspectus.db');
   await expect(page.getByTestId('selected-db-file-summary')).toContainText('/');
   await expect(page.getByTestId('db-file-browser')).toHaveCount(0);
+  expect(await getGraphListChildrenCallCount(page)).toBe(0);
+});
+
+test('restores selected DB file after startup on a non-settings route', async ({ page }) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page);
+
+  await page.goto(appPath('#/settings'));
+  await page.getByRole('button', { name: 'Select DB File' }).click();
+  await page.getByTestId('select-file-file-root-db').click();
+
+  await page.getByRole('link', { name: 'Accounts' }).click();
+  await expect(page.getByRole('heading', { level: 2, name: 'Accounts' })).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByRole('heading', { level: 2, name: 'Accounts' })).toBeVisible();
+  expect(await getGraphListChildrenCallCount(page)).toBe(0);
+
+  await page.getByRole('link', { name: 'Settings' }).click();
+  await expect(page.getByTestId('binding-status-message')).toContainText('DB file selected.');
+  await expect(page.getByTestId('selected-db-file-summary')).toContainText('conspectus.db');
 });
 
 test('shows browse errors without pretending the OneDrive folder is empty', async ({ page }) => {
