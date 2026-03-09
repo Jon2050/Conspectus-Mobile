@@ -156,6 +156,10 @@ const normalizeAuthError = (error: unknown): GraphClientError => {
 const normalizeNetworkError = (error: unknown): GraphClientError =>
   new GraphClientError('network_error', getDefaultErrorMessage('network_error'), undefined, error);
 
+const isSyntaxError = (error: unknown): boolean =>
+  error instanceof SyntaxError ||
+  (isObject(error) && (error as { name?: unknown }).name === 'SyntaxError');
+
 const normalizeHttpError = async (response: Response): Promise<GraphClientError> => {
   let payload: unknown = null;
 
@@ -184,7 +188,11 @@ const readJsonPayload = async (
   try {
     return await response.json();
   } catch (error) {
-    throw new GraphClientError('unknown', invalidResponseMessage, response.status, error);
+    if (isSyntaxError(error)) {
+      throw new GraphClientError('unknown', invalidResponseMessage, response.status, error);
+    }
+
+    throw normalizeNetworkError(error);
   }
 };
 
@@ -263,8 +271,12 @@ export const createGraphClient = (options: CreateGraphClientOptions): GraphClien
 
     async downloadFile(binding): Promise<Uint8Array> {
       const response = await executeRequest(buildDriveItemUrl(binding, '/content'));
-      const arrayBuffer = await response.arrayBuffer();
-      return new Uint8Array(arrayBuffer);
+      try {
+        const arrayBuffer = await response.arrayBuffer();
+        return new Uint8Array(arrayBuffer);
+      } catch (error) {
+        throw normalizeNetworkError(error);
+      }
     },
 
     async uploadFile(binding, bytes, expectedETag): Promise<GraphUploadResult> {
