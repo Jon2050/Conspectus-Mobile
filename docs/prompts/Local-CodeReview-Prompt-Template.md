@@ -26,7 +26,7 @@ Resolves Issues / Description: {{ISSUE_NUMBERS_OR_DESCRIPTION}}
 - **Test Coverage:** Check if new tests were added or existing tests updated. Flag it if missing but reasonably required for the changes.
 - **Strictly Forbidden AI Anti-Patterns (Reject if found):**
   - Placeholder code (e.g., `TODO`, `pass`, `// implement here`) instead of actual logic.
-  - Improper Commenting: Code must be self-explanatory. Reject excessive/robotic comments and comments masking bad logic (request refactor). Complex logic, however, must include meaningful comments.
+  - Improper Commenting: Code must be self-explanatory. Reject excessive/robotic comments and comments masking bad logic (request refactor). Complex logic, however, must include meaningful comments. Every file should start with a short description of what the file does and why it is needed.
   - Unnecessary duplication, redundant fallbacks, over-complicated code, or hardcoded fallback values.
 
 # Code Quality & Architecture
