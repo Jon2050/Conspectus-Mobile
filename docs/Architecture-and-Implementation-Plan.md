@@ -358,6 +358,13 @@ M3-05 implementation clarification:
 - Every Graph request acquires a bearer token from `@auth` using `GRAPH_ONEDRIVE_FILE_SCOPES`, keeping MSAL details out of the graph module surface.
 - Graph/auth failures are normalized into stable app-level graph error codes (`unauthorized`, `forbidden`, `not_found`, `conflict`, `network_error`, `unknown`) for UI and sync-layer handling.
 
+M3-06 implementation clarification:
+
+- OneDrive DB file browsing/selection is implemented in `src/features/app-shell/routes/settingsFileBindingController.ts` and `src/features/app-shell/routes/SettingsRoute.svelte`.
+- The Settings flow uses the Graph client browse surface (`listChildren`) to open the root folder and navigate child folders without adding an external picker dependency.
+- The file browser surfaces folders plus `.db` files only, and validated selections return `driveId`, `itemId`, `name`, and `parentPath` for later persistence/recovery work.
+- File selection state is session-local in M3-06; durable storage of the selected binding remains scoped to `M3-07`.
+
 Deliverables:
 
 - Stable login flow with persisted session where possible.

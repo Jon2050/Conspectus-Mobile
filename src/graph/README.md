@@ -14,9 +14,10 @@ Dependency boundaries:
 Expected public interfaces (`src/graph/index.ts`):
 
 - `DriveItemBinding`: stored identity for the selected OneDrive database file.
+- `DriveFolderReference` and `GraphDriveItem`: typed OneDrive browse models for folder/file selection.
 - `GraphFileMetadata`: eTag/size/modified metadata used by sync decisions.
 - `GraphUploadResult`: post-upload metadata returned from Graph.
-- `GraphClient`: metadata, download, and conditional-upload operations.
+- `GraphClient`: browse, metadata, download, and conditional-upload operations.
 - `createGraphClient`: factory that injects auth-backed bearer tokens into Graph requests.
 - `GraphErrorCode` and `GraphError`: normalized failure model for UI/services.
 
