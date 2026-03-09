@@ -55,8 +55,10 @@ describe('createSelectedDriveItemBindingStore', () => {
     expect(get(store)).toEqual(binding);
     expect(values[storageKey]).toBe(
       JSON.stringify({
-        accountId: 'account-1',
-        binding,
+        version: 2,
+        bindingsByAccountId: {
+          'account-1': binding,
+        },
       }),
     );
 
@@ -75,8 +77,10 @@ describe('createSelectedDriveItemBindingStore', () => {
       parentPath: '/Finance',
     } as const;
     values[storageKey] = JSON.stringify({
-      accountId: 'account-1',
-      binding,
+      version: 2,
+      bindingsByAccountId: {
+        'account-1': binding,
+      },
     });
 
     const store = createSelectedDriveItemBindingStore(null, {
@@ -92,12 +96,14 @@ describe('createSelectedDriveItemBindingStore', () => {
     const { storage, values } = createMemoryStorage();
     const storageKey = 'binding-key';
     values[storageKey] = JSON.stringify({
-      accountId: 'account-1',
-      binding: {
-        driveId: 'drive-123',
-        itemId: '',
-        name: 'conspectus.db',
-        parentPath: '/Finance',
+      version: 2,
+      bindingsByAccountId: {
+        'account-1': {
+          driveId: 'drive-123',
+          itemId: '',
+          name: 'conspectus.db',
+          parentPath: '/Finance',
+        },
       },
     });
 
@@ -120,8 +126,10 @@ describe('createSelectedDriveItemBindingStore', () => {
       parentPath: '/Finance',
     } as const;
     values[storageKey] = JSON.stringify({
-      accountId: 'account-1',
-      binding,
+      version: 2,
+      bindingsByAccountId: {
+        'account-1': binding,
+      },
     });
 
     const store = createSelectedDriveItemBindingStore(null, {
@@ -137,12 +145,14 @@ describe('createSelectedDriveItemBindingStore', () => {
     const { storage, values } = createMemoryStorage();
     const storageKey = 'binding-key';
     values[storageKey] = JSON.stringify({
-      accountId: 'account-1',
-      binding: {
-        driveId: 'drive-123',
-        itemId: 'item-456',
-        name: 'conspectus.db',
-        parentPath: '/Finance',
+      version: 2,
+      bindingsByAccountId: {
+        'account-1': {
+          driveId: 'drive-123',
+          itemId: 'item-456',
+          name: 'conspectus.db',
+          parentPath: '/Finance',
+        },
       },
     });
     const store = createSelectedDriveItemBindingStore(null, {
@@ -161,5 +171,125 @@ describe('createSelectedDriveItemBindingStore', () => {
       name: 'conspectus.db',
       parentPath: '/Finance',
     });
+  });
+
+  it('hydrates legacy unversioned payloads to preserve existing local bindings', () => {
+    const { storage, values } = createMemoryStorage();
+    const storageKey = 'binding-key';
+    values[storageKey] = JSON.stringify({
+      accountId: 'account-1',
+      binding: {
+        driveId: 'drive-123',
+        itemId: 'item-456',
+        name: 'conspectus.db',
+        parentPath: '/Finance',
+      },
+    });
+
+    const store = createSelectedDriveItemBindingStore(null, {
+      storage,
+      storageKey,
+      initialActiveAccountId: 'account-1',
+    });
+
+    expect(get(store)).toEqual({
+      driveId: 'drive-123',
+      itemId: 'item-456',
+      name: 'conspectus.db',
+      parentPath: '/Finance',
+    });
+  });
+
+  it('hydrates legacy v1 payloads to preserve existing local bindings', () => {
+    const { storage, values } = createMemoryStorage();
+    const storageKey = 'binding-key';
+    values[storageKey] = JSON.stringify({
+      version: 1,
+      accountId: 'account-1',
+      binding: {
+        driveId: 'drive-123',
+        itemId: 'item-456',
+        name: 'conspectus.db',
+        parentPath: '/Finance',
+      },
+    });
+
+    const store = createSelectedDriveItemBindingStore(null, {
+      storage,
+      storageKey,
+      initialActiveAccountId: 'account-1',
+    });
+
+    expect(get(store)).toEqual({
+      driveId: 'drive-123',
+      itemId: 'item-456',
+      name: 'conspectus.db',
+      parentPath: '/Finance',
+    });
+  });
+
+  it('ignores persisted payloads with unsupported schema versions', () => {
+    const { storage, values } = createMemoryStorage();
+    const storageKey = 'binding-key';
+    values[storageKey] = JSON.stringify({
+      version: 99,
+      bindingsByAccountId: {
+        'account-1': {
+          driveId: 'drive-123',
+          itemId: 'item-456',
+          name: 'conspectus.db',
+          parentPath: '/Finance',
+        },
+      },
+    });
+
+    const store = createSelectedDriveItemBindingStore(null, {
+      storage,
+      storageKey,
+      initialActiveAccountId: 'account-1',
+    });
+
+    expect(get(store)).toBeNull();
+  });
+
+  it('keeps separate bindings per account in storage', () => {
+    const { storage, values } = createMemoryStorage();
+    const storageKey = 'binding-key';
+    const store = createSelectedDriveItemBindingStore(null, {
+      storage,
+      storageKey,
+      initialActiveAccountId: 'account-1',
+    });
+    const bindingOne = {
+      driveId: 'drive-123',
+      itemId: 'item-1',
+      name: 'first.db',
+      parentPath: '/Finance',
+    } as const;
+    const bindingTwo = {
+      driveId: 'drive-123',
+      itemId: 'item-2',
+      name: 'second.db',
+      parentPath: '/Private',
+    } as const;
+
+    store.setBinding(bindingOne);
+    store.setActiveAccountId('account-2');
+    store.setBinding(bindingTwo);
+
+    expect(get(store)).toEqual(bindingTwo);
+
+    store.setActiveAccountId('account-1');
+    expect(get(store)).toEqual(bindingOne);
+
+    expect(values[storageKey]).toBe(
+      JSON.stringify({
+        version: 2,
+        bindingsByAccountId: {
+          'account-1': bindingOne,
+          'account-2': bindingTwo,
+        },
+      }),
+    );
   });
 });

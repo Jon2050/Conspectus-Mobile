@@ -1,13 +1,15 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
   import type { Readable } from 'svelte/store';
+  import { appSelectedDriveItemBindingStore } from '@shared';
   import LoadingPlaceholder from './components/LoadingPlaceholder.svelte';
   import AccountsRoute from './routes/AccountsRoute.svelte';
   import TransfersRoute from './routes/TransfersRoute.svelte';
   import AddRoute from './routes/AddRoute.svelte';
   import SettingsRoute from './routes/SettingsRoute.svelte';
-  import { initializeAppAuthClient } from './authClientResolver';
+  import { initializeAppAuthClient, resolveAppAuthClient } from './authClientResolver';
   import { APP_ROUTES, createHashRouteStore, DEFAULT_ROUTE, type AppRouteKey } from './hashRouting';
+  import { syncSelectedDriveItemBindingStoreAtStartup } from './startupBindingSync';
 
   export let routeStore: Readable<AppRouteKey> = createHashRouteStore();
   export let loadingDelayMs = 160;
@@ -19,9 +21,16 @@
   });
 
   onMount(() => {
-    void initializeAppAuthClient().catch((error) => {
-      console.warn('Auth bootstrap initialization failed at app-shell startup.', error);
-    });
+    void (async () => {
+      try {
+        await initializeAppAuthClient();
+        const authSession = resolveAppAuthClient().getSession();
+        syncSelectedDriveItemBindingStoreAtStartup(authSession, appSelectedDriveItemBindingStore);
+      } catch (error) {
+        console.warn('Auth bootstrap initialization failed at app-shell startup.', error);
+        appSelectedDriveItemBindingStore.setActiveAccountId(null);
+      }
+    })();
 
     if (!showLoadingPlaceholder || loadingDelayMs <= 0) {
       showLoadingPlaceholder = false;

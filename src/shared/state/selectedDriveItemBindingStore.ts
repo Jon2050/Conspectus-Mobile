@@ -21,7 +21,15 @@ interface CreateSelectedDriveItemBindingStoreOptions {
 }
 
 const DEFAULT_STORAGE_KEY = 'conspectus.selectedDriveItemBinding';
+const LEGACY_PERSISTED_BINDING_SCHEMA_VERSION = 1;
+const PERSISTED_BINDING_SCHEMA_VERSION = 2;
+
 interface PersistedBindingPayload {
+  readonly version: typeof PERSISTED_BINDING_SCHEMA_VERSION;
+  readonly bindingsByAccountId: Record<string, DriveItemBinding>;
+}
+
+interface LegacyPersistedBindingPayload {
   readonly accountId: string;
   readonly binding: DriveItemBinding;
 }
@@ -40,11 +48,58 @@ const isDriveItemBinding = (value: unknown): value is DriveItemBinding =>
   value.name.trim().length > 0 &&
   value.parentPath.trim().length > 0;
 
-const isPersistedBindingPayload = (value: unknown): value is PersistedBindingPayload =>
+const isLegacyPersistedBindingPayload = (value: unknown): value is LegacyPersistedBindingPayload =>
   isRecord(value) &&
   typeof value.accountId === 'string' &&
   value.accountId.trim().length > 0 &&
   isDriveItemBinding(value.binding);
+
+const isBindingsByAccountIdRecord = (value: unknown): value is Record<string, DriveItemBinding> => {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return Object.entries(value).every(([accountId, binding]) => {
+    return accountId.trim().length > 0 && isDriveItemBinding(binding);
+  });
+};
+
+const parsePersistedBindingPayload = (value: unknown): PersistedBindingPayload | null => {
+  if (isRecord(value) && value.version === PERSISTED_BINDING_SCHEMA_VERSION) {
+    if (!isBindingsByAccountIdRecord(value.bindingsByAccountId)) {
+      return null;
+    }
+
+    return {
+      version: PERSISTED_BINDING_SCHEMA_VERSION,
+      bindingsByAccountId: value.bindingsByAccountId,
+    };
+  }
+
+  if (isRecord(value) && value.version === LEGACY_PERSISTED_BINDING_SCHEMA_VERSION) {
+    if (!isLegacyPersistedBindingPayload(value)) {
+      return null;
+    }
+
+    return {
+      version: PERSISTED_BINDING_SCHEMA_VERSION,
+      bindingsByAccountId: {
+        [value.accountId]: value.binding,
+      },
+    };
+  }
+
+  if (isLegacyPersistedBindingPayload(value)) {
+    return {
+      version: PERSISTED_BINDING_SCHEMA_VERSION,
+      bindingsByAccountId: {
+        [value.accountId]: value.binding,
+      },
+    };
+  }
+
+  return null;
+};
 
 const normalizeAccountId = (accountId: string | null | undefined): string | null => {
   if (accountId === null || accountId === undefined) {
@@ -78,12 +133,12 @@ const loadStoredBinding = (
       return null;
     }
 
-    const parsedValue: unknown = JSON.parse(rawValue);
-    if (!isPersistedBindingPayload(parsedValue)) {
+    const parsedValue = parsePersistedBindingPayload(JSON.parse(rawValue));
+    if (parsedValue === null) {
       return null;
     }
 
-    return parsedValue.accountId === accountId ? parsedValue.binding : null;
+    return parsedValue.bindingsByAccountId[accountId] ?? null;
   } catch {
     return null;
   }
@@ -99,13 +154,24 @@ export const createSelectedDriveItemBindingStore = (
   const persistedBinding = loadStoredBinding(storage, storageKey, activeAccountId);
   const { subscribe, set } = writable<DriveItemBinding | null>(initialBinding ?? persistedBinding);
 
-  const persistBinding = (binding: DriveItemBinding | null): void => {
+  const persistActiveAccountBinding = (binding: DriveItemBinding | null): void => {
     if (storage === null || activeAccountId === null) {
       return;
     }
 
     try {
+      const existingPayload = parsePersistedBindingPayload(
+        JSON.parse(storage.getItem(storageKey) ?? 'null'),
+      );
+      const bindingsByAccountId = { ...(existingPayload?.bindingsByAccountId ?? {}) };
+
       if (binding === null) {
+        delete bindingsByAccountId[activeAccountId];
+      } else {
+        bindingsByAccountId[activeAccountId] = binding;
+      }
+
+      if (Object.keys(bindingsByAccountId).length === 0) {
         storage.removeItem(storageKey);
         return;
       }
@@ -113,8 +179,8 @@ export const createSelectedDriveItemBindingStore = (
       storage.setItem(
         storageKey,
         JSON.stringify({
-          accountId: activeAccountId,
-          binding,
+          version: PERSISTED_BINDING_SCHEMA_VERSION,
+          bindingsByAccountId,
         } satisfies PersistedBindingPayload),
       );
     } catch {
@@ -129,11 +195,11 @@ export const createSelectedDriveItemBindingStore = (
       set(loadStoredBinding(storage, storageKey, activeAccountId));
     },
     setBinding: (binding) => {
-      persistBinding(binding);
+      persistActiveAccountBinding(binding);
       set(activeAccountId === null ? null : binding);
     },
     clear: () => {
-      persistBinding(null);
+      persistActiveAccountBinding(null);
       set(null);
     },
   };
