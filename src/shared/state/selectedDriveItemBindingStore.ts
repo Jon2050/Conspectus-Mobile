@@ -3,6 +3,7 @@ import { writable, type Readable } from 'svelte/store';
 import type { DriveItemBinding } from '@graph';
 
 export interface SelectedDriveItemBindingStore extends Readable<DriveItemBinding | null> {
+  setActiveAccountId(accountId: string | null): void;
   setBinding(binding: DriveItemBinding): void;
   clear(): void;
 }
@@ -16,9 +17,14 @@ interface StorageAdapter {
 interface CreateSelectedDriveItemBindingStoreOptions {
   readonly storageKey?: string;
   readonly storage?: StorageAdapter | null;
+  readonly initialActiveAccountId?: string | null;
 }
 
 const DEFAULT_STORAGE_KEY = 'conspectus.selectedDriveItemBinding';
+interface PersistedBindingPayload {
+  readonly accountId: string;
+  readonly binding: DriveItemBinding;
+}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -34,6 +40,21 @@ const isDriveItemBinding = (value: unknown): value is DriveItemBinding =>
   value.name.trim().length > 0 &&
   value.parentPath.trim().length > 0;
 
+const isPersistedBindingPayload = (value: unknown): value is PersistedBindingPayload =>
+  isRecord(value) &&
+  typeof value.accountId === 'string' &&
+  value.accountId.trim().length > 0 &&
+  isDriveItemBinding(value.binding);
+
+const normalizeAccountId = (accountId: string | null | undefined): string | null => {
+  if (accountId === null || accountId === undefined) {
+    return null;
+  }
+
+  const trimmedAccountId = accountId.trim();
+  return trimmedAccountId.length > 0 ? trimmedAccountId : null;
+};
+
 const resolveDefaultStorage = (): StorageAdapter | null => {
   if (typeof window === 'undefined') {
     return null;
@@ -45,8 +66,9 @@ const resolveDefaultStorage = (): StorageAdapter | null => {
 const loadStoredBinding = (
   storage: StorageAdapter | null,
   storageKey: string,
+  accountId: string | null,
 ): DriveItemBinding | null => {
-  if (storage === null) {
+  if (storage === null || accountId === null) {
     return null;
   }
 
@@ -57,7 +79,11 @@ const loadStoredBinding = (
     }
 
     const parsedValue: unknown = JSON.parse(rawValue);
-    return isDriveItemBinding(parsedValue) ? parsedValue : null;
+    if (!isPersistedBindingPayload(parsedValue)) {
+      return null;
+    }
+
+    return parsedValue.accountId === accountId ? parsedValue.binding : null;
   } catch {
     return null;
   }
@@ -69,11 +95,12 @@ export const createSelectedDriveItemBindingStore = (
 ): SelectedDriveItemBindingStore => {
   const storageKey = options.storageKey ?? DEFAULT_STORAGE_KEY;
   const storage = options.storage ?? resolveDefaultStorage();
-  const persistedBinding = loadStoredBinding(storage, storageKey);
+  let activeAccountId = normalizeAccountId(options.initialActiveAccountId);
+  const persistedBinding = loadStoredBinding(storage, storageKey, activeAccountId);
   const { subscribe, set } = writable<DriveItemBinding | null>(initialBinding ?? persistedBinding);
 
   const persistBinding = (binding: DriveItemBinding | null): void => {
-    if (storage === null) {
+    if (storage === null || activeAccountId === null) {
       return;
     }
 
@@ -83,7 +110,13 @@ export const createSelectedDriveItemBindingStore = (
         return;
       }
 
-      storage.setItem(storageKey, JSON.stringify(binding));
+      storage.setItem(
+        storageKey,
+        JSON.stringify({
+          accountId: activeAccountId,
+          binding,
+        } satisfies PersistedBindingPayload),
+      );
     } catch {
       // Persistence failures should not block in-memory state updates.
     }
@@ -91,9 +124,13 @@ export const createSelectedDriveItemBindingStore = (
 
   return {
     subscribe,
+    setActiveAccountId: (accountId) => {
+      activeAccountId = normalizeAccountId(accountId);
+      set(loadStoredBinding(storage, storageKey, activeAccountId));
+    },
     setBinding: (binding) => {
       persistBinding(binding);
-      set(binding);
+      set(activeAccountId === null ? null : binding);
     },
     clear: () => {
       persistBinding(null);
