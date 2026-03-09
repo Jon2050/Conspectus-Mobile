@@ -35,6 +35,7 @@ interface GraphItemPayload {
 
 interface GraphChildrenPayload {
   readonly value?: unknown;
+  readonly '@odata.nextLink'?: unknown;
 }
 
 interface GraphErrorPayload {
@@ -299,21 +300,29 @@ const normalizeGraphItem = (
 const normalizeChildrenPayload = (
   payload: unknown,
   invalidResponseMessage: string,
-): readonly GraphDriveItem[] => {
+): {
+  readonly items: readonly GraphDriveItem[];
+  readonly nextLink: string | null;
+} => {
   if (!isGraphChildrenPayload(payload) || !Array.isArray(payload.value)) {
     throw new GraphClientError('unknown', invalidResponseMessage, undefined, payload);
   }
 
-  return payload.value
-    .map((childPayload) => normalizeDriveItem(childPayload, invalidResponseMessage))
-    .filter((child): child is GraphDriveItem => child !== null)
-    .sort((left, right) => {
-      if (left.kind !== right.kind) {
-        return left.kind === 'folder' ? -1 : 1;
-      }
+  const nextLink =
+    payload['@odata.nextLink'] === undefined
+      ? null
+      : typeof payload['@odata.nextLink'] === 'string'
+        ? payload['@odata.nextLink']
+        : (() => {
+            throw new GraphClientError('unknown', invalidResponseMessage, undefined, payload);
+          })();
 
-      return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
-    });
+  return {
+    items: payload.value
+      .map((childPayload) => normalizeDriveItem(childPayload, invalidResponseMessage))
+      .filter((child): child is GraphDriveItem => child !== null),
+    nextLink,
+  };
 };
 
 export const createGraphClient = (options: CreateGraphClientOptions): GraphClient => {
@@ -352,17 +361,27 @@ export const createGraphClient = (options: CreateGraphClientOptions): GraphClien
 
   return {
     async listChildren(folder): Promise<readonly GraphDriveItem[]> {
-      const childrenUrl = `${buildFolderChildrenUrl(folder)}?$select=${encodeURIComponent(CHILDREN_FIELDS)}`;
-      const response = await executeRequest(childrenUrl);
-      const payload = await readJsonPayload(
-        response,
-        'Microsoft Graph children response did not include the required file fields.',
-      );
+      const invalidChildrenResponseMessage =
+        'Microsoft Graph children response did not include the required file fields.';
+      const items: GraphDriveItem[] = [];
+      let nextUrl: string | null =
+        `${buildFolderChildrenUrl(folder)}?$select=${encodeURIComponent(CHILDREN_FIELDS)}`;
 
-      return normalizeChildrenPayload(
-        payload,
-        'Microsoft Graph children response did not include the required file fields.',
-      );
+      while (nextUrl !== null) {
+        const response = await executeRequest(nextUrl);
+        const payload = await readJsonPayload(response, invalidChildrenResponseMessage);
+        const page = normalizeChildrenPayload(payload, invalidChildrenResponseMessage);
+        items.push(...page.items);
+        nextUrl = page.nextLink;
+      }
+
+      return items.sort((left, right) => {
+        if (left.kind !== right.kind) {
+          return left.kind === 'folder' ? -1 : 1;
+        }
+
+        return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
+      });
     },
 
     async getFileMetadata(binding): Promise<GraphFileMetadata> {

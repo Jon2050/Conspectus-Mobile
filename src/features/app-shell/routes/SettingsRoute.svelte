@@ -1,8 +1,10 @@
 <!-- Renders settings auth controls and the OneDrive DB file selection flow for the current session. -->
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
+  import { get } from 'svelte/store';
   import type { AuthClient } from '@auth';
   import type { GraphClient, GraphDriveItem } from '@graph';
+  import { appSelectedDriveItemBindingStore } from '@shared';
 
   import {
     createSettingsAuthController,
@@ -90,7 +92,17 @@
     items.filter((item) => item.kind === 'file');
 
   const authController = createSettingsAuthController(authClient);
-  const fileBindingController = createSettingsFileBindingController(graphClient);
+  const fileBindingController = createSettingsFileBindingController(graphClient, {
+    initialSelectedBinding: get(appSelectedDriveItemBindingStore),
+    onBindingChange: (binding) => {
+      if (binding === null) {
+        appSelectedDriveItemBindingStore.clear();
+        return;
+      }
+
+      appSelectedDriveItemBindingStore.setBinding(binding);
+    },
+  });
   const unsubscribe = authController.subscribe((nextState) => {
     const wasAuthenticated = state.session.isAuthenticated;
     state = nextState;
@@ -239,7 +251,7 @@
           <p>{bindingState.currentFolder?.path ?? '/'}</p>
         </header>
 
-        {#if bindingState.items.length === 0}
+        {#if bindingState.error === null && bindingState.items.length === 0}
           <p class="settings-screen__browser-empty">No folders or .db files found here.</p>
         {:else}
           {#if folderItems(bindingState.items).length > 0}

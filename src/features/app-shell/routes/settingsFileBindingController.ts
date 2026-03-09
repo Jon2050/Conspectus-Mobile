@@ -41,6 +41,11 @@ export interface SettingsFileBindingController {
   reset(): void;
 }
 
+interface CreateSettingsFileBindingControllerOptions {
+  readonly initialSelectedBinding?: DriveItemBinding | null;
+  readonly onBindingChange?: (binding: DriveItemBinding | null) => void;
+}
+
 const INITIAL_STATE: SettingsFileBindingState = {
   selectedBinding: null,
   currentFolder: null,
@@ -150,9 +155,14 @@ const validateSelectedBinding = (item: GraphDriveItem): DriveItemBinding => {
 
 export const createSettingsFileBindingController = (
   graphClient: GraphClient,
+  options: CreateSettingsFileBindingControllerOptions = {},
 ): SettingsFileBindingController => {
-  let state: SettingsFileBindingState = INITIAL_STATE;
+  let state: SettingsFileBindingState = {
+    ...INITIAL_STATE,
+    selectedBinding: options.initialSelectedBinding ?? null,
+  };
   let folderStack: readonly DriveFolderReference[] = [];
+  let activeRequestId = 0;
   const listeners = new Set<SettingsFileBindingStateListener>();
 
   const emitState = (): void => {
@@ -171,7 +181,15 @@ export const createSettingsFileBindingController = (
     emitState();
   };
 
+  const beginRequest = (): number => {
+    activeRequestId += 1;
+    return activeRequestId;
+  };
+
+  const isStaleRequest = (requestId: number): boolean => requestId !== activeRequestId;
+
   const loadItems = async (folder?: DriveFolderReference): Promise<void> => {
+    const requestId = beginRequest();
     updateState({
       operation: 'loading',
       error: null,
@@ -179,6 +197,10 @@ export const createSettingsFileBindingController = (
 
     try {
       const items = await graphClient.listChildren(folder);
+      if (isStaleRequest(requestId)) {
+        return;
+      }
+
       updateState({
         items: items.filter(isSelectableDatabaseFile),
         operation: 'idle',
@@ -186,6 +208,10 @@ export const createSettingsFileBindingController = (
         hasLoaded: true,
       });
     } catch (error) {
+      if (isStaleRequest(requestId)) {
+        return;
+      }
+
       updateState({
         items: [],
         operation: 'idle',
@@ -245,10 +271,12 @@ export const createSettingsFileBindingController = (
 
     selectFile(item: GraphDriveItem): void {
       try {
+        const selectedBinding = validateSelectedBinding(item);
         updateState({
-          selectedBinding: validateSelectedBinding(item),
+          selectedBinding,
           error: null,
         });
+        options.onBindingChange?.(selectedBinding);
       } catch (error) {
         updateState({
           error: toBindingError(error, 'Failed to validate the selected OneDrive file.'),
@@ -257,8 +285,10 @@ export const createSettingsFileBindingController = (
     },
 
     reset(): void {
+      beginRequest();
       folderStack = [];
       state = INITIAL_STATE;
+      options.onBindingChange?.(null);
       emitState();
     },
   };
