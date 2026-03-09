@@ -10,6 +10,7 @@ Task: Implement issue `M<milestone>-<issue-number>` end-to-end with full verific
 - DO NOT merge into main, close an issue in GitHub or mark it as done if not everything is done. Even if there are only tasks left for the user.
 - DO NOT let subagents push commits or merge pull requests. That must be done by you. Tell the subagents that they are not allowed to push commits or merge pull requests.
 - Push code ONLY if ALL local verification gate steps are green.
+- For GitHub issue/PR comments, always use `--body-file`/`--comment-file` with real multiline Markdown (never `\n` escapes in quoted strings).
 - This prompt with Non-negotiable rules, Execution workflow, Execution Scenarios, Assumptions and Defaults, Quality and Guidelines must always be kept in context and followed strictly. You have to remember this prompt for the whole task.
 
 ## Execution workflow:
