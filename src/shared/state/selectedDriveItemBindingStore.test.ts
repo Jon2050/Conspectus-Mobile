@@ -292,4 +292,48 @@ describe('createSelectedDriveItemBindingStore', () => {
       }),
     );
   });
+
+  it('clears only the active account binding and preserves other account bindings', () => {
+    const { storage, values } = createMemoryStorage();
+    const storageKey = 'binding-key';
+    const bindingOne = {
+      driveId: 'drive-123',
+      itemId: 'item-1',
+      name: 'first.db',
+      parentPath: '/Finance',
+    } as const;
+    const bindingTwo = {
+      driveId: 'drive-123',
+      itemId: 'item-2',
+      name: 'second.db',
+      parentPath: '/Private',
+    } as const;
+    values[storageKey] = JSON.stringify({
+      version: 2,
+      bindingsByAccountId: {
+        'account-1': bindingOne,
+        'account-2': bindingTwo,
+      },
+    });
+    const store = createSelectedDriveItemBindingStore(null, {
+      storage,
+      storageKey,
+      initialActiveAccountId: 'account-1',
+    });
+
+    store.clear();
+
+    expect(get(store)).toBeNull();
+    expect(values[storageKey]).toBe(
+      JSON.stringify({
+        version: 2,
+        bindingsByAccountId: {
+          'account-2': bindingTwo,
+        },
+      }),
+    );
+
+    store.setActiveAccountId('account-2');
+    expect(get(store)).toEqual(bindingTwo);
+  });
 });

@@ -42,7 +42,7 @@ Always print in which step you are!
 8. CI gate: wait for required GitHub checks to pass. If any check fails, fix and repeat from step 4.
 9. Completion:
    - Merge the PR to `main`, then delete the head branch.
-   - Mark issue done in GitHub.
+   - Mark issue done in GitHub. Also add a brief comment with a summary of what you did and why. Also mention if you made any assumptions or any problems you encountered. Comment must be well formatted.
    - Update `docs/GitHub-Issues-MVP-Backlog.md` status marker to done.
    - Update docs/Architecture-and-Implementation-Plan.md: Append something or modify ONLY the specific section relevant to this issue to reflect implementation realities if something changed, got redefined or became clearer during this task. STRICTLY FORBIDDEN: Do not reformat, summarize, or alter any unrelated parts of this document.
    - Provide final report with changed files, commands/results, CI status, acceptance criteria checklist, and assumptions.
