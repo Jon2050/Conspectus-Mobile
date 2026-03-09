@@ -259,6 +259,58 @@ describe('settings file binding controller', () => {
     expect(onBindingChange).not.toHaveBeenCalled();
   });
 
+  it('hydrates a selected binding without triggering binding change callbacks', async () => {
+    const controller = createSettingsFileBindingController(harness.graphClient, {
+      onBindingChange,
+    });
+    await controller.browseRoot();
+
+    controller.hydrateSelectedBinding({
+      driveId: 'drive-123',
+      itemId: 'file-1',
+      name: 'conspectus.db',
+      parentPath: '/',
+    });
+
+    expect(controller.getState()).toEqual({
+      selectedBinding: {
+        driveId: 'drive-123',
+        itemId: 'file-1',
+        name: 'conspectus.db',
+        parentPath: '/',
+      },
+      currentFolder: null,
+      items: [],
+      browserIsOpen: false,
+      operation: 'idle',
+      error: null,
+      hasLoaded: false,
+      canGoBack: false,
+    });
+    expect(onBindingChange).not.toHaveBeenCalled();
+  });
+
+  it('reopens the browser from root even when a binding is already selected', async () => {
+    const controller = createSettingsFileBindingController(harness.graphClient, {
+      onBindingChange,
+    });
+
+    await controller.browseRoot();
+    controller.selectFile(ROOT_DB_FILE_ITEM);
+    await controller.browseRoot();
+
+    expect(controller.getState().selectedBinding).toEqual({
+      driveId: 'drive-123',
+      itemId: 'file-1',
+      name: 'conspectus.db',
+      parentPath: '/',
+    });
+    expect(controller.getState().browserIsOpen).toBe(true);
+    expect(controller.getState().items).toEqual([ROOT_FOLDER_ITEM, ROOT_DB_FILE_ITEM]);
+    expect(controller.getState().hasLoaded).toBe(true);
+    expect(controller.getState().canGoBack).toBe(false);
+  });
+
   it('captures graph browse failures as controller errors', async () => {
     harness.listChildren.mockRejectedValueOnce({
       code: 'network_error',

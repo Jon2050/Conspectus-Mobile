@@ -94,7 +94,6 @@
 
   const authController = createSettingsAuthController(authClient);
   const fileBindingController = createSettingsFileBindingController(graphClient, {
-    initialSelectedBinding: get(appSelectedDriveItemBindingStore),
     onBindingChange: (binding) => {
       if (binding === null) {
         appSelectedDriveItemBindingStore.clear();
@@ -105,11 +104,22 @@
     },
   });
   const unsubscribe = authController.subscribe((nextState) => {
+    const previousAccountId = state.session.account?.homeAccountId ?? null;
     const wasAuthenticated = state.session.isAuthenticated;
     state = nextState;
+    const nextAccountId = nextState.session.account?.homeAccountId ?? null;
     authOperationIsPending = nextState.operation !== 'idle';
     authStatusMessage = buildStatusMessage(nextState);
     bindingStatusMessage = buildBindingStatusMessage(bindingState);
+
+    if (nextState.session.isAuthenticated && previousAccountId !== nextAccountId) {
+      appSelectedDriveItemBindingStore.setActiveAccountId(nextAccountId);
+      fileBindingController.hydrateSelectedBinding(get(appSelectedDriveItemBindingStore));
+    }
+
+    if (!nextState.session.isAuthenticated) {
+      appSelectedDriveItemBindingStore.setActiveAccountId(null);
+    }
 
     if (wasAuthenticated && !nextState.session.isAuthenticated) {
       fileBindingController.reset();
@@ -210,7 +220,7 @@
         Select DB File
       </button>
 
-      {#if bindingState.selectedBinding === null && bindingState.canGoBack}
+      {#if bindingState.browserIsOpen && bindingState.canGoBack}
         <button
           class="settings-screen__button settings-screen__button--secondary"
           type="button"
@@ -235,7 +245,7 @@
       </dl>
     {/if}
 
-    {#if bindingState.selectedBinding === null && bindingState.browserIsOpen && bindingState.hasLoaded}
+    {#if bindingState.browserIsOpen && bindingState.hasLoaded}
       <section class="settings-screen__browser" data-testid="db-file-browser">
         <header class="settings-screen__browser-header">
           <h4>Current folder</h4>

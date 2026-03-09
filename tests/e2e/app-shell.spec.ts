@@ -317,6 +317,11 @@ test('allows selecting a OneDrive .db file from the settings browser', async ({ 
   await page.getByRole('link', { name: 'Settings' }).click();
   await expect(page.getByTestId('binding-status-message')).toContainText('DB file selected.');
   await expect(page.getByTestId('selected-db-file-summary')).toContainText('budget.db');
+
+  await page.getByRole('button', { name: 'Select DB File' }).click();
+  await expect(page.getByTestId('db-file-browser')).toBeVisible();
+  await expect(page.getByTestId('open-folder-folder-finance')).toBeVisible();
+  await expect(page.getByTestId('select-file-file-root-db')).toBeVisible();
 });
 
 test('keeps the selected DB file after reload', async ({ page }) => {
