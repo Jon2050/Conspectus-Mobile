@@ -156,6 +156,74 @@ describe('createGraphClient', () => {
     );
   });
 
+  it('follows paginated children responses until all browse items are loaded', async () => {
+    const authClient = createAuthClient();
+    const fetchFn = vi
+      .fn<(_: string) => Promise<Response>>()
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          value: [
+            {
+              id: 'folder-1',
+              name: 'Finance',
+              parentReference: {
+                driveId: 'drive-123',
+                path: '/drive/root:',
+              },
+              folder: {},
+            },
+          ],
+          '@odata.nextLink':
+            'https://graph.microsoft.com/v1.0/me/drive/root/children?$skiptoken=abc',
+        }),
+      )
+      .mockResolvedValueOnce(
+        createJsonResponse({
+          value: [
+            {
+              id: 'file-1',
+              name: 'conspectus.db',
+              parentReference: {
+                driveId: 'drive-123',
+                path: '/drive/root:/Finance',
+              },
+              file: {},
+            },
+          ],
+        }),
+      );
+    const client = createGraphClient({ authClient, fetchFn });
+
+    const items = await client.listChildren();
+
+    expect(items).toEqual([
+      {
+        driveId: 'drive-123',
+        itemId: 'folder-1',
+        name: 'Finance',
+        parentPath: '/',
+        kind: 'folder',
+      },
+      {
+        driveId: 'drive-123',
+        itemId: 'file-1',
+        name: 'conspectus.db',
+        parentPath: '/Finance',
+        kind: 'file',
+      },
+    ]);
+    expect(fetchFn).toHaveBeenNthCalledWith(
+      1,
+      'https://graph.microsoft.com/v1.0/me/drive/root/children?$select=id%2Cname%2CparentReference%2Cfile%2Cfolder',
+      expect.any(Object),
+    );
+    expect(fetchFn).toHaveBeenNthCalledWith(
+      2,
+      'https://graph.microsoft.com/v1.0/me/drive/root/children?$skiptoken=abc',
+      expect.any(Object),
+    );
+  });
+
   it('fetches file metadata with an auth-backed Graph request', async () => {
     const authClient = createAuthClient();
     const fetchFn = vi.fn(async () =>
@@ -421,6 +489,22 @@ describe('createGraphClient', () => {
             file: {},
           },
         ],
+      }),
+    );
+    const client = createGraphClient({ authClient, fetchFn });
+
+    await expect(client.listChildren()).rejects.toMatchObject({
+      code: 'unknown',
+      message: 'Microsoft Graph children response did not include the required file fields.',
+    });
+  });
+
+  it('rejects invalid paginated children payloads with an unknown Graph error', async () => {
+    const authClient = createAuthClient();
+    const fetchFn = vi.fn(async () =>
+      createJsonResponse({
+        value: [],
+        '@odata.nextLink': 123,
       }),
     );
     const client = createGraphClient({ authClient, fetchFn });

@@ -1,6 +1,6 @@
 // Tests the settings-route file browser controller for browse, navigation, selection, and errors.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { GraphClient, GraphDriveItem } from '@graph';
+import type { DriveItemBinding, GraphClient, GraphDriveItem } from '@graph';
 
 import { createSettingsFileBindingController } from './settingsFileBindingController';
 
@@ -44,6 +44,19 @@ const FINANCE_ITEMS: readonly GraphDriveItem[] = [
   },
 ];
 
+const createDeferred = <T>(): { promise: Promise<T>; resolve(value: T): void } => {
+  let resolvePromise: (value: T) => void = () => {};
+
+  return {
+    promise: new Promise<T>((resolve) => {
+      resolvePromise = resolve;
+    }),
+    resolve: (value: T) => {
+      resolvePromise(value);
+    },
+  };
+};
+
 const createGraphClientHarness = (): {
   readonly graphClient: GraphClient;
   readonly listChildren: ReturnType<typeof vi.fn>;
@@ -81,9 +94,11 @@ const createGraphClientHarness = (): {
 
 describe('settings file binding controller', () => {
   let harness: ReturnType<typeof createGraphClientHarness>;
+  let onBindingChange: ReturnType<typeof vi.fn<(binding: DriveItemBinding | null) => void>>;
 
   beforeEach(() => {
     harness = createGraphClientHarness();
+    onBindingChange = vi.fn<(binding: DriveItemBinding | null) => void>();
   });
 
   it('loads root items and keeps only folders and .db files', async () => {
@@ -124,7 +139,9 @@ describe('settings file binding controller', () => {
   });
 
   it('stores a validated file binding when a .db file is selected', async () => {
-    const controller = createSettingsFileBindingController(harness.graphClient);
+    const controller = createSettingsFileBindingController(harness.graphClient, {
+      onBindingChange,
+    });
     await controller.browseRoot();
 
     controller.selectFile(ROOT_DB_FILE_ITEM);
@@ -136,10 +153,18 @@ describe('settings file binding controller', () => {
       parentPath: '/',
     });
     expect(controller.getState().error).toBeNull();
+    expect(onBindingChange).toHaveBeenCalledWith({
+      driveId: 'drive-123',
+      itemId: 'file-1',
+      name: 'conspectus.db',
+      parentPath: '/',
+    });
   });
 
   it('rejects invalid non-database file selections', () => {
-    const controller = createSettingsFileBindingController(harness.graphClient);
+    const controller = createSettingsFileBindingController(harness.graphClient, {
+      onBindingChange,
+    });
 
     controller.selectFile(ROOT_NON_DB_FILE_ITEM);
 
@@ -152,10 +177,13 @@ describe('settings file binding controller', () => {
         message: 'Selected file must use the .db extension.',
       },
     });
+    expect(onBindingChange).not.toHaveBeenCalled();
   });
 
   it('rejects file selections that are missing required binding identifiers', () => {
-    const controller = createSettingsFileBindingController(harness.graphClient);
+    const controller = createSettingsFileBindingController(harness.graphClient, {
+      onBindingChange,
+    });
 
     controller.selectFile({
       driveId: '',
@@ -174,6 +202,55 @@ describe('settings file binding controller', () => {
         message: 'Selected file did not include the required OneDrive identifiers.',
       },
     });
+    expect(onBindingChange).not.toHaveBeenCalled();
+  });
+
+  it('preserves a previous valid binding when a later invalid selection is made', async () => {
+    const controller = createSettingsFileBindingController(harness.graphClient, {
+      onBindingChange,
+    });
+    await controller.browseRoot();
+
+    controller.selectFile(ROOT_DB_FILE_ITEM);
+    controller.selectFile(ROOT_NON_DB_FILE_ITEM);
+
+    expect(controller.getState().selectedBinding).toEqual({
+      driveId: 'drive-123',
+      itemId: 'file-1',
+      name: 'conspectus.db',
+      parentPath: '/',
+    });
+    expect(controller.getState().error).toEqual({
+      code: 'invalid_selection',
+      message: 'Selected file must use the .db extension.',
+      cause: {
+        code: 'invalid_selection',
+        message: 'Selected file must use the .db extension.',
+      },
+    });
+    expect(onBindingChange).toHaveBeenNthCalledWith(1, {
+      driveId: 'drive-123',
+      itemId: 'file-1',
+      name: 'conspectus.db',
+      parentPath: '/',
+    });
+    expect(onBindingChange).toHaveBeenCalledTimes(1);
+  });
+
+  it('hydrates the initial selected binding from controller options', () => {
+    const initialSelectedBinding = {
+      driveId: 'drive-123',
+      itemId: 'file-1',
+      name: 'conspectus.db',
+      parentPath: '/Finance',
+    } as const;
+    const controller = createSettingsFileBindingController(harness.graphClient, {
+      initialSelectedBinding,
+      onBindingChange,
+    });
+
+    expect(controller.getState().selectedBinding).toEqual(initialSelectedBinding);
+    expect(onBindingChange).not.toHaveBeenCalled();
   });
 
   it('captures graph browse failures as controller errors', async () => {
@@ -195,8 +272,36 @@ describe('settings file binding controller', () => {
     expect(controller.getState().operation).toBe('idle');
   });
 
+  it('ignores stale browse results that resolve after reset', async () => {
+    const browseDeferred = createDeferred<readonly GraphDriveItem[]>();
+    harness.listChildren.mockImplementationOnce(async () => browseDeferred.promise);
+    const controller = createSettingsFileBindingController(harness.graphClient, {
+      onBindingChange,
+    });
+
+    const browsePromise = controller.browseRoot();
+    expect(controller.getState().operation).toBe('loading');
+
+    controller.reset();
+    browseDeferred.resolve(ROOT_ITEMS);
+    await browsePromise;
+
+    expect(controller.getState()).toEqual({
+      selectedBinding: null,
+      currentFolder: null,
+      items: [],
+      operation: 'idle',
+      error: null,
+      hasLoaded: false,
+      canGoBack: false,
+    });
+    expect(onBindingChange).toHaveBeenCalledWith(null);
+  });
+
   it('resets the current browse and selected binding state', async () => {
-    const controller = createSettingsFileBindingController(harness.graphClient);
+    const controller = createSettingsFileBindingController(harness.graphClient, {
+      onBindingChange,
+    });
     await controller.browseRoot();
     controller.selectFile(ROOT_DB_FILE_ITEM);
 
@@ -211,5 +316,6 @@ describe('settings file binding controller', () => {
       hasLoaded: false,
       canGoBack: false,
     });
+    expect(onBindingChange).toHaveBeenLastCalledWith(null);
   });
 });
