@@ -268,7 +268,7 @@ An issue is only considered done when:
 - Depends on: `M3-05`
 - GitHub: [#39](https://github.com/Jon2050/Conspectus-Mobile/issues/39)
 
-### :green_circle: M3-07 Persist binding in local storage layer
+### :white_check_mark: M3-07 Persist binding in local storage layer
 
 - Label: `feature`
 - Milestone: `M3 - Auth + OneDrive Binding`
