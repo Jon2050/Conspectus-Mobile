@@ -260,7 +260,7 @@ An issue is only considered done when:
 - Depends on: `M3-03`
 - GitHub: [#37](https://github.com/Jon2050/Conspectus-Mobile/issues/37)
 
-### :green_circle: M3-06 Implement OneDrive file selection flow
+### :white_check_mark: M3-06 Implement OneDrive file selection flow
 
 - Label: `feature`
 - Milestone: `M3 - Auth + OneDrive Binding`
