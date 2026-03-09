@@ -1,4 +1,4 @@
-name: Deploy Production Website
+name: Deploy Production
 
 on:
   workflow_dispatch:
@@ -15,15 +15,15 @@ permissions:
   contents: read
 
 concurrency:
-  group: deploy-production-website
+  group: deploy-production
   cancel-in-progress: false
 
 jobs:
-  deploy-production-website:
-    name: Dispatch Production Artifact and Verify Live Site
+  deploy-production:
+    name: Deploy Production
     runs-on: ubuntu-latest
     permissions:
-      actions: read
+      actions: write
       contents: read
     steps:
       - name: Require main branch
@@ -44,32 +44,25 @@ jobs:
           set -euo pipefail
           echo "commit_sha=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Resolve published production artifact for current main commit
-        id: source-run
+      - name: Resolve successful Quality run for current main commit
+        id: quality_run
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TARGET_COMMIT_SHA: ${{ steps.target.outputs.commit_sha }}
         run: |
           set -euo pipefail
 
-          source_run_id=''
-          source_commit_sha=''
-          artifact_name=''
+          quality_run_id=''
           page='1'
 
           while :; do
             runs_status="$(curl -sS -o workflow-runs-response.json -w '%{http_code}' \
               -H "Authorization: Bearer ${GITHUB_TOKEN}" \
               -H 'Accept: application/vnd.github+json' \
-              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/publish-production-artifact.yml/runs?branch=main&event=workflow_run&head_sha=${TARGET_COMMIT_SHA}&per_page=100&page=${page}")"
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/quality.yml/runs?branch=main&event=push&head_sha=${TARGET_COMMIT_SHA}&per_page=100&page=${page}")"
 
             if [ "${runs_status}" != '200' ]; then
-              echo "Failed to query Publish Production Artifact workflow runs." >&2
+              echo "Failed to query Quality workflow runs." >&2
               cat workflow-runs-response.json >&2 || true
               exit 1
             fi
@@ -79,35 +72,13 @@ jobs:
               break
             fi
 
-            while IFS=$'\t' read -r candidate_run_id candidate_commit_sha; do
+            while IFS= read -r candidate_run_id; do
               [ -n "${candidate_run_id}" ] || continue
-              if [ "${candidate_commit_sha}" != "${TARGET_COMMIT_SHA}" ]; then
-                continue
-              fi
-
-              artifacts_status="$(curl -sS -o artifacts-response.json -w '%{http_code}' \
-                -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-                -H 'Accept: application/vnd.github+json' \
-                "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${candidate_run_id}/artifacts")"
-
-              if [ "${artifacts_status}" != '200' ]; then
-                echo "Failed to list artifacts for Publish Production Artifact run ${candidate_run_id}." >&2
-                cat artifacts-response.json >&2 || true
-                exit 1
-              fi
-
-              artifact_count="$(jq '[.artifacts[] | select(.expired == false and (.name | startswith("conspectus-mobile-production-")))] | length' artifacts-response.json)"
-              if [ "${artifact_count}" -ne '1' ]; then
-                continue
-              fi
-
-              artifact_name="$(jq -r '[.artifacts[] | select(.expired == false and (.name | startswith("conspectus-mobile-production-")))] | .[0].name' artifacts-response.json)"
-              source_run_id="${candidate_run_id}"
-              source_commit_sha="${candidate_commit_sha}"
+              quality_run_id="${candidate_run_id}"
               break
-            done < <(jq -r '.workflow_runs[] | select(.conclusion == "success") | [.id, .head_sha] | @tsv' workflow-runs-response.json)
+            done < <(jq -r '.workflow_runs[] | select(.conclusion == "success") | .id' workflow-runs-response.json)
 
-            if [ -n "${source_run_id}" ]; then
+            if [ -n "${quality_run_id}" ]; then
               break
             fi
 
@@ -118,34 +89,99 @@ jobs:
             page="$((page + 1))"
           done
 
-          if [ -z "${source_run_id}" ] || [ -z "${source_commit_sha}" ] || [ -z "${artifact_name}" ]; then
-            echo "No successful Publish Production Artifact run with a reusable production artifact was found for current main commit ${TARGET_COMMIT_SHA}." >&2
+          if [ -z "${quality_run_id}" ]; then
+            echo "No successful Quality run was found for current main commit ${TARGET_COMMIT_SHA}." >&2
             exit 1
           fi
 
+          echo "quality_run_id=${quality_run_id}" >> "${GITHUB_OUTPUT}"
+
+      - name: Validate required runtime env
+        run: |
+          if [ -z "${VITE_AZURE_CLIENT_ID}" ]; then
+            echo "Missing repository variable VITE_AZURE_CLIENT_ID." >&2
+            exit 1
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Build production artifact
+        env:
+          DEPLOY_CHANNEL: production
+        run: npm run build
+
+      - name: Verify production build output paths and scope
+        run: >-
+          node scripts/verify-build-channel.mjs
+          --dist dist
+          --channel production
+          --base /conspectus/webapp/
+
+      - name: Resolve production handoff identity
+        id: handoff
+        run: |
+          build_time_utc="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          artifact_name="conspectus-mobile-production-${{ steps.target.outputs.commit_sha }}"
           {
-            echo "source_run_id=${source_run_id}"
-            echo "source_commit_sha=${source_commit_sha}"
             echo "artifact_name=${artifact_name}"
+            echo "build_time_utc=${build_time_utc}"
           } >> "${GITHUB_OUTPUT}"
 
-      - name: Download published production artifact
-        uses: actions/download-artifact@v5
-        with:
-          name: ${{ steps.source-run.outputs.artifact_name }}
-          path: pwa-artifact
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          repository: ${{ github.repository }}
-          run-id: ${{ steps.source-run.outputs.source_run_id }}
-
-      - name: Verify downloaded production artifact metadata
+      - name: Add production artifact metadata
         run: |
+          cat > dist/deploy-metadata.json <<EOF
+          {
+            "channel": "production",
+            "basePath": "/conspectus/webapp/",
+            "sourceBranch": "main",
+            "commitSha": "${{ steps.target.outputs.commit_sha }}",
+            "buildTimeUtc": "${{ steps.handoff.outputs.build_time_utc }}",
+            "qualityRunId": "${{ steps.quality_run.outputs.quality_run_id }}",
+            "deployRunId": "${{ github.run_id }}"
+          }
+          EOF
+
+      - name: Upload production artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.handoff.outputs.artifact_name }}
+          if-no-files-found: error
+          retention-days: 90
+          path: dist
+
+      - name: Verify production handoff outputs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          artifacts_api_url="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts"
+          artifacts_status="$(curl -sS -o artifacts-response.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H 'Accept: application/vnd.github+json' \
+            "${artifacts_api_url}")"
+
+          if [ "${artifacts_status}" != '200' ]; then
+            echo "Failed to list run artifacts for production handoff verification." >&2
+            echo "Artifacts API status: ${artifacts_status}" >&2
+            cat artifacts-response.json >&2 || true
+            exit 1
+          fi
+
           node scripts/verify-production-handoff.mjs \
             --artifacts-json artifacts-response.json \
-            --metadata pwa-artifact/deploy-metadata.json \
-            --artifact-name "${{ steps.source-run.outputs.artifact_name }}" \
-            --commit-sha "${{ steps.source-run.outputs.source_commit_sha }}" \
-            --deploy-run-id "${{ steps.source-run.outputs.source_run_id }}" \
+            --metadata dist/deploy-metadata.json \
+            --artifact-name "${{ steps.handoff.outputs.artifact_name }}" \
+            --commit-sha "${{ steps.target.outputs.commit_sha }}" \
+            --quality-run-id "${{ steps.quality_run.outputs.quality_run_id }}" \
+            --deploy-run-id "${{ github.run_id }}" \
             --source-branch main
 
       - name: Read production deploy metadata
@@ -153,9 +189,9 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo "commit_sha=$(jq -r '.commitSha' pwa-artifact/deploy-metadata.json)"
-            echo "deploy_run_id=$(jq -r '.deployRunId' pwa-artifact/deploy-metadata.json)"
-            echo "quality_run_id=$(jq -r '.qualityRunId' pwa-artifact/deploy-metadata.json)"
+            echo "commit_sha=$(jq -r '.commitSha' dist/deploy-metadata.json)"
+            echo "deploy_run_id=$(jq -r '.deployRunId' dist/deploy-metadata.json)"
+            echo "quality_run_id=$(jq -r '.qualityRunId' dist/deploy-metadata.json)"
           } >> "${GITHUB_OUTPUT}"
 
       - name: Verify website consumer handoff contract
@@ -200,7 +236,7 @@ jobs:
               "commitSha": "${{ steps.metadata.outputs.commit_sha }}",
               "deployRunId": "${{ steps.metadata.outputs.deploy_run_id }}",
               "qualityRunId": "${{ steps.metadata.outputs.quality_run_id }}",
-              "artifactName": "${{ steps.source-run.outputs.artifact_name }}"
+              "artifactName": "${{ steps.handoff.outputs.artifact_name }}"
             }
           }
           EOF

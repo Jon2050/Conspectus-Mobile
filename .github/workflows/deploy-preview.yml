@@ -1,4 +1,4 @@
-name: Deploy Preview Channel
+name: Deploy Preview
 
 on:
   workflow_run:
@@ -144,7 +144,7 @@ jobs:
           fi
 
   deploy-preview:
-    name: Publish Preview
+    name: Deploy Preview
     needs:
       - prepare-context
     if: >-

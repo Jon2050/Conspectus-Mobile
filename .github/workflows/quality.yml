@@ -24,27 +24,63 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Detect docs-only push changes
+      - name: Detect relevant branch changes
         id: detect
         env:
           BEFORE_SHA: ${{ github.event.before || '' }}
           AFTER_SHA: ${{ github.sha }}
+          CURRENT_BRANCH: ${{ github.ref_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           set -euo pipefail
 
-          if [ -z "${BEFORE_SHA}" ] || [ "${BEFORE_SHA}" = '0000000000000000000000000000000000000000' ]; then
-            echo "code_changed=true" >> "${GITHUB_OUTPUT}"
-            echo "Unable to resolve previous commit SHA; running full quality checks."
-            exit 0
+          compare_base=''
+          compare_target="${AFTER_SHA}"
+
+          if [ "${CURRENT_BRANCH}" = "${DEFAULT_BRANCH}" ]; then
+            if [ -z "${BEFORE_SHA}" ] || [ "${BEFORE_SHA}" = '0000000000000000000000000000000000000000' ]; then
+              echo "code_changed=true" >> "${GITHUB_OUTPUT}"
+              echo "Unable to resolve previous commit SHA on ${DEFAULT_BRANCH}; running full quality checks."
+              exit 0
+            fi
+
+            if ! git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null; then
+              echo "code_changed=true" >> "${GITHUB_OUTPUT}"
+              echo "Previous commit SHA is unavailable locally on ${DEFAULT_BRANCH}; running full quality checks."
+              exit 0
+            fi
+
+            compare_base="${BEFORE_SHA}"
+            echo "Comparing default-branch push delta ${compare_base}..${compare_target}."
+          else
+            default_branch_ref="refs/remotes/origin/${DEFAULT_BRANCH}"
+
+            if ! git show-ref --verify --quiet "${default_branch_ref}"; then
+              git fetch --no-tags origin "${DEFAULT_BRANCH}:${default_branch_ref}"
+            fi
+
+            if ! git cat-file -e "${default_branch_ref}^{commit}" 2>/dev/null; then
+              echo "code_changed=true" >> "${GITHUB_OUTPUT}"
+              echo "Unable to resolve ${default_branch_ref}; running full quality checks."
+              exit 0
+            fi
+
+            if ! compare_base="$(git merge-base "${default_branch_ref}" "${AFTER_SHA}")"; then
+              echo "code_changed=true" >> "${GITHUB_OUTPUT}"
+              echo "Unable to resolve the merge-base against ${DEFAULT_BRANCH}; running full quality checks."
+              exit 0
+            fi
+
+            if [ -z "${compare_base}" ]; then
+              echo "code_changed=true" >> "${GITHUB_OUTPUT}"
+              echo "Merge-base against ${DEFAULT_BRANCH} is empty; running full quality checks."
+              exit 0
+            fi
+
+            echo "Comparing branch delta ${compare_base}..${compare_target} against ${DEFAULT_BRANCH}."
           fi
 
-          if ! git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null; then
-            echo "code_changed=true" >> "${GITHUB_OUTPUT}"
-            echo "Previous commit SHA is unavailable locally; running full quality checks."
-            exit 0
-          fi
-
-          if ! changed_files="$(git diff --name-only "${BEFORE_SHA}" "${AFTER_SHA}")"; then
+          if ! changed_files="$(git diff --name-only "${compare_base}" "${compare_target}")"; then
             echo "code_changed=true" >> "${GITHUB_OUTPUT}"
             echo "Unable to compute changed files; running full quality checks."
             exit 0
@@ -76,7 +112,7 @@ jobs:
 
           echo "code_changed=${code_changed}" >> "${GITHUB_OUTPUT}"
           if [ "${code_changed}" = 'false' ]; then
-            echo "Docs-only push detected; lint/typecheck/tests/build jobs will be skipped."
+            echo "Docs-only branch delta detected; lint/typecheck/tests/build jobs will be skipped."
           fi
 
   lint-typecheck:
@@ -318,3 +354,54 @@ jobs:
           node scripts/publish-test-summary.mjs
           --title "E2E Test Report"
           --files reports/playwright/junit.xml
+
+  quality-gate:
+    name: Quality Gate
+    needs:
+      - detect-code-changes
+      - lint-typecheck
+      - unit-tests
+      - build
+      - build-verification
+      - e2e-tests
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Verify Quality pipeline results
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+          CODE_CHANGED: ${{ needs.detect-code-changes.outputs.code_changed }}
+          DETECT_RESULT: ${{ needs.detect-code-changes.result }}
+          E2E_RESULT: ${{ needs.e2e-tests.result }}
+          LINT_RESULT: ${{ needs.lint-typecheck.result }}
+          UNIT_RESULT: ${{ needs.unit-tests.result }}
+          VERIFY_RESULT: ${{ needs.build-verification.result }}
+        run: |
+          set -euo pipefail
+
+          if [ "${DETECT_RESULT}" != 'success' ]; then
+            echo "Detect Relevant Changes did not succeed (result=${DETECT_RESULT})." >&2
+            exit 1
+          fi
+
+          if [ "${CODE_CHANGED}" = 'false' ]; then
+            echo "Docs-only branch delta detected; heavy Quality jobs were intentionally skipped."
+            exit 0
+          fi
+
+          while IFS=':' read -r job_name job_result; do
+            if [ "${job_result}" != 'success' ]; then
+              echo "${job_name} did not succeed (result=${job_result})." >&2
+              exit 1
+            fi
+          done <<EOF
+          Format, Lint, and Typecheck:${LINT_RESULT}
+          Unit Tests:${UNIT_RESULT}
+          Build App (Preview):${BUILD_RESULT}
+          Build Verification:${VERIFY_RESULT}
+          E2E Smoke Tests:${E2E_RESULT}
+          EOF
+
+          echo "Quality pipeline completed successfully."

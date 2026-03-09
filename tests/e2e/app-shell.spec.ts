@@ -16,13 +16,7 @@ const resolveAppBasePath = (): string => {
 
 const APP_BASE_PATH = resolveAppBasePath();
 const APP_BASE_PATH_WITHOUT_TRAILING_SLASH = APP_BASE_PATH.slice(0, -1);
-const PLAYWRIGHT_TEST_CLIENT_ID = 'playwright-test-client-id';
-const RUNTIME_CLIENT_ID_TOKENS = [
-  process.env.VITE_AZURE_CLIENT_ID,
-  PLAYWRIGHT_TEST_CLIENT_ID,
-].filter(
-  (value, index, values): value is string => Boolean(value) && values.indexOf(value) === index,
-);
+const RUNTIME_CLIENT_ID_PATTERN = /VITE_AZURE_CLIENT_ID:"[^"]*"/g;
 const appPath = (suffix = ''): string => `${APP_BASE_PATH}${suffix}`;
 const REQUIRED_MANIFEST_ICONS = [
   {
@@ -132,15 +126,15 @@ test('shows startup configuration error when required runtime env is missing', a
     const response = await route.fetch();
     const body = await response.text();
 
-    const tokenToReplace = RUNTIME_CLIENT_ID_TOKENS.find((token) => body.includes(token));
-    if (!tokenToReplace) {
+    const rewrittenBody = body.replace(RUNTIME_CLIENT_ID_PATTERN, 'VITE_AZURE_CLIENT_ID:"   "');
+    if (rewrittenBody === body) {
       await route.fulfill({ response, body });
       return;
     }
 
     await route.fulfill({
       response,
-      body: body.split(tokenToReplace).join('   '),
+      body: rewrittenBody,
     });
   });
 
