@@ -252,7 +252,7 @@ An issue is only considered done when:
 - Depends on: `M3-03`
 - GitHub: [#35](https://github.com/Jon2050/Conspectus-Mobile/issues/35)
 
-### :green_circle: M3-05 Implement Graph client wrapper
+### :white_check_mark: M3-05 Implement Graph client wrapper
 
 - Label: `feature`
 - Milestone: `M3 - Auth + OneDrive Binding`

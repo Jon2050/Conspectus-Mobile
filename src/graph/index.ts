@@ -41,3 +41,5 @@ export interface GraphClient {
     expectedETag: string,
   ): Promise<GraphUploadResult>;
 }
+
+export { createGraphClient } from './graphClient';

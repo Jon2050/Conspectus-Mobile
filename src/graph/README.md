@@ -17,6 +17,7 @@ Expected public interfaces (`src/graph/index.ts`):
 - `GraphFileMetadata`: eTag/size/modified metadata used by sync decisions.
 - `GraphUploadResult`: post-upload metadata returned from Graph.
 - `GraphClient`: metadata, download, and conditional-upload operations.
+- `createGraphClient`: factory that injects auth-backed bearer tokens into Graph requests.
 - `GraphErrorCode` and `GraphError`: normalized failure model for UI/services.
 
 M3 implementation target:
