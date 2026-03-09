@@ -13,13 +13,9 @@ const deployPreviewWorkflowPath = path.resolve(
   repositoryRootPath,
   '.github/workflows/deploy-preview.yml',
 );
-const publishProductionArtifactWorkflowPath = path.resolve(
+const deployProductionWorkflowPath = path.resolve(
   repositoryRootPath,
-  '.github/workflows/publish-production-artifact.yml',
-);
-const deployProductionWebsiteWorkflowPath = path.resolve(
-  repositoryRootPath,
-  '.github/workflows/deploy-production-website.yml',
+  '.github/workflows/deploy-production.yml',
 );
 const qualityWorkflowPath = path.resolve(repositoryRootPath, '.github/workflows/quality.yml');
 
@@ -121,7 +117,7 @@ describe('quality workflow contract', () => {
     expect(workflowSource).not.toContain('pull_request:');
   });
 
-  it('splits quality stages into detect -> lint/typecheck -> unit -> build preview -> build verification -> e2e', () => {
+  it('splits quality stages into detect -> lint/typecheck -> unit -> build preview -> build verification -> e2e -> gate', () => {
     const workflowSource = fs.readFileSync(qualityWorkflowPath, 'utf8');
     expect(workflowSource).toContain('lint-typecheck:');
     expect(workflowSource).toMatch(
@@ -144,6 +140,11 @@ describe('quality workflow contract', () => {
     expect(workflowSource).toMatch(
       /e2e-tests:\n(?:.*\n)*?\s+needs:\n\s+- detect-code-changes\n\s+- build-verification/,
     );
+    expect(workflowSource).toContain('quality-gate:');
+    expect(workflowSource).toMatch(
+      /quality-gate:\n(?:.*\n)*?\s+needs:\n\s+- detect-code-changes\n\s+- lint-typecheck\n\s+- unit-tests\n\s+- build\n\s+- build-verification\n\s+- e2e-tests/,
+    );
+    expect(workflowSource).toContain('name: Quality Gate');
     expect(workflowSource).toContain('name: quality-preview-dist');
     expect(workflowSource).not.toContain('name: quality-production-dist');
     expect(workflowSource).toContain(
@@ -154,28 +155,26 @@ describe('quality workflow contract', () => {
 });
 
 describe('production workflow contracts', () => {
-  it('publishes the main production artifact from successful Quality workflow_run events', () => {
-    const workflowSource = fs.readFileSync(publishProductionArtifactWorkflowPath, 'utf8');
-    expect(workflowSource).toContain('on:\n  workflow_run:');
-    expect(workflowSource).toContain('workflows:\n      - Quality');
-    expect(workflowSource).toContain("head_branch == 'main'");
-    expect(workflowSource).toContain('name: Confirm trigger commit is still the current main tip');
-    expect(workflowSource).toContain('steps.branch-head.outputs.is_current_main_head');
+  it('deploys production manually from the current main commit after a successful Quality run', () => {
+    const workflowSource = fs.readFileSync(deployProductionWorkflowPath, 'utf8');
+    expect(workflowSource).toContain('on:\n  workflow_dispatch:');
+    expect(workflowSource).toContain('name: Require main branch');
+    expect(workflowSource).toContain('name: Resolve current main commit target');
+    expect(workflowSource).toContain(
+      'name: Resolve successful Quality run for current main commit',
+    );
+    expect(workflowSource).toContain(
+      'actions/workflows/quality.yml/runs?branch=main&event=push&head_sha=${TARGET_COMMIT_SHA}&per_page=100&page=${page}',
+    );
     expect(workflowSource).toContain('name: Build production artifact');
     expect(workflowSource).toContain('DEPLOY_CHANNEL: production');
     expect(workflowSource).toContain('name: Verify production build output paths and scope');
     expect(workflowSource).toContain(
-      'artifact_name="conspectus-mobile-production-${{ github.event.workflow_run.head_sha }}"',
+      'artifact_name="conspectus-mobile-production-${{ steps.target.outputs.commit_sha }}"',
     );
-  });
-
-  it('deploys production manually from the current main commit artifact and paginates publish-run lookup', () => {
-    const workflowSource = fs.readFileSync(deployProductionWebsiteWorkflowPath, 'utf8');
-    expect(workflowSource).toContain('on:\n  workflow_dispatch:');
-    expect(workflowSource).toContain('name: Resolve current main commit target');
-    expect(workflowSource).toContain('head_sha=${TARGET_COMMIT_SHA}');
-    expect(workflowSource).toContain('per_page=100&page=${page}');
-    expect(workflowSource).toMatch(/actions\/download-artifact@v[45]/);
+    expect(workflowSource).toContain(
+      '"qualityRunId": "${{ steps.quality_run.outputs.quality_run_id }}"',
+    );
     expect(workflowSource).toContain('conspectus-mobile-production-ready');
     expect(workflowSource).toContain('node scripts/verify-production-deploy-smoke.mjs');
   });
