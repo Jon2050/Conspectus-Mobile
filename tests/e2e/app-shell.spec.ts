@@ -1,3 +1,4 @@
+// Covers the app-shell navigation, auth mock flow, and OneDrive file selection behavior in a browser.
 import { expect, test } from '@playwright/test';
 
 test.use({ viewport: { width: 390, height: 844 } });
@@ -38,6 +39,10 @@ type MockAuthClientOptions = {
   readonly failSignIn?: boolean;
   readonly failSignOut?: boolean;
   readonly startAuthenticated?: boolean;
+};
+
+type MockGraphClientOptions = {
+  readonly failListChildren?: boolean;
 };
 
 const installMockAuthClient = async (
@@ -121,6 +126,81 @@ const installMockAuthClient = async (
   }, options);
 };
 
+const installMockGraphClient = async (
+  page: import('@playwright/test').Page,
+  options: MockGraphClientOptions = {},
+): Promise<void> => {
+  await page.addInitScript((mockOptions: MockGraphClientOptions) => {
+    const rootItems = [
+      {
+        driveId: 'drive-123',
+        itemId: 'folder-finance',
+        name: 'Finance',
+        parentPath: '/',
+        kind: 'folder',
+      },
+      {
+        driveId: 'drive-123',
+        itemId: 'file-root-db',
+        name: 'conspectus.db',
+        parentPath: '/',
+        kind: 'file',
+      },
+      {
+        driveId: 'drive-123',
+        itemId: 'file-root-text',
+        name: 'notes.txt',
+        parentPath: '/',
+        kind: 'file',
+      },
+    ];
+
+    const financeItems = [
+      {
+        driveId: 'drive-123',
+        itemId: 'file-finance-db',
+        name: 'budget.db',
+        parentPath: '/Finance',
+        kind: 'file',
+      },
+    ];
+
+    (window as Window & { __CONSPECTUS_GRAPH_CLIENT__?: unknown }).__CONSPECTUS_GRAPH_CLIENT__ = {
+      async listChildren(folder?: { itemId?: string }) {
+        if (mockOptions.failListChildren) {
+          throw {
+            code: 'network_error',
+            message: 'Mock OneDrive browse failure.',
+          };
+        }
+
+        if (folder?.itemId === 'folder-finance') {
+          return financeItems;
+        }
+
+        return rootItems;
+      },
+      async getFileMetadata() {
+        return {
+          eTag: '"etag-1"',
+          sizeBytes: 2048,
+          lastModifiedDateTime: '2026-03-09T10:15:00Z',
+        };
+      },
+      async downloadFile() {
+        return new Uint8Array([1, 2, 3]);
+      },
+      async uploadFile() {
+        return {
+          eTag: '"etag-2"',
+          sizeBytes: 2048,
+          lastModifiedDateTime: '2026-03-09T11:15:00Z',
+        };
+      },
+    };
+  }, options);
+};
+
 test('shows startup configuration error when required runtime env is missing', async ({ page }) => {
   await page.route('**/*.js', async (route) => {
     const response = await route.fetch();
@@ -198,6 +278,41 @@ test('supports sign-in and sign-out auth UX states in settings', async ({ page }
   await expect(signOutButton).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Sign in with Microsoft' })).toBeVisible();
   await expect(statusMessage).toContainText('Signed out.');
+});
+
+test('allows selecting a OneDrive .db file from the settings browser', async ({ page }) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page);
+
+  await page.goto(appPath('#/settings'));
+
+  await expect(page.getByTestId('signed-in-account-summary')).toBeVisible();
+  await expect(page.getByTestId('binding-status-message')).toContainText(
+    'No DB file selected yet.',
+  );
+
+  await page.getByRole('button', { name: 'Choose OneDrive DB file' }).click();
+
+  await expect(page.getByTestId('db-file-browser')).toBeVisible();
+  await expect(page.getByText('Finance')).toBeVisible();
+  await expect(page.getByText('conspectus.db')).toBeVisible();
+  await expect(page.getByText('notes.txt')).toHaveCount(0);
+
+  await page.getByTestId('open-folder-folder-finance').click();
+  await expect(page.getByText('/Finance')).toBeVisible();
+  await expect(page.getByText('budget.db')).toBeVisible();
+
+  await page.getByTestId('select-file-file-finance-db').click();
+
+  await expect(page.getByTestId('binding-status-message')).toContainText(
+    'DB file selected for this session.',
+  );
+  await expect(page.getByTestId('selected-db-file-summary')).toContainText('budget.db');
+  await expect(page.getByTestId('selected-db-file-summary')).toContainText('/Finance');
+  await expect(page.getByTestId('selected-db-file-summary')).toContainText('drive-123');
+  await expect(page.getByTestId('selected-db-file-summary')).toContainText('file-finance-db');
 });
 
 test('processes redirect auth hash before route navigation and keeps signed-in status', async ({

@@ -1,22 +1,40 @@
+// Implements the typed Microsoft Graph client used for OneDrive browse, read, and upload flows.
 import { GRAPH_ONEDRIVE_FILE_SCOPES, type AuthClient } from '@auth';
 
 import type {
   DriveItemBinding,
+  DriveFolderReference,
   GraphClient,
+  GraphDriveItem,
   GraphErrorCode,
   GraphFileMetadata,
   GraphUploadResult,
 } from './index';
 
 const GRAPH_API_BASE_URL = 'https://graph.microsoft.com/v1.0';
+const CHILDREN_FIELDS = 'id,name,parentReference,file,folder';
 const METADATA_FIELDS = 'eTag,size,lastModifiedDateTime';
 
 type FetchFn = (input: string, init?: RequestInit) => Promise<Response>;
 
+interface GraphParentReferencePayload {
+  readonly driveId?: unknown;
+  readonly path?: unknown;
+}
+
 interface GraphItemPayload {
+  readonly id?: unknown;
+  readonly name?: unknown;
+  readonly parentReference?: unknown;
+  readonly file?: unknown;
+  readonly folder?: unknown;
   readonly eTag?: unknown;
   readonly size?: unknown;
   readonly lastModifiedDateTime?: unknown;
+}
+
+interface GraphChildrenPayload {
+  readonly value?: unknown;
 }
 
 interface GraphErrorPayload {
@@ -54,6 +72,8 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 
 const isGraphItemPayload = (value: unknown): value is GraphItemPayload => isObject(value);
 
+const isGraphChildrenPayload = (value: unknown): value is GraphChildrenPayload => isObject(value);
+
 const isGraphErrorPayload = (value: unknown): value is GraphErrorPayload => isObject(value);
 
 const getGraphErrorMessage = (payload: unknown): string | null => {
@@ -76,6 +96,27 @@ const buildDriveItemUrl = (binding: DriveItemBinding, suffix = ''): string => {
   const driveId = encodeURIComponent(binding.driveId);
   const itemId = encodeURIComponent(binding.itemId);
   return `${GRAPH_API_BASE_URL}/drives/${driveId}/items/${itemId}${suffix}`;
+};
+
+const buildFolderChildrenUrl = (folder?: DriveFolderReference): string => {
+  if (folder === undefined) {
+    return `${GRAPH_API_BASE_URL}/me/drive/root/children`;
+  }
+
+  const driveId = encodeURIComponent(folder.driveId);
+  const itemId = encodeURIComponent(folder.itemId);
+  return `${GRAPH_API_BASE_URL}/drives/${driveId}/items/${itemId}/children`;
+};
+
+const normalizeParentPath = (value: string): string => {
+  const trimmedValue = value.trim();
+  const delimiterIndex = trimmedValue.indexOf(':');
+  const graphPath = delimiterIndex >= 0 ? trimmedValue.slice(delimiterIndex + 1) : trimmedValue;
+  const decodedPath = decodeURIComponent(graphPath);
+  const normalizedPath = decodedPath.length > 0 ? decodedPath : '/';
+  const withLeadingSlash = normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`;
+  const withoutTrailingSlash = withLeadingSlash.replace(/\/+$/g, '');
+  return withoutTrailingSlash.length > 0 ? withoutTrailingSlash : '/';
 };
 
 const createAuthorizedHeaders = (accessToken: string, headers?: HeadersInit): Headers => {
@@ -196,6 +237,41 @@ const readJsonPayload = async (
   }
 };
 
+const normalizeDriveItem = (
+  payload: unknown,
+  invalidResponseMessage: string,
+): GraphDriveItem | null => {
+  if (!isGraphItemPayload(payload)) {
+    throw new GraphClientError('unknown', invalidResponseMessage, undefined, payload);
+  }
+
+  if (
+    typeof payload.id !== 'string' ||
+    typeof payload.name !== 'string' ||
+    !isObject(payload.parentReference) ||
+    typeof (payload.parentReference as GraphParentReferencePayload).driveId !== 'string' ||
+    typeof (payload.parentReference as GraphParentReferencePayload).path !== 'string'
+  ) {
+    throw new GraphClientError('unknown', invalidResponseMessage, undefined, payload);
+  }
+
+  const kind = isObject(payload.folder) ? 'folder' : isObject(payload.file) ? 'file' : null;
+
+  if (kind === null) {
+    return null;
+  }
+
+  return {
+    driveId: (payload.parentReference as GraphParentReferencePayload).driveId as string,
+    itemId: payload.id,
+    name: payload.name,
+    parentPath: normalizeParentPath(
+      (payload.parentReference as GraphParentReferencePayload).path as string,
+    ),
+    kind,
+  };
+};
+
 const normalizeGraphItem = (
   payload: unknown,
   invalidResponseMessage: string,
@@ -218,6 +294,26 @@ const normalizeGraphItem = (
     sizeBytes: payload.size,
     lastModifiedDateTime: payload.lastModifiedDateTime,
   };
+};
+
+const normalizeChildrenPayload = (
+  payload: unknown,
+  invalidResponseMessage: string,
+): readonly GraphDriveItem[] => {
+  if (!isGraphChildrenPayload(payload) || !Array.isArray(payload.value)) {
+    throw new GraphClientError('unknown', invalidResponseMessage, undefined, payload);
+  }
+
+  return payload.value
+    .map((childPayload) => normalizeDriveItem(childPayload, invalidResponseMessage))
+    .filter((child): child is GraphDriveItem => child !== null)
+    .sort((left, right) => {
+      if (left.kind !== right.kind) {
+        return left.kind === 'folder' ? -1 : 1;
+      }
+
+      return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
+    });
 };
 
 export const createGraphClient = (options: CreateGraphClientOptions): GraphClient => {
@@ -255,6 +351,20 @@ export const createGraphClient = (options: CreateGraphClientOptions): GraphClien
   };
 
   return {
+    async listChildren(folder): Promise<readonly GraphDriveItem[]> {
+      const childrenUrl = `${buildFolderChildrenUrl(folder)}?$select=${encodeURIComponent(CHILDREN_FIELDS)}`;
+      const response = await executeRequest(childrenUrl);
+      const payload = await readJsonPayload(
+        response,
+        'Microsoft Graph children response did not include the required file fields.',
+      );
+
+      return normalizeChildrenPayload(
+        payload,
+        'Microsoft Graph children response did not include the required file fields.',
+      );
+    },
+
     async getFileMetadata(binding): Promise<GraphFileMetadata> {
       const metadataUrl = `${buildDriveItemUrl(binding)}?$select=${encodeURIComponent(METADATA_FIELDS)}`;
       const response = await executeRequest(metadataUrl);

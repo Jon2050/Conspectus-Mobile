@@ -1,3 +1,4 @@
+// Verifies the public graph barrel keeps the stable browse/read/upload client contract.
 import { describe, expect, it, vi } from 'vitest';
 
 import { createGraphClient } from './index';
@@ -29,6 +30,7 @@ describe('graph barrel contract', () => {
 
     expect(client).toEqual(
       expect.objectContaining({
+        listChildren: expect.any(Function),
         getFileMetadata: expect.any(Function),
         downloadFile: expect.any(Function),
         uploadFile: expect.any(Function),

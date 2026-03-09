@@ -1,3 +1,4 @@
+// Tests the Microsoft Graph client browse/read/upload behavior and error normalization.
 import { describe, expect, it, vi } from 'vitest';
 
 import { createGraphClient } from './graphClient';
@@ -47,6 +48,114 @@ const getFetchCall = (
   (fetchFn.mock.calls[0] as [string, RequestInit | undefined]) ?? ['', undefined];
 
 describe('createGraphClient', () => {
+  it('lists root drive children with normalized browse item details', async () => {
+    const authClient = createAuthClient();
+    const fetchFn = vi.fn(async () =>
+      createJsonResponse({
+        value: [
+          {
+            id: 'file-2',
+            name: 'zeta.db',
+            parentReference: {
+              driveId: 'drive-123',
+              path: '/drive/root:/Finance',
+            },
+            file: {},
+          },
+          {
+            id: 'folder-1',
+            name: 'Archives',
+            parentReference: {
+              driveId: 'drive-123',
+              path: '/drive/root:',
+            },
+            folder: {},
+          },
+          {
+            id: 'file-1',
+            name: 'alpha.db',
+            parentReference: {
+              driveId: 'drive-123',
+              path: '/drive/root:/Finance',
+            },
+            file: {},
+          },
+          {
+            id: 'ignored-package',
+            name: 'Package',
+            parentReference: {
+              driveId: 'drive-123',
+              path: '/drive/root:',
+            },
+          },
+        ],
+      }),
+    );
+    const client = createGraphClient({ authClient, fetchFn });
+
+    const items = await client.listChildren();
+
+    expect(items).toEqual([
+      {
+        driveId: 'drive-123',
+        itemId: 'folder-1',
+        name: 'Archives',
+        parentPath: '/',
+        kind: 'folder',
+      },
+      {
+        driveId: 'drive-123',
+        itemId: 'file-1',
+        name: 'alpha.db',
+        parentPath: '/Finance',
+        kind: 'file',
+      },
+      {
+        driveId: 'drive-123',
+        itemId: 'file-2',
+        name: 'zeta.db',
+        parentPath: '/Finance',
+        kind: 'file',
+      },
+    ]);
+
+    const [requestUrl] = getFetchCall(fetchFn);
+    expect(requestUrl).toBe(
+      'https://graph.microsoft.com/v1.0/me/drive/root/children?$select=id%2Cname%2CparentReference%2Cfile%2Cfolder',
+    );
+  });
+
+  it('lists folder children from a selected folder reference', async () => {
+    const authClient = createAuthClient();
+    const fetchFn = vi.fn(async () =>
+      createJsonResponse({
+        value: [
+          {
+            id: 'file-1',
+            name: 'conspectus.db',
+            parentReference: {
+              driveId: 'drive-123',
+              path: '/drive/root:/Finance',
+            },
+            file: {},
+          },
+        ],
+      }),
+    );
+    const client = createGraphClient({ authClient, fetchFn });
+
+    await client.listChildren({
+      driveId: 'drive-123',
+      itemId: 'folder-456',
+      path: '/Finance',
+    });
+
+    const [requestUrl] = getFetchCall(fetchFn);
+    expect(requestUrl).toBe(
+      'https://graph.microsoft.com/v1.0/drives/drive-123/items/folder-456/children?$select=id%2Cname%2CparentReference%2Cfile%2Cfolder',
+    );
+  });
+
   it('fetches file metadata with an auth-backed Graph request', async () => {
     const authClient = createAuthClient();
     const fetchFn = vi.fn(async () =>
@@ -295,6 +404,30 @@ describe('createGraphClient', () => {
     ).rejects.toMatchObject({
       code: 'unknown',
       message: 'Microsoft Graph upload response did not include the required file fields.',
+    });
+  });
+
+  it('rejects invalid children payloads with an unknown Graph error', async () => {
+    const authClient = createAuthClient();
+    const fetchFn = vi.fn(async () =>
+      createJsonResponse({
+        value: [
+          {
+            id: 'file-1',
+            name: 'conspectus.db',
+            parentReference: {
+              path: '/drive/root:/Finance',
+            },
+            file: {},
+          },
+        ],
+      }),
+    );
+    const client = createGraphClient({ authClient, fetchFn });
+
+    await expect(client.listChildren()).rejects.toMatchObject({
+      code: 'unknown',
+      message: 'Microsoft Graph children response did not include the required file fields.',
     });
   });
 });

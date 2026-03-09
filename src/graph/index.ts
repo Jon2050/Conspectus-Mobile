@@ -1,8 +1,25 @@
+// Defines the public Microsoft Graph types and client contract used by app features.
 export interface DriveItemBinding {
   readonly driveId: string;
   readonly itemId: string;
   readonly name: string;
   readonly parentPath: string;
+}
+
+export interface DriveFolderReference {
+  readonly driveId: string;
+  readonly itemId: string;
+  readonly path: string;
+}
+
+export type GraphDriveItemKind = 'file' | 'folder';
+
+export interface GraphDriveItem {
+  readonly driveId: string;
+  readonly itemId: string;
+  readonly name: string;
+  readonly parentPath: string;
+  readonly kind: GraphDriveItemKind;
 }
 
 export interface GraphFileMetadata {
@@ -33,6 +50,7 @@ export interface GraphError {
 }
 
 export interface GraphClient {
+  listChildren(folder?: DriveFolderReference): Promise<readonly GraphDriveItem[]>;
   getFileMetadata(binding: DriveItemBinding): Promise<GraphFileMetadata>;
   downloadFile(binding: DriveItemBinding): Promise<Uint8Array>;
   uploadFile(
