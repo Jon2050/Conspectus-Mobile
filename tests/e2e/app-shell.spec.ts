@@ -306,22 +306,39 @@ test('allows selecting a OneDrive .db file from the settings browser', async ({ 
 
   await page.getByTestId('select-file-file-finance-db').click();
 
-  await expect(page.getByTestId('binding-status-message')).toContainText(
-    'DB file selected for this session.',
-  );
+  await expect(page.getByTestId('binding-status-message')).toContainText('DB file selected.');
+  await expect(page.getByTestId('db-file-browser')).toHaveCount(0);
   await expect(page.getByTestId('selected-db-file-summary')).toContainText('budget.db');
   await expect(page.getByTestId('selected-db-file-summary')).toContainText('/Finance');
-  await expect(page.getByTestId('selected-db-file-summary')).toContainText('drive-123');
-  await expect(page.getByTestId('selected-db-file-summary')).toContainText('file-finance-db');
 
   await page.getByRole('link', { name: 'Accounts' }).click();
   await expect(page.getByRole('heading', { level: 2, name: 'Accounts' })).toBeVisible();
 
   await page.getByRole('link', { name: 'Settings' }).click();
-  await expect(page.getByTestId('binding-status-message')).toContainText(
-    'DB file selected for this session.',
-  );
+  await expect(page.getByTestId('binding-status-message')).toContainText('DB file selected.');
   await expect(page.getByTestId('selected-db-file-summary')).toContainText('budget.db');
+});
+
+test('keeps the selected DB file after reload', async ({ page }) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page);
+
+  await page.goto(appPath('#/settings'));
+  await page.getByRole('button', { name: 'Choose OneDrive DB file' }).click();
+  await page.getByTestId('select-file-file-root-db').click();
+
+  await expect(page.getByTestId('binding-status-message')).toContainText('DB file selected.');
+  await expect(page.getByTestId('selected-db-file-summary')).toContainText('conspectus.db');
+  await expect(page.getByTestId('db-file-browser')).toHaveCount(0);
+
+  await page.reload();
+
+  await expect(page.getByTestId('binding-status-message')).toContainText('DB file selected.');
+  await expect(page.getByTestId('selected-db-file-summary')).toContainText('conspectus.db');
+  await expect(page.getByTestId('selected-db-file-summary')).toContainText('/');
+  await expect(page.getByTestId('db-file-browser')).toHaveCount(0);
 });
 
 test('shows browse errors without pretending the OneDrive folder is empty', async ({ page }) => {

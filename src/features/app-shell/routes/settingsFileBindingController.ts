@@ -23,6 +23,7 @@ export interface SettingsFileBindingState {
   readonly selectedBinding: DriveItemBinding | null;
   readonly currentFolder: DriveFolderReference | null;
   readonly items: readonly GraphDriveItem[];
+  readonly browserIsOpen: boolean;
   readonly operation: SettingsFileBindingOperation;
   readonly error: SettingsFileBindingError | null;
   readonly hasLoaded: boolean;
@@ -50,6 +51,7 @@ const INITIAL_STATE: SettingsFileBindingState = {
   selectedBinding: null,
   currentFolder: null,
   items: [],
+  browserIsOpen: false,
   operation: 'idle',
   error: null,
   hasLoaded: false,
@@ -191,6 +193,7 @@ export const createSettingsFileBindingController = (
   const loadItems = async (folder?: DriveFolderReference): Promise<void> => {
     const requestId = beginRequest();
     updateState({
+      browserIsOpen: true,
       operation: 'loading',
       error: null,
     });
@@ -203,6 +206,7 @@ export const createSettingsFileBindingController = (
 
       updateState({
         items: items.filter(isSelectableDatabaseFile),
+        browserIsOpen: true,
         operation: 'idle',
         error: null,
         hasLoaded: true,
@@ -214,6 +218,7 @@ export const createSettingsFileBindingController = (
 
       updateState({
         items: [],
+        browserIsOpen: true,
         operation: 'idle',
         error: toBindingError(error, 'Failed to load OneDrive files.'),
         hasLoaded: true,
@@ -272,8 +277,12 @@ export const createSettingsFileBindingController = (
     selectFile(item: GraphDriveItem): void {
       try {
         const selectedBinding = validateSelectedBinding(item);
+        folderStack = [];
         updateState({
           selectedBinding,
+          browserIsOpen: false,
+          items: [],
+          hasLoaded: false,
           error: null,
         });
         options.onBindingChange?.(selectedBinding);

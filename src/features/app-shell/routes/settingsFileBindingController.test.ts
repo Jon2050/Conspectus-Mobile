@@ -110,6 +110,7 @@ describe('settings file binding controller', () => {
       selectedBinding: null,
       currentFolder: null,
       items: [ROOT_FOLDER_ITEM, ROOT_DB_FILE_ITEM],
+      browserIsOpen: true,
       operation: 'idle',
       error: null,
       hasLoaded: true,
@@ -152,6 +153,10 @@ describe('settings file binding controller', () => {
       name: 'conspectus.db',
       parentPath: '/',
     });
+    expect(controller.getState().browserIsOpen).toBe(false);
+    expect(controller.getState().items).toEqual([]);
+    expect(controller.getState().hasLoaded).toBe(false);
+    expect(controller.getState().canGoBack).toBe(false);
     expect(controller.getState().error).toBeNull();
     expect(onBindingChange).toHaveBeenCalledWith({
       driveId: 'drive-123',
@@ -220,6 +225,7 @@ describe('settings file binding controller', () => {
       name: 'conspectus.db',
       parentPath: '/',
     });
+    expect(controller.getState().browserIsOpen).toBe(false);
     expect(controller.getState().error).toEqual({
       code: 'invalid_selection',
       message: 'Selected file must use the .db extension.',
@@ -290,6 +296,7 @@ describe('settings file binding controller', () => {
       selectedBinding: null,
       currentFolder: null,
       items: [],
+      browserIsOpen: false,
       operation: 'idle',
       error: null,
       hasLoaded: false,
@@ -311,6 +318,7 @@ describe('settings file binding controller', () => {
       selectedBinding: null,
       currentFolder: null,
       items: [],
+      browserIsOpen: false,
       operation: 'idle',
       error: null,
       hasLoaded: false,

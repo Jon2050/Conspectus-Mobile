@@ -35,6 +35,7 @@
     selectedBinding: null,
     currentFolder: null,
     items: [],
+    browserIsOpen: false,
     operation: 'idle',
     error: null,
     hasLoaded: false,
@@ -75,7 +76,7 @@
     }
 
     if (nextState.selectedBinding !== null) {
-      return 'DB file selected for this session.';
+      return 'DB file selected.';
     }
 
     if (nextState.hasLoaded) {
@@ -233,18 +234,10 @@
           <dt>Folder path</dt>
           <dd>{bindingState.selectedBinding.parentPath}</dd>
         </div>
-        <div>
-          <dt>Drive ID</dt>
-          <dd>{bindingState.selectedBinding.driveId}</dd>
-        </div>
-        <div>
-          <dt>Item ID</dt>
-          <dd>{bindingState.selectedBinding.itemId}</dd>
-        </div>
       </dl>
     {/if}
 
-    {#if bindingState.hasLoaded}
+    {#if bindingState.browserIsOpen && bindingState.hasLoaded}
       <section class="settings-screen__browser" data-testid="db-file-browser">
         <header class="settings-screen__browser-header">
           <h4>Current folder</h4>
