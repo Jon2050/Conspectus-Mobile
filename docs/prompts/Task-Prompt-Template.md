@@ -13,6 +13,8 @@ Task: Implement issue `M<milestone>-<issue-number>` end-to-end with full verific
 
 ## Execution workflow:
 
+Always print in which step you are!
+
 1. Load context from:
    - `README.md`
    - `docs/Architecture-and-Implementation-Plan.md`
@@ -65,6 +67,6 @@ Task: Implement issue `M<milestone>-<issue-number>` end-to-end with full verific
 1. **Clean Code & Architecture:** Enforce DRY (no duplication) and KISS (no over-engineering). Keep cyclomatic complexity low. Avoid deeply nested code (Arrow Anti-Pattern), spaghetti code, and excessively long methods. Use common libraries instead of reinventing the wheel.
 2. **UI/UX:** UI components must be fully responsive across screen sizes. The UI must communicate system status clearly. Always implement loading states for async actions, explicit error/success feedback, and prevent double-submissions. Good and simple but modern and beautiful UX is very important!
 3. **AI Anti-Patterns (STRICTLY FORBIDDEN):** Never implement "backup" solutions, redundant fallbacks, or placeholder code. Do not introduce technical debt.
-4. **Documentation:** Code must be self-explanatory. Add meaningful inline comments only for complex or non-obvious logic.
+4. **Documentation:** Code must be self-explanatory. Add meaningful inline comments only for complex or non-obvious logic. Every file should start with a short description of what the file does and why it is needed.
 5. **Testing:** All new or changed behavior must be accompanied by appropriate, passing tests.
 6. **Contextual Alignment:** Before coding, verify that prerequisites from previous tasks are complete. Ensure your implementation serves as a solid foundation for related upcoming issues in the backlog.
