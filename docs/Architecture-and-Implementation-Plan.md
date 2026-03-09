@@ -351,6 +351,13 @@ M3-04 implementation clarification:
 - E2E auth mocking is enabled only on localhost hosts (`127.0.0.1`/`localhost`) used by Playwright; production hosts always use the real auth client.
 - Platform verification is covered by Playwright Chromium + Pixel 5 by default, with optional iPhone WebKit runs enabled through `PLAYWRIGHT_INCLUDE_IOS_WEBKIT=1`.
 
+M3-05 implementation clarification:
+
+- Graph access is implemented in `src/graph/graphClient.ts` and exposed through `@graph` as `createGraphClient`.
+- The client centralizes the MVP Graph operations needed by upcoming milestones: file metadata, raw file download, and conditional full-file upload.
+- Every Graph request acquires a bearer token from `@auth` using `GRAPH_ONEDRIVE_FILE_SCOPES`, keeping MSAL details out of the graph module surface.
+- Graph/auth failures are normalized into stable app-level graph error codes (`unauthorized`, `forbidden`, `not_found`, `conflict`, `network_error`, `unknown`) for UI and sync-layer handling.
+
 Deliverables:
 
 - Stable login flow with persisted session where possible.
