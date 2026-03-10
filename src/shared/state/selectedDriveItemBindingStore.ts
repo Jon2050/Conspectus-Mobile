@@ -118,6 +118,33 @@ const resolveDefaultStorage = (): StorageAdapter | null => {
   return window.localStorage;
 };
 
+const readPersistedBindingPayload = (
+  storage: StorageAdapter | null,
+  storageKey: string,
+): PersistedBindingPayload | null => {
+  if (storage === null) {
+    return null;
+  }
+
+  let rawValue: string | null;
+
+  try {
+    rawValue = storage.getItem(storageKey);
+  } catch {
+    return null;
+  }
+
+  if (rawValue === null) {
+    return null;
+  }
+
+  try {
+    return parsePersistedBindingPayload(JSON.parse(rawValue));
+  } catch {
+    return null;
+  }
+};
+
 const loadStoredBinding = (
   storage: StorageAdapter | null,
   storageKey: string,
@@ -127,21 +154,12 @@ const loadStoredBinding = (
     return null;
   }
 
-  try {
-    const rawValue = storage.getItem(storageKey);
-    if (rawValue === null) {
-      return null;
-    }
-
-    const parsedValue = parsePersistedBindingPayload(JSON.parse(rawValue));
-    if (parsedValue === null) {
-      return null;
-    }
-
-    return parsedValue.bindingsByAccountId[accountId] ?? null;
-  } catch {
+  const parsedValue = readPersistedBindingPayload(storage, storageKey);
+  if (parsedValue === null) {
     return null;
   }
+
+  return parsedValue.bindingsByAccountId[accountId] ?? null;
 };
 
 export const createSelectedDriveItemBindingStore = (
@@ -159,18 +177,16 @@ export const createSelectedDriveItemBindingStore = (
       return;
     }
 
+    const existingPayload = readPersistedBindingPayload(storage, storageKey);
+    const bindingsByAccountId = { ...(existingPayload?.bindingsByAccountId ?? {}) };
+
+    if (binding === null) {
+      delete bindingsByAccountId[activeAccountId];
+    } else {
+      bindingsByAccountId[activeAccountId] = binding;
+    }
+
     try {
-      const existingPayload = parsePersistedBindingPayload(
-        JSON.parse(storage.getItem(storageKey) ?? 'null'),
-      );
-      const bindingsByAccountId = { ...(existingPayload?.bindingsByAccountId ?? {}) };
-
-      if (binding === null) {
-        delete bindingsByAccountId[activeAccountId];
-      } else {
-        bindingsByAccountId[activeAccountId] = binding;
-      }
-
       if (Object.keys(bindingsByAccountId).length === 0) {
         storage.removeItem(storageKey);
         return;
