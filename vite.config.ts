@@ -7,6 +7,7 @@ import { defineConfig } from 'vitest/config';
 import { normalizeBasePath, toPreviewSlug } from './scripts/deploy-utils.mjs';
 
 const DEFAULT_PRODUCTION_BASE_PATH = '/conspectus/webapp/';
+const LIGHT_APP_THEME_COLOR = '#f3f4f6';
 
 const normalizeBasePrefix = (value: string | undefined): string => {
   const trimmedValue = value?.trim();
@@ -64,8 +65,8 @@ export default defineConfig({
         name: 'Conspectus Mobile',
         short_name: 'Conspectus',
         description: 'Mobile PWA for Conspectus.',
-        theme_color: '#dcdcdc',
-        background_color: '#f5f5f5',
+        theme_color: LIGHT_APP_THEME_COLOR,
+        background_color: LIGHT_APP_THEME_COLOR,
         display: 'standalone',
         start_url: basePath,
         scope: basePath,

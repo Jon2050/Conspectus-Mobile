@@ -324,15 +324,15 @@ An issue is only considered done when:
 - Depends on: `M4-02, M4-03`
 - GitHub: [#50](https://github.com/Jon2050/Conspectus-Mobile/issues/50)
 
-### :green_circle: M4-06 Add sync state UI
+### :green_circle: M4-05 Implement sync state machine for UI
 
 - Label: `feature`
 - Milestone: `M4 - Sync Engine + Local Cache`
-- Summary: Work includes synced, stale, offline, syncing, error visual indicators. It also covers background sync feedback (e.g. `appToastStore.show('Syncing...', 'info')`) instead of blocking modals.
+- Summary: Work includes states: syncing, synced, stale, offline, error and state transitions to UI. It also MUST surface background sync feedback (e.g. `appToastStore.show('Syncing...', 'info')`) instead of blocking modals.
 - Depends on: `M4-04`
-- GitHub: [#50](https://github.com/Jon2050/Conspectus-Mobile/issues/50)
+- GitHub: [#51](https://github.com/Jon2050/Conspectus-Mobile/issues/51)
 
-### :green_circle: M4-07 Add robust retry strategynd backoff for transient sync failures
+### :green_circle: M4-06 Add retry and backoff for transient sync failures
 
 - Label: `feature`
 - Milestone: `M4 - Sync Engine + Cache`
