@@ -7,6 +7,8 @@ declare global {
   }
 }
 
+const FALLBACK_INDEXEDDB_DATABASE_NAMES = ['conspectus-mobile-cache', 'conspectus-cache'];
+
 const defaultCacheStore: Pick<CacheStore, 'clearAll'> = {
   async clearAll(): Promise<void> {
     if (typeof window === 'undefined') {
@@ -52,6 +54,12 @@ const defaultCacheStore: Pick<CacheStore, 'clearAll'> = {
     try {
       const indexedDbApi = window.indexedDB;
       if (typeof indexedDbApi !== 'undefined') {
+        const filterConspectusDatabaseNames = (databaseNames: readonly string[]): string[] =>
+          databaseNames.filter(
+            (databaseName) =>
+              databaseName.length > 0 && databaseName.toLowerCase().includes('conspectus'),
+          );
+
         const deleteIndexedDatabase = async (databaseName: string): Promise<void> => {
           const request = indexedDbApi.deleteDatabase(databaseName);
           if (request === undefined || typeof request !== 'object' || !('onsuccess' in request)) {
@@ -71,16 +79,21 @@ const defaultCacheStore: Pick<CacheStore, 'clearAll'> = {
           });
         };
 
-        const resolvedDatabaseNames =
-          typeof indexedDbApi.databases === 'function'
-            ? (await indexedDbApi.databases())
-                .map((database) => database.name?.trim() ?? '')
-                .filter(
-                  (databaseName) =>
-                    databaseName.length > 0 && databaseName.toLowerCase().includes('conspectus'),
-                )
-            : ['conspectus-mobile-cache', 'conspectus-cache'];
-        const uniqueDatabaseNames = [...new Set(resolvedDatabaseNames)];
+        let resolvedDatabaseNames = [...FALLBACK_INDEXEDDB_DATABASE_NAMES];
+        if (typeof indexedDbApi.databases === 'function') {
+          try {
+            resolvedDatabaseNames = [
+              ...FALLBACK_INDEXEDDB_DATABASE_NAMES,
+              ...(await indexedDbApi.databases()).map((database) => database.name?.trim() ?? ''),
+            ];
+          } catch {
+            resolvedDatabaseNames = [...FALLBACK_INDEXEDDB_DATABASE_NAMES];
+          }
+        }
+
+        const uniqueDatabaseNames = [
+          ...new Set(filterConspectusDatabaseNames(resolvedDatabaseNames)),
+        ];
 
         for (const databaseName of uniqueDatabaseNames) {
           await deleteIndexedDatabase(databaseName);

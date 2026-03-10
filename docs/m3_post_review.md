@@ -92,6 +92,8 @@ Findings that can be resolved in under 20 minutes with isolated, localized chang
 
 #### S-05: IndexedDB `databases()` exception bypasses fallback cleanup targets
 
+- **Status:** Fixed on 2026-03-10.
+
 - **Severity:** Low
 - **Perspective:** Bug Hunting / Resilience
 - **Location:** `src/features/app-shell/routes/settingsCacheStoreResolver.ts` (lines 74-82)

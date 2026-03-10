@@ -84,7 +84,34 @@ describe('settings cache store resolver', () => {
     expect(sessionStorage.getItem('untouched')).toBe('keep');
     expect(cacheDelete).toHaveBeenCalledTimes(1);
     expect(cacheDelete).toHaveBeenCalledWith('conspectus-mobile-precache-v1');
-    expect(indexedDbDeleteDatabase).toHaveBeenCalledTimes(1);
-    expect(indexedDbDeleteDatabase).toHaveBeenCalledWith('conspectus-mobile-cache');
+    expect(indexedDbDeleteDatabase).toHaveBeenCalledTimes(2);
+    expect(indexedDbDeleteDatabase).toHaveBeenNthCalledWith(1, 'conspectus-mobile-cache');
+    expect(indexedDbDeleteDatabase).toHaveBeenNthCalledWith(2, 'conspectus-cache');
+  });
+
+  it('falls back to known IndexedDB cleanup targets when databases enumeration throws', async () => {
+    const indexedDbDeleteDatabase = vi.fn();
+    vi.stubGlobal('window', {
+      location: { hostname: 'jon2050.de' },
+      localStorage: createMemoryStorage({}),
+      sessionStorage: createMemoryStorage({}),
+      caches: {
+        keys: vi.fn(async () => []),
+        delete: vi.fn(async () => true),
+      },
+      indexedDB: {
+        databases: vi.fn(async () => {
+          throw new Error('Enumeration blocked.');
+        }),
+        deleteDatabase: indexedDbDeleteDatabase,
+      },
+    });
+
+    const { resolveSettingsCacheStore } = await import('./settingsCacheStoreResolver');
+    await resolveSettingsCacheStore().clearAll();
+
+    expect(indexedDbDeleteDatabase).toHaveBeenCalledTimes(2);
+    expect(indexedDbDeleteDatabase).toHaveBeenNthCalledWith(1, 'conspectus-mobile-cache');
+    expect(indexedDbDeleteDatabase).toHaveBeenNthCalledWith(2, 'conspectus-cache');
   });
 });
