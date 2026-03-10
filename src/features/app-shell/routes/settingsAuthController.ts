@@ -67,6 +67,7 @@ export const createSettingsAuthController = (authClient: AuthClient): SettingsAu
     error: null,
   };
   let isInitialized = false;
+  let initializationPromise: Promise<void> | null = null;
   const listeners = new Set<SettingsAuthStateListener>();
 
   const emitState = (): void => {
@@ -108,7 +109,12 @@ export const createSettingsAuthController = (authClient: AuthClient): SettingsAu
     },
 
     async initialize(): Promise<void> {
-      if (state.operation === 'initializing') {
+      if (isInitialized) {
+        return;
+      }
+
+      if (initializationPromise !== null) {
+        await initializationPromise;
         return;
       }
 
@@ -117,26 +123,32 @@ export const createSettingsAuthController = (authClient: AuthClient): SettingsAu
         error: null,
       });
 
-      try {
-        await authClient.initialize();
-        isInitialized = true;
-        refreshSession();
-        updateState({
-          operation: 'idle',
-          error: null,
-        });
-      } catch (error) {
-        isInitialized = false;
-        refreshSession();
-        updateState({
-          operation: 'idle',
-          error: toAuthError(error, 'Failed to initialize authentication.'),
-        });
-      }
+      initializationPromise = (async () => {
+        try {
+          await authClient.initialize();
+          isInitialized = true;
+          refreshSession();
+          updateState({
+            operation: 'idle',
+            error: null,
+          });
+        } catch (error) {
+          isInitialized = false;
+          refreshSession();
+          updateState({
+            operation: 'idle',
+            error: toAuthError(error, 'Failed to initialize authentication.'),
+          });
+        } finally {
+          initializationPromise = null;
+        }
+      })();
+
+      await initializationPromise;
     },
 
     async signIn(): Promise<void> {
-      if (state.operation !== 'idle') {
+      if (state.operation === 'signing_in' || state.operation === 'signing_out') {
         return;
       }
 
@@ -145,6 +157,8 @@ export const createSettingsAuthController = (authClient: AuthClient): SettingsAu
         if (!initialized || state.operation !== 'idle') {
           return;
         }
+      } else if (state.operation !== 'idle') {
+        return;
       }
 
       updateState({
@@ -169,7 +183,7 @@ export const createSettingsAuthController = (authClient: AuthClient): SettingsAu
     },
 
     async signOut(): Promise<void> {
-      if (state.operation !== 'idle') {
+      if (state.operation === 'signing_in' || state.operation === 'signing_out') {
         return;
       }
 
@@ -178,6 +192,8 @@ export const createSettingsAuthController = (authClient: AuthClient): SettingsAu
         if (!initialized || state.operation !== 'idle') {
           return;
         }
+      } else if (state.operation !== 'idle') {
+        return;
       }
 
       updateState({
