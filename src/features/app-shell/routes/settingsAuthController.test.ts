@@ -137,6 +137,30 @@ describe('settings auth controller', () => {
     );
   });
 
+  it('waits for in-flight initialization before continuing sign-in', async () => {
+    const initializeDeferred = createDeferred<void>();
+    harness.initialize.mockImplementationOnce(async () => {
+      await initializeDeferred.promise;
+    });
+    const controller = createSettingsAuthController(harness.client);
+
+    const initializePromise = controller.initialize();
+    const signInPromise = controller.signIn();
+
+    expect(harness.initialize).toHaveBeenCalledTimes(1);
+    expect(harness.signIn).not.toHaveBeenCalled();
+
+    initializeDeferred.resolve();
+    await Promise.all([initializePromise, signInPromise]);
+
+    expect(harness.signIn).toHaveBeenCalledTimes(1);
+    expect(controller.getState()).toEqual({
+      operation: 'idle',
+      error: null,
+      session: SIGNED_IN_SESSION,
+    });
+  });
+
   it('transitions through signing_in and returns to idle after successful sign-in', async () => {
     const signInDeferred = createDeferred<void>();
     harness.signIn.mockImplementationOnce(async () => {
@@ -176,6 +200,31 @@ describe('settings auth controller', () => {
 
     signInDeferred.resolve();
     await Promise.all([firstSignIn, secondSignIn]);
+  });
+
+  it('waits for in-flight initialization before continuing sign-out', async () => {
+    const initializeDeferred = createDeferred<void>();
+    harness.setSession(SIGNED_IN_SESSION);
+    harness.initialize.mockImplementationOnce(async () => {
+      await initializeDeferred.promise;
+    });
+    const controller = createSettingsAuthController(harness.client);
+
+    const initializePromise = controller.initialize();
+    const signOutPromise = controller.signOut();
+
+    expect(harness.initialize).toHaveBeenCalledTimes(1);
+    expect(harness.signOut).not.toHaveBeenCalled();
+
+    initializeDeferred.resolve();
+    await Promise.all([initializePromise, signOutPromise]);
+
+    expect(harness.signOut).toHaveBeenCalledTimes(1);
+    expect(controller.getState()).toEqual({
+      operation: 'idle',
+      error: null,
+      session: SIGNED_OUT_SESSION,
+    });
   });
 
   it('captures sign-out errors and preserves authenticated session state', async () => {
