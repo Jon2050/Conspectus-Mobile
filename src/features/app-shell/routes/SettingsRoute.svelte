@@ -266,7 +266,7 @@
 
     <div class="settings-screen__actions">
       <button
-        class="settings-screen__button settings-screen__button--primary"
+        class="app-button app-button--primary"
         type="button"
         on:click={handleBrowseClick}
         disabled={authOperationIsPending ||
@@ -279,7 +279,7 @@
       {#if bindingState.browserIsOpen}
         {#if bindingState.canGoBack}
           <button
-            class="settings-screen__button settings-screen__button--secondary"
+            class="app-button app-button--secondary"
             type="button"
             on:click={handleBackClick}
             disabled={bindingState.operation !== 'idle'}
@@ -289,7 +289,7 @@
         {/if}
 
         <button
-          class="settings-screen__button settings-screen__button--secondary"
+          class="app-button app-button--secondary"
           type="button"
           data-testid="cancel-db-file-browser-button"
           on:click={handleCancelBrowseClick}
@@ -302,7 +302,7 @@
 
     <div class="settings-screen__actions">
       <button
-        class="settings-screen__button settings-screen__button--danger"
+        class="app-button app-button--danger"
         type="button"
         data-testid="reset-local-app-data-button"
         on:click={handleRequestLocalResetClick}
@@ -341,7 +341,7 @@
 
       <div class="settings-screen__actions">
         <button
-          class="settings-screen__button settings-screen__button--secondary"
+          class="app-button app-button--secondary"
           type="button"
           on:click={handleCancelLocalResetClick}
           disabled={localDataResetState.operation === 'resetting'}
@@ -349,7 +349,7 @@
           Cancel
         </button>
         <button
-          class="settings-screen__button settings-screen__button--danger"
+          class="app-button app-button--danger"
           type="button"
           data-testid="confirm-reset-local-app-data-button"
           on:click={handleConfirmLocalResetClick}
@@ -434,7 +434,7 @@
   <div class="settings-screen__actions">
     {#if state.session.isAuthenticated}
       <button
-        class="settings-screen__button settings-screen__button--secondary"
+        class="app-button app-button--secondary"
         type="button"
         on:click={handleSignOutClick}
         disabled={authOperationIsPending || localDataResetState.operation !== 'idle'}
@@ -443,7 +443,7 @@
       </button>
     {:else}
       <button
-        class="settings-screen__button settings-screen__button--primary"
+        class="app-button app-button--primary"
         type="button"
         on:click={handleSignInClick}
         disabled={authOperationIsPending}
@@ -468,11 +468,11 @@
 
   .settings-screen__auth-error {
     margin: 0;
-    padding: 0.65rem;
-    border: 1px solid color-mix(in srgb, var(--error) 40%, var(--border));
-    border-radius: 0.75rem;
-    color: #7d1111;
-    background: #ffe9e9;
+    padding: 1rem;
+    border: none;
+    border-radius: var(--radius-md);
+    color: #991b1b;
+    background: #fef2f2;
   }
 
   .settings-screen__binding-status {
@@ -482,11 +482,11 @@
 
   .settings-screen__binding-error {
     margin: 0;
-    padding: 0.65rem;
-    border: 1px solid color-mix(in srgb, var(--error) 40%, var(--border));
-    border-radius: 0.75rem;
-    color: #7d1111;
-    background: #ffe9e9;
+    padding: 1rem;
+    border: none;
+    border-radius: var(--radius-md);
+    color: #991b1b;
+    background: #fef2f2;
   }
 
   .settings-screen__subheading {
@@ -505,10 +505,11 @@
   .settings-screen__binding-summary div {
     display: grid;
     gap: 0.2rem;
-    padding: 0.65rem;
-    border: 1px solid var(--border);
-    border-radius: 0.75rem;
-    background: color-mix(in srgb, var(--surface) 94%, white);
+    padding: 0.85rem;
+    border: none;
+    border-radius: var(--radius-md);
+    background: var(--surface-strong);
+    box-shadow: var(--shadow-sm);
   }
 
   .settings-screen__account-summary dt,
@@ -532,52 +533,17 @@
     flex-wrap: wrap;
   }
 
-  .settings-screen__button {
-    min-height: 2.75rem;
-    padding: 0.55rem 0.95rem;
-    border-radius: 0.75rem;
-    border: 1px solid transparent;
-    font: inherit;
-    font-weight: 600;
-    cursor: pointer;
-    transition:
-      border-color 120ms ease,
-      background-color 120ms ease;
-  }
-
-  .settings-screen__button:disabled {
-    opacity: 0.65;
-    cursor: not-allowed;
-  }
-
-  .settings-screen__button--primary {
-    color: #ffffff;
-    background: var(--accent);
-    border-color: color-mix(in srgb, var(--accent) 80%, black);
-  }
-
-  .settings-screen__button--secondary {
-    color: var(--text-primary);
-    background: var(--surface);
-    border-color: var(--border);
-  }
-
-  .settings-screen__button--danger {
-    color: #ffffff;
-    background: color-mix(in srgb, var(--error) 92%, black);
-    border-color: color-mix(in srgb, var(--error) 55%, black);
-  }
-
   .settings-screen__confirmation {
     display: grid;
-    gap: 0.65rem;
+    gap: 0.85rem;
     width: min(32rem, calc(100vw - 2rem));
     max-width: 100%;
     margin: auto;
-    padding: 0.8rem;
-    border: 1px solid color-mix(in srgb, var(--error) 40%, var(--border));
-    border-radius: 0.9rem;
-    background: #fff2f2;
+    padding: 1.5rem;
+    border: none;
+    border-radius: var(--radius-lg);
+    background: #fef2f2;
+    box-shadow: var(--shadow-lg);
   }
 
   .settings-screen__confirmation:not([open]) {
@@ -604,10 +570,11 @@
   .settings-screen__browser {
     display: grid;
     gap: 0.85rem;
-    padding: 0.85rem;
-    border: 1px solid var(--border);
-    border-radius: 1rem;
-    background: color-mix(in srgb, var(--surface) 95%, white);
+    padding: 1.25rem;
+    border: none;
+    border-radius: var(--radius-lg);
+    background: var(--surface-strong);
+    box-shadow: var(--shadow-sm);
   }
 
   .settings-screen__browser-header {
@@ -644,25 +611,32 @@
   .settings-screen__browser-item {
     width: 100%;
     min-height: 3rem;
-    padding: 0.7rem 0.8rem;
+    padding: 0.85rem 1rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.8rem;
-    border: 1px solid var(--border);
-    border-radius: 0.85rem;
-    background: #ffffff;
+    border: none;
+    border-radius: var(--radius-md);
+    background: var(--surface-strong);
+    box-shadow: var(--shadow-sm);
     color: var(--text-primary);
     font: inherit;
     text-align: left;
     cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .settings-screen__browser-item:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
   }
 
   .settings-screen__browser-item--folder {
-    border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+    border-left: 4px solid var(--accent);
   }
 
   .settings-screen__browser-item--file {
-    border-color: color-mix(in srgb, var(--success) 35%, var(--border));
+    border-left: 4px solid var(--positive);
   }
 </style>

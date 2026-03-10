@@ -144,3 +144,57 @@ The codebase is exceptionally well-prepared for **M4 (Sync Engine + Cache)**.
 | Medium    | 0     | 0        | 0    | 0      | 0   | 0           |
 | Large     | 0     | 0        | 0    | 0      | 0   | 0           |
 | **Total** | 5     | 0        | 0    | 1      | 4   | 0           |
+
+---
+
+## UI/UX Design Review & Recommendations
+
+**Current UI/UX Status:**
+While the current UI is highly functional and fulfills the MVP requirements, the visual design relies on basic system conventions (standard fonts, grayish backgrounds, primitive border styles). To elevate the app to look "very nice, friendly, and cool" without overloading the user, the aesthetics need a modern redesign.
+
+### 1. Typography
+
+- **Observation:** The app uses standard system fonts (`Segoe UI`, `Helvetica Neue`), which can feel slightly dated or generic.
+- **Recommendation:** Integrate a modern, friendly geometric or humanist sans-serif font like **Inter**, **Outfit**, or **Plus Jakarta Sans** (available via Google Fonts). A typography refresh instantly makes the interface look cleaner and more premium.
+- **Implementation:** Import the selected font into `app.css` (or index.html) and update the `--font-family` variable accordingly. Ensure font weights (e.g., 400 for body, 600/700 for headings/totals) provide clear hierarchy.
+
+### 2. Color Palette & Contrast
+
+- **Observation:** The background utilizes muddy gradients (`#dcdcdc`, `#e7e7e7`) with plain white cards (`#ffffff`). Accent colors (`#0f8f96`) lack vibrancy.
+- **Recommendation:**
+  - Switch to a softer, clean light background (e.g., a very light grayish-slate like `#F8FAFC` or `#F3F4F6`). This provides a refreshing canvas that makes bright white surfaces pop cleanly.
+  - Refine the accent colors into a more vibrant, modern teal or blue (e.g., `#0D9488`).
+  - Use semantic colors for positive (`#10B981`) and negative (`#EF4444`) that are both vibrant and accessible.
+- **Scalable Approach:** Transition CSS variables from strict hex codes to a scaleable palette (e.g., using `hsl`, `rgb` or a numeric scale like `--accent-100` to `--accent-900`) so future components possess a consistent, easily extensible color language.
+
+### 3. Depth, Borders, and Shapes
+
+- **Observation:** Elements heavily use a strict `1px solid var(--border)` with standard corner radii (`1rem` / `0.75rem`).
+- **Recommendation:**
+  - Standardize towards a cohesive "squircle" look by moderately increasing the `border-radius` (e.g., `1.25rem` or `1.5rem` for large cards/containers).
+  - **Remove hard borders where possible** and replace them with soft, diffused drop shadows (e.g., `box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);`). This shifts the app toward a modern "glassy" or card-based elevation.
+  - Increase internal padding (from `0.65rem` to `1rem` or `1.25rem`) inside cards and lists to give data room to breathe and reduce visual clutter.
+
+### 4. Interactive Elements & Micro-animations
+
+- **Observation:** Buttons and navigation items have straightforward hover states without motion.
+- **Recommendation:** Add satisfying tactile micro-animations to make the app feel alive and highly responsive.
+- **Implementation:**
+  - Add `transform: scale(0.97)` to buttons on `:active` to provide immediate physical-feeling feedback.
+  - Apply subtle, smooth background gradients to primary actions (e.g., `linear-gradient(135deg, var(--accent) 0%, #0b7a7f 100%)`).
+  - Introduce smooth transitions (`transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);`) to all interactive hover elements.
+
+### 5. Navigation Bar Modernization
+
+- **Observation:** The bottom navigation (`.app-nav`) is a blocky sticky bar spanning the container edges.
+- **Recommendation:** Evolve the navigation bar into a modern "Floating Dock" or pill shape.
+- **Implementation:** Disconnect it slightly from the absolute bottom using margin (`margin-bottom: 1rem;` plus `env(safe-area-inset-bottom)`), give it a strong completely rounded border (`border-radius: 9999px` or `2rem`), and apply a premium background blur (`backdrop-filter: blur(12px)`) with a refined shadow. This creates a much cooler, native-feeling aesthetic without complex behavior changes.
+
+### Scalable Implementation Plan (Applying to the Codebase)
+
+To systematically implement these without risking layout breakage:
+
+1. **Define a Design Token Base:** Update `:root` in `app.css` systematically. Introduce the new typography, the scalable color palette scheme, and robust shadow variables (e.g., `--shadow-sm`, `--shadow-md`, `--shadow-lg`).
+2. **Global Component Updates:** Refactor `.app-shell`, `.app-header`, and generic card elements across `.svelte` routes to utilize the new shadow tokens instead of solid borders.
+3. **Floating Nav:** Refactor `.app-nav` CSS to detach it from the container bounds and apply the floating dock styles.
+4. **Button Normalization:** Extract standard interactive styles (e.g., `.settings-screen__button`) into a global `.app-button` utility class in `app.css`. This ensures that any new feature additions will inherently use the exact same polished, animated, and correctly scaled buttons automatically.
