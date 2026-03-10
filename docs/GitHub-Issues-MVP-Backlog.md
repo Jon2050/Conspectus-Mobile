@@ -284,7 +284,7 @@ An issue is only considered done when:
 - Depends on: `M3-07`
 - GitHub: [#43](https://github.com/Jon2050/Conspectus-Mobile/issues/43)
 
-### :green_circle: M3-09 Add auth and binding integration tests
+### :white_check_mark: M3-09 Add auth and binding integration tests
 
 - Label: `test`
 - Milestone: `M3 - Auth + OneDrive Binding`

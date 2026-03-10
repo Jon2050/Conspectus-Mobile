@@ -379,6 +379,12 @@ M3-08 implementation clarification:
 - Reset execution is wired through `src/features/app-shell/routes/settingsCacheStoreResolver.ts`, which clears app-owned local storage/session storage keys, service-worker cache entries with `conspectus` naming, and IndexedDB databases matching `conspectus` before binding removal completes.
 - The reset confirmation is rendered as a modal `dialog` and blocks sign-out/reset/rebind controls while confirmation or reset is active to prevent account-context race conditions during binding clearance.
 
+M3-09 implementation clarification:
+
+- Auth and binding integration coverage is implemented in `tests/e2e/app-shell.spec.ts` and validated in CI through `npm run test:e2e`.
+- Core browser-level scenarios now include sign-in/sign-out settings flow, selected DB binding persistence across reload, and startup restoration of an existing binding on non-settings routes.
+- Failure-mode coverage includes token acquisition failure during OneDrive browse (surfaces binding error UI) and malformed `.db` selection (surfaces validation error and prevents false success state).
+
 Deliverables:
 
 - Stable login flow with persisted session where possible.

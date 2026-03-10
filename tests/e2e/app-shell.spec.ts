@@ -573,6 +573,11 @@ test('shows validation error for malformed .db selection and does not persist a 
     'File selection error. Selected file did not include the required OneDrive identifiers.',
   );
   await expect(page.getByTestId('selected-db-file-summary')).toHaveCount(0);
+
+  const persistedBindingValue = await page.evaluate(() =>
+    window.localStorage.getItem('conspectus.selectedDriveItemBinding'),
+  );
+  expect(persistedBindingValue).toBeNull();
 });
 
 test('processes redirect auth hash before route navigation and keeps signed-in status', async ({
