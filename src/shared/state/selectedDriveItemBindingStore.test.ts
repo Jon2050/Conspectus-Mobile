@@ -116,6 +116,38 @@ describe('createSelectedDriveItemBindingStore', () => {
     expect(get(store)).toBeNull();
   });
 
+  it('recovers by overwriting malformed persisted JSON on the next save', () => {
+    const { storage, values } = createMemoryStorage();
+    const storageKey = 'binding-key';
+    const binding = {
+      driveId: 'drive-123',
+      itemId: 'item-456',
+      name: 'conspectus.db',
+      parentPath: '/Finance',
+    } as const;
+    values[storageKey] = '{"version":2,"bindingsByAccountId":';
+
+    const store = createSelectedDriveItemBindingStore(null, {
+      storage,
+      storageKey,
+      initialActiveAccountId: 'account-1',
+    });
+
+    expect(get(store)).toBeNull();
+
+    store.setBinding(binding);
+
+    expect(get(store)).toEqual(binding);
+    expect(values[storageKey]).toBe(
+      JSON.stringify({
+        version: 2,
+        bindingsByAccountId: {
+          'account-1': binding,
+        },
+      }),
+    );
+  });
+
   it('does not hydrate persisted binding when account does not match', () => {
     const { storage, values } = createMemoryStorage();
     const storageKey = 'binding-key';
