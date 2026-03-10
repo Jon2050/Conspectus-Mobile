@@ -37,6 +37,7 @@ export interface SettingsFileBindingController {
   subscribe(listener: SettingsFileBindingStateListener): () => void;
   hydrateSelectedBinding(binding: DriveItemBinding | null): void;
   browseRoot(): Promise<void>;
+  cancelBrowse(): void;
   openFolder(item: GraphDriveItem): Promise<void>;
   goBack(): Promise<void>;
   selectFile(item: GraphDriveItem): void;
@@ -261,6 +262,18 @@ export const createSettingsFileBindingController = (
 
       folderStack = [];
       await loadItems();
+    },
+
+    cancelBrowse(): void {
+      beginRequest();
+      folderStack = [];
+      updateState({
+        browserIsOpen: false,
+        items: [],
+        operation: 'idle',
+        error: null,
+        hasLoaded: false,
+      });
     },
 
     async openFolder(item: GraphDriveItem): Promise<void> {

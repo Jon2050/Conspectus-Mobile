@@ -163,6 +163,11 @@
   const handleBrowseClick = (): void => {
     void fileBindingController.browseRoot();
   };
+
+  const handleCancelBrowseClick = (): void => {
+    fileBindingController.cancelBrowse();
+  };
+
   const handleRequestLocalResetClick = (): void => {
     localDataController.requestReset();
   };
@@ -271,14 +276,26 @@
         {bindingState.selectedBinding === null ? 'Select DB File' : 'Change DB file'}
       </button>
 
-      {#if bindingState.browserIsOpen && bindingState.canGoBack}
+      {#if bindingState.browserIsOpen}
+        {#if bindingState.canGoBack}
+          <button
+            class="settings-screen__button settings-screen__button--secondary"
+            type="button"
+            on:click={handleBackClick}
+            disabled={bindingState.operation !== 'idle'}
+          >
+            Back to parent folder
+          </button>
+        {/if}
+
         <button
           class="settings-screen__button settings-screen__button--secondary"
           type="button"
-          on:click={handleBackClick}
-          disabled={bindingState.operation !== 'idle'}
+          data-testid="cancel-db-file-browser-button"
+          on:click={handleCancelBrowseClick}
+          disabled={localDataResetState.operation !== 'idle'}
         >
-          Back to parent folder
+          Cancel
         </button>
       {/if}
     </div>
