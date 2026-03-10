@@ -206,6 +206,17 @@ Core UI patterns:
 - Native feel via `viewport-fit=cover` and CSS safe-area insets (`env(safe-area-inset-bottom)`) to prevent notch/home bar overlap.
 - Explicit Apple touch icons for Add to Home Screen.
 
+## 4.1 Advanced Mobile UI Patterns
+
+To ensure a continuous "native-app" feel throughout upcoming milestones, the application implements the following unified patterns via `@shared/components` (`src/features/app-shell/components`):
+
+- **Zero-Dependency Motion:** Route and list changes MUST utilize standard Svelte `fly`, `fade`, and `slide` transitions instead of third-party animation libraries.
+- **Transient Feedback (Toasts):** Background sync operations (M4, M6) MUST surface non-blocking feedback via `appToastStore` (e.g., `appToastStore.show('Syncing...', 'info')`) to avoid interrupting user flows.
+- **Contextual Data Entry (Bottom Sheet):** The core "Add Transfer" flow (M6) MUST utilize the `<BottomSheet />` component (a styled standard `<dialog>`) rather than a full page route to keep the user anchored to their context.
+- **Perceived Performance (Skeleton Loading):** Fetch operations involving SQL or Graph API MUST render `<SkeletonCard />` components instead of spinning circles during the initial data load.
+- **System Dark Mode:** The app uses `@media (prefers-color-scheme: dark)` in `app.css` to automatically map base color variables to a dark slate equivalent. No manual toggle is required.
+- **Mobile Input Zoom Prevention:** All inputs MUST use the `.app-input` utility class which binds `font-size: 16px` to prevent automatic zoom behavior on iOS Safari.
+
 ---
 
 ## 5. Detailed Implementation Plan (Milestones)
