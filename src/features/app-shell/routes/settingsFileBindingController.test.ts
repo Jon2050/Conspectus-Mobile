@@ -311,6 +311,80 @@ describe('settings file binding controller', () => {
     expect(controller.getState().canGoBack).toBe(false);
   });
 
+  it('cancels an open browser without clearing the existing selected binding', async () => {
+    const controller = createSettingsFileBindingController(harness.graphClient, {
+      onBindingChange,
+    });
+
+    await controller.browseRoot();
+    controller.selectFile(ROOT_DB_FILE_ITEM);
+    await controller.browseRoot();
+    await controller.openFolder(ROOT_FOLDER_ITEM);
+
+    controller.cancelBrowse();
+
+    expect(controller.getState()).toEqual({
+      selectedBinding: {
+        driveId: 'drive-123',
+        itemId: 'file-1',
+        name: 'conspectus.db',
+        parentPath: '/',
+      },
+      currentFolder: null,
+      items: [],
+      browserIsOpen: false,
+      operation: 'idle',
+      error: null,
+      hasLoaded: false,
+      canGoBack: false,
+    });
+    expect(onBindingChange).toHaveBeenCalledTimes(1);
+    expect(onBindingChange).toHaveBeenCalledWith({
+      driveId: 'drive-123',
+      itemId: 'file-1',
+      name: 'conspectus.db',
+      parentPath: '/',
+    });
+  });
+
+  it('ignores stale browse results that resolve after the browser is cancelled', async () => {
+    const browseDeferred = createDeferred<readonly GraphDriveItem[]>();
+    harness.listChildren.mockImplementationOnce(async () => browseDeferred.promise);
+    const controller = createSettingsFileBindingController(harness.graphClient, {
+      onBindingChange,
+      initialSelectedBinding: {
+        driveId: 'drive-123',
+        itemId: 'file-1',
+        name: 'conspectus.db',
+        parentPath: '/',
+      },
+    });
+
+    const browsePromise = controller.browseRoot();
+    expect(controller.getState().operation).toBe('loading');
+
+    controller.cancelBrowse();
+    browseDeferred.resolve(ROOT_ITEMS);
+    await browsePromise;
+
+    expect(controller.getState()).toEqual({
+      selectedBinding: {
+        driveId: 'drive-123',
+        itemId: 'file-1',
+        name: 'conspectus.db',
+        parentPath: '/',
+      },
+      currentFolder: null,
+      items: [],
+      browserIsOpen: false,
+      operation: 'idle',
+      error: null,
+      hasLoaded: false,
+      canGoBack: false,
+    });
+    expect(onBindingChange).not.toHaveBeenCalled();
+  });
+
   it('rebinds to a different database file from an already selected binding', async () => {
     const controller = createSettingsFileBindingController(harness.graphClient, {
       onBindingChange,
