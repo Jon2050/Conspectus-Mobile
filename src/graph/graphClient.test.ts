@@ -224,6 +224,36 @@ describe('createGraphClient', () => {
     );
   });
 
+  it('falls back to the raw parent path when Graph returns malformed percent-encoding', async () => {
+    const authClient = createAuthClient();
+    const fetchFn = vi.fn(async () =>
+      createJsonResponse({
+        value: [
+          {
+            id: 'file-1',
+            name: 'conspectus.db',
+            parentReference: {
+              driveId: 'drive-123',
+              path: '/drive/root:/Finance%2',
+            },
+            file: {},
+          },
+        ],
+      }),
+    );
+    const client = createGraphClient({ authClient, fetchFn });
+
+    await expect(client.listChildren()).resolves.toEqual([
+      {
+        driveId: 'drive-123',
+        itemId: 'file-1',
+        name: 'conspectus.db',
+        parentPath: '/Finance%2',
+        kind: 'file',
+      },
+    ]);
+  });
+
   it('fetches file metadata with an auth-backed Graph request', async () => {
     const authClient = createAuthClient();
     const fetchFn = vi.fn(async () =>
