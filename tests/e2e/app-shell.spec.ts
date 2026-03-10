@@ -38,11 +38,14 @@ type MockAuthClientOptions = {
   readonly failInitialize?: boolean;
   readonly failSignIn?: boolean;
   readonly failSignOut?: boolean;
+  readonly failGetAccessToken?: boolean;
+  readonly getAccessTokenErrorCode?: string;
   readonly startAuthenticated?: boolean;
 };
 
 type MockGraphClientOptions = {
   readonly failListChildren?: boolean;
+  readonly includeMalformedDbFile?: boolean;
 };
 
 type MockCacheStoreOptions = {
@@ -125,6 +128,13 @@ const installMockAuthClient = async (
         isAuthenticated = false;
       },
       async getAccessToken() {
+        if (mockOptions.failGetAccessToken) {
+          throw {
+            code: mockOptions.getAccessTokenErrorCode ?? 'interaction_required',
+            message: 'Mock token acquisition failure.',
+          };
+        }
+
         return 'mock-access-token';
       },
     };
@@ -159,6 +169,17 @@ const installMockGraphClient = async (
         parentPath: '/',
         kind: 'file',
       },
+      ...(mockOptions.includeMalformedDbFile
+        ? [
+            {
+              driveId: '',
+              itemId: 'file-malformed-db',
+              name: 'malformed.db',
+              parentPath: '/',
+              kind: 'file' as const,
+            },
+          ]
+        : []),
     ];
 
     const financeItems = [
@@ -508,6 +529,50 @@ test('shows browse errors without pretending the OneDrive folder is empty', asyn
     'File selection error. Mock OneDrive browse failure.',
   );
   await expect(page.getByText('No folders or .db files found here.')).toHaveCount(0);
+});
+
+test('shows binding error when token acquisition fails during OneDrive browse', async ({
+  page,
+}) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+    failGetAccessToken: true,
+    getAccessTokenErrorCode: 'interaction_required',
+  });
+
+  await page.goto(appPath('#/settings'));
+  await page.getByRole('button', { name: 'Select DB File' }).click();
+
+  await expect(page.getByRole('alert')).toContainText(
+    'Authentication is required to access the selected OneDrive file.',
+  );
+  await expect(page.getByTestId('binding-status-message')).toContainText(
+    'File selection error. Authentication is required to access the selected OneDrive file.',
+  );
+  await expect(page.getByTestId('selected-db-file-summary')).toHaveCount(0);
+});
+
+test('shows validation error for malformed .db selection and does not persist a binding', async ({
+  page,
+}) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page, {
+    includeMalformedDbFile: true,
+  });
+
+  await page.goto(appPath('#/settings'));
+  await page.getByRole('button', { name: 'Select DB File' }).click();
+  await page.getByTestId('select-file-file-malformed-db').click();
+
+  await expect(page.getByRole('alert')).toContainText(
+    'Selected file did not include the required OneDrive identifiers.',
+  );
+  await expect(page.getByTestId('binding-status-message')).toContainText(
+    'File selection error. Selected file did not include the required OneDrive identifiers.',
+  );
+  await expect(page.getByTestId('selected-db-file-summary')).toHaveCount(0);
 });
 
 test('processes redirect auth hash before route navigation and keeps signed-in status', async ({
