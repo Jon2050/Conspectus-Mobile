@@ -324,15 +324,15 @@ An issue is only considered done when:
 - Depends on: `M4-02, M4-03`
 - GitHub: [#50](https://github.com/Jon2050/Conspectus-Mobile/issues/50)
 
-### :green_circle: M4-05 Implement sync state machine for UI
+### :green_circle: M4-06 Add sync state UI
 
 - Label: `feature`
-- Milestone: `M4 - Sync Engine + Cache`
-- Summary: Work includes states: syncing, synced, stale, offline, error and state transitions to UI. It also covers illegal transitions.
+- Milestone: `M4 - Sync Engine + Local Cache`
+- Summary: Work includes synced, stale, offline, syncing, error visual indicators. It also covers background sync feedback (e.g. `appToastStore.show('Syncing...', 'info')`) instead of blocking modals.
 - Depends on: `M4-04`
-- GitHub: [#51](https://github.com/Jon2050/Conspectus-Mobile/issues/51)
+- GitHub: [#50](https://github.com/Jon2050/Conspectus-Mobile/issues/50)
 
-### :green_circle: M4-06 Add retry and backoff for transient sync failures
+### :green_circle: M4-07 Add robust retry strategynd backoff for transient sync failures
 
 - Label: `feature`
 - Milestone: `M4 - Sync Engine + Cache`
@@ -432,7 +432,7 @@ An issue is only considered done when:
 
 - Label: `feature`
 - Milestone: `M6 - Add Transfer Write Path`
-- Summary: Work includes fields: date, name, amount, from, to, categories, buyplace and touch-friendly controls and keyboard-safe layout. It also covers form-level loading/error states.
+- Summary: Work includes fields: date, name, amount, from, to, categories, buyplace and touch-friendly controls and keyboard-safe layout. It also MUST use the new generic `<BottomSheet />` component, and inputs MUST use the `.app-input` utility class to prevent iOS zoom.
 - Depends on: `M5-06`
 - GitHub: [#64](https://github.com/Jon2050/Conspectus-Mobile/issues/64)
 
@@ -488,7 +488,7 @@ An issue is only considered done when:
 
 - Label: `feature`
 - Milestone: `M6 - Add Transfer Write Path`
-- Summary: Work includes unsent form data on upload failure and retry action without retyping full form. It also covers false-success UI states.
+- Summary: Work includes preserving unsent form data on upload failure and retry action without retyping full form. It also MUST surface transient failure/retry feedback utilizing the `appToastStore` to avoid trapping user flow.
 - Depends on: `M6-07`
 - GitHub: [#71](https://github.com/Jon2050/Conspectus-Mobile/issues/71)
 

@@ -7,6 +7,7 @@
   import TransfersRoute from './routes/TransfersRoute.svelte';
   import AddRoute from './routes/AddRoute.svelte';
   import SettingsRoute from './routes/SettingsRoute.svelte';
+  import ToastContainer from './components/ToastContainer.svelte';
   import { initializeAppAuthClient, resolveAppAuthClient } from './authClientResolver';
   import { APP_ROUTES, createHashRouteStore, DEFAULT_ROUTE, type AppRouteKey } from './hashRouting';
   import { syncSelectedDriveItemBindingStoreAtStartup } from './startupBindingSync';
@@ -83,4 +84,6 @@
       </a>
     {/each}
   </nav>
+
+  <ToastContainer />
 </div>
