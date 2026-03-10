@@ -684,6 +684,26 @@ test('exposes manifest and registers service worker', async ({ page }) => {
   expect(manifest.display).toBe('standalone');
   expect(manifest.start_url).toBe(APP_BASE_PATH);
   expect(manifest.scope).toBe(APP_BASE_PATH);
+  expect(manifest.theme_color).toBe('#f3f4f6');
+  expect(manifest.background_color).toBe('#f3f4f6');
+
+  const colorScheme = await page.locator('meta[name="color-scheme"]').getAttribute('content');
+  expect(colorScheme).toBe('light dark');
+
+  const themeColors = await page.locator('meta[name="theme-color"]').evaluateAll((elements) =>
+    elements.map((element) => ({
+      media: element.getAttribute('media'),
+      content: element.getAttribute('content'),
+    })),
+  );
+  expect(themeColors).toContainEqual({
+    media: '(prefers-color-scheme: light)',
+    content: '#f3f4f6',
+  });
+  expect(themeColors).toContainEqual({
+    media: '(prefers-color-scheme: dark)',
+    content: '#111827',
+  });
 
   const manifestIcons = manifest.icons ?? [];
   expect(manifestIcons.length).toBeGreaterThan(0);
