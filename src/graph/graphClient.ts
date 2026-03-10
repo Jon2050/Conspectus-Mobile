@@ -113,7 +113,16 @@ const normalizeParentPath = (value: string): string => {
   const trimmedValue = value.trim();
   const delimiterIndex = trimmedValue.indexOf(':');
   const graphPath = delimiterIndex >= 0 ? trimmedValue.slice(delimiterIndex + 1) : trimmedValue;
-  const decodedPath = decodeURIComponent(graphPath);
+  let decodedPath = graphPath;
+
+  try {
+    decodedPath = decodeURIComponent(graphPath);
+  } catch (error) {
+    if (!(error instanceof URIError)) {
+      throw error;
+    }
+  }
+
   const normalizedPath = decodedPath.length > 0 ? decodedPath : '/';
   const withLeadingSlash = normalizedPath.startsWith('/') ? normalizedPath : `/${normalizedPath}`;
   const withoutTrailingSlash = withLeadingSlash.replace(/\/+$/g, '');
