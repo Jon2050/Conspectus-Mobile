@@ -47,7 +47,10 @@ export interface SettingsFileBindingController {
 interface CreateSettingsFileBindingControllerOptions {
   readonly initialSelectedBinding?: DriveItemBinding | null;
   readonly onBindingChange?: (binding: DriveItemBinding | null) => void;
+  readonly browseTimeoutMs?: number;
 }
+
+const DEFAULT_BROWSE_TIMEOUT_MS = 15_000;
 
 const INITIAL_STATE: SettingsFileBindingState = {
   selectedBinding: null,
@@ -161,6 +164,7 @@ export const createSettingsFileBindingController = (
   graphClient: GraphClient,
   options: CreateSettingsFileBindingControllerOptions = {},
 ): SettingsFileBindingController => {
+  const browseTimeoutMs = options.browseTimeoutMs ?? DEFAULT_BROWSE_TIMEOUT_MS;
   let state: SettingsFileBindingState = {
     ...INITIAL_STATE,
     selectedBinding: options.initialSelectedBinding ?? null,
@@ -192,8 +196,14 @@ export const createSettingsFileBindingController = (
 
   const isStaleRequest = (requestId: number): boolean => requestId !== activeRequestId;
 
+  const createBrowseTimeoutError = (): SettingsFileBindingError => ({
+    code: 'network_error',
+    message: 'Loading OneDrive files took too long. Try again.',
+  });
+
   const loadItems = async (folder?: DriveFolderReference): Promise<void> => {
     const requestId = beginRequest();
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
     updateState({
       browserIsOpen: true,
       operation: 'loading',
@@ -201,7 +211,14 @@ export const createSettingsFileBindingController = (
     });
 
     try {
-      const items = await graphClient.listChildren(folder);
+      const items = await Promise.race([
+        graphClient.listChildren(folder),
+        new Promise<readonly GraphDriveItem[]>((_, reject) => {
+          timeoutId = setTimeout(() => {
+            reject(createBrowseTimeoutError());
+          }, browseTimeoutMs);
+        }),
+      ]);
       if (isStaleRequest(requestId)) {
         return;
       }
@@ -225,6 +242,10 @@ export const createSettingsFileBindingController = (
         error: toBindingError(error, 'Failed to load OneDrive files.'),
         hasLoaded: true,
       });
+    } finally {
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+      }
     }
   };
 

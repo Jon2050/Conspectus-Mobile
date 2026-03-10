@@ -51,6 +51,23 @@ Startup validation:
 - App startup fails fast when required variables are missing.
 - A clear startup message is shown in the UI and explains how to fix the configuration.
 
+## Local Auth Testing
+
+For real Microsoft sign-in and OneDrive browse testing, the app must run on a redirect URI that is registered in the Entra SPA app registration.
+
+Current local contract:
+
+- Use `http://localhost:5173/` for local auth testing.
+- Run `npm run dev`. It is pinned to `localhost:5173` and fails fast if that port is already occupied.
+- Open exactly `http://localhost:5173/` in the browser.
+
+Important:
+
+- Entra redirect URI matching is exact.
+- `http://127.0.0.1:5173/` does not match `http://localhost:5173/`.
+- Preview ports such as `http://localhost:4173/` or `http://localhost:4174/` do not work for real auth unless they are also registered in Entra.
+- If you want to test real auth on another local host/port, add that exact URI to the Entra SPA redirect URI list first.
+
 ## Documentation Ownership
 
 Canonical source-of-truth by topic:
