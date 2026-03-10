@@ -12,6 +12,7 @@
     type SettingsAuthOperation,
     type SettingsAuthState,
   } from './settingsAuthController';
+  import SkeletonCard from '../components/SkeletonCard.svelte';
   import {
     createSettingsFileBindingController,
     type SettingsFileBindingState,
@@ -373,14 +374,26 @@
       </dl>
     {/if}
 
-    {#if bindingState.browserIsOpen && bindingState.hasLoaded}
-      <section class="settings-screen__browser" data-testid="db-file-browser">
+    {#if bindingState.browserIsOpen}
+      <section
+        class="settings-screen__browser"
+        data-testid="db-file-browser"
+        aria-busy={bindingState.operation === 'loading'}
+      >
         <header class="settings-screen__browser-header">
           <h4>Current folder</h4>
           <p>{bindingState.currentFolder?.path ?? '/'}</p>
         </header>
 
-        {#if bindingState.error === null && bindingState.items.length === 0}
+        {#if bindingState.operation === 'loading'}
+          <p class="settings-screen__browser-loading" aria-live="polite">
+            Loading the current OneDrive folder...
+          </p>
+          <div class="settings-screen__browser-skeletons" data-testid="db-file-browser-loading">
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+        {:else if bindingState.error === null && bindingState.items.length === 0 && bindingState.hasLoaded}
           <p class="settings-screen__browser-empty">No folders or .db files found here.</p>
         {:else}
           {#if folderItems(bindingState.items).length > 0}
@@ -593,6 +606,16 @@
     margin: 0;
     color: var(--text-secondary);
     word-break: break-word;
+  }
+
+  .settings-screen__browser-loading {
+    margin: 0;
+    color: var(--text-secondary);
+  }
+
+  .settings-screen__browser-skeletons {
+    display: grid;
+    gap: 0.75rem;
   }
 
   .settings-screen__browser-group {

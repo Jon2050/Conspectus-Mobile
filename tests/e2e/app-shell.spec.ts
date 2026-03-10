@@ -46,6 +46,7 @@ type MockAuthClientOptions = {
 type MockGraphClientOptions = {
   readonly failListChildren?: boolean;
   readonly includeMalformedDbFile?: boolean;
+  readonly listChildrenDelayMs?: number;
 };
 
 type MockCacheStoreOptions = {
@@ -203,6 +204,15 @@ const installMockGraphClient = async (
             code: 'network_error',
             message: 'Mock OneDrive browse failure.',
           };
+        }
+
+        if (
+          typeof mockOptions.listChildrenDelayMs === 'number' &&
+          mockOptions.listChildrenDelayMs > 0
+        ) {
+          await new Promise((resolve) => {
+            setTimeout(resolve, mockOptions.listChildrenDelayMs);
+          });
         }
 
         if (folder?.itemId === 'folder-finance') {
@@ -415,6 +425,31 @@ test('allows selecting a OneDrive .db file from the settings browser', async ({ 
   await page.getByTestId('select-file-file-root-db').click();
   await expect(page.getByTestId('selected-db-file-summary')).toContainText('conspectus.db');
   await expect(page.getByTestId('selected-db-file-summary')).toContainText('/');
+});
+
+test('shows an in-panel loading state while OneDrive browse results are pending', async ({
+  page,
+}) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page, {
+    listChildrenDelayMs: 1_500,
+  });
+
+  await page.goto(appPath('#/settings'));
+  await page.getByRole('button', { name: 'Select DB File' }).click();
+
+  await expect(page.getByTestId('binding-status-message')).toContainText(
+    'Loading OneDrive files...',
+  );
+  await expect(page.getByTestId('db-file-browser')).toBeVisible();
+  await expect(page.getByTestId('db-file-browser')).toHaveAttribute('aria-busy', 'true');
+  await expect(page.getByText('Loading the current OneDrive folder...')).toBeVisible();
+  await expect(page.getByTestId('db-file-browser-loading')).toBeVisible();
+
+  await expect(page.getByTestId('open-folder-folder-finance')).toBeVisible();
+  await expect(page.getByTestId('db-file-browser')).toHaveAttribute('aria-busy', 'false');
 });
 
 test('keeps the selected DB file after reload', async ({ page }) => {

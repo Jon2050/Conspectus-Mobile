@@ -28,12 +28,20 @@ Optional for GitHub Pages preview login:
 - `https://jon2050.github.io/Conspectus-Mobile/previews/main/`
 - `https://jon2050.github.io/Conspectus-Mobile/previews/test/`
 
+Redirect URI matching note:
+
+- Matching is exact.
+- `http://localhost:5173/` does not match `http://127.0.0.1:5173/`.
+- `npm run dev` is pinned to `http://localhost:5173/` with `--strictPort` so local auth testing stays on the registered SPA redirect URI.
+- If local sign-in is tested from a different host or port, that exact URI must also be registered in the SPA redirect URI list.
+
 ## Frontend Configuration Contract
 
 After registration, copy the `Application (client) ID` and configure:
 
 1. Local development:
    - `.env` -> `VITE_AZURE_CLIENT_ID=<application-client-id>`
+   - Run `npm run dev` and open `http://localhost:5173/` when testing real Microsoft sign-in unless another exact local redirect URI is registered.
 2. CI/CD:
    - GitHub repository variable `VITE_AZURE_CLIENT_ID=<application-client-id>`
 

@@ -1,5 +1,5 @@
 // Tests the settings-route file browser controller for browse, navigation, selection, and errors.
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DriveItemBinding, GraphClient, GraphDriveItem } from '@graph';
 
 import { createSettingsFileBindingController } from './settingsFileBindingController';
@@ -99,6 +99,10 @@ describe('settings file binding controller', () => {
   beforeEach(() => {
     harness = createGraphClientHarness();
     onBindingChange = vi.fn<(binding: DriveItemBinding | null) => void>();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('loads root items and keeps only folders and .db files', async () => {
@@ -433,6 +437,37 @@ describe('settings file binding controller', () => {
     });
     expect(controller.getState().items).toEqual([]);
     expect(controller.getState().operation).toBe('idle');
+  });
+
+  it('fails browse requests that exceed the configured timeout', async () => {
+    vi.useFakeTimers();
+    harness.listChildren.mockImplementationOnce(
+      async () => await new Promise<readonly GraphDriveItem[]>(() => {}),
+    );
+    const controller = createSettingsFileBindingController(harness.graphClient, {
+      browseTimeoutMs: 500,
+    });
+
+    const browsePromise = controller.browseRoot();
+
+    await vi.advanceTimersByTimeAsync(500);
+    await browsePromise;
+
+    expect(controller.getState()).toEqual({
+      selectedBinding: null,
+      currentFolder: null,
+      items: [],
+      browserIsOpen: true,
+      operation: 'idle',
+      error: {
+        code: 'network_error',
+        message: 'Loading OneDrive files took too long. Try again.',
+        status: undefined,
+        cause: undefined,
+      },
+      hasLoaded: true,
+      canGoBack: false,
+    });
   });
 
   it('ignores stale browse results that resolve after reset', async () => {
