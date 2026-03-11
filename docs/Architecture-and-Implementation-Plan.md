@@ -442,6 +442,13 @@ M4-01 implementation clarification:
 - Future cache schema updates must add a new Dexie version block with an explicit migration step instead of changing version `1` in place.
 - `src/features/app-shell/routes/settingsCacheStoreResolver.ts` must close active Dexie connections before calling `indexedDB.deleteDatabase(...)` so local reset cannot be blocked by the open cache connection.
 
+M4-02 implementation clarification:
+
+- Graph metadata fetch is implemented in `src/graph/graphClient.ts` and exposed through `@graph` as `getFileMetadata`.
+- The metadata request selects `eTag`, `size`, and `lastModifiedDateTime` for the bound OneDrive item and normalizes them into the public `GraphFileMetadata` contract.
+- Metadata payload validation rejects missing, blank, or otherwise malformed `eTag`/timestamp fields plus invalid file sizes before the data is allowed into later sync decisions.
+- Metadata fetch failures are normalized into the existing Graph error categories (`unauthorized`, `forbidden`, `not_found`, `conflict`, `network_error`, `unknown`) so later sync-state work can branch deterministically on stable error codes.
+
 Deliverables:
 
 - Reliable DB availability for read-only mode offline.
