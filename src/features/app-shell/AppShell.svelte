@@ -164,25 +164,27 @@
       {:else}
         <SettingsRoute />
       {/if}
-
-      {#if !showLoadingPlaceholder}
-        <DeploymentInfoFooter isVisible={footerIsVisible} />
-      {/if}
     </div>
   </main>
 
-  <nav class="app-nav" aria-label="Primary">
-    {#each APP_ROUTES as route (route.key)}
-      <a
-        class="app-nav__item"
-        class:is-active={route.key === currentRoute}
-        href={route.hash}
-        aria-current={route.key === currentRoute ? 'page' : undefined}
-      >
-        {route.label}
-      </a>
-    {/each}
-  </nav>
+  <div class="app-shell__bottom">
+    <nav class="app-nav" aria-label="Primary">
+      {#each APP_ROUTES as route (route.key)}
+        <a
+          class="app-nav__item"
+          class:is-active={route.key === currentRoute}
+          href={route.hash}
+          aria-current={route.key === currentRoute ? 'page' : undefined}
+        >
+          {route.label}
+        </a>
+      {/each}
+    </nav>
+
+    {#if !showLoadingPlaceholder}
+      <DeploymentInfoFooter isVisible={footerIsVisible} />
+    {/if}
+  </div>
 
   <ToastContainer />
 </div>
