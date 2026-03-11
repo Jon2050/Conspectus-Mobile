@@ -449,6 +449,12 @@ M4-02 implementation clarification:
 - Metadata payload validation rejects missing, blank, or otherwise malformed `eTag`/timestamp fields plus invalid file sizes before the data is allowed into later sync decisions.
 - Metadata fetch failures are normalized into the existing Graph error categories (`unauthorized`, `forbidden`, `not_found`, `conflict`, `network_error`, `unknown`) so later sync-state work can branch deterministically on stable error codes.
 
+M4-03 implementation clarification:
+
+- File download plus cache persistence is implemented in `src/features/app-shell/cachedDatabaseSnapshotService.ts` as a small orchestration service above `@graph` and `@cache`.
+- Successful cache writes require three integrity checks on the downloaded payload before `writeSnapshot(...)` is allowed to run: non-empty metadata/file size, exact byte-length match with Graph `sizeBytes`, and the standard SQLite file header (`SQLite format 3\0`).
+- Invalid downloads fail closed and do not overwrite an existing cached snapshot, which keeps later startup freshness decisions deterministic for `M4-04`.
+
 Deliverables:
 
 - Reliable DB availability for read-only mode offline.

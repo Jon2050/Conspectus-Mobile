@@ -309,7 +309,7 @@ An issue is only considered done when:
 - Depends on: `M3-05`
 - GitHub: [#48](https://github.com/Jon2050/Conspectus-Mobile/issues/48)
 
-### :green_circle: M4-03 Implement file download and cache write
+### :white_check_mark: M4-03 Implement file download and cache write
 
 - Label: `feature`
 - Milestone: `M4 - Sync Engine + Cache`
