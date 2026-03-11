@@ -102,6 +102,42 @@ Findings that can be resolved in under 20 minutes with isolated, localized chang
 - **Recommendation:** Wrap the `indexedDB.databases()` resolution inside its own inner `try...catch` block. If dynamic resolution throws, safely default to the statically defined fallback array so that cleanup iteration can still proceed.
   Reviewed by: Gemini
 
+#### S-06: `SettingsRoute.svelte` exposes raw `homeAccountId` to the end user
+
+- **Status:** Fixed on 2026-03-11.
+
+- **Severity:** Low
+- **Perspective:** UX / Security Awareness
+- **Location:** `src/features/app-shell/routes/SettingsRoute.svelte` (lines 247-250)
+- **Description:** The Settings route renders the user's `homeAccountId` (a lengthy MSAL internal identifier like `00000000-0000-0000-aaaa-bbbbccccdddd.consumers`) in a description list under the "OneDrive account" section. This identifier is an opaque, non-human-readable internal MSAL token cache key and has no informational value for the end user. Exposing it may confuse users and marginally increases the surface area of sensitive identifiers visible in screenshots or screen recordings.
+- **Impact:** Low. It does not create a direct security vulnerability, but displaying internal infrastructure identifiers to end users is a UX anti-pattern that could create confusion or concern.
+- **Recommendation:** Remove the "Account ID" `<dt>`/`<dd>` pair from the signed-in account summary. If an internal account identifier is needed for debugging, render it only in `console.debug` or behind a developer mode toggle.
+  Reviewed by: Antigravity
+
+#### S-07: `settingsLocalDataController` allows `cancelReset()` only from `confirming` state, silently ignoring calls during `resetting`
+
+- **Status:** Will not fix. The reset operation (`cacheStore.clearAll()`) completes within milliseconds, making the timing window for a concurrent sign-out vanishingly small. The confirm button is disabled during `resetting`, so a user cannot directly trigger this race. The complexity of adding `AbortController` support or widening the state machine is not justified by the negligible risk.
+
+- **Severity:** Low
+- **Perspective:** Bug Hunting / Defensive Programming
+- **Location:** `src/features/app-shell/routes/settingsLocalDataController.ts` (lines 92-98)
+- **Description:** The `cancelReset()` method contains an early return guard: `if (state.operation !== 'confirming') return;`. This means that if `cancelReset()` is invoked during the `resetting` phase (e.g., if the user signs out while a reset is in progress), the call is silently ignored. Meanwhile, in `SettingsRoute.svelte` (line 141), the `unsubscribe` callback for auth changes calls `localDataController.cancelReset()` when the user signs out. If a sign-out occurs while a reset is executing, the reset proceeds on stale state without the UI being aware.
+- **Impact:** Low. The `confirmReset` button is disabled during `resetting`, so a user cannot directly trigger this. It only manifests if `signOut` completes during an active reset — a tight timing window. But the controller contract is inconsistent: it advertises `cancelReset()` but silently discards it in valid states.
+- **Recommendation:** Either (a) widen `cancelReset()` to also restore `idle` from `resetting` and abort the in-flight `cacheStore.clearAll()` promise via an `AbortController`, or (b) document with a JSDoc comment that `cancelReset()` is intentionally only valid during `confirming`. Option (b) is acceptable for M3 scope.
+  Reviewed by: Antigravity
+
+#### S-08: `toastStore` auto-dismiss relies on `setTimeout` without cleanup on store `clear()`
+
+- **Status:** Fixed on 2026-03-11.
+
+- **Severity:** Low
+- **Perspective:** Code Quality / Resource Leaks
+- **Location:** `src/shared/state/toastStore.ts` (lines 19-29)
+- **Description:** Each toast shown via `show()` schedules a `setTimeout` to auto-remove itself after `durationMs`. However, when `clear()` is called (which removes all toasts immediately by setting the array to `[]`), any pending `setTimeout` callbacks are not cancelled. They will fire in the background and call `remove(id)` on already-removed toasts. While the `remove(id)` call is idempotent (it filters by ID), the orphaned timers represent unnecessary work and a minor resource leak pattern. As the number of toasts grows, the orphaned timer count grows linearly.
+- **Impact:** Low. The `remove` filter is harmless on missing IDs, so there is no crash. However, it's a subtle resource management gap that could become noticeable if toast frequency increases in M4+ features.
+- **Recommendation:** Store the `setTimeout` return value in a `Map<string, ReturnType<typeof setTimeout>>` keyed by toast ID. In `remove()`, call `clearTimeout` for the corresponding timer. In `clear()`, iterate the map and clear all pending timers before resetting.
+  Reviewed by: Antigravity
+
 ---
 
 ### Effort: Medium
@@ -126,13 +162,73 @@ _(No large-effort findings identified. The architecture is sound and well-aligne
 
 The codebase is exceptionally well-prepared for **M4 (Sync Engine + Cache)**.
 
-- The `AuthClient` properly abstracts access tokens via `getAccessTokenSilent`.
-- The `GraphClient` provides well-typed implementations of metadata fetch and file download.
-- Local state management, notably the `selectedDriveItemBindingStore`, proves that caching infrastructure is already wired safely.
+- The `AuthClient` properly abstracts access tokens via `getAccessToken`.
+- The `GraphClient` provides well-typed implementations of metadata fetch, file download, and conditional upload (`If-Match` / eTag).
+- The `CacheStore` interface (`src/cache/index.ts`) is already defined with `readSnapshot`, `writeSnapshot`, `clearSnapshot`, and `clearAll` — ready for a Dexie-backed implementation.
+- Local state management, notably the `selectedDriveItemBindingStore`, proves that caching infrastructure is already wired safely with schema versioning, multi-account support, and legacy migration.
+- The `settingsCacheStoreResolver` already handles cache cleanup across `localStorage`, `sessionStorage`, `CacheStorage`, and IndexedDB — the M4 Dexie database will automatically be covered by the existing "conspectus" name filter.
 
 ### Blockers or Risks
 
-- **Risk:** When implementing M4 (Sync Engine + Cache) with Dexie, ensure that active IndexedDB connections are closed before executing the local reset action, or else `indexedDB.deleteDatabase` in `settingsCacheStoreResolver.ts` will emit an `onblocked` event and fail the local reset.
+- **Risk:** When implementing M4 (Sync Engine + Cache) with Dexie, ensure that active IndexedDB connections are closed before executing the local reset action, or else `indexedDB.deleteDatabase` in `settingsCacheStoreResolver.ts` will emit an `onblocked` event and fail the local reset. **Tracked:** Implementation note added to M4-01 ([#47](https://github.com/Jon2050/Conspectus-Mobile/issues/47)).
+- ~~**Risk:** The `defaultCacheStore.clearAll()` in `settingsCacheStoreResolver.ts` deletes IndexedDB databases sequentially (line 98-100, `for..of` loop with `await`). If M4 introduces multiple databases, this sequential await pattern will increase the total reset time. Consider parallelizing with `Promise.allSettled` for resilience.~~ **Will not fix.** No additional IndexedDB databases are planned beyond the single Dexie-backed cache store, so the sequential deletion pattern is adequate.
+
+---
+
+## Test Coverage Assessment
+
+### Unit Tests
+
+| Module / File                      | Test File                               | Tests | Coverage Quality |
+| ---------------------------------- | --------------------------------------- | ----- | ---------------- |
+| `src/auth/msalAuthClient.ts`       | `msalAuthClient.test.ts`                | 11    | ✅ Excellent     |
+| `src/auth/scopes.ts`               | `scopes.test.ts`                        | 5     | ✅ Excellent     |
+| `src/auth/index.ts` (barrel)       | `index.test.ts`                         | 2     | ✅ Good          |
+| `src/graph/graphClient.ts`         | `graphClient.test.ts`                   | 15    | ✅ Excellent     |
+| `src/graph/index.ts` (barrel)      | `index.test.ts`                         | 1     | ✅ Good          |
+| `selectedDriveItemBindingStore.ts` | `selectedDriveItemBindingStore.test.ts` | 12    | ✅ Excellent     |
+| `settingsAuthController.ts`        | `settingsAuthController.test.ts`        | 8     | ✅ Excellent     |
+| `settingsFileBindingController.ts` | `settingsFileBindingController.test.ts` | 13    | ✅ Excellent     |
+| `settingsLocalDataController.ts`   | `settingsLocalDataController.test.ts`   | 3     | ✅ Good          |
+| `settingsCacheStoreResolver.ts`    | `settingsCacheStoreResolver.test.ts`    | 3     | ✅ Good          |
+| `hashRouting.ts`                   | `hashRouting.test.ts`                   | 5     | ✅ Excellent     |
+| `startupBindingSync.ts`            | `startupBindingSync.test.ts`            | 2     | ✅ Good          |
+
+### E2E Tests
+
+The `tests/e2e/app-shell.spec.ts` (824 lines, 20+ test cases) provides comprehensive browser-level coverage:
+
+- ✅ Startup error rendering for missing env vars
+- ✅ Navigation across all 4 routes
+- ✅ Sign-in / sign-out lifecycle with loading states
+- ✅ OneDrive file browser: browse, navigate, select, cancel
+- ✅ Loading states with skeleton UI
+- ✅ Binding persistence across page reloads
+- ✅ Local data reset with confirmation dialog
+- ✅ Binding restoration after startup on a non-settings route
+- ✅ Browse error and auth failure error surfacing
+- ✅ Malformed file selection validation
+- ✅ Redirect auth hash processing
+- ✅ PWA manifest, service worker registration, and scope isolation
+
+### Assessment
+
+Test coverage for M3 features is **excellent**. Every public function, every controller, and every user-facing flow has dedicated unit and/or E2E coverage. Edge cases (malformed data, corrupted JSON, stale requests, concurrent initialization, legacy schema migration) are well-represented.
+
+---
+
+## Architecture Compliance
+
+| Criterion                        | Status       | Notes                                                                                                                                |
+| -------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Module boundary enforcement      | ✅ Compliant | All imports use declared aliases (`@auth`, `@graph`, `@shared`, `@cache`, `@features`).                                              |
+| Dependency direction             | ✅ Compliant | `@auth` and `@graph` do not import from `@features`. `@shared` is a leaf dependency.                                                 |
+| Separation of concerns           | ✅ Compliant | View (`SettingsRoute.svelte`) cleanly separated from logic (controllers) and state (stores).                                         |
+| Security: HTTPS-only             | ✅ Compliant | All Graph API calls target `https://graph.microsoft.com/v1.0`.                                                                       |
+| Security: PKCE auth flow         | ✅ Compliant | `@azure/msal-browser` v5 uses PKCE by default for public clients. No secrets in client code.                                         |
+| Security: Least-privilege scopes | ✅ Compliant | Only `Files.ReadWrite` and OIDC scopes requested. Disallowed broad scopes tested via `scopes.test.ts`.                               |
+| Error normalization              | ✅ Compliant | Both `@auth` and `@graph` translate raw errors into typed error codes before exposing to consumers.                                  |
+| DI / Testability                 | ✅ Compliant | All clients use factory functions with injectable dependencies. E2E tests inject mock clients via `window.__CONSPECTUS_*__` globals. |
 
 ---
 
@@ -140,10 +236,10 @@ The codebase is exceptionally well-prepared for **M4 (Sync Engine + Cache)**.
 
 | Effort    | Count | Critical | High | Medium | Low | Invalidated |
 | --------- | ----- | -------- | ---- | ------ | --- | ----------- |
-| Small     | 5     | 0        | 0    | 1      | 4   | 0           |
+| Small     | 8     | 0        | 0    | 1      | 7   | 0           |
 | Medium    | 0     | 0        | 0    | 0      | 0   | 0           |
 | Large     | 0     | 0        | 0    | 0      | 0   | 0           |
-| **Total** | 5     | 0        | 0    | 1      | 4   | 0           |
+| **Total** | 8     | 0        | 0    | 1      | 7   | 0           |
 
 ---
 

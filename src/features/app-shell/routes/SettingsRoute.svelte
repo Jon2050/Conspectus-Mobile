@@ -244,10 +244,6 @@
         <dt>Username</dt>
         <dd>{state.session.account.username}</dd>
       </div>
-      <div>
-        <dt>Account ID</dt>
-        <dd>{state.session.account.homeAccountId}</dd>
-      </div>
     </dl>
 
     <h3 class="settings-screen__subheading">DB file</h3>

@@ -11,8 +11,18 @@ export interface Toast {
 
 const createToastStore = () => {
   const { subscribe, set, update } = writable<Toast[]>([]);
+  const timers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  const clearTimer = (id: string): void => {
+    const timerId = timers.get(id);
+    if (timerId !== undefined) {
+      clearTimeout(timerId);
+      timers.delete(id);
+    }
+  };
 
   const remove = (id: string) => {
+    clearTimer(id);
     update((toasts) => toasts.filter((t) => t.id !== id));
   };
 
@@ -23,19 +33,31 @@ const createToastStore = () => {
     update((toasts) => [...toasts, toast]);
 
     if (durationMs > 0) {
-      setTimeout(() => {
-        remove(id);
-      }, durationMs);
+      timers.set(
+        id,
+        setTimeout(() => {
+          timers.delete(id);
+          remove(id);
+        }, durationMs),
+      );
     }
 
     return id;
+  };
+
+  const clear = () => {
+    for (const timerId of timers.values()) {
+      clearTimeout(timerId);
+    }
+    timers.clear();
+    set([]);
   };
 
   return {
     subscribe,
     show,
     remove,
-    clear: () => set([]),
+    clear,
   };
 };
 
