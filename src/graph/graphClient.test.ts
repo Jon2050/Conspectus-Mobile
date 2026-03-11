@@ -399,6 +399,21 @@ describe('createGraphClient', () => {
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
+  it('preserves unexpected auth failure messages before any network request is made', async () => {
+    const authError = Object.assign(new Error('silent token flow timed out in the browser'), {
+      code: 'unknown',
+    });
+    const authClient = createAuthClient(authError);
+    const fetchFn = vi.fn(async () => createJsonResponse({}));
+    const client = createGraphClient({ authClient, fetchFn });
+
+    await expect(client.getFileMetadata(DRIVE_ITEM_BINDING)).rejects.toMatchObject({
+      code: 'unknown',
+      message: 'silent token flow timed out in the browser',
+    });
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
   it('maps fetch rejections to network_error', async () => {
     const authClient = createAuthClient();
     const fetchFn = vi.fn(async () => {

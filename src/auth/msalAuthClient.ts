@@ -55,6 +55,14 @@ const INTERACTION_REQUIRED_CODES = new Set<string>([
   InteractionRequiredAuthErrorCodes.noTokensFound,
   InteractionRequiredAuthErrorCodes.refreshTokenExpired,
   InteractionRequiredAuthErrorCodes.uxNotAllowed,
+  BrowserAuthErrorCodes.authRequestNotSetError,
+  BrowserAuthErrorCodes.blockIframeReload,
+  BrowserAuthErrorCodes.emptyResponse,
+  BrowserAuthErrorCodes.iframeClosedPrematurely,
+  BrowserAuthErrorCodes.interactionInProgress,
+  BrowserAuthErrorCodes.interactionInProgressCancelled,
+  BrowserAuthErrorCodes.noTokenRequestCacheError,
+  BrowserAuthErrorCodes.timedOut,
 ]);
 
 const NETWORK_ERROR_CODES = new Set<string>([
