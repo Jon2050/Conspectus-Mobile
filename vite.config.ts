@@ -1,4 +1,6 @@
+// Configures the app build, shared aliases, and build-time metadata injected into the client bundle.
 import { svelte } from '@sveltejs/vite-plugin-svelte';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
 import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig } from 'vitest/config';
@@ -8,6 +10,12 @@ import { normalizeBasePath, toPreviewSlug } from './scripts/deploy-utils.mjs';
 
 const DEFAULT_PRODUCTION_BASE_PATH = '/conspectus/webapp/';
 const LIGHT_APP_THEME_COLOR = '#f3f4f6';
+const PACKAGE_JSON_URL = new URL('./package.json', import.meta.url);
+const packageJson = JSON.parse(readFileSync(PACKAGE_JSON_URL, 'utf-8')) as {
+  version: string;
+};
+const appVersion = packageJson.version;
+const appBuildTimeUtc = new Date().toISOString().replace(/\.\d{3}Z$/u, 'Z');
 
 const normalizeBasePrefix = (value: string | undefined): string => {
   const trimmedValue = value?.trim();
@@ -47,6 +55,10 @@ const basePath = resolveBasePath();
 
 export default defineConfig({
   base: basePath,
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+    __APP_BUILD_TIME_UTC__: JSON.stringify(appBuildTimeUtc),
+  },
   plugins: [
     svelte(),
     VitePWA({
