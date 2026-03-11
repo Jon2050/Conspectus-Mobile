@@ -47,6 +47,7 @@ type MockGraphClientOptions = {
   readonly failListChildren?: boolean;
   readonly includeMalformedDbFile?: boolean;
   readonly listChildrenDelayMs?: number;
+  readonly extraRootDbFileCount?: number;
 };
 
 type MockCacheStoreOptions = {
@@ -181,6 +182,13 @@ const installMockGraphClient = async (
             },
           ]
         : []),
+      ...Array.from({ length: mockOptions.extraRootDbFileCount ?? 0 }, (_, index) => ({
+        driveId: 'drive-123',
+        itemId: `file-extra-db-${index + 1}`,
+        name: `extra-${String(index + 1).padStart(2, '0')}.db`,
+        parentPath: '/',
+        kind: 'file' as const,
+      })),
     ];
 
     const financeItems = [
@@ -345,6 +353,68 @@ test('loads a mobile app shell and navigates placeholder routes', async ({ page 
   await page.getByRole('link', { name: 'Settings' }).click();
   await expect(page).toHaveURL(/#\/settings$/);
   await expect(page.getByRole('heading', { level: 2, name: 'Settings' })).toBeVisible();
+});
+
+test('shows deployment footer metadata immediately on short pages', async ({ page }) => {
+  await page.goto(appPath('#/accounts'));
+
+  await expect(page.getByTestId('deployment-info-footer')).toBeVisible();
+  await expect(page.getByTestId('deployment-info-footer')).not.toHaveAttribute(
+    'aria-hidden',
+    'true',
+  );
+  await expect(page.getByTestId('deployment-info-label')).toHaveText(/^Ver\. \S+ .+ \d{2}:\d{2}$/u);
+});
+
+test('reveals deployment footer only when reaching the end of a scrollable page', async ({
+  page,
+}) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page, {
+    extraRootDbFileCount: 80,
+  });
+
+  await page.goto(appPath('#/settings'));
+  await page.getByRole('button', { name: 'Select DB File' }).click();
+
+  const appContent = page.getByTestId('app-shell-content');
+  const footer = page.getByTestId('deployment-info-footer');
+
+  await expect
+    .poll(async () =>
+      appContent.evaluate((element) => ({
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+      })),
+    )
+    .toEqual(
+      expect.objectContaining({
+        clientHeight: expect.any(Number),
+        scrollHeight: expect.any(Number),
+      }),
+    );
+
+  await expect
+    .poll(async () =>
+      appContent.evaluate((element) => element.scrollHeight > element.clientHeight + 24),
+    )
+    .toBe(true);
+
+  await expect(footer).toHaveAttribute('aria-hidden', 'true');
+
+  await appContent.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+    element.dispatchEvent(new Event('scroll'));
+  });
+  await expect(footer).not.toHaveAttribute('aria-hidden', 'true');
+
+  await appContent.evaluate((element) => {
+    element.scrollTop = 0;
+    element.dispatchEvent(new Event('scroll'));
+  });
+  await expect(footer).toHaveAttribute('aria-hidden', 'true');
 });
 
 test('supports sign-in and sign-out auth UX states in settings', async ({ page }) => {

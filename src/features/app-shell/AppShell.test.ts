@@ -1,6 +1,8 @@
+// Verifies shared app-shell route rendering and deployment-footer presence across routes.
 import { describe, expect, it } from 'vitest';
 import { readable } from 'svelte/store';
 import { render } from 'svelte/server';
+import { formatBuildInfoLabel, getFallbackBuildInfo } from '@shared';
 
 import AppShell from './AppShell.svelte';
 import type { AppRouteKey } from './hashRouting';
@@ -17,6 +19,7 @@ describe('AppShell component', () => {
     const { body } = render(AppShell);
 
     expect(body).toContain('data-testid="loading-placeholder"');
+    expect(body).not.toContain('data-testid="deployment-info-footer"');
     expect(body).not.toContain('data-testid="route-accounts"');
     expect(body).not.toContain('data-testid="route-transfers"');
     expect(body).not.toContain('data-testid="route-add"');
@@ -24,7 +27,7 @@ describe('AppShell component', () => {
   });
 
   it.each<AppRouteKey>(['accounts', 'transfers', 'add', 'settings'])(
-    'renders %s route content once loading is complete',
+    'renders %s route content with the shared deployment footer once loading is complete',
     (route) => {
       const { body } = render(AppShell, {
         props: {
@@ -35,6 +38,9 @@ describe('AppShell component', () => {
 
       expect(body).not.toContain('data-testid="loading-placeholder"');
       expect(body).toContain(`data-testid="${ROUTE_TEST_IDS[route]}"`);
+      expect(body).toContain('data-testid="deployment-info-footer"');
+      expect(body).toContain('data-testid="deployment-info-label"');
+      expect(body).toContain(formatBuildInfoLabel(getFallbackBuildInfo()));
       expect(body).toContain(`href="#/${route}"`);
       expect(body).toContain('aria-current="page"');
     },

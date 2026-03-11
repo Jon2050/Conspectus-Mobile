@@ -1,3 +1,4 @@
+/* Defines the shared mobile app shell layout, navigation, and reusable visual primitives. */
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap');
 
 :root {
@@ -70,12 +71,15 @@ body {
 .app-shell {
   display: flex;
   flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
   min-height: 100vh;
   min-height: 100dvh;
   max-width: 32rem;
   margin: 0 auto;
   padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom, 0));
   gap: 1rem;
+  overflow: hidden;
 }
 
 .app-header {
@@ -100,6 +104,19 @@ body {
 
 .app-content {
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-inline: 0.1rem;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--border) 72%, transparent) transparent;
+}
+
+.app-content__page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  gap: 0.9rem;
+  padding-bottom: 0.25rem;
 }
 
 .placeholder-screen,
