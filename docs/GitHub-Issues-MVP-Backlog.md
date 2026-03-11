@@ -292,7 +292,7 @@ An issue is only considered done when:
 - Depends on: `M3-04, M3-06, M3-07`
 - GitHub: [#45](https://github.com/Jon2050/Conspectus-Mobile/issues/45)
 
-### :green_circle: M4-01 Define Dexie schema for DB cache and metadata
+### :white_check_mark: M4-01 Define Dexie schema for DB cache and metadata
 
 - Label: `feature`
 - Milestone: `M4 - Sync Engine + Cache`
