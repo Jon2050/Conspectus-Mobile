@@ -216,6 +216,7 @@ To ensure a continuous "native-app" feel throughout upcoming milestones, the app
 - **Perceived Performance (Skeleton Loading):** Fetch operations involving SQL or Graph API MUST render `<SkeletonCard />` components instead of spinning circles during the initial data load.
 - **System Dark Mode:** The app uses `@media (prefers-color-scheme: dark)` in `app.css` to automatically map base color variables to a dark slate equivalent. No manual toggle is required.
 - **Mobile Input Zoom Prevention:** All inputs MUST use the `.app-input` utility class which binds `font-size: 16px` to prevent automatic zoom behavior on iOS Safari.
+- **End-of-Page Deployment Info:** The app shell exposes a shared, non-sticky footer bar at the end of each primary page that shows `Ver. <version> <date> <time>`. Runtime metadata is resolved through a shared build-info provider: production prefers `deploy-metadata.json.buildTimeUtc`, while preview/local builds use injected deterministic build metadata so the footer remains available offline without backend calls.
 
 ---
 

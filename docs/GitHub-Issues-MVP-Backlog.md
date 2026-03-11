@@ -357,6 +357,14 @@ An issue is only considered done when:
 - Depends on: `M4-05`
 - GitHub: [#54](https://github.com/Jon2050/Conspectus-Mobile/issues/54)
 
+### :white_check_mark: M4-99 Add end-of-page deployment info footer bar
+
+- Label: `feature`
+- Milestone: `M4 - Sync Engine + Cache`
+- Summary: Work includes a shared footer bar across all primary app pages that shows the running app version and deterministic build/deploy timestamp only at the end of page content. It also covers production `deploy-metadata.json` precedence, preview/local fallback metadata, and shell-level tests for short-page and scrollable-page behavior.
+- Depends on: `M1-09, M2-03`
+- GitHub: [#152](https://github.com/Jon2050/Conspectus-Mobile/issues/152)
+
 ### :green_circle: M5-01 Integrate sql.js runtime and DB open service
 
 - Label: `feature`
