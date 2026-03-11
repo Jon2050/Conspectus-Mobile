@@ -119,6 +119,11 @@ body {
   padding-bottom: 0.25rem;
 }
 
+.app-shell__bottom {
+  display: flex;
+  flex-direction: column;
+}
+
 .placeholder-screen,
 .placeholder-state {
   border: none;
@@ -141,8 +146,6 @@ body {
 }
 
 .app-nav {
-  position: sticky;
-  bottom: env(safe-area-inset-bottom, 1rem);
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.25rem;
@@ -153,7 +156,6 @@ body {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   box-shadow: var(--shadow-lg);
-  margin-bottom: 0.5rem;
   z-index: 10;
 }
 

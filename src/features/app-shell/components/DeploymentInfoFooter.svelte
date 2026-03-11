@@ -38,17 +38,22 @@
 
 <style>
   .deployment-info-footer {
-    margin-top: auto;
-    padding: 0.45rem 1rem calc(0.25rem + env(safe-area-inset-bottom, 0));
+    max-height: 0;
+    padding: 0 1rem;
     opacity: 0;
     transform: translateY(0.35rem);
     transition:
+      max-height 0.18s ease,
+      padding 0.18s ease,
       opacity 0.18s ease,
       transform 0.18s ease;
+    overflow: hidden;
     pointer-events: none;
   }
 
   .deployment-info-footer.is-visible {
+    max-height: 3rem;
+    padding: 0.2rem 1rem calc(0.25rem + env(safe-area-inset-bottom, 0));
     opacity: 1;
     transform: translateY(0);
   }

@@ -364,6 +364,13 @@ test('shows deployment footer metadata immediately on short pages', async ({ pag
     'true',
   );
   await expect(page.getByTestId('deployment-info-label')).toHaveText(/^Ver\. \S+ .+ \d{2}:\d{2}$/u);
+
+  const navBox = await page.getByRole('navigation', { name: 'Primary' }).boundingBox();
+  const footerBox = await page.getByTestId('deployment-info-footer').boundingBox();
+
+  expect(navBox).not.toBeNull();
+  expect(footerBox).not.toBeNull();
+  expect(footerBox!.y).toBeGreaterThan(navBox!.y + navBox!.height - 1);
 });
 
 test('reveals deployment footer only when reaching the end of a scrollable page', async ({
