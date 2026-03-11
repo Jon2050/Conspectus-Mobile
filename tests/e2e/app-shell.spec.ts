@@ -56,6 +56,8 @@ type MockGraphClientOptions = {
   readonly failDownloadFile?: boolean;
   readonly includeMalformedDbFile?: boolean;
   readonly listChildrenDelayMs?: number;
+  readonly metadataDelayMs?: number;
+  readonly downloadDelayMs?: number;
   readonly extraRootDbFileCount?: number;
   readonly metadataETag?: string;
   readonly metadataLastModifiedDateTime?: string;
@@ -273,6 +275,12 @@ const installMockGraphClient = async (
           };
         }
 
+        if (typeof mockOptions.metadataDelayMs === 'number' && mockOptions.metadataDelayMs > 0) {
+          await new Promise((resolve) => {
+            setTimeout(resolve, mockOptions.metadataDelayMs);
+          });
+        }
+
         return {
           eTag: mockOptions.metadataETag ?? '"etag-1"',
           sizeBytes: defaultDownloadBytes.length,
@@ -289,6 +297,12 @@ const installMockGraphClient = async (
             code: 'network_error',
             message: 'Mock snapshot download failure.',
           };
+        }
+
+        if (typeof mockOptions.downloadDelayMs === 'number' && mockOptions.downloadDelayMs > 0) {
+          await new Promise((resolve) => {
+            setTimeout(resolve, mockOptions.downloadDelayMs);
+          });
         }
 
         return new Uint8Array(defaultDownloadBytes);
@@ -618,6 +632,47 @@ test('reuses the cached DB on startup when the OneDrive eTag is unchanged', asyn
   expect(await getCacheReadSnapshotCallCount(page)).toBe(1);
   expect(await getGraphMetadataCallCount(page)).toBe(1);
   expect(await getGraphDownloadCallCount(page)).toBe(0);
+});
+
+test('shows syncing state and toast feedback while the startup freshness check is running', async ({
+  page,
+}) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page, {
+    metadataDelayMs: 1_500,
+    metadataETag: '"etag-1"',
+  });
+  await installMockCacheStore(page, {
+    startupSnapshot: {
+      metadata: {
+        eTag: '"etag-1"',
+      },
+      dbBytes: createSqliteBytes([6, 6, 6, 6]),
+    },
+  });
+  await installPersistedBinding(page);
+  await installMockStartupNetworkState(page, true);
+
+  await page.goto(appPath('#/accounts'));
+
+  await expect(page.getByTestId('startup-sync-status')).toContainText(
+    'Checking OneDrive for DB updates...',
+  );
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
+    'data-sync-state',
+    'syncing',
+  );
+  await expect(page.getByText('Syncing with OneDrive in the background...')).toBeVisible();
+
+  await expect(page.getByTestId('startup-sync-status')).toContainText(
+    'Cached DB is current with OneDrive.',
+  );
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
+    'data-sync-state',
+    'synced',
+  );
 });
 
 test('downloads a fresh DB on startup when the OneDrive eTag changed', async ({ page }) => {

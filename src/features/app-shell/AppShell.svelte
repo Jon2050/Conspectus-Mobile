@@ -2,7 +2,11 @@
 <script lang="ts">
   import { afterUpdate, onDestroy, onMount, tick } from 'svelte';
   import { get, type Readable } from 'svelte/store';
-  import { appSelectedDriveItemBindingStore, type SyncState } from '@shared';
+  import {
+    appSelectedDriveItemBindingStore,
+    appSyncStateStore,
+    type SyncStateStore,
+  } from '@shared';
   import LoadingPlaceholder from './components/LoadingPlaceholder.svelte';
   import DeploymentInfoFooter from './components/DeploymentInfoFooter.svelte';
   import AccountsRoute from './routes/AccountsRoute.svelte';
@@ -17,13 +21,18 @@
   import { APP_ROUTES, createHashRouteStore, DEFAULT_ROUTE, type AppRouteKey } from './hashRouting';
   import {
     createStartupFreshnessService,
-    type StartupFreshnessBranch,
     type StartupFreshnessDecision,
   } from './startupFreshnessService';
+  import {
+    applyStartupFreshnessDecision,
+    applyUnexpectedStartupSyncError,
+    beginStartupSync,
+  } from './startupSyncStateController';
   import { resolveAppStartupIsOnline } from './startupNetworkStateResolver';
   import { syncSelectedDriveItemBindingStoreAtStartup } from './startupBindingSync';
 
   export let routeStore: Readable<AppRouteKey> = createHashRouteStore();
+  export let syncStateStore: SyncStateStore = appSyncStateStore;
   export let loadingDelayMs = 160;
   export let showLoadingPlaceholder = true;
 
@@ -36,34 +45,10 @@
   let appShellIsMounted = false;
   let footerVisibilityTrackingIsActive = false;
   let lastRenderedRoute: AppRouteKey | null = null;
-  let startupSyncState: SyncState = 'idle';
-  let startupSyncBranch: StartupFreshnessBranch | null = null;
-  let startupSyncMessage: string | null = null;
   let stopFooterVisibilityTracking = (): void => {};
   const unsubscribe = routeStore.subscribe((route) => {
     currentRoute = route;
   });
-
-  const buildStartupSyncMessage = (decision: StartupFreshnessDecision): string | null => {
-    switch (decision.branch) {
-      case 'no_binding':
-        return null;
-      case 'online_unchanged':
-        return 'Cached DB is current with OneDrive.';
-      case 'online_changed':
-        return 'Downloaded the latest DB from OneDrive.';
-      case 'offline_cached':
-        return 'Offline mode using the last cached DB.';
-      case 'online_metadata_failed_cached':
-        return 'Using cached DB because the OneDrive freshness check failed.';
-      case 'online_download_failed_cached':
-        return 'Using cached DB because downloading the latest DB failed.';
-      case 'offline_missing_cache':
-      case 'online_metadata_failed':
-      case 'online_download_failed':
-        return decision.failure.message;
-    }
-  };
 
   const logStartupFreshnessDecision = (
     decision: StartupFreshnessDecision,
@@ -87,18 +72,6 @@
     }
 
     console.info('Startup freshness decision completed.', logDetails);
-  };
-
-  const applyStartupFreshnessDecision = (decision: StartupFreshnessDecision): void => {
-    startupSyncState = decision.syncState;
-    startupSyncBranch = decision.branch;
-    startupSyncMessage = buildStartupSyncMessage(decision);
-  };
-
-  const applyUnexpectedStartupSyncError = (message: string): void => {
-    startupSyncState = 'error';
-    startupSyncBranch = null;
-    startupSyncMessage = message;
   };
 
   const updateFooterVisibility = (): void => {
@@ -160,6 +133,7 @@
   onMount(() => {
     appShellIsMounted = true;
     let isMounted = true;
+    syncStateStore.reset();
 
     void (async () => {
       try {
@@ -181,16 +155,17 @@
           cacheStore,
           createCachedDatabaseSnapshotService(graphClient, cacheStore),
         );
-        const decision = await startupFreshnessService.resolve(
-          binding,
-          resolveAppStartupIsOnline(),
-        );
+        const startupIsOnline = resolveAppStartupIsOnline();
+        if (binding !== null && startupIsOnline) {
+          beginStartupSync(syncStateStore);
+        }
+        const decision = await startupFreshnessService.resolve(binding, startupIsOnline);
 
         if (!isMounted) {
           return;
         }
 
-        applyStartupFreshnessDecision(decision);
+        applyStartupFreshnessDecision(syncStateStore, decision);
         logStartupFreshnessDecision(decision, binding?.name ?? null);
       } catch (error) {
         if (!isMounted) {
@@ -199,6 +174,7 @@
 
         console.warn('Startup freshness resolution failed unexpectedly.', error);
         applyUnexpectedStartupSyncError(
+          syncStateStore,
           'Startup sync failed unexpectedly. Check the browser console and retry.',
         );
       }
@@ -251,18 +227,18 @@
     <p>Mobile-first application shell placeholder</p>
   </header>
 
-  {#if startupSyncMessage !== null}
+  {#if $syncStateStore.message !== null}
     <section
-      class={`startup-sync-status startup-sync-status--${startupSyncState}`}
+      class={`startup-sync-status startup-sync-status--${$syncStateStore.state}`}
       data-testid="startup-sync-status"
-      data-sync-branch={startupSyncBranch}
-      data-sync-state={startupSyncState}
+      data-sync-branch={$syncStateStore.branch ?? undefined}
+      data-sync-state={$syncStateStore.state}
       aria-live="polite"
     >
-      {#if startupSyncState === 'error'}
-        <p role="alert">{startupSyncMessage}</p>
+      {#if $syncStateStore.state === 'error'}
+        <p role="alert">{$syncStateStore.message}</p>
       {:else}
-        <p>{startupSyncMessage}</p>
+        <p>{$syncStateStore.message}</p>
       {/if}
     </section>
   {/if}
@@ -321,6 +297,11 @@
   .startup-sync-status p {
     margin: 0;
     font-size: 0.92rem;
+  }
+
+  .startup-sync-status--syncing {
+    background: color-mix(in srgb, var(--accent) 12%, white);
+    color: color-mix(in srgb, var(--accent) 68%, black);
   }
 
   .startup-sync-status--synced {
