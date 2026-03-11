@@ -449,6 +449,23 @@ describe('createGraphClient', () => {
     });
   });
 
+  it('rejects blank eTag metadata payloads with an unknown Graph error', async () => {
+    const authClient = createAuthClient();
+    const fetchFn = vi.fn(async () =>
+      createJsonResponse({
+        eTag: '   ',
+        size: 2048,
+        lastModifiedDateTime: '2026-03-09T10:15:00Z',
+      }),
+    );
+    const client = createGraphClient({ authClient, fetchFn });
+
+    await expect(client.getFileMetadata(DRIVE_ITEM_BINDING)).rejects.toMatchObject({
+      code: 'unknown',
+      message: 'Microsoft Graph metadata response did not include the required file fields.',
+    });
+  });
+
   it('maps arrayBuffer body read failures after a successful response to network_error', async () => {
     const authClient = createAuthClient();
     const response = new Response(null, {

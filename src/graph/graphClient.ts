@@ -71,6 +71,9 @@ class GraphClientError extends Error {
 const isObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === 'string' && value.trim().length > 0;
+
 const isGraphItemPayload = (value: unknown): value is GraphItemPayload => isObject(value);
 
 const isGraphChildrenPayload = (value: unknown): value is GraphChildrenPayload => isObject(value);
@@ -291,10 +294,11 @@ const normalizeGraphItem = (
   }
 
   if (
-    typeof payload.eTag !== 'string' ||
+    !isNonEmptyString(payload.eTag) ||
     typeof payload.size !== 'number' ||
     !Number.isFinite(payload.size) ||
-    typeof payload.lastModifiedDateTime !== 'string'
+    payload.size < 0 ||
+    !isNonEmptyString(payload.lastModifiedDateTime)
   ) {
     throw new GraphClientError('unknown', invalidResponseMessage, undefined, payload);
   }

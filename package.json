@@ -1,7 +1,7 @@
 {
   "name": "conspectus-mobile",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.4.02",
   "type": "module",
   "scripts": {
     "dev": "vite --host localhost --port 5173 --strictPort",
