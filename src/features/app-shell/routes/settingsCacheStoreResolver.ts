@@ -1,5 +1,5 @@
 // Resolves the cache store used by Settings local-reset actions, with localhost-only test override support.
-import type { CacheStore } from '@cache';
+import { closeAppCacheStoreConnections, type CacheStore } from '@cache';
 
 declare global {
   interface Window {
@@ -54,6 +54,8 @@ const defaultCacheStore: Pick<CacheStore, 'clearAll'> = {
     try {
       const indexedDbApi = window.indexedDB;
       if (typeof indexedDbApi !== 'undefined') {
+        closeAppCacheStoreConnections();
+
         const filterConspectusDatabaseNames = (databaseNames: readonly string[]): string[] =>
           databaseNames.filter(
             (databaseName) =>

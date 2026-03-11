@@ -434,6 +434,13 @@ Substeps:
    - error
 7. Add robust retry strategy with exponential backoff for transient failures.
 
+M4-01 implementation clarification:
+
+- The local cache schema is implemented as a single Dexie-backed IndexedDB database named `conspectus-mobile-cache`.
+- Schema version `1` uses separate tables for cached DB bytes and sync metadata, both keyed by the bound file identity (`driveId` + `itemId`).
+- Future cache schema updates must add a new Dexie version block with an explicit migration step instead of changing version `1` in place.
+- `src/features/app-shell/routes/settingsCacheStoreResolver.ts` must close active Dexie connections before calling `indexedDB.deleteDatabase(...)` so local reset cannot be blocked by the open cache connection.
+
 Deliverables:
 
 - Reliable DB availability for read-only mode offline.

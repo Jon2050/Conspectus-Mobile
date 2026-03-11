@@ -1,4 +1,4 @@
-// Verifies the Settings cache resolver uses localhost overrides and clears app-owned local caches by default.
+// Verifies the Settings cache resolver uses localhost overrides and safely closes live cache connections before IndexedDB reset.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 interface MemoryStorageLike {
@@ -8,6 +8,8 @@ interface MemoryStorageLike {
   removeItem(key: string): void;
   setItem(key: string, value: string): void;
 }
+
+const closeAppCacheStoreConnections = vi.fn();
 
 const createMemoryStorage = (initialValues: Record<string, string>): MemoryStorageLike => {
   const values = new Map(Object.entries(initialValues));
@@ -31,6 +33,10 @@ describe('settings cache store resolver', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.unstubAllGlobals();
+    vi.clearAllMocks();
+    vi.doMock('@cache', () => ({
+      closeAppCacheStoreConnections,
+    }));
   });
 
   afterEach(() => {
@@ -48,6 +54,7 @@ describe('settings cache store resolver', () => {
     await resolveSettingsCacheStore().clearAll();
 
     expect(overrideClearAll).toHaveBeenCalledTimes(1);
+    expect(closeAppCacheStoreConnections).not.toHaveBeenCalled();
   });
 
   it('clears app-owned storage, CacheStorage, and IndexedDB entries by default', async () => {
@@ -84,9 +91,16 @@ describe('settings cache store resolver', () => {
     expect(sessionStorage.getItem('untouched')).toBe('keep');
     expect(cacheDelete).toHaveBeenCalledTimes(1);
     expect(cacheDelete).toHaveBeenCalledWith('conspectus-mobile-precache-v1');
+    expect(closeAppCacheStoreConnections).toHaveBeenCalledTimes(1);
     expect(indexedDbDeleteDatabase).toHaveBeenCalledTimes(2);
     expect(indexedDbDeleteDatabase).toHaveBeenNthCalledWith(1, 'conspectus-mobile-cache');
     expect(indexedDbDeleteDatabase).toHaveBeenNthCalledWith(2, 'conspectus-cache');
+
+    const closeCallOrder = closeAppCacheStoreConnections.mock.invocationCallOrder[0];
+    const deleteCallOrder = indexedDbDeleteDatabase.mock.invocationCallOrder[0];
+    expect(closeCallOrder).toBeDefined();
+    expect(deleteCallOrder).toBeDefined();
+    expect(closeCallOrder ?? 0).toBeLessThan(deleteCallOrder ?? 0);
   });
 
   it('falls back to known IndexedDB cleanup targets when databases enumeration throws', async () => {
@@ -110,6 +124,7 @@ describe('settings cache store resolver', () => {
     const { resolveSettingsCacheStore } = await import('./settingsCacheStoreResolver');
     await resolveSettingsCacheStore().clearAll();
 
+    expect(closeAppCacheStoreConnections).toHaveBeenCalledTimes(1);
     expect(indexedDbDeleteDatabase).toHaveBeenCalledTimes(2);
     expect(indexedDbDeleteDatabase).toHaveBeenNthCalledWith(1, 'conspectus-mobile-cache');
     expect(indexedDbDeleteDatabase).toHaveBeenNthCalledWith(2, 'conspectus-cache');
