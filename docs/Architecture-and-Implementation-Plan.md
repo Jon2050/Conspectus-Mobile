@@ -469,6 +469,13 @@ M4-05 implementation clarification:
 - Startup-specific sync status orchestration lives in `src/features/app-shell/startupSyncStateController.ts`, which maps `startupFreshnessService` decisions into a single visible UI state/message and emits non-blocking toast feedback through `appToastStore`.
 - Browser coverage for the new `syncing` state and toast-based background feedback is implemented in `tests/e2e/app-shell.spec.ts`, while unit coverage verifies guarded transitions and startup decision mapping.
 
+M4-06 implementation clarification:
+
+- Transient startup sync retries are implemented inside `src/features/app-shell/startupFreshnessService.ts`, not in UI code, so metadata refresh and fresh-snapshot download both share the same capped exponential backoff behavior.
+- Retryability is intentionally narrow: only normalized Graph `network_error` failures are retried; auth, permission, not-found, conflict, and local snapshot validation failures still fail fast on the first attempt.
+- The default startup retry policy is 3 total attempts with a `250ms` base delay capped at `1000ms`; when retries are exhausted, the final failure preserves the normalized `network_error` identity for later handling and surfaces actionable user messaging.
+- When retries are exhausted but a cached snapshot already exists, startup still resolves to the existing `stale` branch and continues with the cached DB instead of discarding readable local data.
+
 Deliverables:
 
 - Reliable DB availability for read-only mode offline.

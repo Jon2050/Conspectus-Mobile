@@ -99,8 +99,12 @@ describe('startupSyncStateController', () => {
       },
       failure: {
         code: 'metadata_fetch_failed',
-        message: 'Graph metadata request failed.',
-        cause: new Error('Graph metadata request failed.'),
+        message:
+          'Unable to refresh the selected OneDrive database metadata after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again.',
+        cause: {
+          code: 'network_error',
+          status: 503,
+        },
       },
     };
 
@@ -108,11 +112,12 @@ describe('startupSyncStateController', () => {
 
     expect(get(store)).toEqual({
       state: 'stale',
-      message: 'Using cached DB because the OneDrive freshness check failed.',
+      message:
+        'Unable to refresh the selected OneDrive database metadata after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again. Using the last cached DB for now.',
       branch: 'online_metadata_failed_cached',
     });
     expect(toastStore.show).toHaveBeenCalledWith(
-      'Using cached DB because the OneDrive freshness check failed.',
+      'Unable to refresh the selected OneDrive database metadata after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again. Using the last cached DB for now.',
       'warning',
       4200,
     );

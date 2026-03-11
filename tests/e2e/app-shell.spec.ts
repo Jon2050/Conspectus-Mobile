@@ -26,6 +26,19 @@ const createSqliteBytes = (payloadBytes: readonly number[] = [1, 2, 3, 4]): numb
   ...SQLITE_DATABASE_HEADER_BYTES,
   ...payloadBytes,
 ];
+const createMockGraphError = (
+  code: string,
+  message: string,
+  status?: number,
+): {
+  readonly code: string;
+  readonly message: string;
+  readonly status?: number;
+} => ({
+  code,
+  message,
+  ...(status === undefined ? {} : { status }),
+});
 const REQUIRED_MANIFEST_ICONS = [
   {
     src: 'icons/moneysack192x192.png',
@@ -50,6 +63,12 @@ type MockAuthClientOptions = {
   readonly startAuthenticated?: boolean;
 };
 
+type MockGraphError = {
+  readonly code: string;
+  readonly message: string;
+  readonly status?: number;
+};
+
 type MockGraphClientOptions = {
   readonly failListChildren?: boolean;
   readonly failGetFileMetadata?: boolean;
@@ -62,6 +81,8 @@ type MockGraphClientOptions = {
   readonly metadataETag?: string;
   readonly metadataLastModifiedDateTime?: string;
   readonly downloadBytes?: readonly number[];
+  readonly metadataErrorSequence?: readonly MockGraphError[];
+  readonly downloadErrorSequence?: readonly MockGraphError[];
 };
 
 type MockStartupSnapshot = {
@@ -180,6 +201,8 @@ const installMockGraphClient = async (
     let listChildrenCallCount = 0;
     let getFileMetadataCallCount = 0;
     let downloadFileCallCount = 0;
+    const metadataErrorSequence = [...(mockOptions.metadataErrorSequence ?? [])];
+    const downloadErrorSequence = [...(mockOptions.downloadErrorSequence ?? [])];
     const defaultDownloadBytes = mockOptions.downloadBytes ?? [
       83, 81, 76, 105, 116, 101, 32, 102, 111, 114, 109, 97, 116, 32, 51, 0, 1, 2, 3, 4,
     ];
@@ -268,6 +291,10 @@ const installMockGraphClient = async (
         (
           window as Window & { __CONSPECTUS_GRAPH_GET_FILE_METADATA_CALL_COUNT__?: number }
         ).__CONSPECTUS_GRAPH_GET_FILE_METADATA_CALL_COUNT__ = getFileMetadataCallCount;
+        const nextMetadataError = metadataErrorSequence.shift();
+        if (nextMetadataError !== undefined) {
+          throw nextMetadataError;
+        }
         if (mockOptions.failGetFileMetadata) {
           throw {
             code: 'network_error',
@@ -292,6 +319,10 @@ const installMockGraphClient = async (
         (
           window as Window & { __CONSPECTUS_GRAPH_DOWNLOAD_FILE_CALL_COUNT__?: number }
         ).__CONSPECTUS_GRAPH_DOWNLOAD_FILE_CALL_COUNT__ = downloadFileCallCount;
+        const nextDownloadError = downloadErrorSequence.shift();
+        if (nextDownloadError !== undefined) {
+          throw nextDownloadError;
+        }
         if (mockOptions.failDownloadFile) {
           throw {
             code: 'network_error',
@@ -673,6 +704,64 @@ test('shows syncing state and toast feedback while the startup freshness check i
     'data-sync-state',
     'synced',
   );
+});
+
+test('retries transient startup metadata failures before settling on the cached DB state', async ({
+  page,
+}) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page, {
+    metadataErrorSequence: [
+      createMockGraphError('network_error', 'Temporary metadata outage.', 503),
+      createMockGraphError('network_error', 'Temporary metadata outage.', 503),
+    ],
+    metadataETag: '"etag-1"',
+  });
+  await installMockCacheStore(page, {
+    startupSnapshot: {
+      metadata: {
+        eTag: '"etag-1"',
+      },
+      dbBytes: createSqliteBytes([3, 3, 3, 3]),
+    },
+  });
+  await installPersistedBinding(page);
+  await installMockStartupNetworkState(page, true);
+
+  await page.goto(appPath('#/accounts'));
+
+  await expect(page.getByTestId('startup-sync-status')).toContainText(
+    'Cached DB is current with OneDrive.',
+  );
+  expect(await getGraphMetadataCallCount(page)).toBe(3);
+  expect(await getGraphDownloadCallCount(page)).toBe(0);
+});
+
+test('fails fast on non-retryable startup metadata errors and surfaces the clear reason', async ({
+  page,
+}) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page, {
+    metadataErrorSequence: [createMockGraphError('forbidden', 'Mock access denied.', 403)],
+  });
+  await installMockCacheStore(page);
+  await installPersistedBinding(page);
+  await installMockStartupNetworkState(page, true);
+
+  await page.goto(appPath('#/accounts'));
+
+  await expect(page.getByTestId('startup-sync-status')).toContainText('Mock access denied.');
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute('data-sync-state', 'error');
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
+    'data-sync-branch',
+    'online_metadata_failed',
+  );
+  expect(await getGraphMetadataCallCount(page)).toBe(1);
+  expect(await getGraphDownloadCallCount(page)).toBe(0);
 });
 
 test('downloads a fresh DB on startup when the OneDrive eTag changed', async ({ page }) => {

@@ -10,6 +10,11 @@ interface ToastStoreLike {
 const STARTUP_SYNCING_MESSAGE = 'Checking OneDrive for DB updates...';
 const STARTUP_SYNCING_TOAST_MESSAGE = 'Syncing with OneDrive in the background...';
 
+const buildCachedFallbackMessage = (failure: StartupFreshnessDecision['failure']): string =>
+  failure === null
+    ? 'Using the last cached DB because refreshing from OneDrive failed.'
+    : `${failure.message} Using the last cached DB for now.`;
+
 const buildStartupSyncMessage = (decision: StartupFreshnessDecision): string | null => {
   switch (decision.branch) {
     case 'no_binding':
@@ -21,9 +26,9 @@ const buildStartupSyncMessage = (decision: StartupFreshnessDecision): string | n
     case 'offline_cached':
       return 'Offline mode using the last cached DB.';
     case 'online_metadata_failed_cached':
-      return 'Using cached DB because the OneDrive freshness check failed.';
+      return buildCachedFallbackMessage(decision.failure);
     case 'online_download_failed_cached':
-      return 'Using cached DB because downloading the latest DB failed.';
+      return buildCachedFallbackMessage(decision.failure);
     case 'offline_missing_cache':
     case 'online_metadata_failed':
     case 'online_download_failed':

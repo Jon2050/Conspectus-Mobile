@@ -333,7 +333,7 @@ An issue is only considered done when:
 - Depends on: `M4-04`
 - GitHub: [#51](https://github.com/Jon2050/Conspectus-Mobile/issues/51)
 
-### :green_circle: M4-06 Add retry and backoff for transient sync failures
+### :white_check_mark: M4-06 Add retry and backoff for transient sync failures
 
 - Label: `feature`
 - Milestone: `M4 - Sync Engine + Cache`
