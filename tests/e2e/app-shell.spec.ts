@@ -19,6 +19,13 @@ const APP_BASE_PATH = resolveAppBasePath();
 const APP_BASE_PATH_WITHOUT_TRAILING_SLASH = APP_BASE_PATH.slice(0, -1);
 const RUNTIME_CLIENT_ID_PATTERN = /VITE_AZURE_CLIENT_ID:"[^"]*"/g;
 const appPath = (suffix = ''): string => `${APP_BASE_PATH}${suffix}`;
+const SQLITE_DATABASE_HEADER_BYTES = [
+  0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, 0x20, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x20, 0x33, 0x00,
+];
+const createSqliteBytes = (payloadBytes: readonly number[] = [1, 2, 3, 4]): number[] => [
+  ...SQLITE_DATABASE_HEADER_BYTES,
+  ...payloadBytes,
+];
 const REQUIRED_MANIFEST_ICONS = [
   {
     src: 'icons/moneysack192x192.png',
@@ -45,14 +52,34 @@ type MockAuthClientOptions = {
 
 type MockGraphClientOptions = {
   readonly failListChildren?: boolean;
+  readonly failGetFileMetadata?: boolean;
+  readonly failDownloadFile?: boolean;
   readonly includeMalformedDbFile?: boolean;
   readonly listChildrenDelayMs?: number;
   readonly extraRootDbFileCount?: number;
+  readonly metadataETag?: string;
+  readonly metadataLastModifiedDateTime?: string;
+  readonly downloadBytes?: readonly number[];
+};
+
+type MockStartupSnapshot = {
+  readonly binding?: {
+    readonly driveId?: string;
+    readonly itemId?: string;
+    readonly name?: string;
+    readonly parentPath?: string;
+  };
+  readonly metadata?: {
+    readonly eTag?: string;
+    readonly lastSyncAtIso?: string;
+  };
+  readonly dbBytes?: readonly number[];
 };
 
 type MockCacheStoreOptions = {
   readonly failClearAll?: boolean;
   readonly clearAllDelayMs?: number;
+  readonly startupSnapshot?: MockStartupSnapshot | null;
 };
 
 const installMockAuthClient = async (
@@ -149,6 +176,11 @@ const installMockGraphClient = async (
 ): Promise<void> => {
   await page.addInitScript((mockOptions: MockGraphClientOptions) => {
     let listChildrenCallCount = 0;
+    let getFileMetadataCallCount = 0;
+    let downloadFileCallCount = 0;
+    const defaultDownloadBytes = mockOptions.downloadBytes ?? [
+      83, 81, 76, 105, 116, 101, 32, 102, 111, 114, 109, 97, 116, 32, 51, 0, 1, 2, 3, 4,
+    ];
     const rootItems = [
       {
         driveId: 'drive-123',
@@ -230,19 +262,41 @@ const installMockGraphClient = async (
         return rootItems;
       },
       async getFileMetadata() {
+        getFileMetadataCallCount += 1;
+        (
+          window as Window & { __CONSPECTUS_GRAPH_GET_FILE_METADATA_CALL_COUNT__?: number }
+        ).__CONSPECTUS_GRAPH_GET_FILE_METADATA_CALL_COUNT__ = getFileMetadataCallCount;
+        if (mockOptions.failGetFileMetadata) {
+          throw {
+            code: 'network_error',
+            message: 'Mock metadata fetch failure.',
+          };
+        }
+
         return {
-          eTag: '"etag-1"',
-          sizeBytes: 2048,
-          lastModifiedDateTime: '2026-03-09T10:15:00Z',
+          eTag: mockOptions.metadataETag ?? '"etag-1"',
+          sizeBytes: defaultDownloadBytes.length,
+          lastModifiedDateTime: mockOptions.metadataLastModifiedDateTime ?? '2026-03-09T10:15:00Z',
         };
       },
       async downloadFile() {
-        return new Uint8Array([1, 2, 3]);
+        downloadFileCallCount += 1;
+        (
+          window as Window & { __CONSPECTUS_GRAPH_DOWNLOAD_FILE_CALL_COUNT__?: number }
+        ).__CONSPECTUS_GRAPH_DOWNLOAD_FILE_CALL_COUNT__ = downloadFileCallCount;
+        if (mockOptions.failDownloadFile) {
+          throw {
+            code: 'network_error',
+            message: 'Mock snapshot download failure.',
+          };
+        }
+
+        return new Uint8Array(defaultDownloadBytes);
       },
       async uploadFile() {
         return {
           eTag: '"etag-2"',
-          sizeBytes: 2048,
+          sizeBytes: defaultDownloadBytes.length,
           lastModifiedDateTime: '2026-03-09T11:15:00Z',
         };
       },
@@ -250,6 +304,12 @@ const installMockGraphClient = async (
     (
       window as Window & { __CONSPECTUS_GRAPH_LIST_CHILDREN_CALL_COUNT__?: number }
     ).__CONSPECTUS_GRAPH_LIST_CHILDREN_CALL_COUNT__ = listChildrenCallCount;
+    (
+      window as Window & { __CONSPECTUS_GRAPH_GET_FILE_METADATA_CALL_COUNT__?: number }
+    ).__CONSPECTUS_GRAPH_GET_FILE_METADATA_CALL_COUNT__ = getFileMetadataCallCount;
+    (
+      window as Window & { __CONSPECTUS_GRAPH_DOWNLOAD_FILE_CALL_COUNT__?: number }
+    ).__CONSPECTUS_GRAPH_DOWNLOAD_FILE_CALL_COUNT__ = downloadFileCallCount;
   }, options);
 };
 
@@ -259,8 +319,94 @@ const installMockCacheStore = async (
 ): Promise<void> => {
   await page.addInitScript((mockOptions: MockCacheStoreOptions) => {
     let clearAllCallCount = 0;
+    let readSnapshotCallCount = 0;
+    const toBindingKey = (binding: { driveId: string; itemId: string }): string =>
+      `${binding.driveId}::${binding.itemId}`;
+    const cloneSnapshot = (snapshot: {
+      binding: {
+        driveId: string;
+        itemId: string;
+        name: string;
+        parentPath: string;
+      };
+      metadata: {
+        eTag: string;
+        lastSyncAtIso: string;
+      };
+      dbBytes: readonly number[];
+    }) => ({
+      binding: { ...snapshot.binding },
+      metadata: { ...snapshot.metadata },
+      dbBytes: new Uint8Array(snapshot.dbBytes),
+    });
 
-    (window as Window & { __CONSPECTUS_CACHE_STORE__?: unknown }).__CONSPECTUS_CACHE_STORE__ = {
+    const storedSnapshots = new Map<
+      string,
+      {
+        binding: {
+          driveId: string;
+          itemId: string;
+          name: string;
+          parentPath: string;
+        };
+        metadata: {
+          eTag: string;
+          lastSyncAtIso: string;
+        };
+        dbBytes: readonly number[];
+      }
+    >();
+    const initialSnapshot = mockOptions.startupSnapshot;
+    if (initialSnapshot !== null && initialSnapshot !== undefined) {
+      const snapshot = {
+        binding: {
+          driveId: initialSnapshot.binding?.driveId ?? 'drive-123',
+          itemId: initialSnapshot.binding?.itemId ?? 'file-root-db',
+          name: initialSnapshot.binding?.name ?? 'conspectus.db',
+          parentPath: initialSnapshot.binding?.parentPath ?? '/',
+        },
+        metadata: {
+          eTag: initialSnapshot.metadata?.eTag ?? '"etag-1"',
+          lastSyncAtIso: initialSnapshot.metadata?.lastSyncAtIso ?? '2026-03-11T09:45:00.000Z',
+        },
+        dbBytes: initialSnapshot.dbBytes ?? [
+          83, 81, 76, 105, 116, 101, 32, 102, 111, 114, 109, 97, 116, 32, 51, 0, 9, 8, 7, 6,
+        ],
+      };
+      storedSnapshots.set(toBindingKey(snapshot.binding), snapshot);
+    }
+
+    const mockCacheStore = {
+      async readSnapshot(binding: { driveId: string; itemId: string }) {
+        readSnapshotCallCount += 1;
+        (
+          window as Window & { __CONSPECTUS_CACHE_READ_SNAPSHOT_CALL_COUNT__?: number }
+        ).__CONSPECTUS_CACHE_READ_SNAPSHOT_CALL_COUNT__ = readSnapshotCallCount;
+        const snapshot = storedSnapshots.get(toBindingKey(binding));
+        return snapshot ? cloneSnapshot(snapshot) : null;
+      },
+      async writeSnapshot(snapshot: {
+        binding: {
+          driveId: string;
+          itemId: string;
+          name: string;
+          parentPath: string;
+        };
+        metadata: {
+          eTag: string;
+          lastSyncAtIso: string;
+        };
+        dbBytes: Uint8Array;
+      }) {
+        storedSnapshots.set(toBindingKey(snapshot.binding), {
+          binding: { ...snapshot.binding },
+          metadata: { ...snapshot.metadata },
+          dbBytes: Array.from(snapshot.dbBytes),
+        });
+      },
+      async clearSnapshot(binding: { driveId: string; itemId: string }) {
+        storedSnapshots.delete(toBindingKey(binding));
+      },
       async clearAll() {
         clearAllCallCount += 1;
         (
@@ -276,13 +422,64 @@ const installMockCacheStore = async (
         if (mockOptions.failClearAll) {
           throw new Error('Mock cache clear failure.');
         }
+        storedSnapshots.clear();
       },
     };
+
+    (window as Window & { __CONSPECTUS_CACHE_STORE__?: unknown }).__CONSPECTUS_CACHE_STORE__ =
+      mockCacheStore;
+    (
+      window as Window & { __CONSPECTUS_APP_CACHE_STORE__?: unknown }
+    ).__CONSPECTUS_APP_CACHE_STORE__ = mockCacheStore;
 
     (
       window as Window & { __CONSPECTUS_CACHE_CLEAR_ALL_CALL_COUNT__?: number }
     ).__CONSPECTUS_CACHE_CLEAR_ALL_CALL_COUNT__ = clearAllCallCount;
+    (
+      window as Window & { __CONSPECTUS_CACHE_READ_SNAPSHOT_CALL_COUNT__?: number }
+    ).__CONSPECTUS_CACHE_READ_SNAPSHOT_CALL_COUNT__ = readSnapshotCallCount;
   }, options);
+};
+
+const installPersistedBinding = async (
+  page: import('@playwright/test').Page,
+  binding: {
+    readonly driveId: string;
+    readonly itemId: string;
+    readonly name: string;
+    readonly parentPath: string;
+  } = {
+    driveId: 'drive-123',
+    itemId: 'file-root-db',
+    name: 'conspectus.db',
+    parentPath: '/',
+  },
+): Promise<void> => {
+  await page.addInitScript(
+    (persistedBinding: { driveId: string; itemId: string; name: string; parentPath: string }) => {
+      window.localStorage.setItem(
+        'conspectus.selectedDriveItemBinding',
+        JSON.stringify({
+          version: 2,
+          bindingsByAccountId: {
+            'mock-home-account': persistedBinding,
+          },
+        }),
+      );
+    },
+    binding,
+  );
+};
+
+const installMockStartupNetworkState = async (
+  page: import('@playwright/test').Page,
+  isOnline: boolean,
+): Promise<void> => {
+  await page.addInitScript((nextIsOnline: boolean) => {
+    (
+      window as Window & { __CONSPECTUS_APP_STARTUP_IS_ONLINE__?: boolean }
+    ).__CONSPECTUS_APP_STARTUP_IS_ONLINE__ = nextIsOnline;
+  }, isOnline);
 };
 
 const getGraphListChildrenCallCount = async (
@@ -297,6 +494,26 @@ const getGraphListChildrenCallCount = async (
     return typeof value === 'number' ? value : 0;
   });
 
+const getGraphMetadataCallCount = async (page: import('@playwright/test').Page): Promise<number> =>
+  page.evaluate(() => {
+    const value = (
+      window as Window & {
+        __CONSPECTUS_GRAPH_GET_FILE_METADATA_CALL_COUNT__?: unknown;
+      }
+    ).__CONSPECTUS_GRAPH_GET_FILE_METADATA_CALL_COUNT__;
+    return typeof value === 'number' ? value : 0;
+  });
+
+const getGraphDownloadCallCount = async (page: import('@playwright/test').Page): Promise<number> =>
+  page.evaluate(() => {
+    const value = (
+      window as Window & {
+        __CONSPECTUS_GRAPH_DOWNLOAD_FILE_CALL_COUNT__?: unknown;
+      }
+    ).__CONSPECTUS_GRAPH_DOWNLOAD_FILE_CALL_COUNT__;
+    return typeof value === 'number' ? value : 0;
+  });
+
 const getCacheClearAllCallCount = async (page: import('@playwright/test').Page): Promise<number> =>
   page.evaluate(() => {
     const value = (
@@ -304,6 +521,18 @@ const getCacheClearAllCallCount = async (page: import('@playwright/test').Page):
         __CONSPECTUS_CACHE_CLEAR_ALL_CALL_COUNT__?: unknown;
       }
     ).__CONSPECTUS_CACHE_CLEAR_ALL_CALL_COUNT__;
+    return typeof value === 'number' ? value : 0;
+  });
+
+const getCacheReadSnapshotCallCount = async (
+  page: import('@playwright/test').Page,
+): Promise<number> =>
+  page.evaluate(() => {
+    const value = (
+      window as Window & {
+        __CONSPECTUS_CACHE_READ_SNAPSHOT_CALL_COUNT__?: unknown;
+      }
+    ).__CONSPECTUS_CACHE_READ_SNAPSHOT_CALL_COUNT__;
     return typeof value === 'number' ? value : 0;
   });
 
@@ -353,6 +582,137 @@ test('loads a mobile app shell and navigates placeholder routes', async ({ page 
   await page.getByRole('link', { name: 'Settings' }).click();
   await expect(page).toHaveURL(/#\/settings$/);
   await expect(page.getByRole('heading', { level: 2, name: 'Settings' })).toBeVisible();
+});
+
+test('reuses the cached DB on startup when the OneDrive eTag is unchanged', async ({ page }) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page, {
+    metadataETag: '"etag-1"',
+  });
+  await installMockCacheStore(page, {
+    startupSnapshot: {
+      metadata: {
+        eTag: '"etag-1"',
+      },
+      dbBytes: createSqliteBytes([7, 7, 7, 7]),
+    },
+  });
+  await installPersistedBinding(page);
+  await installMockStartupNetworkState(page, true);
+
+  await page.goto(appPath('#/accounts'));
+
+  await expect(page.getByTestId('startup-sync-status')).toContainText(
+    'Cached DB is current with OneDrive.',
+  );
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
+    'data-sync-state',
+    'synced',
+  );
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
+    'data-sync-branch',
+    'online_unchanged',
+  );
+  expect(await getCacheReadSnapshotCallCount(page)).toBe(1);
+  expect(await getGraphMetadataCallCount(page)).toBe(1);
+  expect(await getGraphDownloadCallCount(page)).toBe(0);
+});
+
+test('downloads a fresh DB on startup when the OneDrive eTag changed', async ({ page }) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page, {
+    metadataETag: '"etag-2"',
+    downloadBytes: createSqliteBytes([5, 4, 3, 2]),
+  });
+  await installMockCacheStore(page, {
+    startupSnapshot: {
+      metadata: {
+        eTag: '"etag-1"',
+      },
+      dbBytes: createSqliteBytes([1, 1, 1, 1]),
+    },
+  });
+  await installPersistedBinding(page);
+  await installMockStartupNetworkState(page, true);
+
+  await page.goto(appPath('#/accounts'));
+
+  await expect(page.getByTestId('startup-sync-status')).toContainText(
+    'Downloaded the latest DB from OneDrive.',
+  );
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
+    'data-sync-state',
+    'synced',
+  );
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
+    'data-sync-branch',
+    'online_changed',
+  );
+  expect(await getCacheReadSnapshotCallCount(page)).toBe(1);
+  expect(await getGraphMetadataCallCount(page)).toBe(1);
+  expect(await getGraphDownloadCallCount(page)).toBe(1);
+});
+
+test('uses the cached DB on startup when offline', async ({ page }) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page);
+  await installMockCacheStore(page, {
+    startupSnapshot: {
+      metadata: {
+        eTag: '"etag-1"',
+      },
+      dbBytes: createSqliteBytes([4, 4, 4, 4]),
+    },
+  });
+  await installPersistedBinding(page);
+  await installMockStartupNetworkState(page, false);
+
+  await page.goto(appPath('#/accounts'));
+
+  await expect(page.getByTestId('startup-sync-status')).toContainText(
+    'Offline mode using the last cached DB.',
+  );
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
+    'data-sync-state',
+    'offline',
+  );
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
+    'data-sync-branch',
+    'offline_cached',
+  );
+  expect(await getCacheReadSnapshotCallCount(page)).toBe(1);
+  expect(await getGraphMetadataCallCount(page)).toBe(0);
+  expect(await getGraphDownloadCallCount(page)).toBe(0);
+});
+
+test('shows a startup sync error when offline without a cached DB', async ({ page }) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page);
+  await installMockCacheStore(page);
+  await installPersistedBinding(page);
+  await installMockStartupNetworkState(page, false);
+
+  await page.goto(appPath('#/accounts'));
+
+  await expect(page.getByTestId('startup-sync-status')).toContainText(
+    'No cached OneDrive database is available while offline.',
+  );
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute('data-sync-state', 'error');
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
+    'data-sync-branch',
+    'offline_missing_cache',
+  );
+  expect(await getCacheReadSnapshotCallCount(page)).toBe(1);
+  expect(await getGraphMetadataCallCount(page)).toBe(0);
+  expect(await getGraphDownloadCallCount(page)).toBe(0);
 });
 
 test('shows deployment footer metadata immediately on short pages', async ({ page }) => {
