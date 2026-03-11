@@ -325,7 +325,7 @@ An issue is only considered done when:
 - Depends on: `M4-02, M4-03`
 - GitHub: [#50](https://github.com/Jon2050/Conspectus-Mobile/issues/50)
 
-### :green_circle: M4-05 Implement sync state machine for UI
+### :white_check_mark: M4-05 Implement sync state machine for UI
 
 - Label: `feature`
 - Milestone: `M4 - Sync Engine + Local Cache`
