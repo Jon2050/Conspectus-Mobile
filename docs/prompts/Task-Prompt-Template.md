@@ -1,4 +1,4 @@
-Task: Implement issue `M<milestone>-<issue-number>` end-to-end with full verification.
+Task: Implement issue `M4-03` end-to-end with full verification.
 
 ## Non-negotiable rules:
 
@@ -22,9 +22,10 @@ Always print in which step you are!
    - `docs/Architecture-and-Implementation-Plan.md`
    - `docs/Conspectus-Desktop-Info.md`
    - `docs/GitHub-Issues-MVP-Backlog.md`
-     Then locate `M<milestone>-<issue-number>` and extract implementation steps, acceptance criteria, and dependencies/constraints.
+     Then locate `M4-03` and extract implementation steps, acceptance criteria, and dependencies/constraints.
 2. Plan with one planning subagent. Refine until concrete, testable, and mapped from each acceptance criterion to file-level code/test changes. Make clear, that the planning subagent should not write any code, just the plan.
 3. Create/use a dedicated issue branch with a proper name.
+   3.1. Increase the app version in `package.json` to `0.<milestone_number>.<issue_title_number>`. (e.g. `0.4.08` for issue `M4-08`)
 4. Implement the approved plan or findings by a reviewer. Keep commits scoped to this issue. Add/update tests for behavior changes.
 5. Run local verification gate:
    - `npm run format`
@@ -55,6 +56,7 @@ Always print in which step you are!
 - **Local Check or CI Failure:** STOP progression immediately. Inspect logs, fix the root cause, and re-run the FULL verification gate before pushing again.
 - **Review Gaps:** Fix requested changes, re-run local checks, and re-submit for review.
 - **Requirement Ambiguity:** Document assumptions clearly and validate them against the backlog's acceptance criteria before writing code.
+- **Subagents:** Use subagents when ever it seems useful and reasonable for you. Use this heavily to keep the work organized and allow parallel work.
 
 ## Assumptions and Defaults
 
