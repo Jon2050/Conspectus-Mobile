@@ -43,6 +43,7 @@
 ## Merge And Cleanup (PR Path)
 
 - [ ] Required GitHub checks are green.
+- [ ] PR will be merged into `main` with `Rebase and merge`.
 - [ ] PR will be merged into `main` once checks/review requirements are satisfied.
 - [ ] Head branch will be deleted after merge.
 - [ ] Linked issue/backlog marker will only be marked done after merge.
