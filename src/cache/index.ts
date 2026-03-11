@@ -1,3 +1,4 @@
+// Defines the cache module contract and exports the Dexie-backed cache store entry points.
 export interface CachedFileBinding {
   readonly driveId: string;
   readonly itemId: string;
@@ -22,3 +23,9 @@ export interface CacheStore {
   clearSnapshot(binding: CachedFileBinding): Promise<void>;
   clearAll(): Promise<void>;
 }
+
+export {
+  appCacheStore,
+  closeAppCacheStoreConnections,
+  createDexieCacheStore,
+} from './dexieCacheStore';
