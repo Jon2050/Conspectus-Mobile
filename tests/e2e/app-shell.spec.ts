@@ -770,6 +770,30 @@ test('shows a startup sync error when offline without a cached DB', async ({ pag
   expect(await getGraphDownloadCallCount(page)).toBe(0);
 });
 
+test('clears a stale startup sync message after a successful DB file selection', async ({
+  page,
+}) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page);
+  await installMockCacheStore(page);
+  await installPersistedBinding(page);
+  await installMockStartupNetworkState(page, false);
+
+  await page.goto(appPath('#/settings'));
+
+  await expect(page.getByTestId('startup-sync-status')).toContainText(
+    'No cached OneDrive database is available while offline.',
+  );
+
+  await page.getByRole('button', { name: 'Change DB file' }).click();
+  await page.getByTestId('select-file-file-root-db').click();
+
+  await expect(page.getByTestId('binding-status-message')).toContainText('DB file selected.');
+  await expect(page.getByTestId('startup-sync-status')).toHaveCount(0);
+});
+
 test('shows deployment footer metadata immediately on short pages', async ({ page }) => {
   await page.goto(appPath('#/accounts'));
 
