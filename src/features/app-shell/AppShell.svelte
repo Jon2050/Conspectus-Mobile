@@ -43,11 +43,20 @@
   let appContentPageElement: HTMLDivElement | null = null;
   let footerIsVisible = true;
   let appShellIsMounted = false;
+  let selectedBindingHasEmitted = false;
   let footerVisibilityTrackingIsActive = false;
   let lastRenderedRoute: AppRouteKey | null = null;
   let stopFooterVisibilityTracking = (): void => {};
   const unsubscribe = routeStore.subscribe((route) => {
     currentRoute = route;
+  });
+  const unsubscribeSelectedBinding = appSelectedDriveItemBindingStore.subscribe(() => {
+    if (!selectedBindingHasEmitted) {
+      selectedBindingHasEmitted = true;
+      return;
+    }
+
+    syncStateStore.reset();
   });
 
   const logStartupFreshnessDecision = (
@@ -217,6 +226,7 @@
 
   onDestroy(() => {
     unsubscribe();
+    unsubscribeSelectedBinding();
     disconnectFooterVisibilityTracking();
   });
 </script>
