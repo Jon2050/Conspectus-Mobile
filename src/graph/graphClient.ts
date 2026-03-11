@@ -96,6 +96,15 @@ const getErrorCode = (error: unknown): string | null => {
   return error.code;
 };
 
+const getErrorMessage = (error: unknown): string | null => {
+  if (!isObject(error) || typeof error.message !== 'string') {
+    return null;
+  }
+
+  const message = error.message.trim();
+  return message.length > 0 ? message : null;
+};
+
 const buildDriveItemUrl = (binding: DriveItemBinding, suffix = ''): string => {
   const driveId = encodeURIComponent(binding.driveId);
   const itemId = encodeURIComponent(binding.itemId);
@@ -204,7 +213,12 @@ const normalizeAuthError = (error: unknown): GraphClientError => {
     );
   }
 
-  return new GraphClientError('unknown', getDefaultErrorMessage('unknown'), undefined, error);
+  return new GraphClientError(
+    'unknown',
+    getErrorMessage(error) ?? getDefaultErrorMessage('unknown'),
+    undefined,
+    error,
+  );
 };
 
 const normalizeNetworkError = (error: unknown): GraphClientError =>

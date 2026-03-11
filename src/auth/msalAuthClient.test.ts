@@ -187,6 +187,34 @@ describe('createAuthClient', () => {
     });
   });
 
+  it.each([
+    BrowserAuthErrorCodes.authRequestNotSetError,
+    BrowserAuthErrorCodes.blockIframeReload,
+    BrowserAuthErrorCodes.emptyResponse,
+    BrowserAuthErrorCodes.iframeClosedPrematurely,
+    BrowserAuthErrorCodes.interactionInProgress,
+    BrowserAuthErrorCodes.interactionInProgressCancelled,
+    BrowserAuthErrorCodes.noTokenRequestCacheError,
+    BrowserAuthErrorCodes.timedOut,
+  ])('maps recoverable browser token failures (%s) to interaction_required', async (errorCode) => {
+    const activeAccount = createAccount('active@example.com', 'active-home');
+    const mockMsal = createMockMsalInstance({
+      initialActiveAccount: activeAccount,
+      silentError: {
+        errorCode,
+        errorMessage: `Recoverable token failure: ${errorCode}`,
+      },
+    });
+    const client = createAuthClient({ msalInstance: mockMsal.instance });
+
+    await client.initialize();
+
+    await expect(client.getAccessToken(['Files.ReadWrite'])).rejects.toMatchObject({
+      code: 'interaction_required',
+      message: 'User interaction is required to continue authentication.',
+    });
+  });
+
   it('maps network token failures to the stable network_error code', async () => {
     const activeAccount = createAccount('active@example.com', 'active-home');
     const mockMsal = createMockMsalInstance({
