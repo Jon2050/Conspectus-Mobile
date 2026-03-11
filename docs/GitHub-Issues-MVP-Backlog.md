@@ -317,7 +317,7 @@ An issue is only considered done when:
 - Depends on: `M4-01, M4-02`
 - GitHub: [#49](https://github.com/Jon2050/Conspectus-Mobile/issues/49)
 
-### :green_circle: M4-04 Implement startup freshness decision tree
+### :white_check_mark: M4-04 Implement startup freshness decision tree
 
 - Label: `feature`
 - Milestone: `M4 - Sync Engine + Cache`

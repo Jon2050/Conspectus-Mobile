@@ -455,6 +455,13 @@ M4-03 implementation clarification:
 - Successful cache writes require three integrity checks on the downloaded payload before `writeSnapshot(...)` is allowed to run: non-empty metadata/file size, exact byte-length match with Graph `sizeBytes`, and the standard SQLite file header (`SQLite format 3\0`).
 - Invalid downloads fail closed and do not overwrite an existing cached snapshot, which keeps later startup freshness decisions deterministic for `M4-04`.
 
+M4-04 implementation clarification:
+
+- Startup freshness resolution is implemented in `src/features/app-shell/startupFreshnessService.ts` and invoked during app-shell startup from `src/features/app-shell/AppShell.svelte`.
+- The service emits deterministic result branches for the core decision tree: no binding, online unchanged (`eTag` match), online changed (`eTag` mismatch => re-download), offline with cache, and offline without cache.
+- When startup metadata refresh or snapshot download fails while a cached snapshot exists, the current implementation resolves a `stale` startup state and continues with the cached bytes instead of clearing auth/binding state.
+- Development-only telemetry for startup freshness branches is emitted from `AppShell.svelte` so branch selection and fallback/error outcomes remain inspectable without adding production logging noise.
+
 Deliverables:
 
 - Reliable DB availability for read-only mode offline.
