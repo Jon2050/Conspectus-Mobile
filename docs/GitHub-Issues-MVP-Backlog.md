@@ -301,7 +301,7 @@ An issue is only considered done when:
 - Implementation note (from M3 review): When implementing the Dexie-backed `CacheStore`, ensure that active IndexedDB connections are closed before executing the local reset action in `settingsCacheStoreResolver.ts`, or else `indexedDB.deleteDatabase` will emit an `onblocked` event and fail the local data reset.
 - GitHub: [#47](https://github.com/Jon2050/Conspectus-Mobile/issues/47)
 
-### :green_circle: M4-02 Implement Graph metadata fetch (`eTag` and file info)
+### :white_check_mark: M4-02 Implement Graph metadata fetch (`eTag` and file info)
 
 - Label: `feature`
 - Milestone: `M4 - Sync Engine + Cache`
