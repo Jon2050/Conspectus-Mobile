@@ -462,6 +462,13 @@ M4-04 implementation clarification:
 - When startup metadata refresh or snapshot download fails while a cached snapshot exists, the current implementation resolves a `stale` startup state and continues with the cached bytes instead of clearing auth/binding state.
 - Development-only telemetry for startup freshness branches is emitted from `AppShell.svelte` so branch selection and fallback/error outcomes remain inspectable without adding production logging noise.
 
+M4-05 implementation clarification:
+
+- The app-wide sync status state machine is implemented in `src/shared/state/syncStateStore.ts` and exposed as `appSyncStateStore` for cross-route consumers such as the app shell and upcoming Settings work.
+- Legal transitions are enforced in the store itself so UI code cannot jump directly from `idle` to terminal success states without first entering `syncing` when an online startup refresh is actually running.
+- Startup-specific sync status orchestration lives in `src/features/app-shell/startupSyncStateController.ts`, which maps `startupFreshnessService` decisions into a single visible UI state/message and emits non-blocking toast feedback through `appToastStore`.
+- Browser coverage for the new `syncing` state and toast-based background feedback is implemented in `tests/e2e/app-shell.spec.ts`, while unit coverage verifies guarded transitions and startup decision mapping.
+
 Deliverables:
 
 - Reliable DB availability for read-only mode offline.

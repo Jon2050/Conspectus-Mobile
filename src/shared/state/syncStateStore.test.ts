@@ -1,61 +1,116 @@
 import { get } from 'svelte/store';
 import { describe, expect, it } from 'vitest';
-import { createSyncStateStore, type SyncState } from './syncStateStore';
+import { createSyncStateStore, type SyncState, type SyncStateSnapshot } from './syncStateStore';
 
 describe('createSyncStateStore', () => {
   it('starts in idle state by default', () => {
     const store = createSyncStateStore();
-    expect(get(store)).toBe('idle');
+    expect(get(store)).toEqual<SyncStateSnapshot>({
+      state: 'idle',
+      message: null,
+      branch: null,
+    });
   });
 
-  it('supports sync lifecycle transitions', () => {
-    const store = createSyncStateStore('syncing');
+  it('supports valid sync lifecycle transitions', () => {
+    const store = createSyncStateStore({
+      state: 'syncing',
+      message: 'Checking OneDrive for DB updates...',
+    });
 
-    store.setSynced();
-    expect(get(store)).toBe('synced');
+    store.setSynced('Cached DB is current with OneDrive.', {
+      branch: 'online_unchanged',
+    });
+    expect(get(store)).toEqual<SyncStateSnapshot>({
+      state: 'synced',
+      message: 'Cached DB is current with OneDrive.',
+      branch: 'online_unchanged',
+    });
 
-    store.setError();
-    expect(get(store)).toBe('error');
+    store.setOffline('Offline mode using the last cached DB.', {
+      branch: 'offline_cached',
+    });
+    expect(get(store)).toEqual<SyncStateSnapshot>({
+      state: 'offline',
+      message: 'Offline mode using the last cached DB.',
+      branch: 'offline_cached',
+    });
 
-    store.setIdle();
-    expect(get(store)).toBe('idle');
+    store.reset();
+    expect(get(store)).toEqual<SyncStateSnapshot>({
+      state: 'idle',
+      message: null,
+      branch: null,
+    });
   });
 
-  it('supports stale and offline transitions', () => {
+  it('rejects illegal transitions and keeps the previous state', () => {
     const store = createSyncStateStore();
 
-    store.setStale();
-    expect(get(store)).toBe('stale');
+    expect(() => {
+      store.setSynced('Cached DB is current with OneDrive.');
+    }).toThrowError('Illegal sync state transition: idle -> synced');
 
-    store.setOffline();
-    expect(get(store)).toBe('offline');
-
-    store.setSyncing();
-    expect(get(store)).toBe('syncing');
+    expect(get(store)).toEqual<SyncStateSnapshot>({
+      state: 'idle',
+      message: null,
+      branch: null,
+    });
   });
 
   it.each<SyncState>(['idle', 'syncing', 'synced', 'stale', 'offline', 'error'])(
     'can be initialized with state "%s"',
     (state) => {
-      const store = createSyncStateStore(state);
-      expect(get(store)).toBe(state);
+      const store = createSyncStateStore({
+        state,
+        message: `${state} message`,
+        branch: `${state}-branch`,
+      });
+      expect(get(store)).toEqual<SyncStateSnapshot>({
+        state,
+        message: `${state} message`,
+        branch: `${state}-branch`,
+      });
     },
   );
 
   it('notifies subscribers on each state transition', () => {
-    const store = createSyncStateStore('idle');
-    const observed: SyncState[] = [];
+    const store = createSyncStateStore();
+    const observed: SyncStateSnapshot[] = [];
 
     const unsubscribe = store.subscribe((value) => {
       observed.push(value);
     });
 
-    store.setSyncing();
-    store.setSynced();
-    store.setError();
+    store.setSyncing('Checking OneDrive for DB updates...');
+    store.setSynced('Downloaded the latest DB from OneDrive.', {
+      branch: 'online_changed',
+    });
+    store.setError('Startup sync failed unexpectedly.');
 
     unsubscribe();
 
-    expect(observed).toEqual(['idle', 'syncing', 'synced', 'error']);
+    expect(observed).toEqual<SyncStateSnapshot[]>([
+      {
+        state: 'idle',
+        message: null,
+        branch: null,
+      },
+      {
+        state: 'syncing',
+        message: 'Checking OneDrive for DB updates...',
+        branch: null,
+      },
+      {
+        state: 'synced',
+        message: 'Downloaded the latest DB from OneDrive.',
+        branch: 'online_changed',
+      },
+      {
+        state: 'error',
+        message: 'Startup sync failed unexpectedly.',
+        branch: null,
+      },
+    ]);
   });
 });
