@@ -1,3 +1,4 @@
+// Provides a reusable toast store with explicit timer cleanup for component or app teardown.
 import { writable } from 'svelte/store';
 
 export type ToastType = 'info' | 'success' | 'error' | 'warning';
@@ -9,7 +10,15 @@ export interface Toast {
   durationMs: number;
 }
 
-const createToastStore = () => {
+export interface ToastStore {
+  subscribe: ReturnType<typeof writable<Toast[]>>['subscribe'];
+  show(message: string, type?: ToastType, durationMs?: number): string;
+  remove(id: string): void;
+  clear(): void;
+  destroy(): void;
+}
+
+export const createToastStore = (): ToastStore => {
   const { subscribe, set, update } = writable<Toast[]>([]);
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -21,12 +30,12 @@ const createToastStore = () => {
     }
   };
 
-  const remove = (id: string) => {
+  const remove = (id: string): void => {
     clearTimer(id);
     update((toasts) => toasts.filter((t) => t.id !== id));
   };
 
-  const show = (message: string, type: ToastType = 'info', durationMs = 4000) => {
+  const show = (message: string, type: ToastType = 'info', durationMs = 4000): string => {
     const id = crypto.randomUUID();
     const toast: Toast = { id, message, type, durationMs };
 
@@ -45,7 +54,7 @@ const createToastStore = () => {
     return id;
   };
 
-  const clear = () => {
+  const clear = (): void => {
     for (const timerId of timers.values()) {
       clearTimeout(timerId);
     }
@@ -53,11 +62,16 @@ const createToastStore = () => {
     set([]);
   };
 
+  const destroy = (): void => {
+    clear();
+  };
+
   return {
     subscribe,
     show,
     remove,
     clear,
+    destroy,
   };
 };
 

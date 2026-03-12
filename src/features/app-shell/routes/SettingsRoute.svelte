@@ -468,6 +468,9 @@
     display: flex;
     flex-direction: column;
     gap: 0.8rem;
+    --settings-error-color: color-mix(in srgb, var(--negative) 72%, var(--text-primary));
+    --settings-error-surface: color-mix(in srgb, var(--negative) 14%, var(--surface-strong));
+    --settings-dialog-border: color-mix(in srgb, var(--negative) 22%, var(--border));
   }
 
   .settings-screen__auth-status {
@@ -480,8 +483,8 @@
     padding: 1rem;
     border: none;
     border-radius: var(--radius-md);
-    color: #991b1b;
-    background: #fef2f2;
+    color: var(--settings-error-color);
+    background: var(--settings-error-surface);
   }
 
   .settings-screen__binding-status {
@@ -494,8 +497,8 @@
     padding: 1rem;
     border: none;
     border-radius: var(--radius-md);
-    color: #991b1b;
-    background: #fef2f2;
+    color: var(--settings-error-color);
+    background: var(--settings-error-surface);
   }
 
   .settings-screen__subheading {
@@ -549,9 +552,9 @@
     max-width: 100%;
     margin: auto;
     padding: 1.5rem;
-    border: none;
+    border: 1px solid var(--settings-dialog-border);
     border-radius: var(--radius-lg);
-    background: #fef2f2;
+    background: var(--surface-strong);
     box-shadow: var(--shadow-lg);
   }
 
@@ -573,7 +576,7 @@
   }
 
   .settings-screen__confirmation-error {
-    color: #7d1111;
+    color: var(--settings-error-color);
   }
 
   .settings-screen__browser {
