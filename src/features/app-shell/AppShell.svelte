@@ -38,6 +38,8 @@
   export let showLoadingPlaceholder = true;
 
   const FOOTER_VISIBILITY_THRESHOLD_PX = 24;
+  // Keep the footer visible until the user scrolls far enough away from the end of the page.
+  const FOOTER_VISIBILITY_HYSTERESIS_PX = 48;
 
   let currentRoute: AppRouteKey = DEFAULT_ROUTE;
   let appContentElement: HTMLElement | null = null;
@@ -91,9 +93,20 @@
     }
 
     const { clientHeight, scrollHeight, scrollTop } = appContentElement;
-    footerIsVisible =
-      scrollHeight <= clientHeight + FOOTER_VISIBILITY_THRESHOLD_PX ||
-      scrollTop + clientHeight >= scrollHeight - FOOTER_VISIBILITY_THRESHOLD_PX;
+    const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
+
+    if (scrollHeight <= clientHeight + FOOTER_VISIBILITY_THRESHOLD_PX) {
+      footerIsVisible = true;
+      return;
+    }
+
+    if (footerIsVisible) {
+      footerIsVisible =
+        distanceFromBottom <= FOOTER_VISIBILITY_THRESHOLD_PX + FOOTER_VISIBILITY_HYSTERESIS_PX;
+      return;
+    }
+
+    footerIsVisible = distanceFromBottom <= FOOTER_VISIBILITY_THRESHOLD_PX;
   };
 
   const disconnectFooterVisibilityTracking = (): void => {

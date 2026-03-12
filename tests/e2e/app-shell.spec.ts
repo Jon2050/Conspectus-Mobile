@@ -1121,17 +1121,77 @@ test('reveals deployment footer only when reaching the end of a scrollable page'
 
   await expect(footer).toHaveAttribute('aria-hidden', 'true');
 
+  await footer.evaluate((element) => {
+    const footerElement = element as HTMLElement;
+    const trackedWindow = window as typeof window & {
+      __CONSPECTUS_FOOTER_VISIBILITY_CHANGE_COUNT__?: number;
+      __CONSPECTUS_FOOTER_VISIBILITY_OBSERVER__?: MutationObserver;
+    };
+
+    trackedWindow.__CONSPECTUS_FOOTER_VISIBILITY_CHANGE_COUNT__ = 0;
+
+    const observer = new MutationObserver((mutations) => {
+      trackedWindow.__CONSPECTUS_FOOTER_VISIBILITY_CHANGE_COUNT__ =
+        (trackedWindow.__CONSPECTUS_FOOTER_VISIBILITY_CHANGE_COUNT__ ?? 0) +
+        mutations.filter((mutation) => mutation.attributeName === 'aria-hidden').length;
+    });
+
+    observer.observe(footerElement, {
+      attributes: true,
+      attributeFilter: ['aria-hidden'],
+    });
+
+    trackedWindow.__CONSPECTUS_FOOTER_VISIBILITY_OBSERVER__ = observer;
+  });
+
   await appContent.evaluate((element) => {
     element.scrollTop = element.scrollHeight;
     element.dispatchEvent(new Event('scroll'));
   });
   await expect(footer).not.toHaveAttribute('aria-hidden', 'true');
+  await page.waitForTimeout(300);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as typeof window & {
+              __CONSPECTUS_FOOTER_VISIBILITY_CHANGE_COUNT__?: number;
+            }
+          ).__CONSPECTUS_FOOTER_VISIBILITY_CHANGE_COUNT__ ?? 0,
+      ),
+    )
+    .toBe(1);
 
   await appContent.evaluate((element) => {
     element.scrollTop = 0;
     element.dispatchEvent(new Event('scroll'));
   });
   await expect(footer).toHaveAttribute('aria-hidden', 'true');
+  await page.waitForTimeout(300);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as typeof window & {
+              __CONSPECTUS_FOOTER_VISIBILITY_CHANGE_COUNT__?: number;
+            }
+          ).__CONSPECTUS_FOOTER_VISIBILITY_CHANGE_COUNT__ ?? 0,
+      ),
+    )
+    .toBe(2);
+
+  await page.evaluate(() => {
+    const trackedWindow = window as typeof window & {
+      __CONSPECTUS_FOOTER_VISIBILITY_CHANGE_COUNT__?: number;
+      __CONSPECTUS_FOOTER_VISIBILITY_OBSERVER__?: MutationObserver;
+    };
+
+    trackedWindow.__CONSPECTUS_FOOTER_VISIBILITY_OBSERVER__?.disconnect();
+    delete trackedWindow.__CONSPECTUS_FOOTER_VISIBILITY_OBSERVER__;
+    delete trackedWindow.__CONSPECTUS_FOOTER_VISIBILITY_CHANGE_COUNT__;
+  });
 });
 
 test('supports sign-in and sign-out auth UX states in settings', async ({ page }) => {
