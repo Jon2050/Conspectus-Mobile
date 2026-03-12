@@ -1,3 +1,4 @@
+<!-- Renders transient toast notifications as dismissible button controls above the app shell. -->
 <script lang="ts">
   import { flip } from 'svelte/animate';
   import { fly, fade } from 'svelte/transition';
@@ -6,23 +7,17 @@
   const removeToast = (id: string) => {
     appToastStore.remove(id);
   };
-
-  const handleKeydown = (event: KeyboardEvent, id: string) => {
-    if (event.key === 'Enter' || event.key === ' ') {
-      removeToast(id);
-    }
-  };
 </script>
 
 <div class="toast-container" aria-live="polite">
   {#each $appToastStore as toast (toast.id)}
     <button
+      type="button"
       class="toast toast--{toast.type}"
       animate:flip={{ duration: 250 }}
       in:fly={{ y: 50, duration: 300 }}
       out:fade={{ duration: 150 }}
       on:click={() => removeToast(toast.id)}
-      on:keydown={(e) => handleKeydown(e, toast.id)}
     >
       <span class="toast__message">{toast.message}</span>
     </button>
