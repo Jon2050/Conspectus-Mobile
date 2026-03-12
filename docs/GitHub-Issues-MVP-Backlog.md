@@ -341,7 +341,7 @@ An issue is only considered done when:
 - Depends on: `M4-03, M4-04`
 - GitHub: [#52](https://github.com/Jon2050/Conspectus-Mobile/issues/52)
 
-### :green_circle: M4-07 Add sync/cache integration tests
+### :white_check_mark: M4-07 Add sync/cache integration tests
 
 - Label: `test`
 - Milestone: `M4 - Sync Engine + Cache`
