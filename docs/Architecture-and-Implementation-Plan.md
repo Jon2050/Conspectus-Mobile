@@ -476,6 +476,12 @@ M4-06 implementation clarification:
 - The default startup retry policy is 3 total attempts with a `250ms` base delay capped at `1000ms`; when retries are exhausted, the final failure preserves the normalized `network_error` identity for later handling and surfaces actionable user messaging.
 - When retries are exhausted but a cached snapshot already exists, startup still resolves to the existing `stale` branch and continues with the cached DB instead of discarding readable local data.
 
+M4-07 implementation clarification:
+
+- Sync/cache regression coverage is split intentionally across service-level Vitest tests in `src/features/app-shell/startupFreshnessService.test.ts` and browser-level Playwright scenarios in `tests/e2e/app-shell.spec.ts`.
+- The automated coverage now includes the full startup decision matrix plus retry exhaustion behavior for both metadata refresh and fresh-snapshot download branches, including cached stale fallback and terminal error outcomes.
+- Offline startup behavior remains covered in Playwright for both cache-hit and cache-miss paths so CI catches regressions in the app-shell orchestration, not only in isolated service mocks.
+
 Deliverables:
 
 - Reliable DB availability for read-only mode offline.
