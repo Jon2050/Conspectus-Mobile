@@ -26,6 +26,7 @@ describe('startupSyncStateController', () => {
       state: 'syncing',
       message: 'Checking OneDrive for DB updates...',
       branch: null,
+      progress: null,
     });
     expect(toastStore.show).toHaveBeenCalledWith(
       'Syncing with OneDrive in the background...',
@@ -66,6 +67,7 @@ describe('startupSyncStateController', () => {
       state: 'synced',
       message: 'Downloaded the latest DB from OneDrive.',
       branch: 'online_changed',
+      progress: null,
     });
     expect(toastStore.show).toHaveBeenCalledWith(
       'Downloaded the latest DB from OneDrive.',
@@ -115,6 +117,7 @@ describe('startupSyncStateController', () => {
       message:
         'Unable to refresh the selected OneDrive database metadata after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again. Using the last cached DB for now.',
       branch: 'online_metadata_failed_cached',
+      progress: null,
     });
     expect(toastStore.show).toHaveBeenCalledWith(
       'Unable to refresh the selected OneDrive database metadata after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again. Using the last cached DB for now.',
@@ -144,6 +147,7 @@ describe('startupSyncStateController', () => {
       state: 'idle',
       message: null,
       branch: null,
+      progress: null,
     });
     expect(toastStore.show).not.toHaveBeenCalled();
   });
@@ -165,6 +169,7 @@ describe('startupSyncStateController', () => {
       state: 'error',
       message: 'Startup sync failed unexpectedly. Check the browser console and retry.',
       branch: null,
+      progress: null,
     });
     expect(toastStore.show).toHaveBeenCalledWith(
       'Startup sync failed unexpectedly. Check the browser console and retry.',

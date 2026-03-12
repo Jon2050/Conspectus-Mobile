@@ -3,10 +3,16 @@ import { writable, type Readable } from 'svelte/store';
 
 export type SyncState = 'idle' | 'syncing' | 'synced' | 'stale' | 'offline' | 'error';
 
+export interface SyncProgress {
+  readonly loaded: number;
+  readonly total: number | null;
+}
+
 export interface SyncStateSnapshot {
   readonly state: SyncState;
   readonly message: string | null;
   readonly branch: string | null;
+  readonly progress: SyncProgress | null;
 }
 
 export interface SyncStateTransitionOptions {
@@ -20,12 +26,14 @@ export interface SyncStateStore extends Readable<SyncStateSnapshot> {
   setStale: (message: string, options?: SyncStateTransitionOptions) => void;
   setOffline: (message: string, options?: SyncStateTransitionOptions) => void;
   setError: (message: string, options?: SyncStateTransitionOptions) => void;
+  updateProgress: (loaded: number, total: number | null) => void;
 }
 
 const DEFAULT_SYNC_STATE_SNAPSHOT: SyncStateSnapshot = {
   state: 'idle',
   message: null,
   branch: null,
+  progress: null,
 };
 
 const ALLOWED_SYNC_STATE_TRANSITIONS: Record<SyncState, readonly SyncState[]> = {
@@ -45,6 +53,7 @@ const createSnapshot = (
   state,
   message,
   branch: options?.branch ?? null,
+  progress: null, // Reset progress on state transition
 });
 
 const normalizeInitialSnapshot = (
@@ -53,6 +62,7 @@ const normalizeInitialSnapshot = (
   state: initialSnapshot.state ?? DEFAULT_SYNC_STATE_SNAPSHOT.state,
   message: initialSnapshot.message ?? DEFAULT_SYNC_STATE_SNAPSHOT.message,
   branch: initialSnapshot.branch ?? DEFAULT_SYNC_STATE_SNAPSHOT.branch,
+  progress: initialSnapshot.progress ?? DEFAULT_SYNC_STATE_SNAPSHOT.progress,
 });
 
 const assertValidTransition = (current: SyncState, next: SyncState): void => {
@@ -93,6 +103,17 @@ export const createSyncStateStore = (
     setStale: (message, options) => transitionTo('stale', message, options),
     setOffline: (message, options) => transitionTo('offline', message, options),
     setError: (message, options) => transitionTo('error', message, options),
+    updateProgress: (loaded: number, total: number | null) => {
+      update((currentSnapshot) => {
+        if (currentSnapshot.state !== 'syncing') {
+          return currentSnapshot;
+        }
+        return {
+          ...currentSnapshot,
+          progress: { loaded, total },
+        };
+      });
+    },
   };
 };
 

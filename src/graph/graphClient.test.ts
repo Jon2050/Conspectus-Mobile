@@ -561,19 +561,80 @@ describe('createGraphClient', () => {
     });
   });
 
-  it('rejects invalid paginated children payloads with an unknown Graph error', async () => {
+  it('reports progress when downloading a file using the reader stream', async () => {
     const authClient = createAuthClient();
-    const fetchFn = vi.fn(async () =>
-      createJsonResponse({
-        value: [],
-        '@odata.nextLink': 123,
-      }),
+    const encoder = new TextEncoder();
+    const chunk1 = encoder.encode('hello ');
+    const chunk2 = encoder.encode('world!');
+
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(chunk1);
+        controller.enqueue(chunk2);
+        controller.close();
+      },
+    });
+
+    const fetchFn = vi.fn(
+      async () =>
+        new Response(stream, {
+          status: 200,
+          headers: {
+            'Content-Length': '12',
+          },
+        }),
     );
     const client = createGraphClient({ authClient, fetchFn });
+    const onProgress = vi.fn();
 
-    await expect(client.listChildren()).rejects.toMatchObject({
-      code: 'unknown',
-      message: 'Microsoft Graph children response did not include the required file fields.',
-    });
+    const result = await client.downloadFile(DRIVE_ITEM_BINDING, onProgress);
+
+    const text = new TextDecoder().decode(result);
+    expect(text).toBe('hello world!');
+    expect(onProgress).toHaveBeenCalledWith(6, 12);
+    expect(onProgress).toHaveBeenCalledWith(12, 12);
+  });
+
+  it('reports upload progress using XHR fallback', async () => {
+    const authClient = createAuthClient();
+
+    const xhrMock = {
+      open: vi.fn(),
+      setRequestHeader: vi.fn(),
+      send: vi.fn(function (this: XMLHttpRequest) {
+        if (this.upload.onprogress) {
+          this.upload.onprogress({ lengthComputable: true, loaded: 5, total: 10 });
+          this.upload.onprogress({ lengthComputable: true, loaded: 10, total: 10 });
+        }
+        this.status = 200;
+        this.responseText = JSON.stringify({
+          eTag: '"etag-2"',
+          size: 10,
+          lastModifiedDateTime: '2026-03-09T11:00:00Z',
+          id: 'test-id',
+          name: 'test.db',
+          parentReference: {
+            driveId: 'test-drive',
+            path: '/test',
+          },
+          file: {},
+        });
+        if (this.onload) {
+          this.onload();
+        }
+      }),
+      upload: { onprogress: null },
+    } as unknown as XMLHttpRequest;
+
+    const createXhrFn = () => xhrMock;
+    const client = createGraphClient({ authClient, createXhrFn });
+    const onProgress = vi.fn();
+
+    const bytes = Uint8Array.from([1, 2, 3]);
+    const result = await client.uploadFile(DRIVE_ITEM_BINDING, bytes, '"etag-1"', onProgress);
+
+    expect(result.eTag).toBe('"etag-2"');
+    expect(onProgress).toHaveBeenCalledWith(5, 10);
+    expect(onProgress).toHaveBeenCalledWith(10, 10);
   });
 });

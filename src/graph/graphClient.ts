@@ -48,6 +48,7 @@ interface GraphErrorPayload {
 interface CreateGraphClientOptions {
   readonly authClient: AuthClient;
   readonly fetchFn?: FetchFn;
+  readonly createXhrFn?: () => XMLHttpRequest;
 }
 
 class GraphClientError extends Error {
@@ -249,6 +250,26 @@ const normalizeHttpError = async (response: Response): Promise<GraphClientError>
   return new GraphClientError(code, message, response.status, payload);
 };
 
+const normalizeXhrError = (xhr: XMLHttpRequest): GraphClientError => {
+  let payload: unknown = null;
+
+  try {
+    if (xhr.responseText.trim().length > 0) {
+      payload = JSON.parse(xhr.responseText);
+    }
+  } catch {
+    payload = null;
+  }
+
+  const code = mapStatusToErrorCode(xhr.status);
+  const message =
+    code === 'unknown'
+      ? (getGraphErrorMessage(payload) ?? getDefaultErrorMessage(code))
+      : getDefaultErrorMessage(code);
+
+  return new GraphClientError(code, message, xhr.status, payload);
+};
+
 const readJsonPayload = async (
   response: Response,
   invalidResponseMessage: string,
@@ -354,6 +375,7 @@ const normalizeChildrenPayload = (
 
 export const createGraphClient = (options: CreateGraphClientOptions): GraphClient => {
   const fetchFn = options.fetchFn ?? fetch;
+  const createXhrFn = options.createXhrFn ?? (() => new XMLHttpRequest());
   const toRequestBody = (bytes: Uint8Array): Blob =>
     new Blob([Uint8Array.from(bytes).buffer], { type: 'application/octet-stream' });
 
@@ -425,18 +447,142 @@ export const createGraphClient = (options: CreateGraphClientOptions): GraphClien
       );
     },
 
-    async downloadFile(binding): Promise<Uint8Array> {
+    async downloadFile(
+      binding,
+      onProgress?: (loadedBytes: number, totalBytes: number | null) => void,
+    ): Promise<Uint8Array> {
       const response = await executeRequest(buildDriveItemUrl(binding, '/content'));
       try {
+        const contentLength = response.headers.get('Content-Length');
+        const totalBytes = contentLength !== null ? parseInt(contentLength, 10) : null;
+
+        if (onProgress && response.body !== null) {
+          const reader = response.body.getReader();
+          let loadedBytes = 0;
+          const chunks: Uint8Array[] = [];
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              break;
+            }
+            if (value) {
+              chunks.push(value);
+              loadedBytes += value.length;
+              onProgress(loadedBytes, totalBytes);
+            }
+          }
+
+          const arrayBuffer = new Uint8Array(loadedBytes);
+          let offset = 0;
+          for (const chunk of chunks) {
+            arrayBuffer.set(chunk, offset);
+            offset += chunk.length;
+          }
+          return arrayBuffer;
+        }
+
         const arrayBuffer = await response.arrayBuffer();
+        if (onProgress) {
+          onProgress(arrayBuffer.byteLength, totalBytes);
+        }
         return new Uint8Array(arrayBuffer);
       } catch (error) {
         throw normalizeNetworkError(error);
       }
     },
 
-    async uploadFile(binding, bytes, expectedETag): Promise<GraphUploadResult> {
-      const response = await executeRequest(buildDriveItemUrl(binding, '/content'), {
+    async uploadFile(
+      binding,
+      bytes,
+      expectedETag,
+      onProgress?: (loadedBytes: number, totalBytes: number | null) => void,
+    ): Promise<GraphUploadResult> {
+      const url = buildDriveItemUrl(binding, '/content');
+
+      if (onProgress) {
+        let accessToken: string;
+        try {
+          accessToken = await options.authClient.getAccessToken(GRAPH_ONEDRIVE_FILE_SCOPES);
+        } catch (error) {
+          throw normalizeAuthError(error);
+        }
+
+        return new Promise((resolve, reject) => {
+          const xhr = createXhrFn();
+          xhr.open('PUT', url, true);
+          xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
+          xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+          xhr.setRequestHeader('If-Match', expectedETag);
+          xhr.timeout = 30000;
+
+          xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+              onProgress(event.loaded, event.total);
+            } else {
+              onProgress(event.loaded, null);
+            }
+          };
+
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              let payload: unknown = null;
+              try {
+                if (xhr.responseText.trim().length > 0) {
+                  payload = JSON.parse(xhr.responseText);
+                }
+              } catch {
+                // ignore
+              }
+              try {
+                resolve(
+                  normalizeGraphItem(
+                    payload,
+                    'Microsoft Graph upload response did not include the required file fields.',
+                  ) as GraphUploadResult,
+                );
+              } catch (error) {
+                reject(
+                  new GraphClientError(
+                    'unknown',
+                    'Microsoft Graph upload response did not include the required file fields.',
+                    xhr.status,
+                    error,
+                  ),
+                );
+              }
+            } else {
+              reject(normalizeXhrError(xhr));
+            }
+          };
+
+          xhr.onerror = () => {
+            reject(
+              new GraphClientError(
+                'network_error',
+                getDefaultErrorMessage('network_error'),
+                undefined,
+                null,
+              ),
+            );
+          };
+
+          xhr.ontimeout = () => {
+            reject(
+              new GraphClientError(
+                'network_error',
+                getDefaultErrorMessage('network_error'),
+                undefined,
+                null,
+              ),
+            );
+          };
+
+          xhr.send(toRequestBody(bytes));
+        });
+      }
+
+      const response = await executeRequest(url, {
         method: 'PUT',
         body: toRequestBody(bytes),
         headers: {
@@ -452,7 +598,7 @@ export const createGraphClient = (options: CreateGraphClientOptions): GraphClien
       return normalizeGraphItem(
         payload,
         'Microsoft Graph upload response did not include the required file fields.',
-      );
+      ) as GraphUploadResult;
     },
   };
 };

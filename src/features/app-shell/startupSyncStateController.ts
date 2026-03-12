@@ -70,6 +70,14 @@ export const beginStartupSync = (
   toastStore.show(STARTUP_SYNCING_TOAST_MESSAGE, 'info', 2800);
 };
 
+export const updateStartupSyncProgress = (
+  syncStateStore: SyncStateStore,
+  loadedBytes: number,
+  totalBytes: number | null,
+): void => {
+  syncStateStore.updateProgress(loadedBytes, totalBytes);
+};
+
 export const applyStartupFreshnessDecision = (
   syncStateStore: SyncStateStore,
   decision: StartupFreshnessDecision,
@@ -117,6 +125,7 @@ export const applyUnexpectedStartupSyncError = (
 
 export const startupSyncStateController = {
   beginStartupSync,
+  updateStartupSyncProgress,
   applyStartupFreshnessDecision,
   applyUnexpectedStartupSyncError,
 };

@@ -52,11 +52,15 @@ export interface GraphError {
 export interface GraphClient {
   listChildren(folder?: DriveFolderReference): Promise<readonly GraphDriveItem[]>;
   getFileMetadata(binding: DriveItemBinding): Promise<GraphFileMetadata>;
-  downloadFile(binding: DriveItemBinding): Promise<Uint8Array>;
+  downloadFile(
+    binding: DriveItemBinding,
+    onProgress?: (loadedBytes: number, totalBytes: number | null) => void,
+  ): Promise<Uint8Array>;
   uploadFile(
     binding: DriveItemBinding,
     bytes: Uint8Array,
     expectedETag: string,
+    onProgress?: (loadedBytes: number, totalBytes: number | null) => void,
   ): Promise<GraphUploadResult>;
 }
 
