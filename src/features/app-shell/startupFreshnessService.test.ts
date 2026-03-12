@@ -365,6 +365,117 @@ describe('startup freshness service', () => {
     expect(waitFor).toHaveBeenNthCalledWith(2, 500);
   });
 
+  it('keeps the cached snapshot as stale after transient download failures exhaust retries', async () => {
+    const cachedSnapshot = createSnapshot({
+      metadata: {
+        eTag: '"etag-old"',
+        lastSyncAtIso: '2026-03-11T09:45:00.000Z',
+      },
+    });
+    const graphClient = createGraphClient(createMetadata({ eTag: '"etag-new"' }));
+    const cacheStore = createCacheStore(cachedSnapshot);
+    const snapshotService = createSnapshotService(
+      createGraphError('network_error', 'Temporary download outage.', 503),
+      createGraphError('network_error', 'Temporary download outage.', 503),
+      createGraphError('network_error', 'Temporary download outage.', 503),
+    );
+    const waitFor = vi.fn(async () => {});
+    const service = createStartupFreshnessService(graphClient, cacheStore, snapshotService, {
+      retry: {
+        waitFor,
+      },
+    });
+
+    await expect(service.resolve(DRIVE_ITEM_BINDING, true)).resolves.toMatchObject({
+      kind: 'ready',
+      branch: 'online_download_failed_cached',
+      syncState: 'stale',
+      snapshot: cachedSnapshot,
+      failure: {
+        code: 'snapshot_download_failed',
+        message:
+          'Unable to download the latest OneDrive database snapshot after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again.',
+        cause: {
+          code: 'network_error',
+          status: 503,
+        },
+      },
+    });
+
+    expect(graphClient.getFileMetadata).toHaveBeenCalledTimes(1);
+    expect(snapshotService.downloadAndCacheSnapshot).toHaveBeenCalledTimes(3);
+    expect(waitFor.mock.calls).toEqual([[250], [500]]);
+  });
+
+  it('returns an actionable terminal error after transient download failures exhaust retries without cached data', async () => {
+    const graphClient = createGraphClient(createMetadata({ eTag: '"etag-new"' }));
+    const cacheStore = createCacheStore(null);
+    const snapshotService = createSnapshotService(
+      createGraphError('network_error', 'Temporary download outage.', 503),
+      createGraphError('network_error', 'Temporary download outage.', 503),
+      createGraphError('network_error', 'Temporary download outage.', 503),
+    );
+    const waitFor = vi.fn(async () => {});
+    const service = createStartupFreshnessService(graphClient, cacheStore, snapshotService, {
+      retry: {
+        waitFor,
+      },
+    });
+
+    await expect(service.resolve(DRIVE_ITEM_BINDING, true)).resolves.toMatchObject({
+      kind: 'error',
+      branch: 'online_download_failed',
+      syncState: 'error',
+      snapshot: null,
+      failure: {
+        code: 'snapshot_download_failed',
+        message:
+          'Unable to download the latest OneDrive database snapshot after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again.',
+        cause: {
+          code: 'network_error',
+          status: 503,
+        },
+      },
+    });
+
+    expect(graphClient.getFileMetadata).toHaveBeenCalledTimes(1);
+    expect(snapshotService.downloadAndCacheSnapshot).toHaveBeenCalledTimes(3);
+    expect(waitFor.mock.calls).toEqual([[250], [500]]);
+  });
+
+  it('fails fast for non-retryable download errors without waiting for retries', async () => {
+    const graphClient = createGraphClient(createMetadata({ eTag: '"etag-new"' }));
+    const cacheStore = createCacheStore(null);
+    const snapshotService = createSnapshotService(
+      createGraphError(
+        'forbidden',
+        'The app does not have permission to download the selected OneDrive file.',
+        403,
+      ),
+    );
+    const waitFor = vi.fn(async () => {});
+    const service = createStartupFreshnessService(graphClient, cacheStore, snapshotService, {
+      retry: {
+        waitFor,
+      },
+    });
+
+    await expect(service.resolve(DRIVE_ITEM_BINDING, true)).resolves.toMatchObject({
+      kind: 'error',
+      branch: 'online_download_failed',
+      syncState: 'error',
+      snapshot: null,
+      failure: {
+        code: 'snapshot_download_failed',
+        message: 'The app does not have permission to download the selected OneDrive file.',
+      },
+    });
+
+    expect(graphClient.getFileMetadata).toHaveBeenCalledTimes(1);
+    expect(snapshotService.downloadAndCacheSnapshot).toHaveBeenCalledTimes(1);
+    expect(waitFor).not.toHaveBeenCalled();
+  });
+
   it('caps retry backoff delays and returns an actionable final message after transient metadata failures exhaust retries', async () => {
     const graphClient = createGraphClient(
       createGraphError('network_error', 'Temporary metadata outage.', 503),
