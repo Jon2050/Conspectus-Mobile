@@ -739,6 +739,75 @@ test('retries transient startup metadata failures before settling on the cached 
   expect(await getGraphDownloadCallCount(page)).toBe(0);
 });
 
+test('keeps the cached DB as stale when transient startup metadata failures exhaust retries', async ({
+  page,
+}) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page, {
+    metadataErrorSequence: [
+      createMockGraphError('network_error', 'Temporary metadata outage.', 503),
+      createMockGraphError('network_error', 'Temporary metadata outage.', 503),
+      createMockGraphError('network_error', 'Temporary metadata outage.', 503),
+    ],
+  });
+  await installMockCacheStore(page, {
+    startupSnapshot: {
+      metadata: {
+        eTag: '"etag-1"',
+      },
+      dbBytes: createSqliteBytes([3, 3, 3, 3]),
+    },
+  });
+  await installPersistedBinding(page);
+  await installMockStartupNetworkState(page, true);
+
+  await page.goto(appPath('#/accounts'));
+
+  await expect(page.getByTestId('startup-sync-status')).toContainText(
+    'Unable to refresh the selected OneDrive database metadata after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again. Using the last cached DB for now.',
+  );
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute('data-sync-state', 'stale');
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
+    'data-sync-branch',
+    'online_metadata_failed_cached',
+  );
+  expect(await getGraphMetadataCallCount(page)).toBe(3);
+  expect(await getGraphDownloadCallCount(page)).toBe(0);
+});
+
+test('shows a startup sync error when transient metadata failures exhaust retries without a cached DB', async ({
+  page,
+}) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page, {
+    metadataErrorSequence: [
+      createMockGraphError('network_error', 'Temporary metadata outage.', 503),
+      createMockGraphError('network_error', 'Temporary metadata outage.', 503),
+      createMockGraphError('network_error', 'Temporary metadata outage.', 503),
+    ],
+  });
+  await installMockCacheStore(page);
+  await installPersistedBinding(page);
+  await installMockStartupNetworkState(page, true);
+
+  await page.goto(appPath('#/accounts'));
+
+  await expect(page.getByTestId('startup-sync-status')).toContainText(
+    'Unable to refresh the selected OneDrive database metadata after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again.',
+  );
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute('data-sync-state', 'error');
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
+    'data-sync-branch',
+    'online_metadata_failed',
+  );
+  expect(await getGraphMetadataCallCount(page)).toBe(3);
+  expect(await getGraphDownloadCallCount(page)).toBe(0);
+});
+
 test('fails fast on non-retryable startup metadata errors and surfaces the clear reason', async ({
   page,
 }) => {
@@ -799,6 +868,119 @@ test('downloads a fresh DB on startup when the OneDrive eTag changed', async ({ 
   expect(await getCacheReadSnapshotCallCount(page)).toBe(1);
   expect(await getGraphMetadataCallCount(page)).toBe(1);
   expect(await getGraphDownloadCallCount(page)).toBe(1);
+});
+
+test('retries transient startup download failures before downloading the latest DB', async ({
+  page,
+}) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page, {
+    metadataETag: '"etag-2"',
+    downloadErrorSequence: [
+      createMockGraphError('network_error', 'Temporary download outage.', 503),
+      createMockGraphError('network_error', 'Temporary download outage.', 503),
+    ],
+    downloadBytes: createSqliteBytes([5, 4, 3, 2]),
+  });
+  await installMockCacheStore(page, {
+    startupSnapshot: {
+      metadata: {
+        eTag: '"etag-1"',
+      },
+      dbBytes: createSqliteBytes([1, 1, 1, 1]),
+    },
+  });
+  await installPersistedBinding(page);
+  await installMockStartupNetworkState(page, true);
+
+  await page.goto(appPath('#/accounts'));
+
+  await expect(page.getByTestId('startup-sync-status')).toContainText(
+    'Downloaded the latest DB from OneDrive.',
+  );
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
+    'data-sync-state',
+    'synced',
+  );
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
+    'data-sync-branch',
+    'online_changed',
+  );
+  expect(await getGraphMetadataCallCount(page)).toBe(1);
+  expect(await getGraphDownloadCallCount(page)).toBe(3);
+});
+
+test('keeps the cached DB as stale when transient startup download failures exhaust retries', async ({
+  page,
+}) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page, {
+    metadataETag: '"etag-2"',
+    downloadErrorSequence: [
+      createMockGraphError('network_error', 'Temporary download outage.', 503),
+      createMockGraphError('network_error', 'Temporary download outage.', 503),
+      createMockGraphError('network_error', 'Temporary download outage.', 503),
+    ],
+  });
+  await installMockCacheStore(page, {
+    startupSnapshot: {
+      metadata: {
+        eTag: '"etag-1"',
+      },
+      dbBytes: createSqliteBytes([1, 1, 1, 1]),
+    },
+  });
+  await installPersistedBinding(page);
+  await installMockStartupNetworkState(page, true);
+
+  await page.goto(appPath('#/accounts'));
+
+  await expect(page.getByTestId('startup-sync-status')).toContainText(
+    'Unable to download the latest OneDrive database snapshot after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again. Using the last cached DB for now.',
+  );
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute('data-sync-state', 'stale');
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
+    'data-sync-branch',
+    'online_download_failed_cached',
+  );
+  expect(await getGraphMetadataCallCount(page)).toBe(1);
+  expect(await getGraphDownloadCallCount(page)).toBe(3);
+});
+
+test('shows a startup sync error when transient download failures exhaust retries without a cached DB', async ({
+  page,
+}) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page, {
+    metadataETag: '"etag-2"',
+    downloadErrorSequence: [
+      createMockGraphError('network_error', 'Temporary download outage.', 503),
+      createMockGraphError('network_error', 'Temporary download outage.', 503),
+      createMockGraphError('network_error', 'Temporary download outage.', 503),
+    ],
+  });
+  await installMockCacheStore(page);
+  await installPersistedBinding(page);
+  await installMockStartupNetworkState(page, true);
+
+  await page.goto(appPath('#/accounts'));
+
+  await expect(page.getByTestId('startup-sync-status')).toContainText(
+    'Unable to download the latest OneDrive database snapshot after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again.',
+  );
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute('data-sync-state', 'error');
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
+    'data-sync-branch',
+    'online_download_failed',
+  );
+  expect(await getGraphMetadataCallCount(page)).toBe(1);
+  expect(await getGraphDownloadCallCount(page)).toBe(3);
 });
 
 test('uses the cached DB on startup when offline', async ({ page }) => {
