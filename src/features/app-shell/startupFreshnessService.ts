@@ -66,7 +66,11 @@ export type StartupFreshnessDecision =
   | StartupFreshnessErrorDecision;
 
 export interface StartupFreshnessService {
-  resolve(binding: DriveItemBinding | null, isOnline: boolean): Promise<StartupFreshnessDecision>;
+  resolve(
+    binding: DriveItemBinding | null,
+    isOnline: boolean,
+    onProgress?: (loadedBytes: number, totalBytes: number | null) => void,
+  ): Promise<StartupFreshnessDecision>;
 }
 
 export interface StartupFreshnessRetryOptions {
@@ -226,6 +230,7 @@ export const createStartupFreshnessService = (
   async resolve(
     binding: DriveItemBinding | null,
     isOnline: boolean,
+    onProgress?: (loadedBytes: number, totalBytes: number | null) => void,
   ): Promise<StartupFreshnessDecision> {
     if (binding === null) {
       return {
@@ -284,7 +289,7 @@ export const createStartupFreshnessService = (
       try {
         const downloadedSnapshot = await executeWithRetry(
           'download the latest OneDrive database snapshot',
-          async () => snapshotService.downloadAndCacheSnapshot(binding, metadata),
+          async () => snapshotService.downloadAndCacheSnapshot(binding, metadata, onProgress),
           retryOptions,
         );
 

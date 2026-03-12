@@ -59,7 +59,7 @@ describe('cached database snapshot service', () => {
 
     const snapshot = await service.downloadAndCacheSnapshot(DRIVE_ITEM_BINDING, metadata);
 
-    expect(graphClient.downloadFile).toHaveBeenCalledWith(DRIVE_ITEM_BINDING);
+    expect(graphClient.downloadFile).toHaveBeenCalledWith(DRIVE_ITEM_BINDING, undefined);
     expect(snapshot).toEqual<CachedDatabaseSnapshot>({
       binding: DRIVE_ITEM_BINDING,
       metadata: {

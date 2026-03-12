@@ -10,6 +10,7 @@ export interface CachedDatabaseSnapshotService {
   downloadAndCacheSnapshot(
     binding: DriveItemBinding,
     metadata: GraphFileMetadata,
+    onProgress?: (loadedBytes: number, totalBytes: number | null) => void,
   ): Promise<CachedDatabaseSnapshot>;
 }
 
@@ -54,8 +55,9 @@ export const createCachedDatabaseSnapshotService = (
     async downloadAndCacheSnapshot(
       binding: DriveItemBinding,
       metadata: GraphFileMetadata,
+      onProgress?: (loadedBytes: number, totalBytes: number | null) => void,
     ): Promise<CachedDatabaseSnapshot> {
-      const dbBytes = await graphClient.downloadFile(binding);
+      const dbBytes = await graphClient.downloadFile(binding, onProgress);
       validateDownloadedBytes(dbBytes, metadata);
 
       const snapshot: CachedDatabaseSnapshot = {

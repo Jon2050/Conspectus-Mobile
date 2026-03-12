@@ -27,6 +27,7 @@
     applyStartupFreshnessDecision,
     applyUnexpectedStartupSyncError,
     beginStartupSync,
+    updateStartupSyncProgress,
   } from './startupSyncStateController';
   import { resolveAppStartupIsOnline } from './startupNetworkStateResolver';
   import { syncSelectedDriveItemBindingStoreAtStartup } from './startupBindingSync';
@@ -168,7 +169,13 @@
         if (binding !== null && startupIsOnline) {
           beginStartupSync(syncStateStore);
         }
-        const decision = await startupFreshnessService.resolve(binding, startupIsOnline);
+        const decision = await startupFreshnessService.resolve(
+          binding,
+          startupIsOnline,
+          (loadedBytes, totalBytes) => {
+            updateStartupSyncProgress(syncStateStore, loadedBytes, totalBytes);
+          },
+        );
 
         if (!isMounted) {
           return;
@@ -249,6 +256,25 @@
         <p role="alert">{$syncStateStore.message}</p>
       {:else}
         <p>{$syncStateStore.message}</p>
+        {#if $syncStateStore.progress !== null && $syncStateStore.state === 'syncing'}
+          <div class="startup-sync-progress">
+            <progress
+              max={$syncStateStore.progress.total ?? undefined}
+              value={$syncStateStore.progress.total !== null
+                ? $syncStateStore.progress.loaded
+                : undefined}
+            ></progress>
+            <span class="startup-sync-progress-text">
+              {#if $syncStateStore.progress.total !== null}
+                {Math.round($syncStateStore.progress.loaded / 1024)} KB / {Math.round(
+                  $syncStateStore.progress.total / 1024,
+                )} KB
+              {:else}
+                {Math.round($syncStateStore.progress.loaded / 1024)} KB downloaded...
+              {/if}
+            </span>
+          </div>
+        {/if}
       {/if}
     </section>
   {/if}
@@ -332,5 +358,41 @@
   .startup-sync-status--error {
     background: color-mix(in srgb, var(--negative) 14%, white);
     color: color-mix(in srgb, var(--negative) 60%, black);
+  }
+
+  .startup-sync-progress {
+    margin-top: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .startup-sync-progress progress {
+    width: 100%;
+    height: 6px;
+    border: none;
+    border-radius: var(--radius-sm);
+    background-color: rgba(0, 0, 0, 0.1);
+  }
+
+  .startup-sync-progress progress::-webkit-progress-bar {
+    background-color: rgba(0, 0, 0, 0.1);
+    border-radius: var(--radius-sm);
+  }
+
+  .startup-sync-progress progress::-webkit-progress-value {
+    background-color: currentColor;
+    border-radius: var(--radius-sm);
+  }
+
+  .startup-sync-progress progress::-moz-progress-bar {
+    background-color: currentColor;
+    border-radius: var(--radius-sm);
+  }
+
+  .startup-sync-progress-text {
+    font-size: 0.75rem;
+    opacity: 0.8;
+    align-self: flex-end;
   }
 </style>

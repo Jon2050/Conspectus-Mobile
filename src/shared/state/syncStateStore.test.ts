@@ -9,6 +9,7 @@ describe('createSyncStateStore', () => {
       state: 'idle',
       message: null,
       branch: null,
+      progress: null,
     });
   });
 
@@ -25,6 +26,7 @@ describe('createSyncStateStore', () => {
       state: 'synced',
       message: 'Cached DB is current with OneDrive.',
       branch: 'online_unchanged',
+      progress: null,
     });
 
     store.setOffline('Offline mode using the last cached DB.', {
@@ -34,6 +36,7 @@ describe('createSyncStateStore', () => {
       state: 'offline',
       message: 'Offline mode using the last cached DB.',
       branch: 'offline_cached',
+      progress: null,
     });
 
     store.reset();
@@ -41,6 +44,7 @@ describe('createSyncStateStore', () => {
       state: 'idle',
       message: null,
       branch: null,
+      progress: null,
     });
   });
 
@@ -55,6 +59,7 @@ describe('createSyncStateStore', () => {
       state: 'idle',
       message: null,
       branch: null,
+      progress: null,
     });
   });
 
@@ -65,11 +70,13 @@ describe('createSyncStateStore', () => {
         state,
         message: `${state} message`,
         branch: `${state}-branch`,
+        progress: null,
       });
       expect(get(store)).toEqual<SyncStateSnapshot>({
         state,
         message: `${state} message`,
         branch: `${state}-branch`,
+        progress: null,
       });
     },
   );
@@ -95,21 +102,25 @@ describe('createSyncStateStore', () => {
         state: 'idle',
         message: null,
         branch: null,
+        progress: null,
       },
       {
         state: 'syncing',
         message: 'Checking OneDrive for DB updates...',
         branch: null,
+        progress: null,
       },
       {
         state: 'synced',
         message: 'Downloaded the latest DB from OneDrive.',
         branch: 'online_changed',
+        progress: null,
       },
       {
         state: 'error',
         message: 'Startup sync failed unexpectedly.',
         branch: null,
+        progress: null,
       },
     ]);
   });

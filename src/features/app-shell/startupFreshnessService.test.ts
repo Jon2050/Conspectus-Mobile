@@ -207,6 +207,7 @@ describe('startup freshness service', () => {
     expect(snapshotService.downloadAndCacheSnapshot).toHaveBeenCalledWith(
       DRIVE_ITEM_BINDING,
       metadata,
+      undefined,
     );
   });
 
