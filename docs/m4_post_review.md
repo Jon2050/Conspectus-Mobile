@@ -198,25 +198,27 @@ Findings that can be resolved in under 20 minutes with isolated, localized chang
 
 #### S-12: Settings route and confirmation dialog use hardcoded light-mode-only colors
 
-- **Status:** Open | 🆕 Found by second reviewer
+- **Status:** Fixed ✅
 - **Severity:** Low
 - **Perspective:** UI/UX / Dark Mode
 - **Location:** `src/features/app-shell/routes/SettingsRoute.svelte` (lines 478-485, 493-499, 554-555, 576-577)
 - **Description:** The `SettingsRoute.svelte` component hardcodes several color values that are only appropriate for light mode and do not adapt to the dark color scheme. Specifically: (1) The `settings-screen__auth-error` class at line 484 uses `color: #991b1b` and `background: #fef2f2`. (2) The `settings-screen__binding-error` class at line 498 repeats the same hardcoded values. (3) The `settings-screen__confirmation` dialog at lines 554-555 uses `background: #fef2f2`. (4) The `settings-screen__confirmation-error` at line 576 uses `color: #7d1111`. These are all red-on-light-pink color combinations that work on white backgrounds but become nearly invisible or jarring against the dark mode surface colors (`--surface-strong: #374151` in dark mode). The rest of the app uses CSS custom properties (e.g., `var(--negative)`, `var(--surface-strong)`) to adapt to both color schemes, but these error/confirmation surfaces were not updated.
 - **Impact:** Low. Error messages in Settings become hard to read or visually inconsistent in dark mode. The confirmation dialog background clashes with the dark surface.
 - **Recommendation:** Replace the hardcoded colors with CSS custom properties. For error text, use `color: var(--negative)` or define a dedicated `--error-text` / `--error-bg` pair in `:root` and the dark-mode media query. For the confirmation dialog, use `var(--surface-strong)` for the background and appropriate text colors. The `startup-sync-status--error` styles in `AppShell.svelte` (line 358) already demonstrate the correct pattern using `color-mix(in srgb, var(--negative) ...)`.
-  Reviewed by: Antigravity
+- **Resolution:** Fixed in local review follow-up. `SettingsRoute.svelte` now derives its destructive/error surfaces from theme-aware custom properties, and the confirmation dialog uses the shared surface token plus a danger-tinted border so the styling stays legible in both light and dark mode. `SettingsRoute.test.ts` guards the style contract against regressions.
+  Reviewed by: Codex, Antigravity
 
 #### S-13: `toastStore` timer cleanup is not guaranteed on app teardown
 
-- **Status:** Open | 🆕 Found by second reviewer
+- **Status:** Fixed ✅
 - **Severity:** Low
 - **Perspective:** Code Quality / Resource Management
 - **Location:** `src/shared/state/toastStore.ts` (lines 12-46)
 - **Description:** The `createToastStore` function maintains a `timers` Map that holds `setTimeout` handles for each active toast's auto-dismiss timer. These timers are only cleaned up when individual toasts are removed via `remove()` or when `clear()` is explicitly called. There is no automatic cleanup when the store is no longer referenced or when the application is torn down. In the current architecture, the `appToastStore` is a module-level singleton that lives for the entire page lifetime, so this is not a practical leak. However, `createToastStore` is a public factory — any consumer creating a local toast store (e.g., in tests or future component-scoped usage) would need to remember to call `clear()` on cleanup, or the timers continue firing and calling `remove()` on a potentially stale store reference.
 - **Impact:** Low. The singleton usage pattern prevents this from manifesting in production. Test harnesses may accumulate orphaned timers if they create toast stores without calling `clear()`.
 - **Recommendation:** Document that `clear()` must be called before discarding a toast store, or expose a `destroy()` method that calls `clear()` and marks the store as disposed. Alternatively, use `WeakRef` or tie the timer lifecycle to a Svelte `onDestroy` hook when used in component scope.
-  Reviewed by: Antigravity
+- **Resolution:** Fixed in local review follow-up. `createToastStore()` now exposes an explicit `destroy()` teardown that clears pending auto-dismiss timers before a store instance is discarded, and `toastStore.test.ts` covers both normal auto-dismiss behavior and timer cleanup during teardown.
+  Reviewed by: Codex, Antigravity
 
 ---
 
