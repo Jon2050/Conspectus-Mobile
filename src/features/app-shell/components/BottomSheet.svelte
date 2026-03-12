@@ -1,41 +1,73 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
-  import { fly, fade } from 'svelte/transition';
+  import { fly } from 'svelte/transition';
 
   export let isOpen = false;
   export let title = '';
 
+  let dialogElement: HTMLDialogElement | null = null;
   const dispatch = createEventDispatcher();
 
-  const handleClose = () => {
+  const requestClose = () => {
+    if (dialogElement?.open) {
+      dialogElement.close();
+    }
+  };
+
+  const handleDialogClose = () => {
+    if (!isOpen) {
+      return;
+    }
+
     isOpen = false;
     dispatch('close');
   };
 
-  const handleKeydown = (event: KeyboardEvent) => {
-    if (event.key === 'Escape' && isOpen) {
-      handleClose();
-    }
+  const handleDialogCancel = (event: Event) => {
+    event.preventDefault();
+    requestClose();
   };
+
+  const handleDialogClick = (event: MouseEvent) => {
+    if (dialogElement === null || event.target !== dialogElement) {
+      return;
+    }
+
+    const dialogBounds = dialogElement.getBoundingClientRect();
+    const clickWasInsideDialogBounds =
+      event.clientX >= dialogBounds.left &&
+      event.clientX <= dialogBounds.right &&
+      event.clientY >= dialogBounds.top &&
+      event.clientY <= dialogBounds.bottom;
+
+    if (clickWasInsideDialogBounds) {
+      return;
+    }
+
+    requestClose();
+  };
+
+  $: if (dialogElement !== null) {
+    if (isOpen) {
+      if (!dialogElement.open) {
+        dialogElement.showModal();
+      }
+    } else if (dialogElement.open) {
+      dialogElement.close();
+    }
+  }
 </script>
 
-<svelte:window on:keydown={handleKeydown} />
-
 {#if isOpen}
-  <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    class="bottom-sheet__backdrop"
-    in:fade={{ duration: 200 }}
-    out:fade={{ duration: 200 }}
-    on:click={handleClose}
-  ></div>
-
   <dialog
-    open
+    bind:this={dialogElement}
     class="bottom-sheet__dialog"
+    aria-modal="true"
     in:fly={{ y: '100%', duration: 350, opacity: 1, easing: (t) => 1 - Math.pow(1 - t, 4) }}
     out:fly={{ y: '100%', duration: 250 }}
+    on:cancel={handleDialogCancel}
+    on:click={handleDialogClick}
+    on:close={handleDialogClose}
   >
     <div class="bottom-sheet__handle"></div>
     {#if title}
@@ -51,15 +83,6 @@
 {/if}
 
 <style>
-  .bottom-sheet__backdrop {
-    position: fixed;
-    inset: 0;
-    background: color-mix(in srgb, black 40%, transparent);
-    z-index: 40;
-    backdrop-filter: blur(2px);
-    -webkit-backdrop-filter: blur(2px);
-  }
-
   .bottom-sheet__dialog {
     position: fixed;
     bottom: 0;
@@ -78,6 +101,12 @@
     display: flex;
     flex-direction: column;
     max-height: 90vh;
+  }
+
+  .bottom-sheet__dialog::backdrop {
+    background: color-mix(in srgb, black 40%, transparent);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
   }
 
   .bottom-sheet__handle {

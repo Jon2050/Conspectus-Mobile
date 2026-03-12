@@ -50,6 +50,12 @@ interface CreateSettingsFileBindingControllerOptions {
   readonly browseTimeoutMs?: number;
 }
 
+interface LoadItemsFailureFallback {
+  readonly folderStack: readonly DriveFolderReference[];
+  readonly items: readonly GraphDriveItem[];
+  readonly hasLoaded: boolean;
+}
+
 const DEFAULT_BROWSE_TIMEOUT_MS = 15_000;
 
 const INITIAL_STATE: SettingsFileBindingState = {
@@ -201,7 +207,10 @@ export const createSettingsFileBindingController = (
     message: 'Loading OneDrive files took too long. Try again.',
   });
 
-  const loadItems = async (folder?: DriveFolderReference): Promise<void> => {
+  const loadItems = async (
+    folder?: DriveFolderReference,
+    failureFallback?: LoadItemsFailureFallback,
+  ): Promise<void> => {
     const requestId = beginRequest();
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
     updateState({
@@ -235,12 +244,16 @@ export const createSettingsFileBindingController = (
         return;
       }
 
+      if (failureFallback !== undefined) {
+        folderStack = failureFallback.folderStack;
+      }
+
       updateState({
-        items: [],
+        items: failureFallback?.items ?? [],
         browserIsOpen: true,
         operation: 'idle',
         error: toBindingError(error, 'Failed to load OneDrive files.'),
-        hasLoaded: true,
+        hasLoaded: failureFallback?.hasLoaded ?? true,
       });
     } finally {
       if (timeoutId !== null) {
@@ -302,6 +315,9 @@ export const createSettingsFileBindingController = (
         return;
       }
 
+      const previousFolderStack = folderStack;
+      const previousItems = state.items;
+      const previousHasLoaded = state.hasLoaded;
       folderStack = [
         ...folderStack,
         {
@@ -310,7 +326,11 @@ export const createSettingsFileBindingController = (
           path: joinFolderPath(item.parentPath, item.name),
         },
       ];
-      await loadItems(folderStack.at(-1));
+      await loadItems(folderStack.at(-1), {
+        folderStack: previousFolderStack,
+        items: previousItems,
+        hasLoaded: previousHasLoaded,
+      });
     },
 
     async goBack(): Promise<void> {
@@ -318,8 +338,15 @@ export const createSettingsFileBindingController = (
         return;
       }
 
+      const previousFolderStack = folderStack;
+      const previousItems = state.items;
+      const previousHasLoaded = state.hasLoaded;
       folderStack = folderStack.slice(0, -1);
-      await loadItems(folderStack.at(-1));
+      await loadItems(folderStack.at(-1), {
+        folderStack: previousFolderStack,
+        items: previousItems,
+        hasLoaded: previousHasLoaded,
+      });
     },
 
     selectFile(item: GraphDriveItem): void {

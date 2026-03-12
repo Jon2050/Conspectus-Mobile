@@ -143,6 +143,65 @@ describe('settings file binding controller', () => {
     expect(controller.getState().canGoBack).toBe(false);
   });
 
+  it('rolls back folder navigation when loading the next folder fails', async () => {
+    const controller = createSettingsFileBindingController(harness.graphClient);
+    await controller.browseRoot();
+    harness.listChildren.mockRejectedValueOnce({
+      code: 'network_error',
+      message: 'OneDrive is unavailable.',
+    });
+
+    await controller.openFolder(ROOT_FOLDER_ITEM);
+
+    expect(controller.getState()).toEqual({
+      selectedBinding: null,
+      currentFolder: null,
+      items: [ROOT_FOLDER_ITEM, ROOT_DB_FILE_ITEM],
+      browserIsOpen: true,
+      operation: 'idle',
+      error: {
+        code: 'network_error',
+        message: 'OneDrive is unavailable.',
+        status: undefined,
+        cause: undefined,
+      },
+      hasLoaded: true,
+      canGoBack: false,
+    });
+  });
+
+  it('rolls back go-back navigation when loading the parent folder fails', async () => {
+    const controller = createSettingsFileBindingController(harness.graphClient);
+    await controller.browseRoot();
+    await controller.openFolder(ROOT_FOLDER_ITEM);
+    harness.listChildren.mockRejectedValueOnce({
+      code: 'network_error',
+      message: 'OneDrive is unavailable.',
+    });
+
+    await controller.goBack();
+
+    expect(controller.getState()).toEqual({
+      selectedBinding: null,
+      currentFolder: {
+        driveId: 'drive-123',
+        itemId: 'folder-1',
+        path: '/Finance',
+      },
+      items: FINANCE_ITEMS,
+      browserIsOpen: true,
+      operation: 'idle',
+      error: {
+        code: 'network_error',
+        message: 'OneDrive is unavailable.',
+        status: undefined,
+        cause: undefined,
+      },
+      hasLoaded: true,
+      canGoBack: true,
+    });
+  });
+
   it('stores a validated file binding when a .db file is selected', async () => {
     const controller = createSettingsFileBindingController(harness.graphClient, {
       onBindingChange,
