@@ -349,7 +349,7 @@ An issue is only considered done when:
 - Depends on: `M4-04, M4-05, M4-06`
 - GitHub: [#53](https://github.com/Jon2050/Conspectus-Mobile/issues/53)
 
-### :green_circle: M4-08 Implement progress feedback for DB sync and upload operations
+### :white_check_mark: M4-08 Implement progress feedback for DB sync and upload operations
 
 - Label: `feature`
 - Milestone: `M4 - Sync Engine + Cache`

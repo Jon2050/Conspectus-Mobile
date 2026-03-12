@@ -482,6 +482,12 @@ M4-07 implementation clarification:
 - The automated coverage now includes the full startup decision matrix plus retry exhaustion behavior for both metadata refresh and fresh-snapshot download branches, including cached stale fallback and terminal error outcomes.
 - Offline startup behavior remains covered in Playwright for both cache-hit and cache-miss paths so CI catches regressions in the app-shell orchestration, not only in isolated service mocks.
 
+M4-08 implementation clarification:
+
+- Progress reporting for large `downloadFile` operations is implemented via `response.body.getReader()` to stream chunks while incrementally updating a total byte counter.
+- Because `fetch` does not support upload progress natively, `uploadFile` progress is implemented using a seamless fallback to `XMLHttpRequest` that preserves the existing `GraphClientError` normalization, metadata requirements, and authorization header logic.
+- Startup download progress is threaded through `startupFreshnessService` and surfaces in `AppShell.svelte` when the app sync state store is in the `syncing` phase.
+
 Deliverables:
 
 - Reliable DB availability for read-only mode offline.
