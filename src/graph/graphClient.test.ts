@@ -598,10 +598,19 @@ describe('createGraphClient', () => {
   it('reports upload progress using XHR fallback', async () => {
     const authClient = createAuthClient();
 
+    interface XhrMockType {
+      upload: {
+        onprogress?: (event: { lengthComputable: boolean; loaded: number; total: number }) => void;
+      };
+      status: number;
+      responseText: string;
+      onload?: (event: Event) => void;
+    }
+
     const xhrMock = {
       open: vi.fn(),
       setRequestHeader: vi.fn(),
-      send: vi.fn(function (this: XMLHttpRequest) {
+      send: vi.fn(function (this: XhrMockType) {
         if (this.upload.onprogress) {
           this.upload.onprogress({ lengthComputable: true, loaded: 5, total: 10 });
           this.upload.onprogress({ lengthComputable: true, loaded: 10, total: 10 });
@@ -620,10 +629,10 @@ describe('createGraphClient', () => {
           file: {},
         });
         if (this.onload) {
-          this.onload();
+          this.onload({} as Event);
         }
       }),
-      upload: { onprogress: null },
+      upload: { onprogress: undefined },
     } as unknown as XMLHttpRequest;
 
     const createXhrFn = () => xhrMock;
