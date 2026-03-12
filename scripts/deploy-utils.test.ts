@@ -158,6 +158,7 @@ describe('production workflow contracts', () => {
   it('deploys production manually from the current main commit after a successful Quality run', () => {
     const workflowSource = fs.readFileSync(deployProductionWorkflowPath, 'utf8');
     expect(workflowSource).toContain('on:\n  workflow_dispatch:');
+    expect(workflowSource).toContain('VITE_AZURE_CLIENT_ID: ${{ vars.VITE_AZURE_CLIENT_ID }}');
     expect(workflowSource).toContain('name: Require main branch');
     expect(workflowSource).toContain('name: Resolve current main commit target');
     expect(workflowSource).toContain(
@@ -166,6 +167,8 @@ describe('production workflow contracts', () => {
     expect(workflowSource).toContain(
       'actions/workflows/quality.yml/runs?branch=main&event=push&head_sha=${TARGET_COMMIT_SHA}&per_page=100&page=${page}',
     );
+    expect(workflowSource).toContain('name: Validate required runtime env');
+    expect(workflowSource).toContain('Missing repository variable VITE_AZURE_CLIENT_ID.');
     expect(workflowSource).toContain('name: Build production artifact');
     expect(workflowSource).toContain('DEPLOY_CHANNEL: production');
     expect(workflowSource).toContain('name: Verify production build output paths and scope');
@@ -177,5 +180,18 @@ describe('production workflow contracts', () => {
     );
     expect(workflowSource).toContain('conspectus-mobile-production-ready');
     expect(workflowSource).toContain('node scripts/verify-production-deploy-smoke.mjs');
+  });
+
+  it('exports the required Vite client id variable before validating or building production', () => {
+    const qualityWorkflowSource = fs.readFileSync(qualityWorkflowPath, 'utf8');
+    const productionWorkflowSource = fs.readFileSync(deployProductionWorkflowPath, 'utf8');
+    const viteClientIdMapping = 'VITE_AZURE_CLIENT_ID: ${{ vars.VITE_AZURE_CLIENT_ID }}';
+
+    expect(qualityWorkflowSource).toContain(viteClientIdMapping);
+    expect(productionWorkflowSource).toContain(viteClientIdMapping);
+    expect(productionWorkflowSource).toContain('name: Validate required runtime env');
+    expect(productionWorkflowSource).toContain(
+      'echo "Missing repository variable VITE_AZURE_CLIENT_ID." >&2',
+    );
   });
 });

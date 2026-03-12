@@ -49,7 +49,7 @@ Findings that can be resolved in under 20 minutes with isolated, localized chang
 
 #### S-01: Footer visibility flickers when scrolling the Settings page
 
-- **Status:** Fixed locally | ✅ Confirmed by second reviewer
+- **Status:** Fixed ✅
 - **Severity:** Medium
 - **Perspective:** UI/UX Bug (User-reported)
 - **Location:** `src/features/app-shell/AppShell.svelte` (lines 87-140), `src/features/app-shell/components/DeploymentInfoFooter.svelte` (lines 40-58)
@@ -146,7 +146,7 @@ Findings that can be resolved in under 20 minutes with isolated, localized chang
 
 #### S-08: `ToastContainer` close button lacks `type="button"` and uses redundant keydown handler
 
-- **Status:** Fixed locally | ✅ Confirmed by second reviewer
+- **Status:** Fixed ✅
 - **Severity:** Low
 - **Perspective:** Code Quality / UI/UX
 - **Location:** `src/features/app-shell/components/ToastContainer.svelte` (lines 19-28)
@@ -159,7 +159,7 @@ Findings that can be resolved in under 20 minutes with isolated, localized chang
 
 #### S-09: `BottomSheet` dialog implementation lacks focus trapping
 
-- **Status:** Open | ✅ Confirmed by second reviewer
+- **Status:** Fixed ✅
 - **Severity:** Low
 - **Perspective:** UI/UX / Accessibility
 - **Location:** `src/features/app-shell/components/BottomSheet.svelte` (lines 34-39)
@@ -167,11 +167,12 @@ Findings that can be resolved in under 20 minutes with isolated, localized chang
 - **Impact:** Low to Medium. Screen reader and keyboard-only users will experience a broken navigation flow when a bottom sheet is open.
 - **Recommendation:** Refactor the component to use the `.showModal()` API upon mounting (e.g., via a Svelte action or `bind:this` + `onMount`) to leverage the browser's native focus trapping and backdrop management mechanism, removing the need for a separate backdrop `<div>`.
 - **Second reviewer notes:** Confirmed. The component at lines 24-51 renders a `<div class="bottom-sheet__backdrop">` and `<dialog open>` as siblings. The `SettingsRoute.svelte` uses the native `<dialog>` with `showModal()` for its confirmation flow (line 207), demonstrating that the correct pattern is already used elsewhere in the codebase, making this an inconsistency.
+- **Resolution:** Fixed in local review follow-up. `BottomSheet.svelte` now uses `HTMLDialogElement.showModal()` plus native `::backdrop` styling instead of a sibling backdrop node, and regression tests cover the modal-dialog contract.
   Reviewed by: Codex, Antigravity
 
 #### S-10: `SettingsFileBindingController` does not roll back `folderStack` on `loadItems` network failure
 
-- **Status:** Open | ✅ Confirmed by second reviewer
+- **Status:** Fixed ✅
 - **Severity:** Low
 - **Perspective:** Bug Hunting / State Management
 - **Location:** `src/features/app-shell/routes/settingsFileBindingController.ts` (lines 204-250, 305-314)
@@ -179,11 +180,12 @@ Findings that can be resolved in under 20 minutes with isolated, localized chang
 - **Impact:** Low. Requires a network drop exactly when navigating folders. The user can recover by navigating back or cancelling.
 - **Recommendation:** In the `catch` block of `loadItems`, or inside `openFolder`, catch the error and pop the failing folder off the `folderStack` before emitting the error state, so the user remains in the previously loaded, valid folder context.
 - **Second reviewer notes:** Confirmed. The `openFolder` method at line 300 pushes to `folderStack` at line 305 before awaiting `loadItems`. The `loadItems` catch block at lines 233-249 calls `updateState` with `items: []` but never modifies `folderStack`. The `updateState` helper at line 182 derives `currentFolder: folderStack.at(-1) ?? null`, so the UI will show the failed folder's path. `goBack` (line 316) would work to recover, but the error state combined with the wrong folder path is confusing.
+- **Resolution:** Fixed in local review follow-up. `settingsFileBindingController.ts` now restores the previous folder stack and list state when folder-open or go-back loads fail, and unit coverage locks both rollback paths.
   Reviewed by: Codex, Antigravity
 
 #### S-11: `Deploy Production` validates an env var that the workflow never exports
 
-- **Status:** Open | ✅ Confirmed by second reviewer
+- **Status:** Fixed ✅
 - **Severity:** High
 - **Perspective:** CI/CD
 - **Location:** `.github/workflows/deploy-production.yml` (lines 6-11, 99-119)
@@ -191,6 +193,7 @@ Findings that can be resolved in under 20 minutes with isolated, localized chang
 - **Impact:** Production deployments are blocked by configuration that the workflow itself forgets to inject, even when the repository variable is correctly set and preview builds are green.
 - **Recommendation:** Export `VITE_AZURE_CLIENT_ID` at workflow or job scope in `deploy-production.yml`, mirroring the `Quality` workflow, and add a script/workflow test that guards this contract so preview and production pipelines cannot drift again.
 - **Second reviewer notes:** Confirmed. `quality.yml` line 9 sets `VITE_AZURE_CLIENT_ID: ${{ vars.VITE_AZURE_CLIENT_ID }}` at workflow-level `env`. `deploy-production.yml` lines 6-11 define five env vars but omit `VITE_AZURE_CLIENT_ID`. The npm build step at line 119 (`npm run build`) only receives `DEPLOY_CHANNEL: production` as step-level env. Vite requires `VITE_AZURE_CLIENT_ID` during build to embed the client ID — without it, the build would produce an app that fails at runtime startup via `RuntimeEnvError` in `runtimeEnv.ts` line 42.
+- **Resolution:** Fixed in local review follow-up. `deploy-production.yml` now exports `VITE_AZURE_CLIENT_ID` at workflow scope, and `scripts/deploy-utils.test.ts` asserts the production workflow keeps the same client-id injection contract as `quality.yml`.
   Reviewed by: Codex, Antigravity
 
 #### S-12: Settings route and confirmation dialog use hardcoded light-mode-only colors
