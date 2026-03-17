@@ -25,10 +25,11 @@ const buildStartupSyncMessage = (decision: StartupFreshnessDecision): string | n
       return 'Downloaded the latest DB from OneDrive.';
     case 'offline_cached':
       return 'Offline mode using the last cached DB.';
+    case 'online_auth_expired_cached':
     case 'online_metadata_failed_cached':
-      return buildCachedFallbackMessage(decision.failure);
     case 'online_download_failed_cached':
       return buildCachedFallbackMessage(decision.failure);
+    case 'online_auth_expired':
     case 'offline_missing_cache':
     case 'online_metadata_failed':
     case 'online_download_failed':
@@ -49,10 +50,12 @@ const showDecisionToast = (
     case 'online_changed':
       toastStore.show(message, 'success', 3200);
       return;
+    case 'online_auth_expired_cached':
     case 'online_metadata_failed_cached':
     case 'online_download_failed_cached':
       toastStore.show(message, 'warning', 4200);
       return;
+    case 'online_auth_expired':
     case 'online_metadata_failed':
     case 'online_download_failed':
       toastStore.show(message, 'error', 5000);

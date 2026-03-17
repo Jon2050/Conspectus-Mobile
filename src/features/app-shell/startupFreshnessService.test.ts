@@ -252,6 +252,67 @@ describe('startup freshness service', () => {
     expect(snapshotService.downloadAndCacheSnapshot).not.toHaveBeenCalled();
   });
 
+  it('surfaces session-expired fallback details when metadata refresh fails with an auth error and cached data exists', async () => {
+    const cachedSnapshot = createSnapshot();
+    const graphClient = createGraphClient(
+      createGraphError(
+        'unauthorized',
+        'Authentication is required to access the selected OneDrive file.',
+        401,
+      ),
+    );
+    const cacheStore = createCacheStore(cachedSnapshot);
+    const snapshotService = createSnapshotService(createSnapshot());
+    const service = createStartupFreshnessService(graphClient, cacheStore, snapshotService);
+
+    await expect(service.resolve(DRIVE_ITEM_BINDING, true)).resolves.toMatchObject({
+      kind: 'ready',
+      branch: 'online_auth_expired_cached',
+      syncState: 'stale',
+      snapshot: cachedSnapshot,
+      failure: {
+        code: 'auth_expired',
+        message: 'Authentication is required to access the selected OneDrive file.',
+        cause: {
+          code: 'unauthorized',
+          status: 401,
+        },
+      },
+    });
+
+    expect(snapshotService.downloadAndCacheSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a session-expired terminal error when metadata refresh fails with an auth error and no cached data exists', async () => {
+    const graphClient = createGraphClient(
+      createGraphError(
+        'unauthorized',
+        'Authentication is required to access the selected OneDrive file.',
+        401,
+      ),
+    );
+    const cacheStore = createCacheStore(null);
+    const snapshotService = createSnapshotService(createSnapshot());
+    const service = createStartupFreshnessService(graphClient, cacheStore, snapshotService);
+
+    await expect(service.resolve(DRIVE_ITEM_BINDING, true)).resolves.toMatchObject({
+      kind: 'error',
+      branch: 'online_auth_expired',
+      syncState: 'error',
+      snapshot: null,
+      failure: {
+        code: 'auth_expired',
+        message: 'Authentication is required to access the selected OneDrive file.',
+        cause: {
+          code: 'unauthorized',
+          status: 401,
+        },
+      },
+    });
+
+    expect(snapshotService.downloadAndCacheSnapshot).not.toHaveBeenCalled();
+  });
+
   it('falls back to the cached snapshot as stale when downloading a fresh snapshot fails online', async () => {
     const cachedSnapshot = createSnapshot({
       metadata: {
@@ -272,6 +333,68 @@ describe('startup freshness service', () => {
       failure: {
         code: 'snapshot_download_failed',
         message: 'Fresh snapshot download failed.',
+      },
+    });
+  });
+
+  it('keeps the cached snapshot and marks the session as expired when downloading a fresh snapshot fails with an auth error', async () => {
+    const cachedSnapshot = createSnapshot({
+      metadata: {
+        eTag: '"etag-old"',
+        lastSyncAtIso: '2026-03-10T18:30:00.000Z',
+      },
+    });
+    const graphClient = createGraphClient(createMetadata({ eTag: '"etag-new"' }));
+    const cacheStore = createCacheStore(cachedSnapshot);
+    const snapshotService = createSnapshotService(
+      createGraphError(
+        'unauthorized',
+        'Authentication is required to access the selected OneDrive file.',
+        401,
+      ),
+    );
+    const service = createStartupFreshnessService(graphClient, cacheStore, snapshotService);
+
+    await expect(service.resolve(DRIVE_ITEM_BINDING, true)).resolves.toMatchObject({
+      kind: 'ready',
+      branch: 'online_auth_expired_cached',
+      syncState: 'stale',
+      snapshot: cachedSnapshot,
+      failure: {
+        code: 'auth_expired',
+        message: 'Authentication is required to access the selected OneDrive file.',
+        cause: {
+          code: 'unauthorized',
+          status: 401,
+        },
+      },
+    });
+  });
+
+  it('returns a session-expired terminal error when downloading a fresh snapshot fails with an auth error and no cached data exists', async () => {
+    const graphClient = createGraphClient(createMetadata({ eTag: '"etag-new"' }));
+    const cacheStore = createCacheStore(null);
+    const snapshotService = createSnapshotService(
+      createGraphError(
+        'unauthorized',
+        'Authentication is required to access the selected OneDrive file.',
+        401,
+      ),
+    );
+    const service = createStartupFreshnessService(graphClient, cacheStore, snapshotService);
+
+    await expect(service.resolve(DRIVE_ITEM_BINDING, true)).resolves.toMatchObject({
+      kind: 'error',
+      branch: 'online_auth_expired',
+      syncState: 'error',
+      snapshot: null,
+      failure: {
+        code: 'auth_expired',
+        message: 'Authentication is required to access the selected OneDrive file.',
+        cause: {
+          code: 'unauthorized',
+          status: 401,
+        },
       },
     });
   });

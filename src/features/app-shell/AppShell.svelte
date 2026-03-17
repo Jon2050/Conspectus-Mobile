@@ -2,6 +2,7 @@
 <script lang="ts">
   import { afterUpdate, onDestroy, onMount, tick } from 'svelte';
   import { get, type Readable } from 'svelte/store';
+  import type { DriveItemBinding } from '@graph';
   import {
     appSelectedDriveItemBindingStore,
     appSyncStateStore,
@@ -47,19 +48,76 @@
   let footerIsVisible = true;
   let appShellIsMounted = false;
   let selectedBindingHasEmitted = false;
+  let hasPerformedInitialSync = false;
+  let currentSyncId = 0;
   let footerVisibilityTrackingIsActive = false;
   let lastRenderedRoute: AppRouteKey | null = null;
   let stopFooterVisibilityTracking = (): void => {};
   const unsubscribe = routeStore.subscribe((route) => {
     currentRoute = route;
   });
-  const unsubscribeSelectedBinding = appSelectedDriveItemBindingStore.subscribe(() => {
+
+  const performSync = async (binding: DriveItemBinding | null): Promise<void> => {
+    const syncId = ++currentSyncId;
+    syncStateStore.reset();
+
+    if (binding === null) {
+      return;
+    }
+
+    const startupIsOnline = resolveAppStartupIsOnline();
+    if (startupIsOnline) {
+      beginStartupSync(syncStateStore);
+    }
+
+    try {
+      const graphClient = resolveAppGraphClient();
+      const cacheStore = resolveAppCacheStore();
+      const startupFreshnessService = createStartupFreshnessService(
+        graphClient,
+        cacheStore,
+        createCachedDatabaseSnapshotService(graphClient, cacheStore),
+      );
+      const decision = await startupFreshnessService.resolve(
+        binding,
+        startupIsOnline,
+        (loadedBytes, totalBytes) => {
+          if (syncId === currentSyncId) {
+            updateStartupSyncProgress(syncStateStore, loadedBytes, totalBytes);
+          }
+        },
+      );
+
+      if (!appShellIsMounted || syncId !== currentSyncId) {
+        return;
+      }
+
+      applyStartupFreshnessDecision(syncStateStore, decision);
+      logStartupFreshnessDecision(decision, binding?.name ?? null);
+    } catch (error) {
+      if (!appShellIsMounted || syncId !== currentSyncId) {
+        return;
+      }
+
+      console.warn('Startup freshness resolution failed unexpectedly.', error);
+      applyUnexpectedStartupSyncError(
+        syncStateStore,
+        'Startup sync failed unexpectedly. Check the browser console and retry.',
+      );
+    }
+  };
+
+  const unsubscribeSelectedBinding = appSelectedDriveItemBindingStore.subscribe((binding) => {
     if (!selectedBindingHasEmitted) {
       selectedBindingHasEmitted = true;
       return;
     }
 
-    syncStateStore.reset();
+    if (hasPerformedInitialSync) {
+      void performSync(binding);
+    } else {
+      syncStateStore.reset();
+    }
   });
 
   const logStartupFreshnessDecision = (
@@ -166,47 +224,15 @@
       } catch (error) {
         console.warn('Auth bootstrap initialization failed at app-shell startup.', error);
         appSelectedDriveItemBindingStore.setActiveAccountId(null);
+      }
+
+      if (!isMounted) {
         return;
       }
 
-      try {
-        const binding = get(appSelectedDriveItemBindingStore);
-        const graphClient = resolveAppGraphClient();
-        const cacheStore = resolveAppCacheStore();
-        const startupFreshnessService = createStartupFreshnessService(
-          graphClient,
-          cacheStore,
-          createCachedDatabaseSnapshotService(graphClient, cacheStore),
-        );
-        const startupIsOnline = resolveAppStartupIsOnline();
-        if (binding !== null && startupIsOnline) {
-          beginStartupSync(syncStateStore);
-        }
-        const decision = await startupFreshnessService.resolve(
-          binding,
-          startupIsOnline,
-          (loadedBytes, totalBytes) => {
-            updateStartupSyncProgress(syncStateStore, loadedBytes, totalBytes);
-          },
-        );
-
-        if (!isMounted) {
-          return;
-        }
-
-        applyStartupFreshnessDecision(syncStateStore, decision);
-        logStartupFreshnessDecision(decision, binding?.name ?? null);
-      } catch (error) {
-        if (!isMounted) {
-          return;
-        }
-
-        console.warn('Startup freshness resolution failed unexpectedly.', error);
-        applyUnexpectedStartupSyncError(
-          syncStateStore,
-          'Startup sync failed unexpectedly. Check the browser console and retry.',
-        );
-      }
+      hasPerformedInitialSync = true;
+      const binding = get(appSelectedDriveItemBindingStore);
+      void performSync(binding);
     })();
 
     let timerId: number | null = null;
@@ -267,8 +293,18 @@
     >
       {#if $syncStateStore.state === 'error'}
         <p role="alert">{$syncStateStore.message}</p>
+        {#if $syncStateStore.branch === 'online_auth_expired'}
+          <div class="startup-sync-actions">
+            <a href="#settings" class="app-button app-button--secondary">Sign in again</a>
+          </div>
+        {/if}
       {:else}
         <p>{$syncStateStore.message}</p>
+        {#if $syncStateStore.branch === 'online_auth_expired_cached'}
+          <div class="startup-sync-actions">
+            <a href="#settings" class="app-button app-button--secondary">Sign in again</a>
+          </div>
+        {/if}
         {#if $syncStateStore.progress !== null && $syncStateStore.state === 'syncing'}
           <div class="startup-sync-progress">
             <progress
@@ -371,6 +407,17 @@
   .startup-sync-status--error {
     background: color-mix(in srgb, var(--negative) 14%, white);
     color: color-mix(in srgb, var(--negative) 60%, black);
+  }
+
+  .startup-sync-actions {
+    margin-top: 0.75rem;
+    display: flex;
+  }
+
+  .startup-sync-actions .app-button {
+    font-size: 0.85rem;
+    padding: 0.4rem 0.8rem;
+    min-height: auto;
   }
 
   .startup-sync-progress {

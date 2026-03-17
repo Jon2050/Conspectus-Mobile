@@ -228,7 +228,7 @@ Findings that require up to 60 minutes of work, potentially touching multiple fi
 
 #### M-01: Startup freshness flow does not distinguish auth errors from Graph API errors
 
-- **Status:** Open | ✅ Confirmed by second reviewer
+- **Status:** Fixed ✅
 - **Severity:** Medium
 - **Perspective:** Architecture / Error Handling
 - **Location:** `src/features/app-shell/startupFreshnessService.ts` (lines 270-352), `src/graph/graphClient.ts` (lines 70-140)
@@ -236,11 +236,12 @@ Findings that require up to 60 minutes of work, potentially touching multiple fi
 - **Impact:** Medium. This directly contributes to the user-reported post-deployment startup recovery issue. Users cannot distinguish between a genuine Graph API failure and an expired auth session, leading to confusion and unnecessary manual recovery.
 - **Recommendation:** Introduce an `auth_expired` or `interaction_required` error code at the `startupFreshnessService` level. When the underlying error cause is an auth error, surface a specific message like "Your session has expired. Please sign in again to sync with OneDrive." Consider adding a dedicated `StartupFreshnessBranch` (e.g., `online_auth_expired`) that the `startupSyncStateController` can handle differently — potentially offering a "Sign in again" action button in the sync status banner.
 - **Second reviewer notes:** Confirmed. The `normalizeAuthError` function in `graphClient.ts` at line 192 maps `interaction_required`, `no_active_account`, and `not_initialized` to `GraphClientError` with code `unauthorized`. The `isRetryableStartupSyncError` check in `startupFreshnessService.ts` at line 171 only retries `network_error`. So an `unauthorized` error from an expired token immediately falls through to the outer catch at line 328, producing a generic `metadata_fetch_failed` failure. The error code distinguishes from network issues internally but the user-facing message does not.
+- **Resolution:** Fixed in local review follow-up. `startupFreshnessService.ts` now maps unauthorized startup failures to `auth_expired` with dedicated `online_auth_expired` / `online_auth_expired_cached` branches, `startupSyncStateController.ts` surfaces a specific re-auth message, and `AppShell.svelte` renders a `Sign in again` recovery action for both stale-cache and terminal-error auth-expired states. Unit and E2E tests now cover both metadata and download auth-expired paths.
   Reviewed by: Codex, Antigravity
 
 #### M-02: Persisted bindings restored after interactive sign-in do not trigger a fresh sync until reload
 
-- **Status:** Open | ✅ Confirmed by second reviewer
+- **Status:** Fixed ✅
 - **Severity:** Medium
 - **Perspective:** Next Milestone Readiness / Bug Hunting
 - **Location:** `src/features/app-shell/AppShell.svelte` (lines 54-61, 159-185), `src/features/app-shell/routes/SettingsRoute.svelte` (lines 125-137)
@@ -248,6 +249,7 @@ Findings that require up to 60 minutes of work, potentially touching multiple fi
 - **Impact:** Medium. Today this mainly shows up as confusing state after re-authentication; once M5 starts reading from the cached snapshot, a signed-in session can still require a full page reload before the newly restored binding actually has fresh DB bytes available.
 - **Recommendation:** Move startup freshness orchestration behind an account/binding-driven effect instead of a one-shot mount task. When the active account or selected binding changes from `null` to a concrete value, cancel any stale in-flight resolution and start a fresh metadata/cache sync for the new binding. Add an e2e scenario that signs in after initial unauthenticated load and verifies the restored binding triggers sync without reload.
 - **Second reviewer notes:** Confirmed. The `onMount` in `AppShell.svelte` at line 143 calls `startupFreshnessService.resolve(...)` once with the binding from `get(appSelectedDriveItemBindingStore)` at that point. The `unsubscribeSelectedBinding` at line 54 resets sync state on binding changes but does not trigger a re-resolve. The `SettingsRoute.svelte` at line 134 calls `appSelectedDriveItemBindingStore.setActiveAccountId(nextAccountId)` after sign-in, which loads the persisted binding but does not kick off sync.
+- **Resolution:** Fixed in local review follow-up. `AppShell.svelte` now runs startup freshness through a binding-driven `performSync()` flow with in-flight result invalidation, so persisted bindings restored after sign-in immediately trigger metadata refresh / cache sync without requiring a page reload. E2E coverage now verifies both manual DB re-selection and interactive sign-in restoration paths.
   Reviewed by: Codex, Antigravity
 
 ---
@@ -258,7 +260,7 @@ Findings that require more than 60 minutes, involving architectural changes, cro
 
 #### L-01: M4-08 is only partially implemented because upload progress never reaches a user-facing save flow
 
-- **Status:** Open | ✅ Confirmed by second reviewer
+- **Status:** Fixed ✅
 - **Severity:** Medium
 - **Perspective:** Feature Completeness / Testing
 - **Location:** `src/graph/graphClient.ts` (lines 323-409), `src/features/app-shell/AppShell.svelte` (lines 255-275), `src/features/app-shell/routes/AddRoute.svelte` (entire file), `tests/e2e/app-shell.spec.ts` (M4 sync progress coverage only)
@@ -266,6 +268,7 @@ Findings that require more than 60 minutes, involving architectural changes, cro
 - **Impact:** Medium. Milestone accounting currently overstates completion of `M4-08`, and the codebase does not yet provide the user-visible upload-progress behavior promised by the issue acceptance criteria.
 - **Recommendation:** Either reopen/re-scope `#54` so it explicitly covers only the transport-layer groundwork shipped in M4, or carry the missing acceptance criteria forward as an explicit M6 prerequisite and wire upload progress into the transfer-save UX with integration and E2E coverage before calling the issue fully complete.
 - **Second reviewer notes:** Confirmed. `AddRoute.svelte` is a 5-line placeholder (confirmed at lines 1-5). The `uploadFile` method in `graphClient.ts` (lines 495-602) is fully implemented with XHR progress tracking when `onProgress` is provided. However, no existing code outside of tests ever calls `uploadFile`. The `DbClient` interface in `src/db/index.ts` defines `createTransfer` and `exportBytes` but has no implementation — confirming that the write-back flow is not yet built.
+- **Resolution:** Fixed in local review follow-up. The repository tracker no longer marks `M4-08` as done, and the architecture plan now states explicitly that only startup download progress shipped in M4 while user-facing upload progress remains an M6 write-path deliverable that must land with save-flow integration and tests.
   Reviewed by: Codex, Antigravity
 
 ---
@@ -284,9 +287,8 @@ The codebase is well-prepared for **M5 (Accounts + Transfers Read UX)**.
 
 ### Blockers or Risks
 
-- **Risk (M-01 / M-02):** Startup and post-sign-in recovery still lack a targeted re-auth/sync path. Once M5 starts depending on cached DB bytes for actual account and transfer queries, users can end up signed in but without a freshly synchronized snapshot until they reload or manually recover.
 - **Risk:** M5 will need to parse SQLite `.db` bytes from the cached snapshot. The current `CachedDatabaseSnapshot` stores raw `Uint8Array` bytes. A SQLite WASM parser (e.g., `sql.js`) will need to be integrated, and its bundle size impact should be evaluated. The CSP `script-src 'self'` directive in `index.html` may need `'wasm-unsafe-eval'` to allow WASM execution.
-- **Risk (L-01):** The milestone tracker currently treats `M4-08` as complete even though user-visible upload progress is not available yet. That should be corrected before downstream milestone status is used as a planning dependency.
+- **Planning note:** User-visible upload progress is intentionally deferred to the Milestone 6 transfer-save flow; M4 only ships the transport-layer groundwork in `@graph` plus the startup download-progress UI.
 - **Risk:** The `@db` module alias is already registered in `vite.config.ts` (line 133) but the `src/db/` directory doesn't contain M5-relevant code yet. Ensure the module barrel export convention is followed when adding SQLite logic.
 
 ---
@@ -331,9 +333,12 @@ The `tests/e2e/app-shell.spec.ts` (1611 lines, 30+ test cases) provides comprehe
 - ✅ Transient metadata retry exhaustion with cached fallback (`stale`)
 - ✅ Transient metadata retry exhaustion without cache (`error`)
 - ✅ Non-retryable metadata error fast-fail
+- ✅ Auth-expired startup recovery with targeted re-auth messaging and CTA
 - ✅ Transient download retry with successful recovery
 - ✅ Transient download retry exhaustion with cached fallback
 - ✅ Transient download retry exhaustion without cache
+- ✅ Auth-expired download fallback with cached DB retention and CTA
+- ✅ Persisted binding restoration after interactive sign-in triggers sync without reload
 - ✅ Deployment footer visibility on short pages
 - ✅ Deployment footer revealed on scroll to bottom of long pages
 - ✅ Sync status cleared after new DB file selection
@@ -341,7 +346,7 @@ The `tests/e2e/app-shell.spec.ts` (1611 lines, 30+ test cases) provides comprehe
 
 ### Assessment
 
-Test coverage for M4 features is **excellent**. The `startupFreshnessService.test.ts` alone covers all 9 decision branches with deterministic assertions on `kind`, `branch`, `syncState`, `snapshot`, and `failure` fields. The retry tests verify exact backoff delay sequences and call counts. The e2e suite mirrors every unit-tested branch in a real browser context with full mock infrastructure for auth, graph, cache, and network state.
+Test coverage for M4 features is **excellent**. The `startupFreshnessService.test.ts` alone covers all 11 decision branches with deterministic assertions on `kind`, `branch`, `syncState`, `snapshot`, and `failure` fields, including the auth-expired recovery branches added in the review follow-up. The retry tests verify exact backoff delay sequences and call counts. The e2e suite mirrors every unit-tested branch in a real browser context with full mock infrastructure for auth, graph, cache, and network state.
 
 ---
 
