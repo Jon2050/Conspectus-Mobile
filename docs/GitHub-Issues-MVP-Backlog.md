@@ -349,12 +349,13 @@ An issue is only considered done when:
 - Depends on: `M4-04, M4-05, M4-06`
 - GitHub: [#53](https://github.com/Jon2050/Conspectus-Mobile/issues/53)
 
-### :white_check_mark: M4-08 Implement progress feedback for DB sync and upload operations
+### :yellow_circle: M4-08 Implement progress feedback for DB sync and upload operations
 
 - Label: `feature`
 - Milestone: `M4 - Sync Engine + Cache`
 - Summary: Work includes progress indicator for initial DB download and cache-miss re-downloads and progress indicator for DB upload after transfer creation. It also covers progress states are clear during slow mobile connections.
 - Depends on: `M4-05`
+- Status note: Startup download progress shipped in M4. Upload-progress transport plumbing exists in `@graph`, but the user-facing upload progress indicator remains blocked on the M6 transfer-save flow and its tests (`M6-07`, `M6-08`, `M6-10`).
 - GitHub: [#54](https://github.com/Jon2050/Conspectus-Mobile/issues/54)
 
 ### :white_check_mark: M4-99 Add end-of-page deployment info footer bar

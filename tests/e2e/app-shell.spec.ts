@@ -833,6 +833,43 @@ test('fails fast on non-retryable startup metadata errors and surfaces the clear
   expect(await getGraphDownloadCallCount(page)).toBe(0);
 });
 
+test('surfaces a sign-in-again recovery action when startup metadata refresh fails because the session expired', async ({
+  page,
+}) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page, {
+    metadataErrorSequence: [
+      createMockGraphError(
+        'unauthorized',
+        'Your session has expired. Please sign in again to sync with OneDrive.',
+        401,
+      ),
+    ],
+  });
+  await installMockCacheStore(page);
+  await installPersistedBinding(page);
+  await installMockStartupNetworkState(page, true);
+
+  await page.goto(appPath('#/accounts'));
+
+  await expect(page.getByTestId('startup-sync-status')).toContainText(
+    'Your session has expired. Please sign in again to sync with OneDrive.',
+  );
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute('data-sync-state', 'error');
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
+    'data-sync-branch',
+    'online_auth_expired',
+  );
+  await expect(page.getByRole('link', { name: 'Sign in again' })).toHaveAttribute(
+    'href',
+    '#settings',
+  );
+  expect(await getGraphMetadataCallCount(page)).toBe(1);
+  expect(await getGraphDownloadCallCount(page)).toBe(0);
+});
+
 test('downloads a fresh DB on startup when the OneDrive eTag changed', async ({ page }) => {
   await installMockAuthClient(page, {
     startAuthenticated: true,
@@ -983,6 +1020,51 @@ test('shows a startup sync error when transient download failures exhaust retrie
   expect(await getGraphDownloadCallCount(page)).toBe(3);
 });
 
+test('keeps the cached DB available and offers sign-in again when download fails because the session expired', async ({
+  page,
+}) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page, {
+    metadataETag: '"etag-2"',
+    downloadErrorSequence: [
+      createMockGraphError(
+        'unauthorized',
+        'Your session has expired. Please sign in again to sync with OneDrive.',
+        401,
+      ),
+    ],
+  });
+  await installMockCacheStore(page, {
+    startupSnapshot: {
+      metadata: {
+        eTag: '"etag-1"',
+      },
+      dbBytes: createSqliteBytes([1, 1, 1, 1]),
+    },
+  });
+  await installPersistedBinding(page);
+  await installMockStartupNetworkState(page, true);
+
+  await page.goto(appPath('#/accounts'));
+
+  await expect(page.getByTestId('startup-sync-status')).toContainText(
+    'Your session has expired. Please sign in again to sync with OneDrive. Using the last cached DB for now.',
+  );
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute('data-sync-state', 'stale');
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
+    'data-sync-branch',
+    'online_auth_expired_cached',
+  );
+  await expect(page.getByRole('link', { name: 'Sign in again' })).toHaveAttribute(
+    'href',
+    '#settings',
+  );
+  expect(await getGraphMetadataCallCount(page)).toBe(1);
+  expect(await getGraphDownloadCallCount(page)).toBe(1);
+});
+
 test('uses the cached DB on startup when offline', async ({ page }) => {
   await installMockAuthClient(page, {
     startAuthenticated: true,
@@ -1041,28 +1123,60 @@ test('shows a startup sync error when offline without a cached DB', async ({ pag
   expect(await getGraphDownloadCallCount(page)).toBe(0);
 });
 
-test('clears a stale startup sync message after a successful DB file selection', async ({
-  page,
-}) => {
+test('triggers a fresh sync after a successful DB file selection', async ({ page }) => {
   await installMockAuthClient(page, {
     startAuthenticated: true,
   });
   await installMockGraphClient(page);
   await installMockCacheStore(page);
   await installPersistedBinding(page);
-  await installMockStartupNetworkState(page, false);
+  await installMockStartupNetworkState(page, true);
 
   await page.goto(appPath('#/settings'));
 
   await expect(page.getByTestId('startup-sync-status')).toContainText(
-    'No cached OneDrive database is available while offline.',
+    'Cached DB is current with OneDrive.',
   );
 
   await page.getByRole('button', { name: 'Change DB file' }).click();
   await page.getByTestId('select-file-file-root-db').click();
 
   await expect(page.getByTestId('binding-status-message')).toContainText('DB file selected.');
+  await expect(page.getByTestId('startup-sync-status')).toContainText(
+    'Cached DB is current with OneDrive.',
+  );
+
+  expect(await getCacheReadSnapshotCallCount(page)).toBe(3);
+  expect(await getGraphMetadataCallCount(page)).toBe(3);
+  expect(await getGraphDownloadCallCount(page)).toBe(1);
+});
+
+test('restored binding triggers sync after interactive sign-in without reload', async ({
+  page,
+}) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: false,
+  });
+  await installMockGraphClient(page);
+  await installMockCacheStore(page);
+  await installPersistedBinding(page);
+  await installMockStartupNetworkState(page, true);
+
+  await page.goto(appPath('#/settings'));
+
+  await expect(page.getByTestId('auth-status-message')).toContainText('Signed out.');
   await expect(page.getByTestId('startup-sync-status')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Sign in with Microsoft' }).click();
+
+  await expect(page.getByTestId('auth-status-message')).toContainText('Signed in.');
+  await expect(page.getByTestId('startup-sync-status')).toContainText(
+    'Downloaded the latest DB from OneDrive.',
+  );
+
+  expect(await getCacheReadSnapshotCallCount(page)).toBe(1);
+  expect(await getGraphMetadataCallCount(page)).toBe(1);
+  expect(await getGraphDownloadCallCount(page)).toBe(1);
 });
 
 test('shows deployment footer metadata immediately on short pages', async ({ page }) => {

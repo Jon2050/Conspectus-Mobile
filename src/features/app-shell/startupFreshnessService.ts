@@ -14,12 +14,15 @@ export type StartupFreshnessBranch =
   | 'online_metadata_failed_cached'
   | 'online_metadata_failed'
   | 'online_download_failed_cached'
-  | 'online_download_failed';
+  | 'online_download_failed'
+  | 'online_auth_expired_cached'
+  | 'online_auth_expired';
 
 export type StartupFreshnessFailureCode =
   | 'offline_cache_missing'
   | 'metadata_fetch_failed'
-  | 'snapshot_download_failed';
+  | 'snapshot_download_failed'
+  | 'auth_expired';
 
 export interface StartupFreshnessFailure {
   readonly code: StartupFreshnessFailureCode;
@@ -47,14 +50,19 @@ export interface StartupFreshnessReadyDecision extends StartupFreshnessBaseDecis
     | 'online_changed'
     | 'offline_cached'
     | 'online_metadata_failed_cached'
-    | 'online_download_failed_cached';
+    | 'online_download_failed_cached'
+    | 'online_auth_expired_cached';
   readonly syncState: 'synced' | 'offline' | 'stale';
   readonly snapshot: CachedDatabaseSnapshot;
 }
 
 export interface StartupFreshnessErrorDecision extends StartupFreshnessBaseDecision {
   readonly kind: 'error';
-  readonly branch: 'offline_missing_cache' | 'online_metadata_failed' | 'online_download_failed';
+  readonly branch:
+    | 'offline_missing_cache'
+    | 'online_metadata_failed'
+    | 'online_download_failed'
+    | 'online_auth_expired';
   readonly syncState: 'error';
   readonly snapshot: null;
   readonly failure: StartupFreshnessFailure;
@@ -301,16 +309,18 @@ export const createStartupFreshnessService = (
           failure: null,
         };
       } catch (error) {
-        const failure = createFailure(
-          'snapshot_download_failed',
-          error,
-          'Failed to download the latest OneDrive database snapshot.',
-        );
+        const isAuthError = isGraphError(error) && error.code === 'unauthorized';
+        const failureCode = isAuthError ? 'auth_expired' : 'snapshot_download_failed';
+        const fallbackMessage = isAuthError
+          ? 'Your session has expired. Please sign in again to sync with OneDrive.'
+          : 'Failed to download the latest OneDrive database snapshot.';
+
+        const failure = createFailure(failureCode, error, fallbackMessage);
 
         if (cachedSnapshot !== null) {
           return {
             kind: 'ready',
-            branch: 'online_download_failed_cached',
+            branch: isAuthError ? 'online_auth_expired_cached' : 'online_download_failed_cached',
             syncState: 'stale',
             snapshot: cachedSnapshot,
             failure,
@@ -319,23 +329,25 @@ export const createStartupFreshnessService = (
 
         return {
           kind: 'error',
-          branch: 'online_download_failed',
+          branch: isAuthError ? 'online_auth_expired' : 'online_download_failed',
           syncState: 'error',
           snapshot: null,
           failure,
         };
       }
     } catch (error) {
-      const failure = createFailure(
-        'metadata_fetch_failed',
-        error,
-        'Failed to refresh the selected OneDrive database metadata.',
-      );
+      const isAuthError = isGraphError(error) && error.code === 'unauthorized';
+      const failureCode = isAuthError ? 'auth_expired' : 'metadata_fetch_failed';
+      const fallbackMessage = isAuthError
+        ? 'Your session has expired. Please sign in again to sync with OneDrive.'
+        : 'Failed to refresh the selected OneDrive database metadata.';
+
+      const failure = createFailure(failureCode, error, fallbackMessage);
 
       if (cachedSnapshot !== null) {
         return {
           kind: 'ready',
-          branch: 'online_metadata_failed_cached',
+          branch: isAuthError ? 'online_auth_expired_cached' : 'online_metadata_failed_cached',
           syncState: 'stale',
           snapshot: cachedSnapshot,
           failure,
@@ -344,7 +356,7 @@ export const createStartupFreshnessService = (
 
       return {
         kind: 'error',
-        branch: 'online_metadata_failed',
+        branch: isAuthError ? 'online_auth_expired' : 'online_metadata_failed',
         syncState: 'error',
         snapshot: null,
         failure,

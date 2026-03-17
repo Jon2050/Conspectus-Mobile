@@ -50,7 +50,7 @@ This prompt is designed to be run multiple times by different agents against the
 
 ### If the review file does NOT exist yet
 
-You are the first reviewer. Create the file from scratch using the full output format defined below.
+You are the first reviewer. Create the file from scratch using the full output format defined below. Afterwards, follow the protocol below for subsequent runs.
 
 ### If the review file ALREADY exists
 
@@ -60,12 +60,12 @@ You are a subsequent reviewer. Follow this protocol:
 2. **Verify every existing finding:**
    - Confirm it is still valid by inspecting the referenced code/files.
    - If valid and correct: leave it unchanged.
-   - If valid but incomplete: enrich it with additional details, affected locations, or context. Append a `Reviewed by: {{AGENT_NAME}}` annotation at the end of the finding.
-   - If the severity or cost tier is wrong: adjust it and add a brief justification note. Append `Reviewed by: {{AGENT_NAME}}`.
+   - If valid but incomplete: enrich it with additional details, affected locations, or context.
+   - If the severity or cost tier is wrong: adjust it and add a brief justification note.
    - If a finding is invalid (the original agent was wrong): mark it with `~~strikethrough~~` and add a `**INVALIDATED** by {{AGENT_NAME}}: [reason]` note directly below it. Do NOT delete it or change its ID.
 3. **Add new findings** that previous agents missed. Use the next available ID in the appropriate cost tier (see ID scheme below).
 4. **Update the summary table** at the bottom to reflect the current state.
-5. **Do NOT restructure, reformat, or rewrite sections written by prior agents** beyond the specific enrichment/correction actions above. The file must remain coherent and read as one unified document.
+5. **Do NOT restructure, reformat, or rewrite sections written by prior agents** beyond the specific enrichment/correction actions above. The file must remain coherent and read as one unified document. But if you see ways to improve the file that are aligned with this ruleset, you may do so.
 
 ---
 
@@ -93,7 +93,7 @@ You MUST cover at least these perspectives. You are encouraged to add more persp
 
 9. **UI/UX** — Verify responsive design, loading states, error states, success feedback, accessibility (tap targets, contrast, keyboard navigation), double-submission prevention, and mobile-first design principles. Check alignment with the UX section of the architecture doc (section 4).
 
-10. **Refactoring & Technical Debt** — Identify code that works but should be restructured for maintainability: duplicated logic, overly complex functions, poor abstractions, inconsistent patterns, or workarounds that need permanent solutions.
+10. **Refactoring & Technical Debt** — Identify code that works but should be restructured for maintainability: duplicated logic, overly complex functions, poor abstractions, to long files, spaghetti code, architecture flaws, inconsistent patterns, or workarounds that need permanent solutions.
 
 11. **Maintainability** — Evaluate long-term maintainability: are patterns consistent, is the code self-documenting, are file/function descriptions present (per project guidelines), would a new developer understand the structure?
 
@@ -200,12 +200,12 @@ Findings that require more than 60 minutes, involving architectural changes, cro
 
 ## Summary
 
-| Effort    | Count | Critical | High | Medium | Low | Invalidated |
-| --------- | ----- | -------- | ---- | ------ | --- | ----------- |
-| Small     | X     | X        | X    | X      | X   | X           |
-| Medium    | X     | X        | X    | X      | X   | X           |
-| Large     | X     | X        | X    | X      | X   | X           |
-| **Total** | X     | X        | X    | X      | X   | X           |
+| Effort    | Count | Critical | High | Medium | Low | Invalidated | Solved |
+| --------- | ----- | -------- | ---- | ------ | --- | ----------- | ------ |
+| Small     | X     | X        | X    | X      | X   | X           | X      |
+| Medium    | X     | X        | X    | X      | X   | X           | X      |
+| Large     | X     | X        | X    | X      | X   | X           | X      |
+| **Total** | X     | X        | X    | X      | X   | X           | X      |
 ```
 
 ---
@@ -222,16 +222,28 @@ Findings that require more than 60 minutes, involving architectural changes, cro
 
 ---
 
-## Placeholder Reference
+## Placeholder Reference (Dont include this into the review prompt)
 
 Fill these placeholders before running the prompt:
 
-| Placeholder                 | Description                           | Example                     |
-| --------------------------- | ------------------------------------- | --------------------------- |
-| `{{MILESTONE_NUMBER}}`      | Current milestone number              | `3`                         |
-| `{{MILESTONE_TITLE}}`       | Current milestone title from backlog  | `Auth + OneDrive Binding`   |
-| `{{PREVIOUS_MILESTONE}}`    | Previous milestone number             | `2`                         |
-| `{{NEXT_MILESTONE_NUMBER}}` | Next milestone number                 | `4`                         |
-| `{{NEXT_MILESTONE_TITLE}}`  | Next milestone title from backlog     | `Sync Engine + Cache`       |
-| `{{DATE}}`                  | Review date (YYYY-MM-DD)              | `2026-03-10`                |
-| `{{AGENT_NAME}}`            | Name of the agent running this prompt | `Claude`, `Gemini`, `Codex` |
+| Placeholder                 | Description                          | Example                   |
+| --------------------------- | ------------------------------------ | ------------------------- |
+| `{{MILESTONE_NUMBER}}`      | Current milestone number             | `3`                       |
+| `{{MILESTONE_TITLE}}`       | Current milestone title from backlog | `Auth + OneDrive Binding` |
+| `{{PREVIOUS_MILESTONE}}`    | Previous milestone number            | `2`                       |
+| `{{NEXT_MILESTONE_NUMBER}}` | Next milestone number                | `4`                       |
+| `{{NEXT_MILESTONE_TITLE}}`  | Next milestone title from backlog    | `Sync Engine + Cache`     |
+
+# Post-Milestone Review Fix Findings Prompt Template (Dont include this into the review prompt)
+
+First, read the files README.md, docs\Architecture-and-Implementation-Plan.md to understand this project. The  
+ milestone {{MILESTONE_NUMBER}} was just implemented and the project is currently in a review for the code changes after milestone  
+ {{MILESTONE_NUMBER}}. Multiple reviewers already wrote a review file docs\m{{MILESTONE_NUMBER}}\_post_review.md. Please read it also. Please then fix  
+ the findings {{FINDINGS_TO_FIX}}. When doing that, stick to the code and architecture guidelines you find in the file  
+ docs\prompts\Task-Prompt-Template.md and also use the development process described there. Add new tests if appropriate. But after the findings are fixed and all locally Quality gates passed, mark the findings in the review file as solved/fixed and commit the changes locally to the review-fixing branch. Dont push the commit yet.
+
+# Fix Findings Review Prompt Template (Dont include this into the review prompt)
+
+First, read the files README.md, docs\Architecture-and-Implementation-Plan.md to understand this project. The  
+ milestone {{MILESTONE_NUMBER}} was just implemented and the project is currently in a review for the code changes after milestone  
+ {{MILESTONE_NUMBER}}. There was a full review file written (docs\m{{MILESTONE_NUMBER}}\_post_review.md). All findings have been fixed and committed. Please review the changes on the review-fixing branch and verify that all findings are fixed, reasonable tests were added if appropriate, all quality guidelines are met and the project is in a consitent state.

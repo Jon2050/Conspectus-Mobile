@@ -126,6 +126,91 @@ describe('startupSyncStateController', () => {
     );
   });
 
+  it('applies auth-expired fallback decisions with the cached-db warning message', () => {
+    const store = createSyncStateStore({
+      state: 'syncing',
+      message: 'Checking OneDrive for DB updates...',
+    });
+    const toastStore = createToastStore();
+    const decision: StartupFreshnessDecision = {
+      kind: 'ready',
+      branch: 'online_auth_expired_cached',
+      syncState: 'stale',
+      snapshot: {
+        binding: {
+          driveId: 'drive-123',
+          itemId: 'item-456',
+          name: 'conspectus.db',
+          parentPath: '/',
+        },
+        metadata: {
+          eTag: '"etag-1"',
+          lastSyncAtIso: '2026-03-11T09:45:00.000Z',
+        },
+        dbBytes: Uint8Array.from([1, 2, 3, 4]),
+      },
+      failure: {
+        code: 'auth_expired',
+        message: 'Your session has expired. Please sign in again to sync with OneDrive.',
+        cause: {
+          code: 'unauthorized',
+          status: 401,
+        },
+      },
+    };
+
+    applyStartupFreshnessDecision(store, decision, toastStore);
+
+    expect(get(store)).toEqual({
+      state: 'stale',
+      message:
+        'Your session has expired. Please sign in again to sync with OneDrive. Using the last cached DB for now.',
+      branch: 'online_auth_expired_cached',
+      progress: null,
+    });
+    expect(toastStore.show).toHaveBeenCalledWith(
+      'Your session has expired. Please sign in again to sync with OneDrive. Using the last cached DB for now.',
+      'warning',
+      4200,
+    );
+  });
+
+  it('applies auth-expired terminal decisions as actionable errors', () => {
+    const store = createSyncStateStore({
+      state: 'syncing',
+      message: 'Checking OneDrive for DB updates...',
+    });
+    const toastStore = createToastStore();
+    const decision: StartupFreshnessDecision = {
+      kind: 'error',
+      branch: 'online_auth_expired',
+      syncState: 'error',
+      snapshot: null,
+      failure: {
+        code: 'auth_expired',
+        message: 'Your session has expired. Please sign in again to sync with OneDrive.',
+        cause: {
+          code: 'unauthorized',
+          status: 401,
+        },
+      },
+    };
+
+    applyStartupFreshnessDecision(store, decision, toastStore);
+
+    expect(get(store)).toEqual({
+      state: 'error',
+      message: 'Your session has expired. Please sign in again to sync with OneDrive.',
+      branch: 'online_auth_expired',
+      progress: null,
+    });
+    expect(toastStore.show).toHaveBeenCalledWith(
+      'Your session has expired. Please sign in again to sync with OneDrive.',
+      'error',
+      5000,
+    );
+  });
+
   it('resets to idle when the startup decision is skipped', () => {
     const store = createSyncStateStore({
       state: 'offline',
