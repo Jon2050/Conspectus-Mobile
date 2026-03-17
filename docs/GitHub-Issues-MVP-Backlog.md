@@ -356,6 +356,7 @@ An issue is only considered done when:
 - Summary: Work includes progress indicator for initial DB download and cache-miss re-downloads and progress indicator for DB upload after transfer creation. It also covers progress states are clear during slow mobile connections.
 - Depends on: `M4-05`
 - Status note: Startup download progress shipped in M4. Upload-progress transport plumbing exists in `@graph`, but the user-facing upload progress indicator remains blocked on the M6 transfer-save flow and its tests (`M6-07`, `M6-08`, `M6-10`).
+- Follow-up contract: `M6-07` must expose upload progress from the real save/upload orchestration, `M6-08` must surface a determinate upload-progress UI in the add-transfer flow without false-success states, and `M6-10` must cover slow-upload progress behavior in automated tests before `M4-08` can be treated as fully complete in practice.
 - GitHub: [#54](https://github.com/Jon2050/Conspectus-Mobile/issues/54)
 
 ### :white_check_mark: M4-99 Add end-of-page deployment info footer bar
@@ -370,7 +371,7 @@ An issue is only considered done when:
 
 - Label: `feature`
 - Milestone: `M5 - Accounts + Transfers Read UX`
-- Summary: Work includes sql.js WASM bundle and DB open/close lifecycle from cached bytes. It also covers required SQLite pragmas and error handling.
+- Summary: Work includes sql.js WASM bundle and DB open/close lifecycle from cached bytes. It also covers required SQLite pragmas, initial `@db` module/barrel structure, CSP/WASM compatibility validation, and deterministic DB-open failure handling.
 - Depends on: `M4-03`
 - GitHub: [#55](https://github.com/Jon2050/Conspectus-Mobile/issues/55)
 
@@ -490,7 +491,7 @@ An issue is only considered done when:
 
 - Label: `feature`
 - Milestone: `M6 - Add Transfer Write Path`
-- Summary: Work includes Upload full DB bytes with If-Match and success and eTag refresh. It also covers precondition failure conflicts.
+- Summary: Work includes Upload full DB bytes with If-Match and success and eTag refresh. It also covers upload-progress callback plumbing through the real save flow and precondition failure conflicts.
 - Depends on: `M6-06, M4-02`
 - GitHub: [#70](https://github.com/Jon2050/Conspectus-Mobile/issues/70)
 
@@ -498,7 +499,7 @@ An issue is only considered done when:
 
 - Label: `feature`
 - Milestone: `M6 - Add Transfer Write Path`
-- Summary: Work includes preserving unsent form data on upload failure and retry action without retyping full form. It also MUST surface transient failure/retry feedback utilizing the `appToastStore` to avoid trapping user flow.
+- Summary: Work includes preserving unsent form data on upload failure and retry action without retyping full form. It also MUST surface transient failure/retry feedback utilizing the `appToastStore`, show determinate upload progress during slow saves, and avoid trapping user flow.
 - Depends on: `M6-07`
 - GitHub: [#71](https://github.com/Jon2050/Conspectus-Mobile/issues/71)
 
@@ -514,7 +515,7 @@ An issue is only considered done when:
 
 - Label: `test`
 - Milestone: `M6 - Add Transfer Write Path`
-- Summary: Work includes Unit test validations and transfer type derivation and Integration test SQL transaction behavior. It also covers E2E test happy path, conflict, and retry scenarios.
+- Summary: Work includes Unit test validations and transfer type derivation and Integration test SQL transaction behavior. It also covers E2E test happy path, conflict, retry, and slow-upload progress scenarios.
 - Depends on: `M6-05, M6-07, M6-08, M6-09`
 - GitHub: [#73](https://github.com/Jon2050/Conspectus-Mobile/issues/73)
 
