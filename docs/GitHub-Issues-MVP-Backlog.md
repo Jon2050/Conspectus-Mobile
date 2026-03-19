@@ -375,7 +375,7 @@ An issue is only considered done when:
 - Depends on: `M4-03`
 - GitHub: [#55](https://github.com/Jon2050/Conspectus-Mobile/issues/55)
 
-### :green_circle: M5-02 Implement account query service
+### :white_check_mark: M5-02 Implement account query service
 
 - Label: `feature`
 - Milestone: `M5 - Accounts + Transfers Read UX`

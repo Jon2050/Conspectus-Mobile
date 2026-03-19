@@ -1,6 +1,11 @@
 // Exposes the public DB runtime contract and typed entities for read/write services.
 export type { BindParams, QueryExecResult, SqlValue } from 'sql.js';
 export {
+  appAccountQueryService,
+  createAccountQueryService,
+  type AccountQueryService,
+} from './accountQueryService';
+export {
   appBrowserDbRuntime,
   createBrowserDbRuntime,
   type BrowserDbRuntime,
