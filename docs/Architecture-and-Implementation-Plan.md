@@ -535,6 +535,14 @@ M5-01 implementation clarification:
 - DB runtime errors are normalized into stable codes (`DbRuntimeErrorCode`) and mapped to deterministic startup error messages in app-shell state handling.
 - CSP contract now explicitly includes `script-src 'wasm-unsafe-eval'` for sql.js WASM execution, and build-channel verification enforces this contract.
 
+M5-02 implementation clarification:
+
+- Account query access for the upcoming Accounts screen is implemented in `src/db/accountQueryService.ts` and exposed through `@db` as `createAccountQueryService`/`appAccountQueryService`.
+- The query mirrors desktop parity for list scope by selecting only visible non-primary accounts (`visible = 1` and `ac_type_id NOT IN (1, 2)`).
+- Deterministic ordering is enforced in SQL (`ac_order ASC`, `LOWER(name) ASC`, `account_id ASC`) so equal-name/equal-order rows remain stable across executions.
+- Query result mapping fails closed with `db_query_failed` when result columns or value types do not match the expected `AccountRecord` shape, preventing runtime parsing drift from leaking into UI consumers.
+- Regression coverage for the service includes valid filter/sort behavior plus malformed result-shape/type scenarios in `src/db/accountQueryService.test.ts`.
+
 Deliverables:
 
 - Production-ready viewing experience for accounts and monthly transfers.
