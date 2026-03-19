@@ -17,6 +17,7 @@ Expected public interfaces (`src/db/index.ts`):
 - `createBrowserDbRuntime` and `appBrowserDbRuntime`: open/close/exec/export lifecycle over snapshot bytes.
 - `DbRuntimeError` + `DbRuntimeErrorCode`: deterministic runtime/open failure codes for startup handling.
 - `AccountRecord`: normalized account row shape for Accounts UI.
+- `createTransferMonthQueryService` + `getEpochDayMonthBounds`: inclusive epoch-day month filtering for transfer list reads.
 - `TransferRecord`: normalized transfer row shape for Transfers UI.
 - `CreateTransferInput` and `CreateTransferResult`: write-path contract.
 

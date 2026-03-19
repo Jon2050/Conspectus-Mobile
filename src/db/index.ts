@@ -6,6 +6,13 @@ export {
   type AccountQueryService,
 } from './accountQueryService';
 export {
+  appTransferMonthQueryService,
+  createTransferMonthQueryService,
+  getEpochDayMonthBounds,
+  type EpochDayMonthBounds,
+  type TransferMonthQueryService,
+} from './transferMonthQueryService';
+export {
   appBrowserDbRuntime,
   createBrowserDbRuntime,
   type BrowserDbRuntime,
