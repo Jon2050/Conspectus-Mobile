@@ -383,7 +383,7 @@ An issue is only considered done when:
 - Depends on: `M5-01`
 - GitHub: [#56](https://github.com/Jon2050/Conspectus-Mobile/issues/56)
 
-### :green_circle: M5-03 Implement transfer-by-month query service
+### :white_check_mark: M5-03 Implement transfer-by-month query service
 
 - Label: `feature`
 - Milestone: `M5 - Accounts + Transfers Read UX`

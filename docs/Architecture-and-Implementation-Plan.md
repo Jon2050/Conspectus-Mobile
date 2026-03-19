@@ -543,6 +543,14 @@ M5-02 implementation clarification:
 - Query result mapping fails closed with `db_query_failed` when result columns or value types do not match the expected `AccountRecord` shape, preventing runtime parsing drift from leaking into UI consumers.
 - Regression coverage for the service includes valid filter/sort behavior plus malformed result-shape/type scenarios in `src/db/accountQueryService.test.ts`.
 
+M5-03 implementation clarification:
+
+- Transfer-by-month query access is implemented in `src/db/transferMonthQueryService.ts` and exposed through `@db` as `createTransferMonthQueryService`/`appTransferMonthQueryService`.
+- Inclusive month bounds are derived from epoch-day input via `getEpochDayMonthBounds(monthAnchorEpochDay)` using UTC-safe month boundary calculation (`startEpochDay`, `endEpochDay`).
+- Monthly transfer reads use inclusive SQL range filtering (`date >= ? AND date <= ?`) and deterministic desktop-parity ordering (`date ASC`, `transfer_id ASC`).
+- Query result mapping is strict and fails closed with `db_query_failed` when transfer result columns, row widths, or value types do not match the expected `TransferRecord` shape.
+- Regression coverage includes fixture-backed month queries against `tests/fixtures/test.db`, boundary-date inclusion checks, deterministic tie-break sorting, and malformed-result failure scenarios in `src/db/transferMonthQueryService.test.ts`.
+
 Deliverables:
 
 - Production-ready viewing experience for accounts and monthly transfers.
