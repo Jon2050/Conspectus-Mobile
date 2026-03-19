@@ -2,7 +2,7 @@
 
 Responsibility:
 
-- Own SQLite/sql.js database lifecycle in the browser.
+- Own SQLite/sql.js WASM runtime loading and database open/close lifecycle in the browser.
 - Implement read queries and write transactions.
 - Export updated database bytes for upload.
 
@@ -13,12 +13,14 @@ Dependency boundaries:
 
 Expected public interfaces (`src/db/index.ts`):
 
+- `createSqlJsLoader` and `appSqlJsLoader`: cached sql.js runtime loader with Vite WASM asset resolution.
+- `createBrowserDbRuntime` and `appBrowserDbRuntime`: open/close/exec/export lifecycle over snapshot bytes.
+- `DbRuntimeError` + `DbRuntimeErrorCode`: deterministic runtime/open failure codes for startup handling.
 - `AccountRecord`: normalized account row shape for Accounts UI.
 - `TransferRecord`: normalized transfer row shape for Transfers UI.
 - `CreateTransferInput` and `CreateTransferResult`: write-path contract.
-- `DbClient`: initialize/query/write/export lifecycle surface.
 
 M5/M6 implementation target:
 
-- Encapsulate SQL details in this module.
-- Keep feature modules dependent on typed contracts, not SQL statements.
+- Encapsulate SQL details and runtime lifecycle in this module.
+- Keep feature modules dependent on typed contracts, not raw sql.js globals.

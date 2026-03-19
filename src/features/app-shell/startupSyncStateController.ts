@@ -1,4 +1,5 @@
 // Applies startup freshness outcomes to the app sync-state store and surfaces background feedback via toasts.
+import { isDbRuntimeError, type DbRuntimeErrorCode } from '@db';
 import { appToastStore, type SyncStateStore, type ToastType } from '@shared';
 
 import type { StartupFreshnessDecision } from './startupFreshnessService';
@@ -9,6 +10,20 @@ interface ToastStoreLike {
 
 const STARTUP_SYNCING_MESSAGE = 'Checking OneDrive for DB updates...';
 const STARTUP_SYNCING_TOAST_MESSAGE = 'Syncing with OneDrive in the background...';
+const STARTUP_DB_RUNTIME_FAILURE_BRANCH = 'db_runtime_open_failed';
+
+const STARTUP_DB_RUNTIME_FAILURE_MESSAGES: Record<DbRuntimeErrorCode, string> = {
+  db_runtime_init_failed:
+    'Failed to initialize the local SQLite runtime. Reload the app and try syncing again.',
+  db_open_failed:
+    'Failed to open the cached OneDrive database snapshot. Re-sync from settings and try again.',
+  db_pragma_failed:
+    'The downloaded OneDrive database could not be prepared for safe reads. Re-sync and try again.',
+  db_not_open:
+    'No open local database is available yet. Run startup sync again to load the snapshot.',
+  db_query_failed: 'The local SQLite database query failed unexpectedly.',
+  db_export_failed: 'Failed to export local SQLite bytes.',
+};
 
 const buildCachedFallbackMessage = (failure: StartupFreshnessDecision['failure']): string =>
   failure === null
@@ -126,9 +141,24 @@ export const applyUnexpectedStartupSyncError = (
   toastStore.show(message, 'error', 5000);
 };
 
+export const applyStartupDbRuntimeError = (
+  syncStateStore: SyncStateStore,
+  error: unknown,
+  toastStore: ToastStoreLike = appToastStore,
+): void => {
+  const message = isDbRuntimeError(error)
+    ? STARTUP_DB_RUNTIME_FAILURE_MESSAGES[error.code]
+    : 'Failed to open the local SQLite database snapshot. Retry sync from settings.';
+  syncStateStore.setError(message, {
+    branch: STARTUP_DB_RUNTIME_FAILURE_BRANCH,
+  });
+  toastStore.show(message, 'error', 5000);
+};
+
 export const startupSyncStateController = {
   beginStartupSync,
   updateStartupSyncProgress,
   applyStartupFreshnessDecision,
+  applyStartupDbRuntimeError,
   applyUnexpectedStartupSyncError,
 };

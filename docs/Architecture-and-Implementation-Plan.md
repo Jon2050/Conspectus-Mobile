@@ -526,6 +526,15 @@ Substeps:
    - avoid unnecessary re-query/re-render
    - memoize derived values where useful
 
+M5-01 implementation clarification:
+
+- The browser DB runtime now uses `sql.js` WASM with a dedicated loader (`src/db/sqlJsLoader.ts`) and singleton runtime service (`src/db/browserDbRuntime.ts`) exposed through `@db`.
+- Startup sync now opens cached/downloaded snapshot bytes into the runtime after freshness resolution and closes the runtime deterministically when startup fails or no binding is selected.
+- Open operations are guarded against superseded startup runs to prevent stale in-memory DB state during overlapping startup/rebind operations.
+- Required DB initialization pragma is applied on open (`PRAGMA foreign_keys = ON`) and validated before runtime consumers can execute queries.
+- DB runtime errors are normalized into stable codes (`DbRuntimeErrorCode`) and mapped to deterministic startup error messages in app-shell state handling.
+- CSP contract now explicitly includes `script-src 'wasm-unsafe-eval'` for sql.js WASM execution, and build-channel verification enforces this contract.
+
 Deliverables:
 
 - Production-ready viewing experience for accounts and monthly transfers.
