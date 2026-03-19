@@ -1,3 +1,18 @@
+// Exposes the public DB runtime contract and typed entities for read/write services.
+export type { BindParams, QueryExecResult, SqlValue } from 'sql.js';
+export {
+  appBrowserDbRuntime,
+  createBrowserDbRuntime,
+  type BrowserDbRuntime,
+} from './browserDbRuntime';
+export {
+  DbRuntimeError,
+  isDbRuntimeError,
+  toDbRuntimeError,
+  type DbRuntimeErrorCode,
+} from './dbRuntimeErrors';
+export { appSqlJsLoader, createSqlJsLoader, type SqlJsLoader } from './sqlJsLoader';
+
 export interface AccountRecord {
   readonly accountId: number;
   readonly name: string;
@@ -28,13 +43,4 @@ export interface CreateTransferInput {
 export interface CreateTransferResult {
   readonly transferId: number;
   readonly persistedAtIso: string;
-}
-
-export interface DbClient {
-  initialize(bytes: Uint8Array): Promise<void>;
-  close(): void;
-  listAccounts(): readonly AccountRecord[];
-  listTransfersForMonth(year: number, month: number): readonly TransferRecord[];
-  createTransfer(input: CreateTransferInput): CreateTransferResult;
-  exportBytes(): Uint8Array;
 }

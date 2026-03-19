@@ -1,9 +1,11 @@
 // Verifies startup sync-state transitions and toast feedback stay deterministic for UI consumers.
 import { get } from 'svelte/store';
 import { describe, expect, it, vi } from 'vitest';
+import { DbRuntimeError } from '@db';
 import { createSyncStateStore } from '@shared';
 
 import {
+  applyStartupDbRuntimeError,
   applyStartupFreshnessDecision,
   applyUnexpectedStartupSyncError,
   beginStartupSync,
@@ -258,6 +260,51 @@ describe('startupSyncStateController', () => {
     });
     expect(toastStore.show).toHaveBeenCalledWith(
       'Startup sync failed unexpectedly. Check the browser console and retry.',
+      'error',
+      5000,
+    );
+  });
+
+  it('maps deterministic db runtime open errors into startup sync error state', () => {
+    const store = createSyncStateStore({
+      state: 'syncing',
+      message: 'Checking OneDrive for DB updates...',
+    });
+    const toastStore = createToastStore();
+
+    applyStartupDbRuntimeError(store, new DbRuntimeError('db_open_failed'), toastStore);
+
+    expect(get(store)).toEqual({
+      state: 'error',
+      message:
+        'Failed to open the cached OneDrive database snapshot. Re-sync from settings and try again.',
+      branch: 'db_runtime_open_failed',
+      progress: null,
+    });
+    expect(toastStore.show).toHaveBeenCalledWith(
+      'Failed to open the cached OneDrive database snapshot. Re-sync from settings and try again.',
+      'error',
+      5000,
+    );
+  });
+
+  it('falls back to a deterministic generic message for unknown db runtime failures', () => {
+    const store = createSyncStateStore({
+      state: 'syncing',
+      message: 'Checking OneDrive for DB updates...',
+    });
+    const toastStore = createToastStore();
+
+    applyStartupDbRuntimeError(store, new Error('Unexpected runtime failure'), toastStore);
+
+    expect(get(store)).toEqual({
+      state: 'error',
+      message: 'Failed to open the local SQLite database snapshot. Retry sync from settings.',
+      branch: 'db_runtime_open_failed',
+      progress: null,
+    });
+    expect(toastStore.show).toHaveBeenCalledWith(
+      'Failed to open the local SQLite database snapshot. Retry sync from settings.',
       'error',
       5000,
     );

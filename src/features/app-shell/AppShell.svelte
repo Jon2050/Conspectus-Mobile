@@ -19,6 +19,7 @@
   import { resolveAppCacheStore } from './cacheStoreResolver';
   import { createCachedDatabaseSnapshotService } from './cachedDatabaseSnapshotService';
   import { resolveAppGraphClient } from './graphClientResolver';
+  import { resolveAppDbRuntime } from './dbRuntimeResolver';
   import { APP_ROUTES, createHashRouteStore, DEFAULT_ROUTE, type AppRouteKey } from './hashRouting';
   import {
     createStartupFreshnessService,
@@ -26,10 +27,12 @@
   } from './startupFreshnessService';
   import {
     applyStartupFreshnessDecision,
+    applyStartupDbRuntimeError,
     applyUnexpectedStartupSyncError,
     beginStartupSync,
     updateStartupSyncProgress,
   } from './startupSyncStateController';
+  import { syncDbRuntimeForStartupDecision } from './startupDbRuntimeSync';
   import { resolveAppStartupIsOnline } from './startupNetworkStateResolver';
   import { syncSelectedDriveItemBindingStoreAtStartup } from './startupBindingSync';
 
@@ -60,8 +63,10 @@
   const performSync = async (binding: DriveItemBinding | null): Promise<void> => {
     const syncId = ++currentSyncId;
     syncStateStore.reset();
+    const dbRuntime = resolveAppDbRuntime();
 
     if (binding === null) {
+      dbRuntime.close();
       return;
     }
 
@@ -92,6 +97,20 @@
         return;
       }
 
+      try {
+        const dbSyncResult = await syncDbRuntimeForStartupDecision(dbRuntime, decision, () => {
+          return appShellIsMounted && syncId === currentSyncId;
+        });
+
+        if (dbSyncResult === 'superseded') {
+          return;
+        }
+      } catch (error) {
+        console.warn('Opening cached OneDrive database snapshot failed.', error);
+        applyStartupDbRuntimeError(syncStateStore, error);
+        return;
+      }
+
       applyStartupFreshnessDecision(syncStateStore, decision);
       logStartupFreshnessDecision(decision, binding?.name ?? null);
     } catch (error) {
@@ -100,6 +119,7 @@
       }
 
       console.warn('Startup freshness resolution failed unexpectedly.', error);
+      dbRuntime.close();
       applyUnexpectedStartupSyncError(
         syncStateStore,
         'Startup sync failed unexpectedly. Check the browser console and retry.',
@@ -273,6 +293,7 @@
   onDestroy(() => {
     unsubscribe();
     unsubscribeSelectedBinding();
+    resolveAppDbRuntime().close();
     disconnectFooterVisibilityTracking();
   });
 </script>

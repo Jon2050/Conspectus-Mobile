@@ -19,7 +19,11 @@ const writeText = (filePath: string, value: string) => {
 
 type DistFixtureOptions = {
   includeCspMeta?: boolean;
+  cspMetaContent?: string;
 };
+
+const BASE_CSP_META_CONTENT =
+  "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'";
 
 const createDistFixture = (
   fixtureRootPath: string,
@@ -29,8 +33,9 @@ const createDistFixture = (
   const distPath = path.join(fixtureRootPath, 'dist');
   const basePath = '/conspectus/webapp/';
   const includeCspMeta = options.includeCspMeta ?? true;
+  const cspMetaContent = options.cspMetaContent ?? BASE_CSP_META_CONTENT;
   const cspMetaTag = includeCspMeta
-    ? `<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'" />`
+    ? `<meta http-equiv="Content-Security-Policy" content="${cspMetaContent}" />`
     : '';
 
   writeText(
@@ -156,6 +161,38 @@ describe('verify-build-channel script', () => {
     }
   });
 
+  it('fails when script-src does not include wasm-unsafe-eval', () => {
+    const fixturePath = createFixtureDirectory();
+
+    try {
+      const distPath = createDistFixture(
+        fixturePath,
+        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/conspectus/webapp/sw.js', { scope: '/conspectus/webapp/' }); }`,
+        {
+          cspMetaContent:
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'",
+        },
+      );
+
+      const result = runVerifier([
+        '--dist',
+        distPath,
+        '--channel',
+        'production',
+        '--base',
+        '/conspectus/webapp/',
+      ]);
+
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(
+        "Content-Security-Policy script-src directive must include 'wasm-unsafe-eval' for sql.js WASM runtime support.",
+      );
+    } finally {
+      rmSync(fixturePath, { force: true, recursive: true });
+    }
+  });
+
   it('fails when service worker scope is not restricted to the expected base', () => {
     const fixturePath = createFixtureDirectory();
 
@@ -196,7 +233,7 @@ describe('verify-build-channel script', () => {
         `<!doctype html>
 <html lang="en">
   <head>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'" />
+    <meta http-equiv="Content-Security-Policy" content="${BASE_CSP_META_CONTENT}" />
     <link rel="manifest" href="${previewBase}manifest.webmanifest" />
     <link rel="stylesheet" href="${previewBase}assets/index.css" />
   </head>
@@ -249,7 +286,7 @@ describe('verify-build-channel script', () => {
         `<!doctype html>
 <html lang="en">
   <head>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'" />
+    <meta http-equiv="Content-Security-Policy" content="${BASE_CSP_META_CONTENT}" />
     <link rel="manifest" href="${basePath}manifest.webmanifest" />
     <link rel="stylesheet" href="${basePath}assets/index.css" />
   </head>

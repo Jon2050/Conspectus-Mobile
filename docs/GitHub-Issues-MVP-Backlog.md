@@ -367,7 +367,7 @@ An issue is only considered done when:
 - Depends on: `M1-09, M2-03`
 - GitHub: [#152](https://github.com/Jon2050/Conspectus-Mobile/issues/152)
 
-### :green_circle: M5-01 Integrate sql.js runtime and DB open service
+### :white_check_mark: M5-01 Integrate sql.js runtime and DB open service
 
 - Label: `feature`
 - Milestone: `M5 - Accounts + Transfers Read UX`

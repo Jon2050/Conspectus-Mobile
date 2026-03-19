@@ -247,6 +247,11 @@ const extractCspMetaContent = (indexHtml) => {
 const hasDirective = (policyText, directiveName) =>
   new RegExp(`(?:^|;)\\s*${directiveName}\\s+[^;]+`).test(policyText);
 
+const extractDirectiveValue = (policyText, directiveName) => {
+  const directiveMatch = policyText.match(new RegExp(`(?:^|;)\\s*${directiveName}\\s+([^;]+)`));
+  return directiveMatch?.[1]?.trim() ?? null;
+};
+
 const verifyCspMetaTag = (indexHtml) => {
   const cspContent = extractCspMetaContent(indexHtml);
   const requiredDirectives = [
@@ -264,6 +269,13 @@ const verifyCspMetaTag = (indexHtml) => {
   assert(
     missingDirectives.length === 0,
     `Content-Security-Policy meta tag is missing required directive(s): ${missingDirectives.join(', ')}.`,
+  );
+
+  const scriptSourceDirectiveValue = extractDirectiveValue(cspContent, 'script-src');
+  assert(
+    scriptSourceDirectiveValue !== null &&
+      scriptSourceDirectiveValue.includes("'wasm-unsafe-eval'"),
+    "Content-Security-Policy script-src directive must include 'wasm-unsafe-eval' for sql.js WASM runtime support.",
   );
 };
 
