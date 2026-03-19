@@ -391,7 +391,7 @@ An issue is only considered done when:
 - Depends on: `M5-01`
 - GitHub: [#57](https://github.com/Jon2050/Conspectus-Mobile/issues/57)
 
-### :green_circle: M5-04 Implement month navigation state and gestures
+### :white_check_mark: M5-04 Implement month navigation state and gestures
 
 - Label: `feature`
 - Milestone: `M5 - Accounts + Transfers Read UX`

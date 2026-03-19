@@ -551,6 +551,13 @@ M5-03 implementation clarification:
 - Query result mapping is strict and fails closed with `db_query_failed` when transfer result columns, row widths, or value types do not match the expected `TransferRecord` shape.
 - Regression coverage includes fixture-backed month queries against `tests/fixtures/test.db`, boundary-date inclusion checks, deterministic tie-break sorting, and malformed-result failure scenarios in `src/db/transferMonthQueryService.test.ts`.
 
+M5-04 implementation clarification:
+
+- Month-navigation state and swipe intent logic are centralized in `src/features/app-shell/routes/transfersMonthNavigation.ts` (`getCurrentMonthAnchorEpochDay`, month shifting, deterministic `YYYY-MM` keys, and swipe intent resolution).
+- The Transfers route now provides both gesture and non-gesture month switching controls in `src/features/app-shell/routes/TransfersRoute.svelte`: explicit Previous/Next buttons plus a touch swipe surface guarded by horizontal-distance/dominance thresholds.
+- Current-month default selection follows device-local month context while month key/label rendering uses UTC-safe epoch-day anchors to avoid timezone/DST drift in month identity.
+- Regression coverage for this scope is implemented in `src/features/app-shell/routes/transfersMonthNavigation.test.ts`, `src/features/app-shell/routes/TransfersRoute.test.ts`, and `tests/e2e/app-shell.spec.ts` (button + swipe month switching).
+
 Deliverables:
 
 - Production-ready viewing experience for accounts and monthly transfers.
