@@ -4,7 +4,6 @@ import { render } from 'svelte/server';
 import AccountsRoute from './AccountsRoute.svelte';
 import AddRoute from './AddRoute.svelte';
 import SettingsRoute from './SettingsRoute.svelte';
-import TransfersRoute from './TransfersRoute.svelte';
 
 describe('route placeholder components', () => {
   it.each([
@@ -13,12 +12,6 @@ describe('route placeholder components', () => {
       testId: 'route-accounts',
       heading: 'Accounts',
       bodyText: 'Accounts route placeholder for upcoming balance and account cards.',
-    },
-    {
-      component: TransfersRoute,
-      testId: 'route-transfers',
-      heading: 'Transfers',
-      bodyText: 'Transfers route placeholder for monthly transfer list and swipe navigation.',
     },
     {
       component: AddRoute,

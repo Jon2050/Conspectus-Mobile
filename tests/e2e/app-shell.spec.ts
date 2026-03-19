@@ -50,6 +50,75 @@ const REQUIRED_MANIFEST_ICONS = [
   },
 ];
 
+const resolveCurrentMonthKey = async (page: import('@playwright/test').Page): Promise<string> =>
+  page.evaluate(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+  });
+
+const dispatchTransferMonthSwipe = async (
+  page: import('@playwright/test').Page,
+  deltaX: number,
+  deltaY = 0,
+): Promise<void> => {
+  await page.getByTestId('transfers-month-swipe-surface').evaluate(
+    (swipeSurface, swipeDelta) => {
+      const element = swipeSurface as HTMLElement;
+      const bounds = element.getBoundingClientRect();
+      const startX = bounds.left + bounds.width / 2;
+      const startY = bounds.top + bounds.height / 2;
+      const endX = startX + swipeDelta.deltaX;
+      const endY = startY + swipeDelta.deltaY;
+
+      const createTouchList = (
+        x: number,
+        y: number,
+      ): ArrayLike<{ clientX: number; clientY: number }> => {
+        const point = {
+          clientX: x,
+          clientY: y,
+        };
+
+        return {
+          0: point,
+          length: 1,
+          item(index: number) {
+            return index === 0 ? point : null;
+          },
+        };
+      };
+      const dispatchTouch = (
+        type: 'touchstart' | 'touchend',
+        touches: ArrayLike<{ clientX: number; clientY: number }>,
+        changedTouches: ArrayLike<{ clientX: number; clientY: number }>,
+      ): void => {
+        const event = new Event(type, {
+          bubbles: true,
+          cancelable: true,
+        });
+        Object.defineProperty(event, 'touches', {
+          value: touches,
+          configurable: true,
+        });
+        Object.defineProperty(event, 'changedTouches', {
+          value: changedTouches,
+          configurable: true,
+        });
+        element.dispatchEvent(event);
+      };
+
+      dispatchTouch('touchstart', createTouchList(startX, startY), createTouchList(startX, startY));
+      dispatchTouch('touchend', createTouchList(endX, endY), createTouchList(endX, endY));
+    },
+    {
+      deltaX,
+      deltaY,
+    },
+  );
+};
+
 type MockAuthClientOptions = {
   readonly initializeDelayMs?: number;
   readonly signInDelayMs?: number;
@@ -609,7 +678,7 @@ test('shows startup configuration error when required runtime env is missing', a
   await expect(page.getByTestId('app-shell')).toHaveCount(0);
 });
 
-test('loads a mobile app shell and navigates placeholder routes', async ({ page }) => {
+test('loads a mobile app shell and navigates primary routes', async ({ page }) => {
   await page.goto(appPath('#/accounts'));
 
   await expect(page.getByTestId('app-shell')).toBeVisible();
@@ -627,6 +696,38 @@ test('loads a mobile app shell and navigates placeholder routes', async ({ page 
   await page.getByRole('link', { name: 'Settings' }).click();
   await expect(page).toHaveURL(/#\/settings$/);
   await expect(page.getByRole('heading', { level: 2, name: 'Settings' })).toBeVisible();
+});
+
+test('switches transfer months by buttons and swipe gestures', async ({ page }) => {
+  await page.goto(appPath('#/transfers'));
+
+  const monthLabel = page.getByTestId('transfers-month-label');
+  const expectedInitialMonthKey = await resolveCurrentMonthKey(page);
+  await expect(monthLabel).toBeVisible();
+  await expect(monthLabel).toHaveAttribute('data-month-key', expectedInitialMonthKey);
+
+  await page.getByTestId('transfers-month-next-button').click();
+  await expect(monthLabel).toHaveAttribute('data-month-key', /^\d{4}-\d{2}$/);
+  const monthAfterNextButton = await monthLabel.getAttribute('data-month-key');
+  expect(monthAfterNextButton).not.toBeNull();
+  expect(monthAfterNextButton).not.toBe(expectedInitialMonthKey);
+
+  await page.getByTestId('transfers-month-previous-button').click();
+  await expect(monthLabel).toHaveAttribute('data-month-key', expectedInitialMonthKey);
+
+  await dispatchTransferMonthSwipe(page, -120, 8);
+  const monthAfterLeftSwipe = await monthLabel.getAttribute('data-month-key');
+  expect(monthAfterLeftSwipe).not.toBeNull();
+  expect(monthAfterLeftSwipe).not.toBe(expectedInitialMonthKey);
+
+  await dispatchTransferMonthSwipe(page, 120, 10);
+  await expect(monthLabel).toHaveAttribute('data-month-key', expectedInitialMonthKey);
+
+  await dispatchTransferMonthSwipe(page, -24, 4);
+  await expect(monthLabel).toHaveAttribute('data-month-key', expectedInitialMonthKey);
+
+  await dispatchTransferMonthSwipe(page, 30, 120);
+  await expect(monthLabel).toHaveAttribute('data-month-key', expectedInitialMonthKey);
 });
 
 test('reuses the cached DB on startup when the OneDrive eTag is unchanged', async ({ page }) => {
