@@ -103,6 +103,8 @@ You MUST cover at least these perspectives. You are encouraged to add more persp
 
 14. **Next Milestone Readiness** — Assess whether the codebase is ready for Milestone `{{NEXT_MILESTONE_NUMBER}}` (`{{NEXT_MILESTONE_TITLE}}`). Identify any blockers, prerequisites not met, or foundations missing for the next milestone's work.
 
+15. **Overengineering Check** — Explicitly look for feature implementations where complexity/LOC is disproportionate to scope (e.g., redundant abstractions, excessive defensive checks under stable internal contracts, duplicated negative-case tests, unnecessary animation/interaction machinery). Flag simplification opportunities that preserve correctness and long-term maintainability.
+
 ### Additional Perspectives (Agent Discretion)
 
 If the codebase reveals concerns in other areas (e.g., performance, accessibility compliance, dependency health, configuration management, error handling patterns, logging), add findings under an appropriate category name using the same format.
