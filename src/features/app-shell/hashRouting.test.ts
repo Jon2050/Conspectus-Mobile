@@ -1,6 +1,8 @@
+// Verifies route parsing and bottom-navigation metadata contracts for hash-based routing.
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  APP_ROUTES,
   createHashRouteStore,
   DEFAULT_ROUTE,
   resolveRouteFromHash,
@@ -36,6 +38,31 @@ describe('hashRouting', () => {
     expect(toRouteHash('transfers')).toBe('#/transfers');
     expect(toRouteHash('add')).toBe('#/add');
     expect(toRouteHash('settings')).toBe('#/settings');
+  });
+
+  it('exposes per-route icon metadata for the bottom navigation', () => {
+    expect(APP_ROUTES).toEqual([
+      expect.objectContaining({
+        key: 'accounts',
+        label: 'Accounts',
+        icon: 'icons/account_55.png',
+      }),
+      expect.objectContaining({
+        key: 'transfers',
+        label: 'Transfers',
+        icon: 'icons/standingorder_55.png',
+      }),
+      expect.objectContaining({
+        key: 'add',
+        label: 'Add',
+        icon: 'icons/category_55.png',
+      }),
+      expect.objectContaining({
+        key: 'settings',
+        label: 'Settings',
+        icon: 'icons/settings_55.png',
+      }),
+    ]);
   });
 
   it('subscribes to hash changes and unsubscribes cleanly', () => {

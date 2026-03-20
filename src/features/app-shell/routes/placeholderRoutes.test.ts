@@ -1,18 +1,12 @@
+// Verifies remaining placeholder routes keep stable baseline content contracts.
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 
-import AccountsRoute from './AccountsRoute.svelte';
 import AddRoute from './AddRoute.svelte';
 import SettingsRoute from './SettingsRoute.svelte';
 
 describe('route placeholder components', () => {
   it.each([
-    {
-      component: AccountsRoute,
-      testId: 'route-accounts',
-      heading: 'Accounts',
-      bodyText: 'Accounts route placeholder for upcoming balance and account cards.',
-    },
     {
       component: AddRoute,
       testId: 'route-add',

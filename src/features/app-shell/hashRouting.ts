@@ -1,3 +1,4 @@
+// Centralizes hash-route metadata and browser hash->route resolution for app-shell navigation.
 import { readable, type Readable } from 'svelte/store';
 
 const ROUTE_KEYS = ['accounts', 'transfers', 'add', 'settings'] as const;
@@ -9,13 +10,33 @@ export type AppRoute = {
   readonly key: AppRouteKey;
   readonly label: string;
   readonly hash: string;
+  readonly icon: string;
 };
 
 export const DEFAULT_ROUTE: AppRouteKey = 'accounts';
 
+const ROUTE_META: Record<AppRouteKey, Pick<AppRoute, 'label' | 'icon'>> = {
+  accounts: {
+    label: 'Accounts',
+    icon: 'icons/account_55.png',
+  },
+  transfers: {
+    label: 'Transfers',
+    icon: 'icons/standingorder_55.png',
+  },
+  add: {
+    label: 'Add',
+    icon: 'icons/category_55.png',
+  },
+  settings: {
+    label: 'Settings',
+    icon: 'icons/settings_55.png',
+  },
+};
+
 export const APP_ROUTES: readonly AppRoute[] = ROUTE_KEYS.map((key) => ({
   key,
-  label: key === 'add' ? 'Add' : key.charAt(0).toUpperCase() + key.slice(1),
+  ...ROUTE_META[key],
   hash: `#/${key}`,
 }));
 

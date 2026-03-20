@@ -174,6 +174,20 @@ type MockCacheStoreOptions = {
   readonly startupSnapshot?: MockStartupSnapshot | null;
 };
 
+type MockDbRuntimeAccountRow = {
+  readonly accountId: number;
+  readonly name: string;
+  readonly amountCents: number;
+};
+
+type MockDbRuntimeOptions = {
+  readonly accountRows?: readonly MockDbRuntimeAccountRow[];
+  readonly failAccountsQuery?: boolean;
+  readonly accountsQueryErrorCode?: string;
+  readonly accountsQueryErrorMessage?: string;
+  readonly forceAlwaysOpen?: boolean;
+};
+
 const installMockAuthClient = async (
   page: import('@playwright/test').Page,
   options: MockAuthClientOptions = {},
@@ -555,6 +569,86 @@ const installMockCacheStore = async (
   }, options);
 };
 
+const installMockDbRuntime = async (
+  page: import('@playwright/test').Page,
+  options: MockDbRuntimeOptions = {},
+): Promise<void> => {
+  await page.addInitScript((mockOptions: MockDbRuntimeOptions) => {
+    const accountRows = mockOptions.accountRows ?? [];
+    let isOpen = mockOptions.forceAlwaysOpen ?? false;
+    let execCallCount = 0;
+    const isAccountsQuery = (sql: string): boolean => {
+      const normalizedSql = sql.toLowerCase();
+      return (
+        normalizedSql.includes('from account') &&
+        normalizedSql.includes('where visible = 1') &&
+        normalizedSql.includes('ac_type_id not in (1, 2)')
+      );
+    };
+
+    (window as Window & { __CONSPECTUS_APP_DB_RUNTIME__?: unknown }).__CONSPECTUS_APP_DB_RUNTIME__ =
+      {
+        async open() {
+          isOpen = true;
+        },
+        close() {
+          if (mockOptions.forceAlwaysOpen) {
+            return;
+          }
+          isOpen = false;
+        },
+        isOpen() {
+          return isOpen;
+        },
+        exec(sql: string) {
+          execCallCount += 1;
+          (
+            window as Window & { __CONSPECTUS_DB_RUNTIME_EXEC_CALL_COUNT__?: number }
+          ).__CONSPECTUS_DB_RUNTIME_EXEC_CALL_COUNT__ = execCallCount;
+
+          if (!isOpen) {
+            throw {
+              code: 'db_not_open',
+              message: 'SQLite runtime is not open yet.',
+            };
+          }
+
+          if (isAccountsQuery(sql)) {
+            if (mockOptions.failAccountsQuery) {
+              throw {
+                code: mockOptions.accountsQueryErrorCode ?? 'db_query_failed',
+                message: mockOptions.accountsQueryErrorMessage ?? 'Mock accounts query failed.',
+              };
+            }
+
+            return [
+              {
+                columns: ['account_id', 'name', 'amount'],
+                values: accountRows.map((account) => [
+                  account.accountId,
+                  account.name,
+                  account.amountCents,
+                ]),
+              },
+            ];
+          }
+
+          return [];
+        },
+        exportBytes() {
+          return new Uint8Array([
+            0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, 0x20, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x20,
+            0x33, 0x00, 4, 3, 2, 1,
+          ]);
+        },
+      };
+
+    (
+      window as Window & { __CONSPECTUS_DB_RUNTIME_EXEC_CALL_COUNT__?: number }
+    ).__CONSPECTUS_DB_RUNTIME_EXEC_CALL_COUNT__ = execCallCount;
+  }, options);
+};
+
 const installPersistedBinding = async (
   page: import('@playwright/test').Page,
   binding: {
@@ -683,6 +777,23 @@ test('loads a mobile app shell and navigates primary routes', async ({ page }) =
 
   await expect(page.getByTestId('app-shell')).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible();
+  await expect(page.getByTestId('app-nav-icon-accounts')).toHaveAttribute(
+    'src',
+    appPath('icons/account_55.png'),
+  );
+  await expect(page.getByTestId('app-nav-icon-transfers')).toHaveAttribute(
+    'src',
+    appPath('icons/standingorder_55.png'),
+  );
+  await expect(page.getByTestId('app-nav-icon-add')).toHaveAttribute(
+    'src',
+    appPath('icons/category_55.png'),
+  );
+  await expect(page.getByTestId('app-nav-icon-settings')).toHaveAttribute(
+    'src',
+    appPath('icons/settings_55.png'),
+  );
+  await expect(page.getByTestId('app-shell-bottom')).toBeVisible();
   await expect(page.getByRole('heading', { level: 2, name: 'Accounts' })).toBeVisible();
 
   await page.getByRole('link', { name: 'Transfers' }).click();
@@ -696,6 +807,96 @@ test('loads a mobile app shell and navigates primary routes', async ({ page }) =
   await page.getByRole('link', { name: 'Settings' }).click();
   await expect(page).toHaveURL(/#\/settings$/);
   await expect(page.getByRole('heading', { level: 2, name: 'Settings' })).toBeVisible();
+});
+
+test('renders readable account cards with semantic amount styling on narrow mobile widths', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 844 });
+  await installMockDbRuntime(page, {
+    forceAlwaysOpen: true,
+    accountRows: [
+      {
+        accountId: 101,
+        name: 'Main Household Spending Account with Long Name',
+        amountCents: 1234567,
+      },
+      {
+        accountId: 102,
+        name: 'Long-Term Loan',
+        amountCents: -499900,
+      },
+      {
+        accountId: 103,
+        name: 'Settled Offset',
+        amountCents: 0,
+      },
+    ],
+  });
+
+  await page.goto(appPath('#/accounts'));
+
+  await expect(page.getByTestId('accounts-route-cards')).toBeVisible();
+  await expect(page.getByText('Main Household Spending Account with Long Name')).toBeVisible();
+  await expect(page.getByTestId('account-amount-positive-101')).toHaveText('+$12,345.67');
+  await expect(page.getByTestId('account-amount-negative-102')).toHaveText('-$4,999.00');
+  await expect(page.getByTestId('account-amount-neutral-103')).toHaveText('$0.00');
+
+  const hasHorizontalOverflow = await page.getByTestId('route-accounts').evaluate((element) => {
+    return element.scrollWidth > element.clientWidth + 1;
+  });
+  expect(hasHorizontalOverflow).toBe(false);
+
+  const amountColors = await page.evaluate(() => {
+    const positive = getComputedStyle(
+      document.querySelector('[data-testid="account-amount-positive-101"]') as HTMLElement,
+    ).color;
+    const negative = getComputedStyle(
+      document.querySelector('[data-testid="account-amount-negative-102"]') as HTMLElement,
+    ).color;
+    const neutral = getComputedStyle(
+      document.querySelector('[data-testid="account-amount-neutral-103"]') as HTMLElement,
+    ).color;
+    return { positive, negative, neutral };
+  });
+
+  expect(amountColors.positive).not.toBe(amountColors.negative);
+  expect(amountColors.neutral).not.toBe(amountColors.negative);
+});
+
+test('shows accounts empty state when no visible non-primary accounts are returned', async ({
+  page,
+}) => {
+  await installMockDbRuntime(page, {
+    forceAlwaysOpen: true,
+    accountRows: [],
+  });
+
+  await page.goto(appPath('#/accounts'));
+
+  await expect(page.getByTestId('accounts-route-empty')).toBeVisible();
+  await expect(page.getByTestId('accounts-route-cards')).toHaveCount(0);
+  await expect(page.getByTestId('accounts-route-status')).toContainText(
+    'No visible non-primary accounts found or no DB file is ready.',
+  );
+});
+
+test('shows accounts error state on query failure without breaking bottom navigation', async ({
+  page,
+}) => {
+  await installMockDbRuntime(page, {
+    forceAlwaysOpen: true,
+    failAccountsQuery: true,
+    accountsQueryErrorMessage: 'Mock accounts query failure.',
+  });
+
+  await page.goto(appPath('#/accounts'));
+
+  await expect(page.getByRole('alert')).toContainText(
+    'Failed to load visible non-primary accounts from the local SQLite database.',
+  );
+  await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Settings' })).toBeVisible();
 });
 
 test('switches transfer months by buttons and swipe gestures', async ({ page }) => {
@@ -1313,6 +1514,7 @@ test('reveals deployment footer only when reaching the end of a scrollable page'
 
   const appContent = page.getByTestId('app-shell-content');
   const footer = page.getByTestId('deployment-info-footer');
+  const appShellBottom = page.getByTestId('app-shell-bottom');
 
   await expect
     .poll(async () =>
@@ -1335,6 +1537,7 @@ test('reveals deployment footer only when reaching the end of a scrollable page'
     .toBe(true);
 
   await expect(footer).toHaveAttribute('aria-hidden', 'true');
+  await expect(appShellBottom).toHaveClass(/app-shell__bottom--with-safe-area/);
 
   await footer.evaluate((element) => {
     const footerElement = element as HTMLElement;
@@ -1364,6 +1567,7 @@ test('reveals deployment footer only when reaching the end of a scrollable page'
     element.dispatchEvent(new Event('scroll'));
   });
   await expect(footer).not.toHaveAttribute('aria-hidden', 'true');
+  await expect(appShellBottom).not.toHaveClass(/app-shell__bottom--with-safe-area/);
   await page.waitForTimeout(300);
   await expect
     .poll(() =>
@@ -1383,6 +1587,7 @@ test('reveals deployment footer only when reaching the end of a scrollable page'
     element.dispatchEvent(new Event('scroll'));
   });
   await expect(footer).toHaveAttribute('aria-hidden', 'true');
+  await expect(appShellBottom).toHaveClass(/app-shell__bottom--with-safe-area/);
   await page.waitForTimeout(300);
   await expect
     .poll(() =>
