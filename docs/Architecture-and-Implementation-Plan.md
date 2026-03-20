@@ -558,6 +558,14 @@ M5-04 implementation clarification:
 - Current-month default selection follows device-local month context while month key/label rendering uses UTC-safe epoch-day anchors to avoid timezone/DST drift in month identity.
 - Regression coverage for this scope is implemented in `src/features/app-shell/routes/transfersMonthNavigation.test.ts`, `src/features/app-shell/routes/TransfersRoute.test.ts`, and `tests/e2e/app-shell.spec.ts` (button + swipe month switching).
 
+M5-05 implementation clarification:
+
+- The Accounts screen UI is implemented in `src/features/app-shell/routes/AccountsRoute.svelte` with explicit `loading`, `ready`, `empty`, and `error` states, including skeleton loading and actionable empty-state guidance for missing file binding/runtime readiness.
+- Accounts view-state orchestration is isolated in `src/features/app-shell/routes/accountsRouteController.ts`; query access remains in `@db` (`createAccountQueryService`) to preserve separation between UI rendering and DB access.
+- Amount rendering now uses deterministic sign semantics (`positive`, `negative`, `neutral`) with high-contrast light/dark theme tokens to keep balance readability accessible on mobile card surfaces.
+- Bottom navigation now renders icon + label entries from `public/icons` metadata in `src/features/app-shell/hashRouting.ts`, including explicit Settings icon coverage and safe-area separation behavior for notched/gesture devices.
+- Regression coverage for this scope is implemented across unit/UI/E2E in `src/features/app-shell/routes/accountsRouteController.test.ts`, `src/features/app-shell/routes/AccountsRoute.test.ts`, `src/features/app-shell/AppShell.test.ts`, `src/features/app-shell/hashRouting.test.ts`, and `tests/e2e/app-shell.spec.ts`.
+
 Deliverables:
 
 - Production-ready viewing experience for accounts and monthly transfers.
