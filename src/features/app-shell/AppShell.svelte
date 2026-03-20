@@ -56,9 +56,12 @@
   let footerVisibilityTrackingIsActive = false;
   let lastRenderedRoute: AppRouteKey | null = null;
   let stopFooterVisibilityTracking = (): void => {};
+  const navIconBaseUrl = import.meta.env.BASE_URL;
   const unsubscribe = routeStore.subscribe((route) => {
     currentRoute = route;
   });
+
+  const resolveNavIconUrl = (iconPath: string): string => `${navIconBaseUrl}${iconPath}`;
 
   const performSync = async (binding: DriveItemBinding | null): Promise<void> => {
     const syncId = ++currentSyncId;
@@ -370,7 +373,11 @@
     </div>
   </main>
 
-  <div class="app-shell__bottom">
+  <div
+    class="app-shell__bottom"
+    class:app-shell__bottom--with-safe-area={showLoadingPlaceholder || !footerIsVisible}
+    data-testid="app-shell-bottom"
+  >
     <nav class="app-nav" aria-label="Primary">
       {#each APP_ROUTES as route (route.key)}
         <a
@@ -379,7 +386,16 @@
           href={route.hash}
           aria-current={route.key === currentRoute ? 'page' : undefined}
         >
-          {route.label}
+          <img
+            class="app-nav__icon"
+            src={resolveNavIconUrl(route.icon)}
+            alt=""
+            aria-hidden="true"
+            width="22"
+            height="22"
+            data-testid={`app-nav-icon-${route.key}`}
+          />
+          <span class="app-nav__label">{route.label}</span>
         </a>
       {/each}
     </nav>

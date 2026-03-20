@@ -5,7 +5,7 @@ import { render } from 'svelte/server';
 import { formatBuildInfoLabel, getFallbackBuildInfo } from '@shared';
 
 import AppShell from './AppShell.svelte';
-import type { AppRouteKey } from './hashRouting';
+import { APP_ROUTES, type AppRouteKey } from './hashRouting';
 
 const ROUTE_TEST_IDS: Record<AppRouteKey, string> = {
   accounts: 'route-accounts',
@@ -13,6 +13,7 @@ const ROUTE_TEST_IDS: Record<AppRouteKey, string> = {
   add: 'route-add',
   settings: 'route-settings',
 };
+const NAV_ICON_BASE_URL = '/';
 
 describe('AppShell component', () => {
   it('renders loading placeholder before route placeholder content', () => {
@@ -29,6 +30,11 @@ describe('AppShell component', () => {
   it.each<AppRouteKey>(['accounts', 'transfers', 'add', 'settings'])(
     'renders %s route content with the shared deployment footer once loading is complete',
     (route) => {
+      const routeMeta = APP_ROUTES.find((candidate) => candidate.key === route);
+      if (routeMeta === undefined) {
+        throw new Error(`Missing route metadata for ${route}`);
+      }
+
       const { body } = render(AppShell, {
         props: {
           routeStore: readable(route),
@@ -43,6 +49,9 @@ describe('AppShell component', () => {
       expect(body).toContain(formatBuildInfoLabel(getFallbackBuildInfo()));
       expect(body).toContain(`href="#/${route}"`);
       expect(body).toContain('aria-current="page"');
+      expect(body).toContain(`src="${NAV_ICON_BASE_URL}${routeMeta.icon}"`);
+      expect(body).toContain(`data-testid="app-nav-icon-${route}"`);
+      expect(body).toContain(routeMeta.label);
     },
   );
 });
