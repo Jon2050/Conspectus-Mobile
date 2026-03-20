@@ -399,7 +399,7 @@ An issue is only considered done when:
 - Depends on: `M5-03`
 - GitHub: [#58](https://github.com/Jon2050/Conspectus-Mobile/issues/58)
 
-### :green_circle: M5-05 Build Accounts screen UI
+### :white_check_mark: M5-05 Build Accounts screen UI
 
 - Label: `feature`
 - Milestone: `M5 - Accounts + Transfers Read UX`
