@@ -24,6 +24,7 @@ Resolves Issues / Description: {{ISSUE_NUMBERS_OR_DESCRIPTION}}
 - **Logic, Architecture & Scope:** Focus strictly on logic, structure, architecture, and issue resolution (verify the code changes actually solve the stated issues/description).
 - **Pre-checks & Exclusions:** Tests, linting, and formatting are already green. DO NOT run them. Ignore minor formatting/syntax style issues. Explicitly ignore changes in auto-generated files (e.g., package-lock.json, yarn.lock), build artifacts, and compiled/minified assets.
 - **Test Coverage:** Check if new tests were added or existing tests updated. Flag it if missing but reasonably required for the changes.
+- **Overengineering & Maintainability:** Explicitly check whether implementation complexity is proportional to feature scope. Flag unnecessary abstractions, duplicated logic/tests, over-defensive checks where internal contracts are stable, and UI interaction/animation code that adds complexity without durable value.
 - **Strictly Forbidden AI Anti-Patterns (Reject if found):**
   - Placeholder code (e.g., `TODO`, `pass`, `// implement here`) instead of actual logic.
   - Improper Commenting: Code must be self-explanatory. Reject excessive/robotic comments and comments masking bad logic (request refactor). Complex logic, however, must include meaningful comments. Every file should start with a short description of what the file does and why it is needed.
