@@ -57,7 +57,7 @@ export const createCachedDatabaseSnapshotService = (
       metadata: GraphFileMetadata,
       onProgress?: (loadedBytes: number, totalBytes: number | null) => void,
     ): Promise<CachedDatabaseSnapshot> {
-      const dbBytes = await graphClient.downloadFile(binding, onProgress);
+      const dbBytes = await graphClient.downloadFile(metadata.downloadUrl, onProgress);
       validateDownloadedBytes(dbBytes, metadata);
 
       const snapshot: CachedDatabaseSnapshot = {

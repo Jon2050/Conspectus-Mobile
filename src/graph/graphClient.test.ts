@@ -261,6 +261,7 @@ describe('createGraphClient', () => {
         eTag: '"etag-1"',
         size: 2048,
         lastModifiedDateTime: '2026-03-09T10:15:00Z',
+        '@microsoft.graph.downloadUrl': 'https://download.example.com/conspectus.db',
       }),
     );
     const client = createGraphClient({ authClient, fetchFn });
@@ -271,6 +272,7 @@ describe('createGraphClient', () => {
       eTag: '"etag-1"',
       sizeBytes: 2048,
       lastModifiedDateTime: '2026-03-09T10:15:00Z',
+      downloadUrl: 'https://download.example.com/conspectus.db',
     });
     expect(authClient.getAccessToken).toHaveBeenCalledWith(['Files.ReadWrite']);
 
@@ -281,13 +283,15 @@ describe('createGraphClient', () => {
     const parsedUrl = new URL(requestUrl as string);
     expect(parsedUrl.origin).toBe('https://graph.microsoft.com');
     expect(parsedUrl.pathname).toBe('/v1.0/drives/drive-123/items/item-456');
-    expect(parsedUrl.searchParams.get('$select')).toBe('eTag,size,lastModifiedDateTime');
+    expect(parsedUrl.searchParams.get('$select')).toBe(
+      'eTag,size,lastModifiedDateTime,@microsoft.graph.downloadUrl',
+    );
 
     const requestHeaders = getRequestHeaders(getFetchCall(fetchFn));
     expect(requestHeaders.get('Authorization')).toBe('Bearer graph-token');
   });
 
-  it('downloads file bytes from the Graph content endpoint', async () => {
+  it('downloads file bytes from the preauthenticated OneDrive download URL without auth headers', async () => {
     const authClient = createAuthClient();
     const fetchFn = vi.fn(
       async () =>
@@ -297,13 +301,13 @@ describe('createGraphClient', () => {
     );
     const client = createGraphClient({ authClient, fetchFn });
 
-    const bytes = await client.downloadFile(DRIVE_ITEM_BINDING);
+    const bytes = await client.downloadFile('https://download.example.com/conspectus.db');
 
     expect(Array.from(bytes)).toEqual([1, 2, 3, 4]);
-    const [requestUrl] = getFetchCall(fetchFn);
-    expect(requestUrl).toBe(
-      'https://graph.microsoft.com/v1.0/drives/drive-123/items/item-456/content',
-    );
+    expect(authClient.getAccessToken).not.toHaveBeenCalled();
+    const [requestUrl, requestInit] = getFetchCall(fetchFn);
+    expect(requestUrl).toBe('https://download.example.com/conspectus.db');
+    expect(new Headers(requestInit?.headers).get('Authorization')).toBeNull();
   });
 
   it('uploads file bytes with If-Match and returns normalized metadata', async () => {
@@ -464,6 +468,23 @@ describe('createGraphClient', () => {
     });
   });
 
+  it('rejects metadata responses missing the download URL with an unknown Graph error', async () => {
+    const authClient = createAuthClient();
+    const fetchFn = vi.fn(async () =>
+      createJsonResponse({
+        eTag: '"etag-1"',
+        size: 2048,
+        lastModifiedDateTime: '2026-03-09T10:15:00Z',
+      }),
+    );
+    const client = createGraphClient({ authClient, fetchFn });
+
+    await expect(client.getFileMetadata(DRIVE_ITEM_BINDING)).rejects.toMatchObject({
+      code: 'unknown',
+      message: 'Microsoft Graph metadata response did not include the required file fields.',
+    });
+  });
+
   it('rejects blank eTag metadata payloads with an unknown Graph error', async () => {
     const authClient = createAuthClient();
     const fetchFn = vi.fn(async () =>
@@ -495,7 +516,9 @@ describe('createGraphClient', () => {
     const fetchFn = vi.fn(async () => response);
     const client = createGraphClient({ authClient, fetchFn });
 
-    await expect(client.downloadFile(DRIVE_ITEM_BINDING)).rejects.toMatchObject({
+    await expect(
+      client.downloadFile('https://download.example.com/conspectus.db'),
+    ).rejects.toMatchObject({
       code: 'network_error',
     });
   });
@@ -587,7 +610,10 @@ describe('createGraphClient', () => {
     const client = createGraphClient({ authClient, fetchFn });
     const onProgress = vi.fn();
 
-    const result = await client.downloadFile(DRIVE_ITEM_BINDING, onProgress);
+    const result = await client.downloadFile(
+      'https://download.example.com/conspectus.db',
+      onProgress,
+    );
 
     const text = new TextDecoder().decode(result);
     expect(text).toBe('hello world!');

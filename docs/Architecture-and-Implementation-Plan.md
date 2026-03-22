@@ -475,6 +475,7 @@ M4-06 implementation clarification:
 - Retryability is intentionally narrow: only normalized Graph `network_error` failures are retried; auth, permission, not-found, conflict, and local snapshot validation failures still fail fast on the first attempt.
 - The default startup retry policy is 3 total attempts with a `250ms` base delay capped at `1000ms`; when retries are exhausted, the final failure preserves the normalized `network_error` identity for later handling and surfaces actionable user messaging.
 - When retries are exhausted but a cached snapshot already exists, startup still resolves to the existing `stale` branch and continues with the cached DB instead of discarding readable local data.
+- Browser snapshot downloads use `@microsoft.graph.downloadUrl` from the metadata response instead of the Graph `/content` redirect endpoint, because the redirect path can fail under browser CORS handling while the preauthenticated download URL avoids that failure mode.
 
 M4-07 implementation clarification:
 

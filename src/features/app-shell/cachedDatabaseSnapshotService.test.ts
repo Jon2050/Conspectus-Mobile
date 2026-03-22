@@ -30,6 +30,7 @@ const createMetadata = (
   eTag: '"etag-1"',
   sizeBytes: defaultBytes.length,
   lastModifiedDateTime: '2026-03-11T08:30:00.000Z',
+  downloadUrl: 'https://download.example.com/conspectus.db',
   ...overrides,
 });
 
@@ -59,7 +60,7 @@ describe('cached database snapshot service', () => {
 
     const snapshot = await service.downloadAndCacheSnapshot(DRIVE_ITEM_BINDING, metadata);
 
-    expect(graphClient.downloadFile).toHaveBeenCalledWith(DRIVE_ITEM_BINDING, undefined);
+    expect(graphClient.downloadFile).toHaveBeenCalledWith(metadata.downloadUrl, undefined);
     expect(snapshot).toEqual<CachedDatabaseSnapshot>({
       binding: DRIVE_ITEM_BINDING,
       metadata: {
