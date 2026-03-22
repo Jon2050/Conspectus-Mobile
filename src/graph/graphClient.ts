@@ -13,7 +13,7 @@ import type {
 
 const GRAPH_API_BASE_URL = 'https://graph.microsoft.com/v1.0';
 const CHILDREN_FIELDS = 'id,name,parentReference,file,folder';
-const METADATA_FIELDS = 'eTag,size,lastModifiedDateTime';
+const METADATA_FIELDS = 'eTag,size,lastModifiedDateTime,@microsoft.graph.downloadUrl';
 
 type FetchFn = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -31,6 +31,7 @@ interface GraphItemPayload {
   readonly eTag?: unknown;
   readonly size?: unknown;
   readonly lastModifiedDateTime?: unknown;
+  readonly '@microsoft.graph.downloadUrl'?: unknown;
 }
 
 interface GraphChildrenPayload {
@@ -320,10 +321,10 @@ const normalizeDriveItem = (
   };
 };
 
-const normalizeGraphItem = (
+const normalizeGraphItemBase = (
   payload: unknown,
   invalidResponseMessage: string,
-): GraphFileMetadata | GraphUploadResult => {
+): Omit<GraphFileMetadata, 'downloadUrl'> => {
   if (!isGraphItemPayload(payload)) {
     throw new GraphClientError('unknown', invalidResponseMessage, undefined, payload);
   }
@@ -344,6 +345,27 @@ const normalizeGraphItem = (
     lastModifiedDateTime: payload.lastModifiedDateTime,
   };
 };
+
+const normalizeFileMetadata = (
+  payload: unknown,
+  invalidResponseMessage: string,
+): GraphFileMetadata => {
+  const baseMetadata = normalizeGraphItemBase(payload, invalidResponseMessage);
+
+  if (!isGraphItemPayload(payload) || !isNonEmptyString(payload['@microsoft.graph.downloadUrl'])) {
+    throw new GraphClientError('unknown', invalidResponseMessage, undefined, payload);
+  }
+
+  return {
+    ...baseMetadata,
+    downloadUrl: payload['@microsoft.graph.downloadUrl'],
+  };
+};
+
+const normalizeUploadResult = (
+  payload: unknown,
+  invalidResponseMessage: string,
+): GraphUploadResult => normalizeGraphItemBase(payload, invalidResponseMessage);
 
 const normalizeChildrenPayload = (
   payload: unknown,
@@ -441,17 +463,28 @@ export const createGraphClient = (options: CreateGraphClientOptions): GraphClien
         'Microsoft Graph metadata response did not include the required file fields.',
       );
 
-      return normalizeGraphItem(
+      return normalizeFileMetadata(
         payload,
         'Microsoft Graph metadata response did not include the required file fields.',
       );
     },
 
     async downloadFile(
-      binding,
+      downloadUrl,
       onProgress?: (loadedBytes: number, totalBytes: number | null) => void,
     ): Promise<Uint8Array> {
-      const response = await executeRequest(buildDriveItemUrl(binding, '/content'));
+      let response: Response;
+
+      try {
+        response = await fetchFn(downloadUrl);
+      } catch (error) {
+        throw normalizeNetworkError(error);
+      }
+
+      if (!response.ok) {
+        throw await normalizeHttpError(response);
+      }
+
       try {
         const contentLength = response.headers.get('Content-Length');
         const totalBytes = contentLength !== null ? parseInt(contentLength, 10) : null;
@@ -536,10 +569,10 @@ export const createGraphClient = (options: CreateGraphClientOptions): GraphClien
               }
               try {
                 resolve(
-                  normalizeGraphItem(
+                  normalizeUploadResult(
                     payload,
                     'Microsoft Graph upload response did not include the required file fields.',
-                  ) as GraphUploadResult,
+                  ),
                 );
               } catch (error) {
                 reject(
@@ -595,10 +628,10 @@ export const createGraphClient = (options: CreateGraphClientOptions): GraphClien
         'Microsoft Graph upload response did not include the required file fields.',
       );
 
-      return normalizeGraphItem(
+      return normalizeUploadResult(
         payload,
         'Microsoft Graph upload response did not include the required file fields.',
-      ) as GraphUploadResult;
+      );
     },
   };
 };

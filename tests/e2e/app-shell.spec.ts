@@ -395,6 +395,7 @@ const installMockGraphClient = async (
           eTag: mockOptions.metadataETag ?? '"etag-1"',
           sizeBytes: defaultDownloadBytes.length,
           lastModifiedDateTime: mockOptions.metadataLastModifiedDateTime ?? '2026-03-09T10:15:00Z',
+          downloadUrl: 'https://download.example.com/conspectus.db',
         };
       },
       async downloadFile() {
