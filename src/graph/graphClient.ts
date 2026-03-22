@@ -13,7 +13,7 @@ import type {
 
 const GRAPH_API_BASE_URL = 'https://graph.microsoft.com/v1.0';
 const CHILDREN_FIELDS = 'id,name,parentReference,file,folder';
-const METADATA_FIELDS = 'eTag,size,lastModifiedDateTime,@microsoft.graph.downloadUrl';
+const METADATA_FIELDS = 'eTag,size,lastModifiedDateTime,content.downloadUrl';
 
 type FetchFn = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -32,6 +32,7 @@ interface GraphItemPayload {
   readonly size?: unknown;
   readonly lastModifiedDateTime?: unknown;
   readonly '@microsoft.graph.downloadUrl'?: unknown;
+  readonly '@content.downloadUrl'?: unknown;
 }
 
 interface GraphChildrenPayload {
@@ -352,13 +353,23 @@ const normalizeFileMetadata = (
 ): GraphFileMetadata => {
   const baseMetadata = normalizeGraphItemBase(payload, invalidResponseMessage);
 
-  if (!isGraphItemPayload(payload) || !isNonEmptyString(payload['@microsoft.graph.downloadUrl'])) {
+  if (!isGraphItemPayload(payload)) {
+    throw new GraphClientError('unknown', invalidResponseMessage, undefined, payload);
+  }
+
+  const downloadUrl = isNonEmptyString(payload['@microsoft.graph.downloadUrl'])
+    ? payload['@microsoft.graph.downloadUrl']
+    : isNonEmptyString(payload['@content.downloadUrl'])
+      ? payload['@content.downloadUrl']
+      : null;
+
+  if (downloadUrl === null) {
     throw new GraphClientError('unknown', invalidResponseMessage, undefined, payload);
   }
 
   return {
     ...baseMetadata,
-    downloadUrl: payload['@microsoft.graph.downloadUrl'],
+    downloadUrl,
   };
 };
 

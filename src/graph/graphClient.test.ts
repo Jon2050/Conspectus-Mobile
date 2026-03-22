@@ -284,7 +284,7 @@ describe('createGraphClient', () => {
     expect(parsedUrl.origin).toBe('https://graph.microsoft.com');
     expect(parsedUrl.pathname).toBe('/v1.0/drives/drive-123/items/item-456');
     expect(parsedUrl.searchParams.get('$select')).toBe(
-      'eTag,size,lastModifiedDateTime,@microsoft.graph.downloadUrl',
+      'eTag,size,lastModifiedDateTime,content.downloadUrl',
     );
 
     const requestHeaders = getRequestHeaders(getFetchCall(fetchFn));
@@ -482,6 +482,26 @@ describe('createGraphClient', () => {
     await expect(client.getFileMetadata(DRIVE_ITEM_BINDING)).rejects.toMatchObject({
       code: 'unknown',
       message: 'Microsoft Graph metadata response did not include the required file fields.',
+    });
+  });
+
+  it('accepts the legacy content download URL annotation shape from Graph metadata', async () => {
+    const authClient = createAuthClient();
+    const fetchFn = vi.fn(async () =>
+      createJsonResponse({
+        eTag: '"etag-1"',
+        size: 2048,
+        lastModifiedDateTime: '2026-03-09T10:15:00Z',
+        '@content.downloadUrl': 'https://download.example.com/conspectus.db',
+      }),
+    );
+    const client = createGraphClient({ authClient, fetchFn });
+
+    await expect(client.getFileMetadata(DRIVE_ITEM_BINDING)).resolves.toEqual({
+      eTag: '"etag-1"',
+      sizeBytes: 2048,
+      lastModifiedDateTime: '2026-03-09T10:15:00Z',
+      downloadUrl: 'https://download.example.com/conspectus.db',
     });
   });
 
