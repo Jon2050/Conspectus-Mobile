@@ -439,6 +439,14 @@ An issue is only considered done when:
 - Depends on: `none`
 - GitHub: [#63](https://github.com/Jon2050/Conspectus-Mobile/issues/63)
 
+### :green_circle: M5-10 Follow-up UI cleanup and usability polish
+
+- Label: `feature`
+- Milestone: `M5 - Accounts + Transfers Read UX`
+- Summary: Work includes a later cleanup pass for the Milestone 5 UI and overall usability once the remaining planned work is further along. It intentionally keeps the exact polish scope open for later review.
+- Depends on: `M5-06, M5-07, M5-08, M5-09`
+- GitHub: [#174](https://github.com/Jon2050/Conspectus-Mobile/issues/174)
+
 ### :green_circle: M6-01 Build Add Transfer form UI (bottom sheet)
 
 - Label: `feature`
