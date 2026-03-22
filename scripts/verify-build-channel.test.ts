@@ -23,7 +23,7 @@ type DistFixtureOptions = {
 };
 
 const BASE_CSP_META_CONTENT =
-  "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'";
+  "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://login.microsoftonline.com https://graph.microsoft.com https://*.1drv.com https://*.microsoftpersonalcontent.com; object-src 'none'; base-uri 'self'";
 
 const createDistFixture = (
   fixtureRootPath: string,
@@ -170,7 +170,7 @@ describe('verify-build-channel script', () => {
         `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/conspectus/webapp/sw.js', { scope: '/conspectus/webapp/' }); }`,
         {
           cspMetaContent:
-            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'",
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://login.microsoftonline.com https://graph.microsoft.com https://*.1drv.com https://*.microsoftpersonalcontent.com; object-src 'none'; base-uri 'self'",
         },
       );
 
@@ -187,6 +187,38 @@ describe('verify-build-channel script', () => {
       expect(result.status).toBe(1);
       expect(result.stderr).toContain(
         "Content-Security-Policy script-src directive must include 'wasm-unsafe-eval' for sql.js WASM runtime support.",
+      );
+    } finally {
+      rmSync(fixturePath, { force: true, recursive: true });
+    }
+  });
+
+  it('fails when connect-src does not allow OneDrive download hosts', () => {
+    const fixturePath = createFixtureDirectory();
+
+    try {
+      const distPath = createDistFixture(
+        fixturePath,
+        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/conspectus/webapp/sw.js', { scope: '/conspectus/webapp/' }); }`,
+        {
+          cspMetaContent:
+            "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://login.microsoftonline.com https://graph.microsoft.com; object-src 'none'; base-uri 'self'",
+        },
+      );
+
+      const result = runVerifier([
+        '--dist',
+        distPath,
+        '--channel',
+        'production',
+        '--base',
+        '/conspectus/webapp/',
+      ]);
+
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(
+        'Content-Security-Policy connect-src directive is missing required source(s): https://*.1drv.com, https://*.microsoftpersonalcontent.com.',
       );
     } finally {
       rmSync(fixturePath, { force: true, recursive: true });

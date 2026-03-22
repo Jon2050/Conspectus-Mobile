@@ -277,6 +277,29 @@ const verifyCspMetaTag = (indexHtml) => {
       scriptSourceDirectiveValue.includes("'wasm-unsafe-eval'"),
     "Content-Security-Policy script-src directive must include 'wasm-unsafe-eval' for sql.js WASM runtime support.",
   );
+
+  const connectSourceDirectiveValue = extractDirectiveValue(cspContent, 'connect-src');
+  const requiredConnectSources = [
+    "'self'",
+    'https://login.microsoftonline.com',
+    'https://graph.microsoft.com',
+    'https://*.1drv.com',
+    'https://*.microsoftpersonalcontent.com',
+  ];
+
+  assert(
+    connectSourceDirectiveValue !== null,
+    'Content-Security-Policy connect-src directive is required for auth and OneDrive download requests.',
+  );
+
+  const missingConnectSources = requiredConnectSources.filter(
+    (source) => !connectSourceDirectiveValue.includes(source),
+  );
+
+  assert(
+    missingConnectSources.length === 0,
+    `Content-Security-Policy connect-src directive is missing required source(s): ${missingConnectSources.join(', ')}.`,
+  );
 };
 
 const main = () => {
