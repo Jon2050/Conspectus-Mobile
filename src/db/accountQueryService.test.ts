@@ -113,7 +113,12 @@ describe('account query service', () => {
       { accountId: 16, name: 'alpha', amountCents: 1200, accountTypeId: 3 },
       { accountId: 10, name: 'Bravo', amountCents: 5400, accountTypeId: 3 },
     ]);
-    expect(Object.keys(result[0] ?? {}).sort()).toEqual(['accountId', 'accountTypeId', 'amountCents', 'name']);
+    expect(Object.keys(result[0] ?? {}).sort()).toEqual([
+      'accountId',
+      'accountTypeId',
+      'amountCents',
+      'name',
+    ]);
     runtime.close();
   });
 
