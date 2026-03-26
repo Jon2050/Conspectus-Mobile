@@ -407,7 +407,7 @@ An issue is only considered done when:
 - Depends on: `M5-02`
 - GitHub: [#59](https://github.com/Jon2050/Conspectus-Mobile/issues/59)
 
-### :green_circle: M5-06 Build Transfers screen UI
+### :white_check_mark: M5-06 Build Transfers screen UI
 
 - Label: `feature`
 - Milestone: `M5 - Accounts + Transfers Read UX`
