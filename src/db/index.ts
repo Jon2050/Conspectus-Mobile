@@ -13,6 +13,11 @@ export {
   type TransferMonthQueryService,
 } from './transferMonthQueryService';
 export {
+  appCategoryQueryService,
+  createCategoryQueryService,
+  type CategoryQueryService,
+} from './categoryQueryService';
+export {
   appBrowserDbRuntime,
   createBrowserDbRuntime,
   type BrowserDbRuntime,
@@ -29,6 +34,12 @@ export interface AccountRecord {
   readonly accountId: number;
   readonly name: string;
   readonly amountCents: number;
+  readonly accountTypeId: number | null;
+}
+
+export interface CategoryRecord {
+  readonly categoryId: number;
+  readonly name: string;
 }
 
 export interface TransferRecord {

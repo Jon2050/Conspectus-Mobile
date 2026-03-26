@@ -108,12 +108,12 @@ describe('account query service', () => {
     const result = service.listVisibleNonPrimaryAccounts();
 
     expect(result).toEqual([
-      { accountId: 11, name: 'alpha', amountCents: 8100 },
-      { accountId: 12, name: 'Alpha', amountCents: 2300 },
-      { accountId: 16, name: 'alpha', amountCents: 1200 },
-      { accountId: 10, name: 'Bravo', amountCents: 5400 },
+      { accountId: 11, name: 'alpha', amountCents: 8100, accountTypeId: 3 },
+      { accountId: 12, name: 'Alpha', amountCents: 2300, accountTypeId: 3 },
+      { accountId: 16, name: 'alpha', amountCents: 1200, accountTypeId: 3 },
+      { accountId: 10, name: 'Bravo', amountCents: 5400, accountTypeId: 3 },
     ]);
-    expect(Object.keys(result[0] ?? {}).sort()).toEqual(['accountId', 'amountCents', 'name']);
+    expect(Object.keys(result[0] ?? {}).sort()).toEqual(['accountId', 'accountTypeId', 'amountCents', 'name']);
     runtime.close();
   });
 
@@ -162,11 +162,11 @@ describe('account query service', () => {
       exec: () =>
         [
           {
-            columns: ['account_id', 'name', 'amount'],
+            columns: ['account_id', 'name', 'amount', 'ac_type_id'],
             values: [
-              ['not-a-number', 'Cash', 900],
-              [11, 123, 700],
-              [12, 'Safe', Number.POSITIVE_INFINITY],
+              ['not-a-number', 'Cash', 900, 1],
+              [11, 123, 700, 2],
+              [12, 'Safe', Number.POSITIVE_INFINITY, 3],
             ],
           } as unknown as QueryExecResult,
         ] as readonly QueryExecResult[],
@@ -180,7 +180,7 @@ describe('account query service', () => {
       exec: () =>
         [
           {
-            columns: ['account_id', 'name', 'amount'],
+            columns: ['account_id', 'name', 'amount', 'ac_type_id'],
             values: [[10, 'Cash']],
           } as unknown as QueryExecResult,
         ] as readonly QueryExecResult[],
