@@ -5,7 +5,10 @@ import { render } from 'svelte/server';
 import TransfersRoute from './TransfersRoute.svelte';
 
 describe('TransfersRoute', () => {
-  const createMockController = (operation: 'loading' | 'ready' | 'empty' | 'error' = 'ready', transfers = []) => ({
+  const createMockController = (
+    operation: 'loading' | 'ready' | 'empty' | 'error' = 'ready',
+    transfers = [],
+  ) => ({
     getState: vi.fn(() => ({
       operation,
       transfers,
