@@ -624,11 +624,12 @@ const installMockDbRuntime = async (
 
             return [
               {
-                columns: ['account_id', 'name', 'amount'],
+                columns: ['account_id', 'name', 'amount', 'ac_type_id'],
                 values: accountRows.map((account) => [
                   account.accountId,
                   account.name,
                   account.amountCents,
+                  null,
                 ]),
               },
             ];

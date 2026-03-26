@@ -24,9 +24,9 @@ const getStateSnapshot = (state: AccountsRouteState): AccountsRouteState => ({
 describe('accounts route controller', () => {
   it('loads account rows into ready cards with amount semantics and formatting', async () => {
     const listVisibleNonPrimaryAccounts = vi.fn(() => [
-      { accountId: 12, name: 'Cash', amountCents: 1250 },
-      { accountId: 18, name: 'Loan', amountCents: -9750 },
-      { accountId: 19, name: 'Offset', amountCents: 0 },
+      { accountId: 12, name: 'Cash', amountCents: 1250, accountTypeId: null },
+      { accountId: 18, name: 'Loan', amountCents: -9750, accountTypeId: null },
+      { accountId: 19, name: 'Offset', amountCents: 0, accountTypeId: null },
     ]);
     const controller = createAccountsRouteController({ listVisibleNonPrimaryAccounts });
 

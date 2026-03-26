@@ -6,14 +6,20 @@ import { DbRuntimeError, toDbRuntimeError } from './dbRuntimeErrors';
 import { appBrowserDbRuntime } from './browserDbRuntime';
 
 const VISIBLE_NON_PRIMARY_ACCOUNTS_SQL = `
-  SELECT account_id, name, amount
+  SELECT account_id, name, amount, ac_type_id
   FROM account
   WHERE visible = 1
     AND ac_type_id NOT IN (1, 2)
   ORDER BY ac_order ASC, LOWER(name) ASC, account_id ASC;
 `;
 
-const ACCOUNT_RESULT_COLUMNS = ['account_id', 'name', 'amount'] as const;
+const ALL_ACCOUNTS_SQL = `
+  SELECT account_id, name, amount, ac_type_id
+  FROM account
+  ORDER BY account_id ASC;
+`;
+
+const ACCOUNT_RESULT_COLUMNS = ['account_id', 'name', 'amount', 'ac_type_id'] as const;
 
 const hasExpectedColumns = (columns: readonly string[]): boolean =>
   columns.length === ACCOUNT_RESULT_COLUMNS.length &&
@@ -39,6 +45,13 @@ const toName = (value: unknown): string => {
   }
 
   return value;
+};
+
+const toNullableInteger = (value: unknown, fieldName: string): number | null => {
+  if (value === null) {
+    return null;
+  }
+  return toInteger(value, fieldName);
 };
 
 const mapAccountQueryResult = (results: readonly QueryExecResult[]): readonly AccountRecord[] => {
@@ -70,12 +83,14 @@ const mapAccountQueryResult = (results: readonly QueryExecResult[]): readonly Ac
       accountId: toInteger(row[0], 'account_id'),
       name: toName(row[1]),
       amountCents: toInteger(row[2], 'amount'),
+      accountTypeId: toNullableInteger(row[3], 'ac_type_id'),
     };
   });
 };
 
 export interface AccountQueryService {
   listVisibleNonPrimaryAccounts(): readonly AccountRecord[];
+  listAllAccounts(): readonly AccountRecord[];
 }
 
 export const createAccountQueryService = (
@@ -90,6 +105,19 @@ export const createAccountQueryService = (
         error,
         'db_query_failed',
         'Failed to load visible non-primary accounts from the local SQLite database.',
+      );
+    }
+  },
+
+  listAllAccounts(): readonly AccountRecord[] {
+    try {
+      const results = dbRuntime.exec(ALL_ACCOUNTS_SQL);
+      return mapAccountQueryResult(results);
+    } catch (error) {
+      throw toDbRuntimeError(
+        error,
+        'db_query_failed',
+        'Failed to load all accounts from the local SQLite database.',
       );
     }
   },
