@@ -63,7 +63,7 @@
         initializing: $_('settings.status.checking'),
         idle: '',
         signing_in: $_('settings.status.openingSignIn'),
-        signing_out: $_('settings.status.signingOut')
+        signing_out: $_('settings.status.signingOut'),
       };
       return operationMap[nextState.operation];
     }
@@ -72,7 +72,9 @@
       return `${$_('settings.status.errorPrefix')} ${nextState.error.message}`;
     }
 
-    return nextState.session.isAuthenticated ? $_('settings.status.signedIn') : $_('settings.status.signedOut');
+    return nextState.session.isAuthenticated
+      ? $_('settings.status.signedIn')
+      : $_('settings.status.signedOut');
   };
 
   const buildBindingStatusMessage = (nextState: SettingsFileBindingState): string => {
@@ -270,7 +272,9 @@
           bindingState.operation !== 'idle' ||
           localDataResetState.operation !== 'idle'}
       >
-        {bindingState.selectedBinding === null ? $_('settings.db.actions.select') : $_('settings.db.actions.change')}
+        {bindingState.selectedBinding === null
+          ? $_('settings.db.actions.select')
+          : $_('settings.db.actions.change')}
       </button>
 
       {#if bindingState.browserIsOpen}

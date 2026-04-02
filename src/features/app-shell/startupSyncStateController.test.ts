@@ -254,7 +254,8 @@ describe('startupSyncStateController', () => {
 
     expect(get(store)).toEqual({
       state: 'error',
-      message: 'Start-Synchronisation unerwartet fehlgeschlagen. Bitte prüfe die Browser-Konsole und versuche es erneut.',
+      message:
+        'Start-Synchronisation unerwartet fehlgeschlagen. Bitte prüfe die Browser-Konsole und versuche es erneut.',
       branch: null,
       progress: null,
     });
@@ -299,7 +300,8 @@ describe('startupSyncStateController', () => {
 
     expect(get(store)).toEqual({
       state: 'error',
-      message: 'Konnte das lokale SQLite-Snapshot nicht öffnen. Wiederhole die Synchronisation in den Einstellungen.',
+      message:
+        'Konnte das lokale SQLite-Snapshot nicht öffnen. Wiederhole die Synchronisation in den Einstellungen.',
       branch: 'db_runtime_open_failed',
       progress: null,
     });

@@ -319,14 +319,18 @@
         <p role="alert">{$syncStateStore.message}</p>
         {#if $syncStateStore.branch === 'online_auth_expired'}
           <div class="startup-sync-actions">
-            <a href="#settings" class="app-button app-button--secondary">{$_('appShell.signInAgain')}</a>
+            <a href="#settings" class="app-button app-button--secondary"
+              >{$_('appShell.signInAgain')}</a
+            >
           </div>
         {/if}
       {:else}
         <p>{$syncStateStore.message}</p>
         {#if $syncStateStore.branch === 'online_auth_expired_cached'}
           <div class="startup-sync-actions">
-            <a href="#settings" class="app-button app-button--secondary">{$_('appShell.signInAgain')}</a>
+            <a href="#settings" class="app-button app-button--secondary"
+              >{$_('appShell.signInAgain')}</a
+            >
           </div>
         {/if}
         {#if $syncStateStore.progress !== null && $syncStateStore.state === 'syncing'}
@@ -339,9 +343,16 @@
             ></progress>
             <span class="startup-sync-progress-text">
               {#if $syncStateStore.progress.total !== null}
-                {$_('appShell.downloadProgress', { values: { loaded: Math.round($syncStateStore.progress.loaded / 1024), total: Math.round($syncStateStore.progress.total / 1024) } })}
+                {$_('appShell.downloadProgress', {
+                  values: {
+                    loaded: Math.round($syncStateStore.progress.loaded / 1024),
+                    total: Math.round($syncStateStore.progress.total / 1024),
+                  },
+                })}
               {:else}
-                {$_('appShell.downloadedKb', { values: { kb: Math.round($syncStateStore.progress.loaded / 1024) } })}
+                {$_('appShell.downloadedKb', {
+                  values: { kb: Math.round($syncStateStore.progress.loaded / 1024) },
+                })}
               {/if}
             </span>
           </div>

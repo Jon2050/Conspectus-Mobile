@@ -144,9 +144,11 @@ export const applyStartupDbRuntimeError = (
   error: unknown,
   toastStore: ToastStoreLike = appToastStore,
 ): void => {
-  const message = get(_)(isDbRuntimeError(error)
-    ? STARTUP_DB_RUNTIME_FAILURE_MESSAGES[error.code]
-    : 'sync.dbRuntimeError.fallback');
+  const message = get(_)(
+    isDbRuntimeError(error)
+      ? STARTUP_DB_RUNTIME_FAILURE_MESSAGES[error.code]
+      : 'sync.dbRuntimeError.fallback',
+  );
   syncStateStore.setError(message, {
     branch: STARTUP_DB_RUNTIME_FAILURE_BRANCH,
   });
