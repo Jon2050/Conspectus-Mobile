@@ -1,0 +1,128 @@
+{
+  "nav": {
+    "accounts": "Konten",
+    "transfers": "Überweisungen",
+    "add": "Neu",
+    "settings": "Einstellungen"
+  },
+  "appShell": {
+    "signInAgain": "Erneut anmelden",
+    "downloadedKb": "{kb} KB heruntergeladen...",
+    "downloadProgress": "{loaded} KB / {total} KB",
+    "title": "Conspectus Mobile"
+  },
+  "accounts": {
+    "title": "Konten",
+    "loading": "Konten werden geladen...",
+    "errorDefault": "Fehler beim Laden der Konten.",
+    "emptyState": "Es wurden noch keine passenden Konten gefunden. Bitte verknüpfe unter 'Einstellungen' eine Datenbank."
+  },
+  "transfers": {
+    "title": "Transfers",
+    "previousMonth": "Vorheriger Monat",
+    "nextMonth": "Nächster Monat",
+    "loading": "Transfers werden geladen...",
+    "errorDefault": "Fehler beim Laden der Transfers.",
+    "emptyStatus": "Für diesen Monat sind keine Transfers hinterlegt.",
+    "countFound": "{count} Transfers gefunden.",
+    "emptyBox": "Es gibt keine Transfers für diesen Monat."
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "description": "Authentifizierung für den OneDrive-Zugriff.",
+    "status": {
+      "signedOut": "Abgemeldet.",
+      "signedIn": "Angemeldet.",
+      "checking": "Authentifizierung wird geprüft...",
+      "openingSignIn": "Microsoft-Anmeldung wird geöffnet...",
+      "signingOut": "Abmeldung läuft...",
+      "errorPrefix": "Authentifizierungsfehler."
+    },
+    "account": {
+      "heading": "OneDrive-Konto",
+      "name": "Name",
+      "username": "Benutzername",
+      "unknown": "Unbekannt"
+    },
+    "db": {
+      "heading": "Datenbank-Datei",
+      "status": {
+        "signInRequired": "Melde dich an, um eine .db-Datei auszuwählen.",
+        "loading": "OneDrive-Dateien werden geladen...",
+        "errorPrefix": "Fehler bei der Dateiauswahl.",
+        "selected": "DB-Datei ausgewählt.",
+        "choose": "Wähle eine .db-Datei aus dem aktuellen OneDrive-Ordner.",
+        "notSelected": "Bisher keine DB-Datei ausgewählt."
+      },
+      "summary": {
+        "fileName": "Dateiname",
+        "folderPath": "Ordnerpfad"
+      },
+      "actions": {
+        "select": "Datenbank auswählen",
+        "change": "Datenbank ändern",
+        "back": "Zurück zum übergeordneten Ordner",
+        "cancel": "Abbrechen"
+      }
+    },
+    "browser": {
+      "currentFolder": "Aktueller Ordner",
+      "loading": "Lade aktuellen OneDrive-Ordner...",
+      "empty": "Hier wurden keine Ordner oder .db-Dateien gefunden.",
+      "foldersHeading": "Ordner",
+      "filesHeading": "Datenbank-Dateien",
+      "openFolder": "Ordner öffnen",
+      "selectFile": "Datei auswählen"
+    },
+    "reset": {
+      "button": "Lokale App-Daten zurücksetzen",
+      "title": "Lokale App-Daten zurücksetzen?",
+      "description": "Hiermit werden die lokale DB-Dateibindung und die zwischengespeicherten App-Daten auf diesem Gerät für das angemeldete Konto gelöscht.",
+      "status": "Lokale App-Daten werden zurückgesetzt...",
+      "cancel": "Abbrechen",
+      "confirm": "Zurücksetzen bestätigen"
+    },
+    "generalActions": {
+      "signOut": "Abmelden",
+      "signIn": "Mit Microsoft anmelden"
+    }
+  },
+  "deploymentInfo": {
+    "title": "Deployment-Info",
+    "version": "Version",
+    "commit": "Commit",
+    "build": "Build"
+  },
+  "loadingPlaceholder": {
+    "title": "Lade...",
+    "description": "Dein mobiler Arbeitsplatz wird vorbereitet."
+  },
+  "toast": {
+    "dismiss": "Schließen"
+  },
+  "sync": {
+    "startup": {
+      "checking": "Suche nach DB-Updates auf OneDrive...",
+      "toastSyncing": "Synchronisiere mit OneDrive im Hintergrund...",
+      "onlineUnchanged": "Zwischengespeicherte DB ist aktuell mit OneDrive.",
+      "onlineChanged": "Neueste DB von OneDrive heruntergeladen.",
+      "offlineCached": "Offline-Modus nutzt die zuletzt zwischengespeicherte DB.",
+      "cachedFallback": "Nutze die letzte zwischengespeicherte DB, da die Aktualisierung fehlgeschlagen ist.",
+      "cachedFallbackPrefix": "{message} Nutze vorerst die zwischengespeicherte DB.",
+      "completed": "DB-Synchronisation abgeschlossen.",
+      "stale": "Zwischengespeicherte DB ist veraltet.",
+      "offlineActive": "Offline-Modus ist aktiv.",
+      "failed": "Start-Synchronisation fehlgeschlagen.",
+      "failedUnexpected": "Start-Synchronisation unerwartet fehlgeschlagen. Bitte prüfe die Browser-Konsole und versuche es erneut."
+    },
+    "dbRuntimeError": {
+      "initFailed": "Konnte lokale SQLite-Laufzeitumgebung nicht initialisieren. Lade die App neu.",
+      "openFailed": "Konnte zwischengespeicherte DB nicht öffnen. Synchronisiere erneut über die Einstellungen.",
+      "pragmaFailed": "Die heruntergeladene DB konnte nicht fürs Lesen vorbereitet werden. Bitte erneut synchronisieren.",
+      "notOpen": "Es ist noch keine lokale DB geöffnet. Führe die Synchronisation erneut aus.",
+      "queryFailed": "Lokale SQLite-Abfrage unerwartet fehlgeschlagen.",
+      "exportFailed": "Konnte lokale SQLite-Bytes nicht exportieren.",
+      "fallback": "Konnte das lokale SQLite-Snapshot nicht öffnen. Wiederhole die Synchronisation in den Einstellungen."
+    }
+  }
+}

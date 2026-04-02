@@ -4,6 +4,7 @@
   import { fly } from 'svelte/transition';
   import { onDestroy } from 'svelte';
   import { appSyncStateStore, type SyncState } from '@shared';
+  import { _ } from 'svelte-i18n';
   import {
     createAccountQueryService,
     createCategoryQueryService,
@@ -124,14 +125,14 @@
   data-testid="route-transfers"
   aria-busy={state.operation === 'loading'}
 >
-  <h2>Transfers</h2>
+  <h2>{$_('transfers.title')}</h2>
   <div class="transfers-route__month-navigation" data-testid="transfers-month-navigation">
     <button
       type="button"
       class="app-button app-button--secondary transfers-route__month-button"
       data-testid="transfers-month-previous-button"
-      aria-label="Previous month"
-      on:click={handlePreviousMonthClick}>Previous</button
+      aria-label={$_('transfers.previousMonth')}
+      on:click={handlePreviousMonthClick}>{$_('transfers.previousMonth')}</button
     >
     <p
       class="transfers-route__month-label"
@@ -159,8 +160,8 @@
       type="button"
       class="app-button app-button--secondary transfers-route__month-button"
       data-testid="transfers-month-next-button"
-      aria-label="Next month"
-      on:click={handleNextMonthClick}>Next</button
+      aria-label={$_('transfers.nextMonth')}
+      on:click={handleNextMonthClick}>{$_('transfers.nextMonth')}</button
     >
   </div>
 
@@ -181,13 +182,11 @@
       role={state.operation === 'error' ? 'alert' : undefined}
     >
       {#if state.operation === 'loading'}
-        Loading transfers...
+        {$_('transfers.loading')}
       {:else if state.operation === 'error'}
-        {state.error?.message ?? 'Failed to load transfers.'}
-      {:else if state.operation === 'empty'}
-        No transfers found for this month.
-      {:else}
-        {state.transfers.length} transfers found.
+        {state.error?.message ?? $_('transfers.errorDefault')}
+      {:else if state.operation === 'ready'}
+        {$_('transfers.countFound', { values: { count: state.transfers.length } })}
       {/if}
     </p>
 
@@ -198,7 +197,7 @@
       </div>
     {:else if state.operation === 'empty'}
       <div class="transfers-route__empty" data-testid="transfers-route-empty">
-        <p>There are no transfers recorded for this month.</p>
+        <p>{$_('transfers.emptyBox')}</p>
       </div>
     {:else if state.operation === 'ready'}
       <ul class="transfers-route__cards" data-testid="transfers-route-cards">
@@ -392,13 +391,13 @@
   }
 
   .transfer-card--positive .transfer-card__amount {
-    color: var(--transfers-amount-positive);
+    color: var(--amount-positive);
   }
   .transfer-card--negative .transfer-card__amount {
-    color: var(--transfers-amount-negative);
+    color: var(--amount-negative);
   }
   .transfer-card--neutral .transfer-card__amount {
-    color: var(--transfers-amount-neutral);
+    color: var(--text-secondary);
   }
 
   .transfer-card__accounts {

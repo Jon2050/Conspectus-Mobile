@@ -51,7 +51,13 @@ describe('AppShell component', () => {
       expect(body).toContain('aria-current="page"');
       expect(body).toContain(`src="${NAV_ICON_BASE_URL}${routeMeta.icon}"`);
       expect(body).toContain(`data-testid="app-nav-icon-${route}"`);
-      expect(body).toContain(routeMeta.label);
+      const ROUTE_LABELS: Record<AppRouteKey, string> = {
+        accounts: 'Konten',
+        transfers: 'Überweisungen',
+        add: 'Neu',
+        settings: 'Einstellungen',
+      };
+      expect(body).toContain(ROUTE_LABELS[route]);
     },
   );
 });

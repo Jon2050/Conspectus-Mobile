@@ -6,6 +6,7 @@
   import type { CacheStore } from '@cache';
   import type { GraphClient, GraphDriveItem } from '@graph';
   import { appSelectedDriveItemBindingStore } from '@shared';
+  import { _ } from 'svelte-i18n';
 
   import {
     createSettingsAuthController,
@@ -38,7 +39,7 @@
     error: null,
   };
   let authOperationIsPending = false;
-  let authStatusMessage = 'Signed out.';
+  $: authStatusMessage = $_('settings.status.signedOut');
   let bindingState: SettingsFileBindingState = {
     selectedBinding: null,
     currentFolder: null,
@@ -49,54 +50,53 @@
     hasLoaded: false,
     canGoBack: false,
   };
-  let bindingStatusMessage = 'Sign in to browse and choose a .db file.';
+  $: bindingStatusMessage = $_('settings.db.status.signInRequired');
   let localDataResetState: SettingsLocalDataResetState = {
     operation: 'idle',
     error: null,
   };
   let localDataResetDialogElement: HTMLDialogElement | null = null;
 
-  const statusMessageByOperation: Record<SettingsAuthOperation, string> = {
-    initializing: 'Checking authentication status...',
-    idle: '',
-    signing_in: 'Opening Microsoft sign-in...',
-    signing_out: 'Signing out...',
-  };
-
   const buildStatusMessage = (nextState: SettingsAuthState): string => {
     if (nextState.operation !== 'idle') {
-      return statusMessageByOperation[nextState.operation];
+      const operationMap: Record<SettingsAuthOperation, string> = {
+        initializing: $_('settings.status.checking'),
+        idle: '',
+        signing_in: $_('settings.status.openingSignIn'),
+        signing_out: $_('settings.status.signingOut')
+      };
+      return operationMap[nextState.operation];
     }
 
     if (nextState.error !== null) {
-      return `Authentication error. ${nextState.error.message}`;
+      return `${$_('settings.status.errorPrefix')} ${nextState.error.message}`;
     }
 
-    return nextState.session.isAuthenticated ? 'Signed in.' : 'Signed out.';
+    return nextState.session.isAuthenticated ? $_('settings.status.signedIn') : $_('settings.status.signedOut');
   };
 
   const buildBindingStatusMessage = (nextState: SettingsFileBindingState): string => {
     if (!state.session.isAuthenticated) {
-      return 'Sign in to browse and choose a .db file.';
+      return $_('settings.db.status.signInRequired');
     }
 
     if (nextState.operation === 'loading') {
-      return 'Loading OneDrive files...';
+      return $_('settings.db.status.loading');
     }
 
     if (nextState.error !== null) {
-      return `File selection error. ${nextState.error.message}`;
+      return `${$_('settings.db.status.errorPrefix')} ${nextState.error.message}`;
     }
 
     if (nextState.selectedBinding !== null) {
-      return 'DB file selected.';
+      return $_('settings.db.status.selected');
     }
 
     if (nextState.hasLoaded) {
-      return 'Choose a .db file from the current OneDrive folder.';
+      return $_('settings.db.status.choose');
     }
 
-    return 'No DB file selected yet.';
+    return $_('settings.db.status.notSelected');
   };
 
   const folderItems = (items: readonly GraphDriveItem[]): readonly GraphDriveItem[] =>
@@ -220,8 +220,8 @@
 </script>
 
 <section class="placeholder-screen settings-screen" data-testid="route-settings">
-  <h2>Settings</h2>
-  <p>Authentication controls for OneDrive account access.</p>
+  <h2>{$_('settings.title')}</h2>
+  <p>{$_('settings.description')}</p>
 
   <p class="settings-screen__auth-status" data-testid="auth-status-message" aria-live="polite">
     {authStatusMessage}
@@ -234,19 +234,19 @@
   {/if}
 
   {#if state.session.isAuthenticated && state.session.account !== null}
-    <h3 class="settings-screen__subheading">OneDrive account</h3>
+    <h3 class="settings-screen__subheading">{$_('settings.account.heading')}</h3>
     <dl class="settings-screen__account-summary" data-testid="signed-in-account-summary">
       <div>
-        <dt>Name</dt>
-        <dd>{state.session.account.displayName ?? 'Unknown'}</dd>
+        <dt>{$_('settings.account.name')}</dt>
+        <dd>{state.session.account.displayName ?? $_('settings.account.unknown')}</dd>
       </div>
       <div>
-        <dt>Username</dt>
+        <dt>{$_('settings.account.username')}</dt>
         <dd>{state.session.account.username}</dd>
       </div>
     </dl>
 
-    <h3 class="settings-screen__subheading">DB file</h3>
+    <h3 class="settings-screen__subheading">{$_('settings.db.heading')}</h3>
     <p
       class="settings-screen__binding-status"
       data-testid="binding-status-message"
@@ -270,7 +270,7 @@
           bindingState.operation !== 'idle' ||
           localDataResetState.operation !== 'idle'}
       >
-        {bindingState.selectedBinding === null ? 'Select DB File' : 'Change DB file'}
+        {bindingState.selectedBinding === null ? $_('settings.db.actions.select') : $_('settings.db.actions.change')}
       </button>
 
       {#if bindingState.browserIsOpen}
@@ -281,7 +281,7 @@
             on:click={handleBackClick}
             disabled={bindingState.operation !== 'idle'}
           >
-            Back to parent folder
+            {$_('settings.db.actions.back')}
           </button>
         {/if}
 
@@ -292,7 +292,7 @@
           on:click={handleCancelBrowseClick}
           disabled={localDataResetState.operation !== 'idle'}
         >
-          Cancel
+          {$_('settings.db.actions.cancel')}
         </button>
       {/if}
     </div>
@@ -307,7 +307,7 @@
           bindingState.operation !== 'idle' ||
           localDataResetState.operation !== 'idle'}
       >
-        Reset local app data
+        {$_('settings.reset.button')}
       </button>
     </div>
 
@@ -318,10 +318,9 @@
       data-testid="reset-local-app-data-confirmation"
       on:cancel={handleLocalResetDialogCancel}
     >
-      <h4 id="reset-local-data-title">Reset local app data?</h4>
+      <h4 id="reset-local-data-title">{$_('settings.reset.title')}</h4>
       <p>
-        This clears local DB file binding and cached app data on this device for the signed-in
-        account.
+        {$_('settings.reset.description')}
       </p>
 
       {#if localDataResetState.error !== null}
@@ -332,7 +331,7 @@
 
       {#if localDataResetState.operation === 'resetting'}
         <p class="settings-screen__confirmation-status" aria-live="polite">
-          Resetting local app data...
+          {$_('settings.reset.status')}
         </p>
       {/if}
 
@@ -343,7 +342,7 @@
           on:click={handleCancelLocalResetClick}
           disabled={localDataResetState.operation === 'resetting'}
         >
-          Cancel
+          {$_('settings.reset.cancel')}
         </button>
         <button
           class="app-button app-button--danger"
@@ -352,7 +351,7 @@
           on:click={handleConfirmLocalResetClick}
           disabled={localDataResetState.operation === 'resetting'}
         >
-          Confirm reset
+          {$_('settings.reset.confirm')}
         </button>
       </div>
     </dialog>
@@ -360,11 +359,11 @@
     {#if bindingState.selectedBinding !== null}
       <dl class="settings-screen__binding-summary" data-testid="selected-db-file-summary">
         <div>
-          <dt>File name</dt>
+          <dt>{$_('settings.db.summary.fileName')}</dt>
           <dd>{bindingState.selectedBinding.name}</dd>
         </div>
         <div>
-          <dt>Folder path</dt>
+          <dt>{$_('settings.db.summary.folderPath')}</dt>
           <dd>{bindingState.selectedBinding.parentPath}</dd>
         </div>
       </dl>
@@ -377,24 +376,24 @@
         aria-busy={bindingState.operation === 'loading'}
       >
         <header class="settings-screen__browser-header">
-          <h4>Current folder</h4>
+          <h4>{$_('settings.browser.currentFolder')}</h4>
           <p>{bindingState.currentFolder?.path ?? '/'}</p>
         </header>
 
         {#if bindingState.operation === 'loading'}
           <p class="settings-screen__browser-loading" aria-live="polite">
-            Loading the current OneDrive folder...
+            {$_('settings.browser.loading')}
           </p>
           <div class="settings-screen__browser-skeletons" data-testid="db-file-browser-loading">
             <SkeletonCard />
             <SkeletonCard />
           </div>
         {:else if bindingState.error === null && bindingState.items.length === 0 && bindingState.hasLoaded}
-          <p class="settings-screen__browser-empty">No folders or .db files found here.</p>
+          <p class="settings-screen__browser-empty">{$_('settings.browser.empty')}</p>
         {:else}
           {#if folderItems(bindingState.items).length > 0}
             <div class="settings-screen__browser-group">
-              <h4>Folders</h4>
+              <h4>{$_('settings.browser.foldersHeading')}</h4>
               <ul class="settings-screen__browser-list">
                 {#each folderItems(bindingState.items) as item (item.itemId)}
                   <li>
@@ -406,7 +405,7 @@
                       disabled={bindingState.operation !== 'idle'}
                     >
                       <span>{item.name}</span>
-                      <span>Open folder</span>
+                      <span>{$_('settings.browser.openFolder')}</span>
                     </button>
                   </li>
                 {/each}
@@ -416,7 +415,7 @@
 
           {#if selectableFileItems(bindingState.items).length > 0}
             <div class="settings-screen__browser-group">
-              <h4>Database files</h4>
+              <h4>{$_('settings.browser.filesHeading')}</h4>
               <ul class="settings-screen__browser-list">
                 {#each selectableFileItems(bindingState.items) as item (item.itemId)}
                   <li>
@@ -428,7 +427,7 @@
                       disabled={bindingState.operation !== 'idle'}
                     >
                       <span>{item.name}</span>
-                      <span>Select file</span>
+                      <span>{$_('settings.browser.selectFile')}</span>
                     </button>
                   </li>
                 {/each}
@@ -448,7 +447,7 @@
         on:click={handleSignOutClick}
         disabled={authOperationIsPending || localDataResetState.operation !== 'idle'}
       >
-        Sign out
+        {$_('settings.generalActions.signOut')}
       </button>
     {:else}
       <button
@@ -457,7 +456,7 @@
         on:click={handleSignInClick}
         disabled={authOperationIsPending}
       >
-        Sign in with Microsoft
+        {$_('settings.generalActions.signIn')}
       </button>
     {/if}
   </div>

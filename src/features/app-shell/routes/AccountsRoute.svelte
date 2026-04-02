@@ -3,6 +3,7 @@
   import { onDestroy, onMount } from 'svelte';
   import { createAccountQueryService } from '@db';
   import { appSyncStateStore, type SyncState } from '@shared';
+  import { _ } from 'svelte-i18n';
 
   import SkeletonCard from '../components/SkeletonCard.svelte';
   import {
@@ -52,8 +53,7 @@
   data-testid="route-accounts"
   aria-busy={state.operation === 'loading'}
 >
-  <h2>Accounts</h2>
-  <p class="accounts-route__lede">Visible non-primary balances from the local SQLite database.</p>
+  <h2>{$_('accounts.title')}</h2>
 
   <p
     class="accounts-route__status"
@@ -63,13 +63,9 @@
     role={state.operation === 'error' ? 'alert' : undefined}
   >
     {#if state.operation === 'loading'}
-      Loading accounts from the local database...
+      {$_('accounts.loading')}
     {:else if state.operation === 'error'}
-      {state.error?.message ?? 'Failed to load accounts.'}
-    {:else if state.operation === 'empty'}
-      No visible non-primary accounts found or no DB file is ready.
-    {:else}
-      {state.accounts.length} accounts loaded.
+      {state.error?.message ?? $_('accounts.errorDefault')}
     {/if}
   </p>
 
@@ -81,8 +77,7 @@
   {:else if state.operation === 'empty'}
     <div class="accounts-route__empty" data-testid="accounts-route-empty">
       <p>
-        No accounts match the visible non-primary filter yet. If you have not selected a DB file,
-        open Settings and bind your OneDrive database.
+        {$_('accounts.emptyState')}
       </p>
     </div>
   {:else if state.operation === 'ready'}
@@ -107,8 +102,6 @@
                 {account.amountDisplay}
               </span>
             </div>
-
-            <p class="account-card__meta">Account ID {account.accountId}</p>
           </article>
         </li>
       {/each}
@@ -118,26 +111,13 @@
 
 <style>
   .accounts-route {
-    --accounts-amount-positive: #0f6b43;
-    --accounts-amount-negative: #b42318;
-    --accounts-amount-neutral: var(--text-secondary);
     display: flex;
     flex-direction: column;
     gap: 0.8rem;
   }
 
-  @media (prefers-color-scheme: dark) {
-    .accounts-route {
-      --accounts-amount-positive: #34d399;
-      --accounts-amount-negative: #fca5a5;
-      --accounts-amount-neutral: #d1d5db;
-    }
-  }
-
-  .accounts-route__lede,
   .accounts-route__status,
-  .accounts-route__empty p,
-  .account-card__meta {
+  .accounts-route__empty p {
     margin: 0;
     color: var(--text-secondary);
   }
@@ -171,7 +151,7 @@
     padding: 0;
     margin: 0;
     display: grid;
-    gap: 0.75rem;
+    gap: 0.5rem;
   }
 
   .accounts-route__card-item {
@@ -180,8 +160,8 @@
 
   .account-card {
     display: grid;
-    gap: 0.55rem;
-    padding: 1rem;
+    gap: 0.25rem;
+    padding: 0.75rem;
     border-radius: var(--radius-lg);
     background: var(--surface-strong);
     box-shadow: var(--shadow-sm);
@@ -223,14 +203,14 @@
   }
 
   .account-card--positive .account-card__amount {
-    color: var(--accounts-amount-positive);
+    color: var(--amount-positive);
   }
 
   .account-card--negative .account-card__amount {
-    color: var(--accounts-amount-negative);
+    color: var(--amount-negative);
   }
 
   .account-card--neutral .account-card__amount {
-    color: var(--accounts-amount-neutral);
+    color: var(--text-secondary);
   }
 </style>
