@@ -39,7 +39,7 @@
     error: null,
   };
   let authOperationIsPending = false;
-  $: authStatusMessage = $_('settings.status.signedOut');
+  let authStatusMessage = $_('settings.status.signedOut');
   let bindingState: SettingsFileBindingState = {
     selectedBinding: null,
     currentFolder: null,
@@ -50,7 +50,7 @@
     hasLoaded: false,
     canGoBack: false,
   };
-  $: bindingStatusMessage = $_('settings.db.status.signInRequired');
+  let bindingStatusMessage = $_('settings.db.status.signInRequired');
   let localDataResetState: SettingsLocalDataResetState = {
     operation: 'idle',
     error: null,
