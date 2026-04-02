@@ -1,4 +1,8 @@
+<script lang="ts">
+  import { _ } from 'svelte-i18n';
+</script>
+
 <section class="placeholder-state" data-testid="loading-placeholder" aria-live="polite">
-  <h2>Loading Placeholder</h2>
-  <p>Preparing your mobile workspace.</p>
+  <h2>{$_('loadingPlaceholder.title')}</h2>
+  <p>{$_('loadingPlaceholder.description')}</p>
 </section>

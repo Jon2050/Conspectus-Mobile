@@ -27,9 +27,9 @@ describe('AccountsRoute', () => {
     });
 
     expect(body).toContain('data-testid="route-accounts"');
-    expect(body).toContain('<h2>Accounts</h2>');
+    expect(body).toContain('<h2>Konten</h2>');
     expect(body).toContain('data-testid="accounts-route-status"');
-    expect(body).toContain('Loading accounts from the local database...');
+    expect(body).toContain('Konten werden geladen...');
     expect(body).toContain('data-testid="accounts-route-loading"');
   });
 
@@ -44,9 +44,8 @@ describe('AccountsRoute', () => {
       },
     });
 
-    expect(body).toContain('No visible non-primary accounts found or no DB file is ready.');
     expect(body).toContain('data-testid="accounts-route-empty"');
-    expect(body).toContain('open Settings and bind your OneDrive database');
+    expect(body).toContain('Es wurden noch keine passenden Konten gefunden');
   });
 
   it('renders an error state with alert semantics', () => {

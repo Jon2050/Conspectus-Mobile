@@ -1,0 +1,128 @@
+{
+  "nav": {
+    "accounts": "Accounts",
+    "transfers": "Transfers",
+    "add": "Add",
+    "settings": "Settings"
+  },
+  "appShell": {
+    "signInAgain": "Sign in again",
+    "downloadedKb": "{kb} KB downloaded...",
+    "downloadProgress": "{loaded} KB / {total} KB",
+    "title": "Conspectus Mobile"
+  },
+  "accounts": {
+    "title": "Accounts",
+    "loading": "Loading accounts from the local database...",
+    "errorDefault": "Failed to load accounts.",
+    "emptyState": "No accounts match the visible non-primary filter yet. If you have not selected a DB file, open Settings and bind your OneDrive database."
+  },
+  "transfers": {
+    "title": "Transfers",
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month",
+    "loading": "Loading transfers...",
+    "errorDefault": "Failed to load transfers.",
+    "emptyStatus": "No transfers found for this month.",
+    "countFound": "{count} transfers found.",
+    "emptyBox": "There are no transfers recorded for this month."
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Authentication controls for OneDrive account access.",
+    "status": {
+      "signedOut": "Signed out.",
+      "signedIn": "Signed in.",
+      "checking": "Checking authentication status...",
+      "openingSignIn": "Opening Microsoft sign-in...",
+      "signingOut": "Signing out...",
+      "errorPrefix": "Authentication error."
+    },
+    "account": {
+      "heading": "OneDrive account",
+      "name": "Name",
+      "username": "Username",
+      "unknown": "Unknown"
+    },
+    "db": {
+      "heading": "DB file",
+      "status": {
+        "signInRequired": "Sign in to browse and choose a .db file.",
+        "loading": "Loading OneDrive files...",
+        "errorPrefix": "File selection error.",
+        "selected": "DB file selected.",
+        "choose": "Choose a .db file from the current OneDrive folder.",
+        "notSelected": "No DB file selected yet."
+      },
+      "summary": {
+        "fileName": "File name",
+        "folderPath": "Folder path"
+      },
+      "actions": {
+        "select": "Select DB File",
+        "change": "Change DB file",
+        "back": "Back to parent folder",
+        "cancel": "Cancel"
+      }
+    },
+    "browser": {
+      "currentFolder": "Current folder",
+      "loading": "Loading the current OneDrive folder...",
+      "empty": "No folders or .db files found here.",
+      "foldersHeading": "Folders",
+      "filesHeading": "Database files",
+      "openFolder": "Open folder",
+      "selectFile": "Select file"
+    },
+    "reset": {
+      "button": "Reset local app data",
+      "title": "Reset local app data?",
+      "description": "This clears local DB file binding and cached app data on this device for the signed-in account.",
+      "status": "Resetting local app data...",
+      "cancel": "Cancel",
+      "confirm": "Confirm reset"
+    },
+    "generalActions": {
+      "signOut": "Sign out",
+      "signIn": "Sign in with Microsoft"
+    }
+  },
+  "deploymentInfo": {
+    "title": "Deployment Info",
+    "version": "Version",
+    "commit": "Commit",
+    "build": "Build"
+  },
+  "loadingPlaceholder": {
+    "title": "Loading...",
+    "description": "Preparing your mobile workspace."
+  },
+  "toast": {
+    "dismiss": "Dismiss"
+  },
+  "sync": {
+    "startup": {
+      "checking": "Checking OneDrive for DB updates...",
+      "toastSyncing": "Syncing with OneDrive in the background...",
+      "onlineUnchanged": "Cached DB is current with OneDrive.",
+      "onlineChanged": "Downloaded the latest DB from OneDrive.",
+      "offlineCached": "Offline mode using the last cached DB.",
+      "cachedFallback": "Using the last cached DB because refreshing from OneDrive failed.",
+      "cachedFallbackPrefix": "{message} Using the last cached DB for now.",
+      "completed": "DB sync completed.",
+      "stale": "Cached DB is stale.",
+      "offlineActive": "Offline mode is active.",
+      "failed": "Startup sync failed.",
+      "failedUnexpected": "Startup sync failed unexpectedly. Check the browser console and retry."
+    },
+    "dbRuntimeError": {
+      "initFailed": "Failed to initialize the local SQLite runtime. Reload the app and try syncing again.",
+      "openFailed": "Failed to open the cached OneDrive database snapshot. Re-sync from settings and try again.",
+      "pragmaFailed": "The downloaded OneDrive database could not be prepared for safe reads. Re-sync and try again.",
+      "notOpen": "No open local database is available yet. Run startup sync again to load the snapshot.",
+      "queryFailed": "The local SQLite database query failed unexpectedly.",
+      "exportFailed": "Failed to export local SQLite bytes.",
+      "fallback": "Failed to open the local SQLite database snapshot. Retry sync from settings."
+    }
+  }
+}

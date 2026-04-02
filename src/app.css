@@ -22,6 +22,8 @@
   --error: #ef4444;
   --positive: #10b981;
   --negative: #ef4444;
+  --amount-positive: #0f6b43;
+  --amount-negative: #b42318;
 
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
@@ -43,6 +45,10 @@
     --border: #4b5563;
     --accent: #14b8a6;
     --accent-soft: #134e4a;
+    --amount-positive: #34d399;
+    --amount-negative: #fca5a5;
+    --amount-positive: #79ff21;
+    --amount-negative: #e54b4b;
     --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
     --shadow-lg: 0 10px 25px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
@@ -203,8 +209,8 @@ body {
 }
 
 .app-nav__icon {
-  width: 1.15rem;
-  height: 1.15rem;
+  width: 1.5rem;
+  height: 1.5rem;
   flex: none;
   object-fit: contain;
 }

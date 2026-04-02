@@ -28,9 +28,9 @@ describe('route placeholder components', () => {
     const { body } = render(SettingsRoute);
 
     expect(body).toContain('data-testid="route-settings"');
-    expect(body).toContain('<h2>Settings</h2>');
-    expect(body).toContain('Sign in with Microsoft');
+    expect(body).toContain('<h2>Einstellungen</h2>');
+    expect(body).toContain('Mit Microsoft anmelden');
     expect(body).toContain('data-testid="auth-status-message"');
-    expect(body).toContain('Signed out.');
+    expect(body).toContain('Abgemeldet.');
   });
 });

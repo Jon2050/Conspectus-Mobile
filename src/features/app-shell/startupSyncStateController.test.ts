@@ -26,12 +26,12 @@ describe('startupSyncStateController', () => {
 
     expect(get(store)).toEqual({
       state: 'syncing',
-      message: 'Checking OneDrive for DB updates...',
+      message: 'Suche nach DB-Updates auf OneDrive...',
       branch: null,
       progress: null,
     });
     expect(toastStore.show).toHaveBeenCalledWith(
-      'Syncing with OneDrive in the background...',
+      'Synchronisiere mit OneDrive im Hintergrund...',
       'info',
       2800,
     );
@@ -67,12 +67,12 @@ describe('startupSyncStateController', () => {
 
     expect(get(store)).toEqual({
       state: 'synced',
-      message: 'Downloaded the latest DB from OneDrive.',
+      message: 'Neueste DB von OneDrive heruntergeladen.',
       branch: 'online_changed',
       progress: null,
     });
     expect(toastStore.show).toHaveBeenCalledWith(
-      'Downloaded the latest DB from OneDrive.',
+      'Neueste DB von OneDrive heruntergeladen.',
       'success',
       3200,
     );
@@ -81,7 +81,7 @@ describe('startupSyncStateController', () => {
   it('applies stale cached fallback decisions and surfaces a warning toast', () => {
     const store = createSyncStateStore({
       state: 'syncing',
-      message: 'Checking OneDrive for DB updates...',
+      message: 'Suche nach DB-Updates auf OneDrive...',
     });
     const toastStore = createToastStore();
     const decision: StartupFreshnessDecision = {
@@ -117,12 +117,12 @@ describe('startupSyncStateController', () => {
     expect(get(store)).toEqual({
       state: 'stale',
       message:
-        'Unable to refresh the selected OneDrive database metadata after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again. Using the last cached DB for now.',
+        'Unable to refresh the selected OneDrive database metadata after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again. Nutze vorerst die zwischengespeicherte DB.',
       branch: 'online_metadata_failed_cached',
       progress: null,
     });
     expect(toastStore.show).toHaveBeenCalledWith(
-      'Unable to refresh the selected OneDrive database metadata after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again. Using the last cached DB for now.',
+      'Unable to refresh the selected OneDrive database metadata after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again. Nutze vorerst die zwischengespeicherte DB.',
       'warning',
       4200,
     );
@@ -131,7 +131,7 @@ describe('startupSyncStateController', () => {
   it('applies auth-expired fallback decisions with the cached-db warning message', () => {
     const store = createSyncStateStore({
       state: 'syncing',
-      message: 'Checking OneDrive for DB updates...',
+      message: 'Suche nach DB-Updates auf OneDrive...',
     });
     const toastStore = createToastStore();
     const decision: StartupFreshnessDecision = {
@@ -166,12 +166,12 @@ describe('startupSyncStateController', () => {
     expect(get(store)).toEqual({
       state: 'stale',
       message:
-        'Your session has expired. Please sign in again to sync with OneDrive. Using the last cached DB for now.',
+        'Your session has expired. Please sign in again to sync with OneDrive. Nutze vorerst die zwischengespeicherte DB.',
       branch: 'online_auth_expired_cached',
       progress: null,
     });
     expect(toastStore.show).toHaveBeenCalledWith(
-      'Your session has expired. Please sign in again to sync with OneDrive. Using the last cached DB for now.',
+      'Your session has expired. Please sign in again to sync with OneDrive. Nutze vorerst die zwischengespeicherte DB.',
       'warning',
       4200,
     );
@@ -180,7 +180,7 @@ describe('startupSyncStateController', () => {
   it('applies auth-expired terminal decisions as actionable errors', () => {
     const store = createSyncStateStore({
       state: 'syncing',
-      message: 'Checking OneDrive for DB updates...',
+      message: 'Suche nach DB-Updates auf OneDrive...',
     });
     const toastStore = createToastStore();
     const decision: StartupFreshnessDecision = {
@@ -216,7 +216,7 @@ describe('startupSyncStateController', () => {
   it('resets to idle when the startup decision is skipped', () => {
     const store = createSyncStateStore({
       state: 'offline',
-      message: 'Offline mode using the last cached DB.',
+      message: 'Offline-Modus nutzt die zuletzt zwischengespeicherte DB.',
       branch: 'offline_cached',
     });
     const toastStore = createToastStore();
@@ -242,24 +242,24 @@ describe('startupSyncStateController', () => {
   it('applies unexpected startup errors and surfaces an error toast', () => {
     const store = createSyncStateStore({
       state: 'syncing',
-      message: 'Checking OneDrive for DB updates...',
+      message: 'Suche nach DB-Updates auf OneDrive...',
     });
     const toastStore = createToastStore();
 
     applyUnexpectedStartupSyncError(
       store,
-      'Startup sync failed unexpectedly. Check the browser console and retry.',
+      'Start-Synchronisation unerwartet fehlgeschlagen. Bitte prüfe die Browser-Konsole und versuche es erneut.',
       toastStore,
     );
 
     expect(get(store)).toEqual({
       state: 'error',
-      message: 'Startup sync failed unexpectedly. Check the browser console and retry.',
+      message: 'Start-Synchronisation unerwartet fehlgeschlagen. Bitte prüfe die Browser-Konsole und versuche es erneut.',
       branch: null,
       progress: null,
     });
     expect(toastStore.show).toHaveBeenCalledWith(
-      'Startup sync failed unexpectedly. Check the browser console and retry.',
+      'Start-Synchronisation unerwartet fehlgeschlagen. Bitte prüfe die Browser-Konsole und versuche es erneut.',
       'error',
       5000,
     );
@@ -268,7 +268,7 @@ describe('startupSyncStateController', () => {
   it('maps deterministic db runtime open errors into startup sync error state', () => {
     const store = createSyncStateStore({
       state: 'syncing',
-      message: 'Checking OneDrive for DB updates...',
+      message: 'Suche nach DB-Updates auf OneDrive...',
     });
     const toastStore = createToastStore();
 
@@ -277,12 +277,12 @@ describe('startupSyncStateController', () => {
     expect(get(store)).toEqual({
       state: 'error',
       message:
-        'Failed to open the cached OneDrive database snapshot. Re-sync from settings and try again.',
+        'Konnte zwischengespeicherte DB nicht öffnen. Synchronisiere erneut über die Einstellungen.',
       branch: 'db_runtime_open_failed',
       progress: null,
     });
     expect(toastStore.show).toHaveBeenCalledWith(
-      'Failed to open the cached OneDrive database snapshot. Re-sync from settings and try again.',
+      'Konnte zwischengespeicherte DB nicht öffnen. Synchronisiere erneut über die Einstellungen.',
       'error',
       5000,
     );
@@ -291,7 +291,7 @@ describe('startupSyncStateController', () => {
   it('falls back to a deterministic generic message for unknown db runtime failures', () => {
     const store = createSyncStateStore({
       state: 'syncing',
-      message: 'Checking OneDrive for DB updates...',
+      message: 'Suche nach DB-Updates auf OneDrive...',
     });
     const toastStore = createToastStore();
 
@@ -299,12 +299,12 @@ describe('startupSyncStateController', () => {
 
     expect(get(store)).toEqual({
       state: 'error',
-      message: 'Failed to open the local SQLite database snapshot. Retry sync from settings.',
+      message: 'Konnte das lokale SQLite-Snapshot nicht öffnen. Wiederhole die Synchronisation in den Einstellungen.',
       branch: 'db_runtime_open_failed',
       progress: null,
     });
     expect(toastStore.show).toHaveBeenCalledWith(
-      'Failed to open the local SQLite database snapshot. Retry sync from settings.',
+      'Konnte das lokale SQLite-Snapshot nicht öffnen. Wiederhole die Synchronisation in den Einstellungen.',
       'error',
       5000,
     );

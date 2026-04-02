@@ -54,6 +54,7 @@
   "dependencies": {
     "@azure/msal-browser": "^5.4.0",
     "dexie": "^4.3.0",
-    "sql.js": "^1.14.1"
+    "sql.js": "^1.14.1",
+    "svelte-i18n": "^4.0.1"
   }
 }

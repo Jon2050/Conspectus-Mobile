@@ -2,6 +2,7 @@
 <script lang="ts">
   import { afterUpdate, onDestroy, onMount, tick } from 'svelte';
   import { get, type Readable } from 'svelte/store';
+  import { _ } from 'svelte-i18n';
   import type { DriveItemBinding } from '@graph';
   import {
     appSelectedDriveItemBindingStore,
@@ -303,8 +304,7 @@
 
 <div class="app-shell" data-testid="app-shell">
   <header class="app-header">
-    <h1>Conspectus Mobile</h1>
-    <p>Mobile-first application shell placeholder</p>
+    <h1>{$_('appShell.title')}</h1>
   </header>
 
   {#if $syncStateStore.message !== null}
@@ -319,14 +319,14 @@
         <p role="alert">{$syncStateStore.message}</p>
         {#if $syncStateStore.branch === 'online_auth_expired'}
           <div class="startup-sync-actions">
-            <a href="#settings" class="app-button app-button--secondary">Sign in again</a>
+            <a href="#settings" class="app-button app-button--secondary">{$_('appShell.signInAgain')}</a>
           </div>
         {/if}
       {:else}
         <p>{$syncStateStore.message}</p>
         {#if $syncStateStore.branch === 'online_auth_expired_cached'}
           <div class="startup-sync-actions">
-            <a href="#settings" class="app-button app-button--secondary">Sign in again</a>
+            <a href="#settings" class="app-button app-button--secondary">{$_('appShell.signInAgain')}</a>
           </div>
         {/if}
         {#if $syncStateStore.progress !== null && $syncStateStore.state === 'syncing'}
@@ -339,11 +339,9 @@
             ></progress>
             <span class="startup-sync-progress-text">
               {#if $syncStateStore.progress.total !== null}
-                {Math.round($syncStateStore.progress.loaded / 1024)} KB / {Math.round(
-                  $syncStateStore.progress.total / 1024,
-                )} KB
+                {$_('appShell.downloadProgress', { values: { loaded: Math.round($syncStateStore.progress.loaded / 1024), total: Math.round($syncStateStore.progress.total / 1024) } })}
               {:else}
-                {Math.round($syncStateStore.progress.loaded / 1024)} KB downloaded...
+                {$_('appShell.downloadedKb', { values: { kb: Math.round($syncStateStore.progress.loaded / 1024) } })}
               {/if}
             </span>
           </div>
@@ -391,11 +389,11 @@
             src={resolveNavIconUrl(route.icon)}
             alt=""
             aria-hidden="true"
-            width="22"
-            height="22"
+            width="28"
+            height="28"
             data-testid={`app-nav-icon-${route.key}`}
           />
-          <span class="app-nav__label">{route.label}</span>
+          <span class="app-nav__label">{$_('nav.' + route.key)}</span>
         </a>
       {/each}
     </nav>
