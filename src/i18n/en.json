@@ -9,6 +9,8 @@
     "signInAgain": "Sign in again",
     "downloadedKb": "{kb} KB downloaded...",
     "downloadProgress": "{loaded} KB / {total} KB",
+    "uploadedKb": "{kb} KB uploaded...",
+    "uploadProgress": "{loaded} KB / {total} KB uploaded",
     "title": "Conspectus Mobile"
   },
   "accounts": {
@@ -114,6 +116,9 @@
       "offlineActive": "Offline mode is active.",
       "failed": "Startup sync failed.",
       "failedUnexpected": "Startup sync failed unexpectedly. Check the browser console and retry."
+    },
+    "upload": {
+      "uploading": "Uploading database to OneDrive..."
     },
     "dbRuntimeError": {
       "initFailed": "Failed to initialize the local SQLite runtime. Reload the app and try syncing again.",

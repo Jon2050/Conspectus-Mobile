@@ -146,6 +146,14 @@ export default tseslint.config(
     },
   },
   {
-    ignores: ['dist', 'coverage', 'node_modules', 'playwright-report', 'test-results'],
+    ignores: [
+      'dist',
+      'coverage',
+      'node_modules',
+      'playwright-report',
+      'test-results',
+      'read-pw.js',
+      'replace.js',
+    ],
   },
 );

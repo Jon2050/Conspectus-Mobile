@@ -11,6 +11,7 @@
   } from '@shared';
   import LoadingPlaceholder from './components/LoadingPlaceholder.svelte';
   import DeploymentInfoFooter from './components/DeploymentInfoFooter.svelte';
+  import ProgressIndicator from './components/ProgressIndicator.svelte';
   import AccountsRoute from './routes/AccountsRoute.svelte';
   import TransfersRoute from './routes/TransfersRoute.svelte';
   import AddRoute from './routes/AddRoute.svelte';
@@ -334,28 +335,11 @@
           </div>
         {/if}
         {#if $syncStateStore.progress !== null && $syncStateStore.state === 'syncing'}
-          <div class="startup-sync-progress">
-            <progress
-              max={$syncStateStore.progress.total ?? undefined}
-              value={$syncStateStore.progress.total !== null
-                ? $syncStateStore.progress.loaded
-                : undefined}
-            ></progress>
-            <span class="startup-sync-progress-text">
-              {#if $syncStateStore.progress.total !== null}
-                {$_('appShell.downloadProgress', {
-                  values: {
-                    loaded: Math.round($syncStateStore.progress.loaded / 1024),
-                    total: Math.round($syncStateStore.progress.total / 1024),
-                  },
-                })}
-              {:else}
-                {$_('appShell.downloadedKb', {
-                  values: { kb: Math.round($syncStateStore.progress.loaded / 1024) },
-                })}
-              {/if}
-            </span>
-          </div>
+          <ProgressIndicator
+            loaded={$syncStateStore.progress.loaded}
+            total={$syncStateStore.progress.total}
+            kind={$syncStateStore.progress.kind}
+          />
         {/if}
       {/if}
     </section>
@@ -464,41 +448,5 @@
     font-size: 0.85rem;
     padding: 0.4rem 0.8rem;
     min-height: auto;
-  }
-
-  .startup-sync-progress {
-    margin-top: 0.5rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-  }
-
-  .startup-sync-progress progress {
-    width: 100%;
-    height: 6px;
-    border: none;
-    border-radius: var(--radius-sm);
-    background-color: rgba(0, 0, 0, 0.1);
-  }
-
-  .startup-sync-progress progress::-webkit-progress-bar {
-    background-color: rgba(0, 0, 0, 0.1);
-    border-radius: var(--radius-sm);
-  }
-
-  .startup-sync-progress progress::-webkit-progress-value {
-    background-color: currentColor;
-    border-radius: var(--radius-sm);
-  }
-
-  .startup-sync-progress progress::-moz-progress-bar {
-    background-color: currentColor;
-    border-radius: var(--radius-sm);
-  }
-
-  .startup-sync-progress-text {
-    font-size: 0.75rem;
-    opacity: 0.8;
-    align-self: flex-end;
   }
 </style>

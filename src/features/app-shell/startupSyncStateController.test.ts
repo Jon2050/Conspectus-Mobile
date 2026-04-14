@@ -9,6 +9,7 @@ import {
   applyStartupFreshnessDecision,
   applyUnexpectedStartupSyncError,
   beginStartupSync,
+  updateStartupSyncProgress,
 } from './startupSyncStateController';
 
 import type { StartupFreshnessDecision } from './startupFreshnessService';
@@ -35,6 +36,18 @@ describe('startupSyncStateController', () => {
       'info',
       2800,
     );
+  });
+
+  it('updates progress in the store when startup sync progress changes', () => {
+    const store = createSyncStateStore();
+    const toastStore = createToastStore();
+
+    beginStartupSync(store, toastStore);
+    updateStartupSyncProgress(store, 1024, 2048);
+    expect(get(store).progress).toEqual({ loaded: 1024, total: 2048, kind: 'download' });
+
+    updateStartupSyncProgress(store, 2048, 2048);
+    expect(get(store).progress).toEqual({ loaded: 2048, total: 2048, kind: 'download' });
   });
 
   it('applies a successful online change decision and surfaces a success toast', () => {

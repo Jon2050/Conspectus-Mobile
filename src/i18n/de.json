@@ -9,6 +9,8 @@
     "signInAgain": "Erneut anmelden",
     "downloadedKb": "{kb} KB heruntergeladen...",
     "downloadProgress": "{loaded} KB / {total} KB",
+    "uploadedKb": "{kb} KB hochgeladen...",
+    "uploadProgress": "{loaded} KB / {total} KB hochgeladen",
     "title": "Conspectus Mobile"
   },
   "accounts": {
@@ -114,6 +116,9 @@
       "offlineActive": "Offline-Modus ist aktiv.",
       "failed": "Start-Synchronisation fehlgeschlagen.",
       "failedUnexpected": "Start-Synchronisation unerwartet fehlgeschlagen. Bitte prüfe die Browser-Konsole und versuche es erneut."
+    },
+    "upload": {
+      "uploading": "Datenbank wird auf OneDrive hochgeladen..."
     },
     "dbRuntimeError": {
       "initFailed": "Konnte lokale SQLite-Laufzeitumgebung nicht initialisieren. Lade die App neu.",

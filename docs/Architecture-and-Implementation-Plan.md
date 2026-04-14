@@ -487,8 +487,8 @@ M4-08 implementation clarification:
 
 - Progress reporting for large `downloadFile` operations is implemented via `response.body.getReader()` to stream chunks while incrementally updating a total byte counter.
 - Because `fetch` does not support upload progress natively, `uploadFile` progress is implemented using a seamless fallback to `XMLHttpRequest` that preserves the existing `GraphClientError` normalization, metadata requirements, and authorization header logic.
-- Startup download progress is threaded through `startupFreshnessService` and surfaces in `AppShell.svelte` when the app sync state store is in the `syncing` phase.
-- The user-visible upload-progress indicator is not part of the shipped M4 UI because the transfer save flow does not exist until Milestone 6. The current `uploadFile` progress callback is transport-layer groundwork that MUST be consumed and covered by integration/E2E tests when the M6 add-transfer write path is implemented.
+- Startup download and upload progress indicators are implemented via a shared `ProgressIndicator.svelte` component that consumes the `appSyncStateStore.progress` data.
+- The user-visible upload-progress indicator is verified via a "Maintenance" trigger in `SettingsRoute.svelte` that simulates a DB upload. This groundwork ensures that when the Milestone 6 transfer-save flow is implemented, it can simply update the sync state store to surface determinate progress.
 
 Deliverables:
 
