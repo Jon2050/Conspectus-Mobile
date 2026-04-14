@@ -5,11 +5,7 @@
   import type { AuthClient } from '@auth';
   import type { CacheStore } from '@cache';
   import type { GraphClient, GraphDriveItem } from '@graph';
-  import {
-    appSelectedDriveItemBindingStore,
-    appSyncStateStore,
-    appToastStore,
-  } from '@shared';
+  import { appSelectedDriveItemBindingStore, appSyncStateStore, appToastStore } from '@shared';
   import { _ } from 'svelte-i18n';
   import { resolveAppDbRuntime } from '../dbRuntimeResolver';
   import { resolveAppGraphClient } from '../graphClientResolver';
