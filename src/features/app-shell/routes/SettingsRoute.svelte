@@ -5,8 +5,14 @@
   import type { AuthClient } from '@auth';
   import type { CacheStore } from '@cache';
   import type { GraphClient, GraphDriveItem } from '@graph';
-  import { appSelectedDriveItemBindingStore } from '@shared';
+  import {
+    appSelectedDriveItemBindingStore,
+    appSyncStateStore,
+    appToastStore,
+  } from '@shared';
   import { _ } from 'svelte-i18n';
+  import { resolveAppDbRuntime } from '../dbRuntimeResolver';
+  import { resolveAppGraphClient } from '../graphClientResolver';
 
   import {
     createSettingsAuthController,
@@ -200,6 +206,40 @@
     fileBindingController.selectFile(item);
   };
 
+  const handleUploadTestClick = async (): Promise<void> => {
+    const binding = get(appSelectedDriveItemBindingStore);
+    if (binding === null) return;
+
+    const dbRuntime = resolveAppDbRuntime();
+    if (!dbRuntime.isOpen()) {
+      appToastStore.show('Database is not open.', 'error');
+      return;
+    }
+
+    try {
+      const bytes = dbRuntime.exportBytes();
+      const graphClient = resolveAppGraphClient();
+
+      appSyncStateStore.setSyncing($_('sync.upload.uploading'));
+
+      await graphClient.uploadFile(
+        binding,
+        bytes,
+        '*', // In a real flow, use the eTag
+        (loaded, total) => {
+          appSyncStateStore.updateProgress(loaded, total, 'upload');
+        },
+      );
+
+      appSyncStateStore.setSynced('Mock upload complete.');
+      appToastStore.show('Mock upload complete.', 'success');
+    } catch (error) {
+      console.error('Upload test failed', error);
+      appSyncStateStore.setError('Mock upload failed.');
+      appToastStore.show('Mock upload failed.', 'error');
+    }
+  };
+
   $: if (localDataResetDialogElement !== null) {
     if (localDataResetState.operation === 'idle') {
       if (localDataResetDialogElement.open) {
@@ -312,6 +352,21 @@
           localDataResetState.operation !== 'idle'}
       >
         {$_('settings.reset.button')}
+      </button>
+    </div>
+
+    <h3 class="settings-screen__subheading">Maintenance (Debug)</h3>
+    <div class="settings-screen__actions">
+      <button
+        class="app-button app-button--secondary"
+        type="button"
+        data-testid="test-db-upload-button"
+        on:click={handleUploadTestClick}
+        disabled={authOperationIsPending ||
+          bindingState.operation !== 'idle' ||
+          localDataResetState.operation !== 'idle'}
+      >
+        Test DB Upload (M4-08)
       </button>
     </div>
 

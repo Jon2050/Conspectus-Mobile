@@ -6,6 +6,7 @@ export type SyncState = 'idle' | 'syncing' | 'synced' | 'stale' | 'offline' | 'e
 export interface SyncProgress {
   readonly loaded: number;
   readonly total: number | null;
+  readonly kind: 'download' | 'upload';
 }
 
 export interface SyncStateSnapshot {
@@ -26,7 +27,7 @@ export interface SyncStateStore extends Readable<SyncStateSnapshot> {
   setStale: (message: string, options?: SyncStateTransitionOptions) => void;
   setOffline: (message: string, options?: SyncStateTransitionOptions) => void;
   setError: (message: string, options?: SyncStateTransitionOptions) => void;
-  updateProgress: (loaded: number, total: number | null) => void;
+  updateProgress: (loaded: number, total: number | null, kind?: 'download' | 'upload') => void;
 }
 
 const DEFAULT_SYNC_STATE_SNAPSHOT: SyncStateSnapshot = {
@@ -103,14 +104,18 @@ export const createSyncStateStore = (
     setStale: (message, options) => transitionTo('stale', message, options),
     setOffline: (message, options) => transitionTo('offline', message, options),
     setError: (message, options) => transitionTo('error', message, options),
-    updateProgress: (loaded: number, total: number | null) => {
+    updateProgress: (
+      loaded: number,
+      total: number | null,
+      kind: 'download' | 'upload' = 'download',
+    ) => {
       update((currentSnapshot) => {
         if (currentSnapshot.state !== 'syncing') {
           return currentSnapshot;
         }
         return {
           ...currentSnapshot,
-          progress: { loaded, total },
+          progress: { loaded, total, kind },
         };
       });
     },

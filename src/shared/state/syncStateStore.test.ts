@@ -124,4 +124,22 @@ describe('createSyncStateStore', () => {
       },
     ]);
   });
+
+  it('only updates progress when in syncing state', () => {
+    const store = createSyncStateStore();
+
+    store.updateProgress(10, 100);
+    expect(get(store).progress).toBeNull();
+
+    store.setSyncing('Syncing...');
+    store.updateProgress(10, 100);
+    expect(get(store).progress).toEqual({ loaded: 10, total: 100, kind: 'download' });
+
+    store.updateProgress(20, 100, 'upload');
+    expect(get(store).progress).toEqual({ loaded: 20, total: 100, kind: 'upload' });
+
+    store.setSynced('Done');
+    store.updateProgress(20, 100);
+    expect(get(store).progress).toBeNull();
+  });
 });

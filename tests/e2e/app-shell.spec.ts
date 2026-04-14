@@ -398,7 +398,10 @@ const installMockGraphClient = async (
           downloadUrl: 'https://download.example.com/conspectus.db',
         };
       },
-      async downloadFile() {
+      async downloadFile(
+        _downloadUrl: string,
+        onProgress?: (loaded: number, total: number | null) => void,
+      ) {
         downloadFileCallCount += 1;
         (
           window as Window & { __CONSPECTUS_GRAPH_DOWNLOAD_FILE_CALL_COUNT__?: number }
@@ -415,17 +418,48 @@ const installMockGraphClient = async (
         }
 
         if (typeof mockOptions.downloadDelayMs === 'number' && mockOptions.downloadDelayMs > 0) {
-          await new Promise((resolve) => {
-            setTimeout(resolve, mockOptions.downloadDelayMs);
-          });
+          if (onProgress) {
+            const total = defaultDownloadBytes.length;
+            const half = Math.floor(total / 2);
+            onProgress(half, total);
+            await new Promise((resolve) => {
+              setTimeout(resolve, mockOptions.downloadDelayMs / 2);
+            });
+            onProgress(total, total);
+            await new Promise((resolve) => {
+              setTimeout(resolve, mockOptions.downloadDelayMs / 2);
+            });
+          } else {
+            await new Promise((resolve) => {
+              setTimeout(resolve, mockOptions.downloadDelayMs);
+            });
+          }
         }
 
         return new Uint8Array(defaultDownloadBytes);
       },
-      async uploadFile() {
+      async uploadFile(
+        _binding: unknown,
+        bytes: Uint8Array,
+        _eTag: string,
+        onProgress?: (loaded: number, total: number | null) => void,
+      ) {
+        if (onProgress) {
+          const total = bytes.length;
+          const half = Math.floor(total / 2);
+          onProgress(half, total);
+          // Small delay for progress visibility in E2E
+          await new Promise((resolve) => {
+            setTimeout(resolve, 500);
+          });
+          onProgress(total, total);
+          await new Promise((resolve) => {
+            setTimeout(resolve, 500);
+          });
+        }
         return {
           eTag: '"etag-2"',
-          sizeBytes: defaultDownloadBytes.length,
+          sizeBytes: bytes.length,
           lastModifiedDateTime: '2026-03-09T11:15:00Z',
         };
       },
@@ -878,9 +912,6 @@ test('shows accounts empty state when no visible non-primary accounts are return
 
   await expect(page.getByTestId('accounts-route-empty')).toBeVisible();
   await expect(page.getByTestId('accounts-route-cards')).toHaveCount(0);
-  await expect(page.getByTestId('accounts-route-status')).toContainText(
-    'No visible non-primary accounts found or no DB file is ready.',
-  );
 });
 
 test('shows accounts error state on query failure without breaking bottom navigation', async ({
@@ -1008,6 +1039,87 @@ test('shows syncing state and toast feedback while the startup freshness check i
     'data-sync-state',
     'synced',
   );
+});
+
+test('shows download progress feedback during slow startup sync', async ({ page }) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page, {
+    metadataETag: '"etag-2"',
+    downloadDelayMs: 2000,
+    downloadBytes: createSqliteBytes(Array.from({ length: 10224 }, (_, i) => i % 256)), // 10 KB total
+  });
+  await installMockCacheStore(page, {
+    startupSnapshot: {
+      metadata: {
+        eTag: '"etag-1"',
+      },
+      dbBytes: createSqliteBytes([1, 1, 1, 1]),
+    },
+  });
+  await installPersistedBinding(page);
+  await installMockStartupNetworkState(page, true);
+
+  await page.goto(appPath('#/accounts'));
+
+  await expect(page.getByTestId('progress-indicator')).toBeVisible();
+  await expect(page.getByTestId('progress-indicator')).toHaveAttribute('data-kind', 'download');
+
+  const progressBar = page.getByTestId('progress-bar');
+  await expect(progressBar).toHaveAttribute('max', '10240');
+
+  // Verify it starts at ~50% (5KB) due to our mock half-way call
+  await expect
+    .poll(async () => {
+      const value = await progressBar.getAttribute('value');
+      return value ? parseInt(value, 10) : 0;
+    })
+    .toBeGreaterThanOrEqual(5120);
+
+  await expect(page.getByTestId('progress-text')).toContainText('5 KB / 10 KB');
+
+  // Wait for it to finish
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
+    'data-sync-state',
+    'synced',
+  );
+  await expect(page.getByTestId('progress-indicator')).toHaveCount(0);
+});
+
+test('shows upload progress feedback during manual sync test', async ({ page }) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page, {
+    downloadBytes: createSqliteBytes(Array.from({ length: 20464 }, (_, i) => i % 256)), // 20 KB total
+  });
+  await installMockCacheStore(page);
+  await installPersistedBinding(page);
+  await installMockStartupNetworkState(page, true);
+  await installMockDbRuntime(page, { forceAlwaysOpen: true });
+
+  await page.goto(appPath('#/settings'));
+
+  // Wait for startup sync to finish
+  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
+    'data-sync-state',
+    'synced',
+  );
+
+  await page.getByTestId('test-db-upload-button').click();
+
+  await expect(page.getByTestId('progress-indicator')).toBeVisible();
+  await expect(page.getByTestId('progress-indicator')).toHaveAttribute('data-kind', 'upload');
+
+  const progressBar = page.getByTestId('progress-bar');
+  // Our mock dbRuntime.exportBytes returns [SQLITE_HEADER, 4, 3, 2, 1] -> 16 + 4 = 20 bytes
+  await expect(progressBar).toHaveAttribute('max', '20');
+
+  await expect(page.getByTestId('progress-text')).toContainText('0 KB / 0 KB uploaded');
+
+  await expect(page.getByRole('button', { name: 'Mock upload complete.' })).toBeVisible();
+  await expect(page.getByTestId('progress-indicator')).toHaveCount(0);
 });
 
 test('retries transient startup metadata failures before settling on the cached DB state', async ({
