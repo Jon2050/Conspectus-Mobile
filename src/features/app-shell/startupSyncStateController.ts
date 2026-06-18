@@ -60,8 +60,14 @@ const showDecisionToast = (
   }
 
   switch (decision.branch) {
+    case 'online_unchanged':
+      toastStore.show(message, 'success', 3200);
+      return;
     case 'online_changed':
       toastStore.show(message, 'success', 3200);
+      return;
+    case 'offline_cached':
+      toastStore.show(message, 'info', 3200);
       return;
     case 'online_auth_expired_cached':
     case 'online_metadata_failed_cached':
@@ -69,6 +75,7 @@ const showDecisionToast = (
       toastStore.show(message, 'warning', 4200);
       return;
     case 'online_auth_expired':
+    case 'offline_missing_cache':
     case 'online_metadata_failed':
     case 'online_download_failed':
       toastStore.show(message, 'error', 5000);
