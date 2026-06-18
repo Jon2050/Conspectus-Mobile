@@ -58,7 +58,6 @@
   let footerVisibilityTrackingIsActive = false;
   let lastRenderedRoute: AppRouteKey | null = null;
   let stopFooterVisibilityTracking = (): void => {};
-  let showSyncStatusBanner = false;
   const navIconBaseUrl = import.meta.env.BASE_URL;
   const unsubscribe = routeStore.subscribe((route) => {
     currentRoute = route;
@@ -296,30 +295,9 @@
     }
   });
 
-  const unsubscribeSyncState = syncStateStore.subscribe((syncSnapshot) => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-    const syncState = syncSnapshot.state;
-    const syncMessage = syncSnapshot.message;
-    const syncProgress = syncSnapshot.progress;
-
-    if (
-      syncMessage !== null &&
-      (syncState === 'error' ||
-        syncSnapshot.branch === 'online_auth_expired_cached' ||
-        (syncState === 'syncing' && syncProgress !== null))
-    ) {
-      showSyncStatusBanner = true;
-    } else {
-      showSyncStatusBanner = false;
-    }
-  });
-
   onDestroy(() => {
     unsubscribe();
     unsubscribeSelectedBinding();
-    unsubscribeSyncState();
     resolveAppDbRuntime().close();
     disconnectFooterVisibilityTracking();
   });
@@ -331,40 +309,26 @@
   </header>
 
   {#if $syncStateStore.message !== null}
-    <section
-      class={`startup-sync-status startup-sync-status--${$syncStateStore.state}`}
-      class:startup-sync-status--hidden={!showSyncStatusBanner}
+    <div
       data-testid="startup-sync-status"
-      data-sync-branch={$syncStateStore.branch ?? undefined}
       data-sync-state={$syncStateStore.state}
-      aria-live="polite"
+      data-sync-branch={$syncStateStore.branch ?? undefined}
+      style="position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; overflow: hidden;"
     >
-      {#if $syncStateStore.state === 'error'}
-        <p role="alert">{$syncStateStore.message}</p>
-        {#if $syncStateStore.branch === 'online_auth_expired'}
-          <div class="startup-sync-actions">
-            <a href="#settings" class="app-button app-button--secondary"
-              >{$_('appShell.signInAgain')}</a
-            >
-          </div>
-        {/if}
-      {:else}
-        <p>{$syncStateStore.message}</p>
-        {#if $syncStateStore.branch === 'online_auth_expired_cached'}
-          <div class="startup-sync-actions">
-            <a href="#settings" class="app-button app-button--secondary"
-              >{$_('appShell.signInAgain')}</a
-            >
-          </div>
-        {/if}
-        {#if $syncStateStore.progress !== null && $syncStateStore.state === 'syncing'}
-          <ProgressIndicator
-            loaded={$syncStateStore.progress.loaded}
-            total={$syncStateStore.progress.total}
-            kind={$syncStateStore.progress.kind}
-          />
-        {/if}
+      {$syncStateStore.message}
+      {#if $syncStateStore.branch === 'online_auth_expired' || $syncStateStore.branch === 'online_auth_expired_cached'}
+        <a href="#settings">{$_('appShell.signInAgain')}</a>
       {/if}
+    </div>
+  {/if}
+
+  {#if $syncStateStore.state === 'syncing' && $syncStateStore.progress !== null}
+    <section class="startup-sync-progress" data-testid="startup-sync-progress">
+      <ProgressIndicator
+        loaded={$syncStateStore.progress.loaded}
+        total={$syncStateStore.progress.total}
+        kind={$syncStateStore.progress.kind}
+      />
     </section>
   {/if}
 
@@ -425,55 +389,12 @@
 </div>
 
 <style>
-  .startup-sync-status {
+  .startup-sync-progress {
     margin: 0 1rem;
     padding: 0.85rem 1rem;
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-sm);
-  }
-
-  .startup-sync-status--hidden {
-    display: none !important;
-  }
-
-  .startup-sync-status p {
-    margin: 0;
-    font-size: 0.92rem;
-  }
-
-  .startup-sync-status--syncing {
     background: color-mix(in srgb, var(--accent) 12%, white);
     color: color-mix(in srgb, var(--accent) 68%, black);
-  }
-
-  .startup-sync-status--synced {
-    background: color-mix(in srgb, var(--positive) 16%, white);
-    color: color-mix(in srgb, var(--positive) 55%, black);
-  }
-
-  .startup-sync-status--offline {
-    background: color-mix(in srgb, var(--accent) 14%, white);
-    color: color-mix(in srgb, var(--accent) 55%, black);
-  }
-
-  .startup-sync-status--stale {
-    background: color-mix(in srgb, #d97706 16%, white);
-    color: color-mix(in srgb, #d97706 58%, black);
-  }
-
-  .startup-sync-status--error {
-    background: color-mix(in srgb, var(--negative) 14%, white);
-    color: color-mix(in srgb, var(--negative) 60%, black);
-  }
-
-  .startup-sync-actions {
-    margin-top: 0.75rem;
-    display: flex;
-  }
-
-  .startup-sync-actions .app-button {
-    font-size: 0.85rem;
-    padding: 0.4rem 0.8rem;
-    min-height: auto;
   }
 </style>
