@@ -31,11 +31,7 @@ describe('startupSyncStateController', () => {
       branch: null,
       progress: null,
     });
-    expect(toastStore.show).toHaveBeenCalledWith(
-      'Synchronisiere mit OneDrive im Hintergrund...',
-      'info',
-      2800,
-    );
+    expect(toastStore.show).toHaveBeenCalledWith('Synchronisiere mit OneDrive...', 'info', 2800);
   });
 
   it('updates progress in the store when startup sync progress changes', () => {
@@ -121,12 +117,12 @@ describe('startupSyncStateController', () => {
 
     expect(get(store)).toEqual({
       state: 'synced',
-      message: 'Zwischengespeicherte DB ist aktuell mit OneDrive.',
+      message: 'Zwischengespeicherte DB ist aktuell',
       branch: 'online_unchanged',
       progress: null,
     });
     expect(toastStore.show).toHaveBeenCalledWith(
-      'Zwischengespeicherte DB ist aktuell mit OneDrive.',
+      'Zwischengespeicherte DB ist aktuell',
       'success',
       3200,
     );

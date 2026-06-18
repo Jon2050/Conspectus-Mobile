@@ -5,10 +5,8 @@
   import type { AuthClient } from '@auth';
   import type { CacheStore } from '@cache';
   import type { GraphClient, GraphDriveItem } from '@graph';
-  import { appSelectedDriveItemBindingStore, appSyncStateStore, appToastStore } from '@shared';
+  import { appSelectedDriveItemBindingStore } from '@shared';
   import { _ } from 'svelte-i18n';
-  import { resolveAppDbRuntime } from '../dbRuntimeResolver';
-  import { resolveAppGraphClient } from '../graphClientResolver';
 
   import {
     createSettingsAuthController,
@@ -202,38 +200,12 @@
     fileBindingController.selectFile(item);
   };
 
-  const handleUploadTestClick = async (): Promise<void> => {
-    const binding = get(appSelectedDriveItemBindingStore);
-    if (binding === null) return;
-
-    const dbRuntime = resolveAppDbRuntime();
-    if (!dbRuntime.isOpen()) {
-      appToastStore.show('Database is not open.', 'error');
-      return;
+  const resolveDbFilePath = (binding: { parentPath: string; name: string }): string => {
+    const { parentPath, name } = binding;
+    if (parentPath === '/') {
+      return `/${name}`;
     }
-
-    try {
-      const bytes = dbRuntime.exportBytes();
-      const graphClient = resolveAppGraphClient();
-
-      appSyncStateStore.setSyncing($_('sync.upload.uploading'));
-
-      await graphClient.uploadFile(
-        binding,
-        bytes,
-        '*', // In a real flow, use the eTag
-        (loaded, total) => {
-          appSyncStateStore.updateProgress(loaded, total, 'upload');
-        },
-      );
-
-      appSyncStateStore.setSynced('Mock upload complete.');
-      appToastStore.show('Mock upload complete.', 'success');
-    } catch (error) {
-      console.error('Upload test failed', error);
-      appSyncStateStore.setError('Mock upload failed.');
-      appToastStore.show('Mock upload failed.', 'error');
-    }
+    return `${parentPath.endsWith('/') ? parentPath : parentPath + '/'}${name}`;
   };
 
   $: if (localDataResetDialogElement !== null) {
@@ -351,21 +323,6 @@
       </button>
     </div>
 
-    <h3 class="settings-screen__subheading">Maintenance (Debug)</h3>
-    <div class="settings-screen__actions">
-      <button
-        class="app-button app-button--secondary"
-        type="button"
-        data-testid="test-db-upload-button"
-        on:click={handleUploadTestClick}
-        disabled={authOperationIsPending ||
-          bindingState.operation !== 'idle' ||
-          localDataResetState.operation !== 'idle'}
-      >
-        Test DB Upload (M4-08)
-      </button>
-    </div>
-
     <dialog
       bind:this={localDataResetDialogElement}
       class="settings-screen__confirmation"
@@ -414,12 +371,8 @@
     {#if bindingState.selectedBinding !== null}
       <dl class="settings-screen__binding-summary" data-testid="selected-db-file-summary">
         <div>
-          <dt>{$_('settings.db.summary.fileName')}</dt>
-          <dd>{bindingState.selectedBinding.name}</dd>
-        </div>
-        <div>
-          <dt>{$_('settings.db.summary.folderPath')}</dt>
-          <dd>{bindingState.selectedBinding.parentPath}</dd>
+          <dt>{$_('settings.db.summary.dbFile')}</dt>
+          <dd>{resolveDbFilePath(bindingState.selectedBinding)}</dd>
         </div>
       </dl>
     {/if}

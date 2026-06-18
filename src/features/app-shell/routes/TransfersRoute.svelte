@@ -1,11 +1,11 @@
 <!-- Implements month navigation controls and swipe handling for transfer-month browsing scaffolding. -->
 <script lang="ts">
-  import { cubicOut } from 'svelte/easing';
-  import { fly } from 'svelte/transition';
   import { onDestroy } from 'svelte';
-  import { appSyncStateStore, type SyncState } from '@shared';
-  import { _ } from 'svelte-i18n';
+  import { appSyncStateStore, type SyncState, formatEpochDayToDate } from '@shared';
+  import { _, locale } from 'svelte-i18n';
   import {
+    PRIMARY_INCOME_ACCOUNT_TYPE_ID,
+    PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID,
     createAccountQueryService,
     createCategoryQueryService,
     createTransferMonthQueryService,
@@ -31,19 +31,14 @@
     createCategoryQueryService(resolveAppDbRuntime()),
   );
 
-  const MONTH_LABEL_TRANSITION_DURATION_MS = 180;
-
   let monthAnchorEpochDay = getCurrentMonthAnchorEpochDay();
   let swipeStartX: number | null = null;
   let swipeStartY: number | null = null;
-  let monthTransitionDirection: 'previous' | 'next' = 'next';
   let state: TransfersRouteState = controller.getState();
   let lastObservedSyncState: SyncState = 'idle';
 
   $: monthKey = toMonthKey(monthAnchorEpochDay);
   $: monthLabel = formatMonthLabel(monthAnchorEpochDay);
-  $: monthLabelTransitionKey = `${monthTransitionDirection}-${monthKey}`;
-  $: monthLabelTransitionOffsetX = monthTransitionDirection === 'next' ? 20 : -20;
 
   $: {
     void controller.load(monthAnchorEpochDay);
@@ -78,7 +73,6 @@
   };
   const shiftMonth = (deltaMonths: number): void => {
     if (deltaMonths === 0) return;
-    monthTransitionDirection = deltaMonths > 0 ? 'next' : 'previous';
     monthAnchorEpochDay = shiftMonthAnchorEpochDay(monthAnchorEpochDay, deltaMonths);
   };
   const handlePreviousMonthClick = (): void => shiftMonth(-1);
@@ -139,22 +133,7 @@
       data-testid="transfers-month-label"
       data-month-key={monthKey}
     >
-      {#key monthLabelTransitionKey}
-        <span
-          in:fly={{
-            x: monthLabelTransitionOffsetX,
-            duration: MONTH_LABEL_TRANSITION_DURATION_MS,
-            easing: cubicOut,
-          }}
-          out:fly={{
-            x: -monthLabelTransitionOffsetX,
-            duration: MONTH_LABEL_TRANSITION_DURATION_MS,
-            easing: cubicOut,
-          }}
-        >
-          {monthLabel}
-        </span>
-      {/key}
+      <span>{monthLabel}</span>
     </p>
     <button
       type="button"
@@ -210,7 +189,9 @@
             >
               <div class="transfer-card__header">
                 <div>
-                  <p class="transfer-card__date">{transfer.dateDisplay}</p>
+                  <p class="transfer-card__date">
+                    {formatEpochDayToDate(transfer.bookingDateEpochDay, $locale)}
+                  </p>
                   <h3 class="transfer-card__name">{transfer.name}</h3>
                 </div>
                 <span
@@ -219,24 +200,38 @@
                   >{transfer.amountDisplay}</span
                 >
               </div>
-              <div class="transfer-card__accounts">
-                <span class="transfer-card__account transfer-card__account--from"
-                  >{transfer.fromAccountName}</span
-                >
-                <span class="transfer-card__account-arrow">→</span>
-                <span class="transfer-card__account transfer-card__account--to"
-                  >{transfer.toAccountName}</span
-                >
+              <div class="transfer-card__details">
+                <div class="transfer-card__accounts">
+                  <span class="transfer-card__account transfer-card__account--from">
+                    {#if transfer.fromAccountTypeId === PRIMARY_INCOME_ACCOUNT_TYPE_ID}
+                      {$_('transfers.primaryIncome')}
+                    {:else if transfer.fromAccountTypeId === PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID}
+                      {$_('transfers.primarySpendings')}
+                    {:else}
+                      {transfer.fromAccountName}
+                    {/if}
+                  </span>
+                  <span class="transfer-card__account-arrow">→</span>
+                  <span class="transfer-card__account transfer-card__account--to">
+                    {#if transfer.toAccountTypeId === PRIMARY_INCOME_ACCOUNT_TYPE_ID}
+                      {$_('transfers.primaryIncome')}
+                    {:else if transfer.toAccountTypeId === PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID}
+                      {$_('transfers.primarySpendings')}
+                    {:else}
+                      {transfer.toAccountName}
+                    {/if}
+                  </span>
+                </div>
+                {#if transfer.categoryNames.length > 0}
+                  <ul class="transfer-card__categories">
+                    {#each transfer.categoryNames as category (category)}
+                      <li class="transfer-card__category">
+                        <span class="app-badge">{category}</span>
+                      </li>
+                    {/each}
+                  </ul>
+                {/if}
               </div>
-              {#if transfer.categoryNames.length > 0}
-                <ul class="transfer-card__categories">
-                  {#each transfer.categoryNames as category (category)}
-                    <li class="transfer-card__category">
-                      <span class="app-badge">{category}</span>
-                    </li>
-                  {/each}
-                </ul>
-              {/if}
             </article>
           </li>
         {/each}
@@ -332,7 +327,7 @@
     padding: 0;
     margin: 0;
     display: grid;
-    gap: 0.75rem;
+    gap: 0.25rem;
   }
 
   .transfers-route__card-item {
@@ -342,8 +337,8 @@
   .transfer-card {
     display: flex;
     flex-direction: column;
-    gap: 0.6rem;
-    padding: 1rem;
+    gap: 0.3rem;
+    padding: 0.25rem 0.8rem;
     border-radius: var(--radius-lg);
     background: var(--surface-strong);
     box-shadow: var(--shadow-sm);
@@ -368,8 +363,8 @@
   }
 
   .transfer-card__date {
-    margin: 0 0 0.2rem 0;
-    font-size: 0.8rem;
+    margin: 0;
+    font-size: 0.7rem;
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.02em;
@@ -400,6 +395,15 @@
     color: var(--text-secondary);
   }
 
+  .transfer-card__details {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: -0.4rem;
+  }
+
   .transfer-card__accounts {
     display: flex;
     flex-wrap: wrap;
@@ -420,10 +424,11 @@
   .transfer-card__categories {
     list-style: none;
     padding: 0;
-    margin: 0.2rem 0 0 0;
+    margin: 0;
     display: flex;
     flex-wrap: wrap;
     gap: 0.4rem;
+    justify-content: flex-end;
   }
 
   .transfer-card__category {

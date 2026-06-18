@@ -874,9 +874,9 @@ test('renders readable account cards with semantic amount styling on narrow mobi
 
   await expect(page.getByTestId('accounts-route-cards')).toBeVisible();
   await expect(page.getByText('Main Household Spending Account with Long Name')).toBeVisible();
-  await expect(page.getByTestId('account-amount-positive-101')).toHaveText('+$12,345.67');
-  await expect(page.getByTestId('account-amount-negative-102')).toHaveText('-$4,999.00');
-  await expect(page.getByTestId('account-amount-neutral-103')).toHaveText('$0.00');
+  await expect(page.getByTestId('account-amount-positive-101')).toHaveText('+12.345,67€');
+  await expect(page.getByTestId('account-amount-negative-102')).toHaveText('-4.999,00€');
+  await expect(page.getByTestId('account-amount-neutral-103')).toHaveText('0,00€');
 
   const hasHorizontalOverflow = await page.getByTestId('route-accounts').evaluate((element) => {
     return element.scrollWidth > element.clientWidth + 1;
@@ -1084,41 +1084,6 @@ test('shows download progress feedback during slow startup sync', async ({ page 
     'data-sync-state',
     'synced',
   );
-  await expect(page.getByTestId('progress-indicator')).toHaveCount(0);
-});
-
-test('shows upload progress feedback during manual sync test', async ({ page }) => {
-  await installMockAuthClient(page, {
-    startAuthenticated: true,
-  });
-  await installMockGraphClient(page, {
-    downloadBytes: createSqliteBytes(Array.from({ length: 20464 }, (_, i) => i % 256)), // 20 KB total
-  });
-  await installMockCacheStore(page);
-  await installPersistedBinding(page);
-  await installMockStartupNetworkState(page, true);
-  await installMockDbRuntime(page, { forceAlwaysOpen: true });
-
-  await page.goto(appPath('#/settings'));
-
-  // Wait for startup sync to finish
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
-    'data-sync-state',
-    'synced',
-  );
-
-  await page.getByTestId('test-db-upload-button').click();
-
-  await expect(page.getByTestId('progress-indicator')).toBeVisible();
-  await expect(page.getByTestId('progress-indicator')).toHaveAttribute('data-kind', 'upload');
-
-  const progressBar = page.getByTestId('progress-bar');
-  // Our mock dbRuntime.exportBytes returns [SQLITE_HEADER, 4, 3, 2, 1] -> 16 + 4 = 20 bytes
-  await expect(progressBar).toHaveAttribute('max', '20');
-
-  await expect(page.getByTestId('progress-text')).toContainText('0 KB / 0 KB uploaded');
-
-  await expect(page.getByRole('button', { name: 'Mock upload complete.' })).toBeVisible();
   await expect(page.getByTestId('progress-indicator')).toHaveCount(0);
 });
 

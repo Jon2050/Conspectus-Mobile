@@ -1,5 +1,12 @@
-import type { AccountQueryService, CategoryQueryService, TransferMonthQueryService } from '@db';
-import { formatAmountDisplay, formatEpochDayToDate, type AmountSemantic } from '@shared';
+// Coordinates loading and mapping monthly transfers with account balances and category information.
+import {
+  PRIMARY_INCOME_ACCOUNT_TYPE_ID,
+  PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID,
+  type AccountQueryService,
+  type CategoryQueryService,
+  type TransferMonthQueryService,
+} from '@db';
+import { formatAmountDisplay, type AmountSemantic } from '@shared';
 
 export type TransfersRouteOperation = 'loading' | 'ready' | 'empty' | 'error';
 
@@ -11,7 +18,6 @@ export interface TransfersRouteError {
 export interface TransfersRouteTransfer {
   readonly transferId: number;
   readonly bookingDateEpochDay: number;
-  readonly dateDisplay: string;
   readonly name: string;
   readonly amountCents: number;
   readonly amountDisplay: string;
@@ -20,6 +26,8 @@ export interface TransfersRouteTransfer {
   readonly toAccountName: string;
   readonly categoryNames: readonly string[];
   readonly buyplace: string | null;
+  readonly fromAccountTypeId: number | null;
+  readonly toAccountTypeId: number | null;
 }
 
 export interface TransfersRouteState {
@@ -117,16 +125,21 @@ export const createTransfersRouteController = (
           const toAccount = accountMap.get(t.toAccountId);
 
           let semantic: AmountSemantic = 'neutral';
-          if (toAccount?.accountTypeId === 1 || toAccount?.accountTypeId === 2) {
+          if (
+            toAccount?.accountTypeId === PRIMARY_INCOME_ACCOUNT_TYPE_ID ||
+            toAccount?.accountTypeId === PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID
+          ) {
             semantic = 'negative';
-          } else if (fromAccount?.accountTypeId === 1 || fromAccount?.accountTypeId === 2) {
+          } else if (
+            fromAccount?.accountTypeId === PRIMARY_INCOME_ACCOUNT_TYPE_ID ||
+            fromAccount?.accountTypeId === PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID
+          ) {
             semantic = 'positive';
           }
 
           return {
             transferId: t.transferId,
             bookingDateEpochDay: t.bookingDateEpochDay,
-            dateDisplay: formatEpochDayToDate(t.bookingDateEpochDay),
             name: t.name,
             amountCents: t.amountCents,
             amountDisplay: formatAmountDisplay(t.amountCents, semantic),
@@ -135,6 +148,8 @@ export const createTransfersRouteController = (
             toAccountName: toAccount?.name ?? `Unknown (${t.toAccountId})`,
             categoryNames: t.categoryIds.map((id) => categoryMap.get(id) ?? `Unknown (${id})`),
             buyplace: t.buyplace,
+            fromAccountTypeId: fromAccount?.accountTypeId ?? null,
+            toAccountTypeId: toAccount?.accountTypeId ?? null,
           };
         });
 

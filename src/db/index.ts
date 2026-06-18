@@ -30,6 +30,9 @@ export {
 } from './dbRuntimeErrors';
 export { appSqlJsLoader, createSqlJsLoader, type SqlJsLoader } from './sqlJsLoader';
 
+export const PRIMARY_INCOME_ACCOUNT_TYPE_ID = 1;
+export const PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID = 2;
+
 export interface AccountRecord {
   readonly accountId: number;
   readonly name: string;

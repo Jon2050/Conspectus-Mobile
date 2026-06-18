@@ -53,7 +53,7 @@ describe('AppShell component', () => {
       expect(body).toContain(`data-testid="app-nav-icon-${route}"`);
       const ROUTE_LABELS: Record<AppRouteKey, string> = {
         accounts: 'Konten',
-        transfers: 'Überweisungen',
+        transfers: 'Transfers',
         add: 'Neu',
         settings: 'Einstellungen',
       };

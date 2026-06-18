@@ -55,19 +55,21 @@
 >
   <h2>{$_('accounts.title')}</h2>
 
-  <p
-    class="accounts-route__status"
-    class:accounts-route__status--error={state.operation === 'error'}
-    data-testid="accounts-route-status"
-    aria-live="polite"
-    role={state.operation === 'error' ? 'alert' : undefined}
-  >
-    {#if state.operation === 'loading'}
-      {$_('accounts.loading')}
-    {:else if state.operation === 'error'}
-      {state.error?.message ?? $_('accounts.errorDefault')}
-    {/if}
-  </p>
+  {#if state.operation === 'loading' || state.operation === 'error'}
+    <p
+      class="accounts-route__status"
+      class:accounts-route__status--error={state.operation === 'error'}
+      data-testid="accounts-route-status"
+      aria-live="polite"
+      role={state.operation === 'error' ? 'alert' : undefined}
+    >
+      {#if state.operation === 'loading'}
+        {$_('accounts.loading')}
+      {:else if state.operation === 'error'}
+        {state.error?.message ?? $_('accounts.errorDefault')}
+      {/if}
+    </p>
+  {/if}
 
   {#if state.operation === 'loading'}
     <div class="accounts-route__loading" data-testid="accounts-route-loading">

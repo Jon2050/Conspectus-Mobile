@@ -27,7 +27,9 @@
     "errorDefault": "Failed to load transfers.",
     "emptyStatus": "No transfers found for this month.",
     "countFound": "{count} transfers found.",
-    "emptyBox": "There are no transfers recorded for this month."
+    "emptyBox": "There are no transfers recorded for this month.",
+    "primaryIncome": "INCOME",
+    "primarySpendings": "SPENDINGS"
   },
   "settings": {
     "title": "Settings",
@@ -57,8 +59,7 @@
         "notSelected": "No DB file selected yet."
       },
       "summary": {
-        "fileName": "File name",
-        "folderPath": "Folder path"
+        "dbFile": "Database file"
       },
       "actions": {
         "select": "Select DB File",
