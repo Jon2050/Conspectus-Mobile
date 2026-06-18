@@ -302,12 +302,13 @@
     }
     const syncState = syncSnapshot.state;
     const syncMessage = syncSnapshot.message;
+    const syncProgress = syncSnapshot.progress;
 
     if (
       syncMessage !== null &&
-      (syncState === 'syncing' ||
-        syncState === 'error' ||
-        syncSnapshot.branch === 'online_auth_expired_cached')
+      (syncState === 'error' ||
+        syncSnapshot.branch === 'online_auth_expired_cached' ||
+        (syncState === 'syncing' && syncProgress !== null))
     ) {
       showSyncStatusBanner = true;
     } else {
