@@ -58,6 +58,7 @@
   let footerVisibilityTrackingIsActive = false;
   let lastRenderedRoute: AppRouteKey | null = null;
   let stopFooterVisibilityTracking = (): void => {};
+  let showSyncStatusBanner = false;
   const navIconBaseUrl = import.meta.env.BASE_URL;
   const unsubscribe = routeStore.subscribe((route) => {
     currentRoute = route;
@@ -295,9 +296,29 @@
     }
   });
 
+  const unsubscribeSyncState = syncStateStore.subscribe((syncSnapshot) => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const syncState = syncSnapshot.state;
+    const syncMessage = syncSnapshot.message;
+
+    if (
+      syncMessage !== null &&
+      (syncState === 'syncing' ||
+        syncState === 'error' ||
+        syncSnapshot.branch === 'online_auth_expired_cached')
+    ) {
+      showSyncStatusBanner = true;
+    } else {
+      showSyncStatusBanner = false;
+    }
+  });
+
   onDestroy(() => {
     unsubscribe();
     unsubscribeSelectedBinding();
+    unsubscribeSyncState();
     resolveAppDbRuntime().close();
     disconnectFooterVisibilityTracking();
   });
@@ -311,6 +332,7 @@
   {#if $syncStateStore.message !== null}
     <section
       class={`startup-sync-status startup-sync-status--${$syncStateStore.state}`}
+      class:startup-sync-status--hidden={!showSyncStatusBanner}
       data-testid="startup-sync-status"
       data-sync-branch={$syncStateStore.branch ?? undefined}
       data-sync-state={$syncStateStore.state}
@@ -407,6 +429,10 @@
     padding: 0.85rem 1rem;
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-sm);
+  }
+
+  .startup-sync-status--hidden {
+    display: none !important;
   }
 
   .startup-sync-status p {

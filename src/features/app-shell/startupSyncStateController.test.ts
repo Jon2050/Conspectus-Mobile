@@ -91,6 +91,88 @@ describe('startupSyncStateController', () => {
     );
   });
 
+  it('applies a successful online unchanged decision and surfaces a success toast', () => {
+    const store = createSyncStateStore();
+    const toastStore = createToastStore();
+    const decision: StartupFreshnessDecision = {
+      kind: 'ready',
+      branch: 'online_unchanged',
+      syncState: 'synced',
+      snapshot: {
+        binding: {
+          driveId: 'drive-123',
+          itemId: 'item-456',
+          name: 'conspectus.db',
+          parentPath: '/',
+        },
+        metadata: {
+          eTag: '"etag-1"',
+          lastSyncAtIso: '2026-03-11T10:45:00.000Z',
+        },
+        dbBytes: Uint8Array.from([1, 2, 3, 4]),
+      },
+      failure: null,
+    };
+
+    beginStartupSync(store, toastStore);
+    toastStore.show.mockClear();
+
+    applyStartupFreshnessDecision(store, decision, toastStore);
+
+    expect(get(store)).toEqual({
+      state: 'synced',
+      message: 'Zwischengespeicherte DB ist aktuell mit OneDrive.',
+      branch: 'online_unchanged',
+      progress: null,
+    });
+    expect(toastStore.show).toHaveBeenCalledWith(
+      'Zwischengespeicherte DB ist aktuell mit OneDrive.',
+      'success',
+      3200,
+    );
+  });
+
+  it('applies an offline cached decision and surfaces an info toast', () => {
+    const store = createSyncStateStore();
+    const toastStore = createToastStore();
+    const decision: StartupFreshnessDecision = {
+      kind: 'ready',
+      branch: 'offline_cached',
+      syncState: 'offline',
+      snapshot: {
+        binding: {
+          driveId: 'drive-123',
+          itemId: 'item-456',
+          name: 'conspectus.db',
+          parentPath: '/',
+        },
+        metadata: {
+          eTag: '"etag-1"',
+          lastSyncAtIso: '2026-03-11T10:45:00.000Z',
+        },
+        dbBytes: Uint8Array.from([1, 2, 3, 4]),
+      },
+      failure: null,
+    };
+
+    beginStartupSync(store, toastStore);
+    toastStore.show.mockClear();
+
+    applyStartupFreshnessDecision(store, decision, toastStore);
+
+    expect(get(store)).toEqual({
+      state: 'offline',
+      message: 'Offline-Modus nutzt die zuletzt zwischengespeicherte DB.',
+      branch: 'offline_cached',
+      progress: null,
+    });
+    expect(toastStore.show).toHaveBeenCalledWith(
+      'Offline-Modus nutzt die zuletzt zwischengespeicherte DB.',
+      'info',
+      3200,
+    );
+  });
+
   it('applies stale cached fallback decisions and surfaces a warning toast', () => {
     const store = createSyncStateStore({
       state: 'syncing',
