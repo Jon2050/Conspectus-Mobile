@@ -8,7 +8,7 @@ import TransfersRoute from './TransfersRoute.svelte';
 describe('TransfersRoute', () => {
   const createMockController = (
     operation: 'loading' | 'ready' | 'empty' | 'error' = 'ready',
-    transfers = [],
+    transfers: readonly unknown[] = [],
   ) => ({
     getState: vi.fn(() => ({
       operation,
@@ -61,5 +61,32 @@ describe('TransfersRoute', () => {
 
     expect(body).toContain('data-testid="transfers-route-empty"');
     expect(body).toContain('Es gibt keine Transfers für diesen Monat.');
+  });
+
+  it('renders primary system accounts with localized display names (EINNAHMEN / AUSGABEN)', () => {
+    const mockTransfer = {
+      transferId: 99,
+      bookingDateEpochDay: 20000,
+      name: 'Test Transfer',
+      amountCents: 5000,
+      amountDisplay: '50,00€',
+      amountSemantic: 'neutral',
+      fromAccountName: 'Original From Name',
+      toAccountName: 'Original To Name',
+      categoryNames: [],
+      buyplace: null,
+      fromAccountTypeId: 2, // PRIMARY_SPENDINGS -> AUSGABEN
+      toAccountTypeId: 1, // PRIMARY_INCOME -> EINNAHMEN
+    };
+
+    const controller = createMockController('ready', [mockTransfer]);
+    const { body } = render(TransfersRoute, {
+      props: { controller: controller as unknown as TransfersRouteController },
+    });
+
+    expect(body).toContain('AUSGABEN');
+    expect(body).toContain('EINNAHMEN');
+    expect(body).not.toContain('Original From Name');
+    expect(body).not.toContain('Original To Name');
   });
 });

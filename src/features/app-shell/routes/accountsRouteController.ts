@@ -1,5 +1,6 @@
 // Loads visible account rows from the DB query service and exposes route-ready view models.
 import type { AccountQueryService, AccountRecord } from '@db';
+import { formatAmountDisplay, type AmountSemantic } from '@shared';
 
 export type AccountsRouteAmountSemantic = 'positive' | 'negative' | 'neutral';
 
@@ -38,8 +39,6 @@ const INITIAL_STATE: AccountsRouteState = {
   error: null,
 };
 
-const WHOLE_DOLLAR_FORMATTER = new Intl.NumberFormat('en-US');
-
 const toAccountsRouteError = (error: unknown, fallbackMessage: string): AccountsRouteError => {
   if (error instanceof Error && error.message.trim().length > 0) {
     return {
@@ -71,33 +70,16 @@ const deriveAmountSemantic = (amountCents: number): AccountsRouteAmountSemantic 
 
   return 'neutral';
 };
-
-const formatAmountDisplay = (amountCents: number): string => {
-  const absoluteAmountCents = Math.abs(amountCents);
-  const wholeDollars = Math.trunc(absoluteAmountCents / 100);
-  const remainingCents = absoluteAmountCents % 100;
-  const currencyValue = `$${WHOLE_DOLLAR_FORMATTER.format(wholeDollars)}.${remainingCents
-    .toString()
-    .padStart(2, '0')}`;
-
-  if (amountCents > 0) {
-    return `+${currencyValue}`;
-  }
-
-  if (amountCents < 0) {
-    return `-${currencyValue}`;
-  }
-
-  return currencyValue;
+const toRouteAccount = (account: AccountRecord): AccountsRouteAccount => {
+  const semantic = deriveAmountSemantic(account.amountCents) as AmountSemantic;
+  return {
+    accountId: account.accountId,
+    name: account.name,
+    amountCents: account.amountCents,
+    amountDisplay: formatAmountDisplay(account.amountCents, semantic),
+    amountSemantic: semantic,
+  };
 };
-
-const toRouteAccount = (account: AccountRecord): AccountsRouteAccount => ({
-  accountId: account.accountId,
-  name: account.name,
-  amountCents: account.amountCents,
-  amountDisplay: formatAmountDisplay(account.amountCents),
-  amountSemantic: deriveAmountSemantic(account.amountCents),
-});
 
 export const createAccountsRouteController = (
   accountQueryService: Pick<AccountQueryService, 'listVisibleNonPrimaryAccounts'>,

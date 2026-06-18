@@ -1,7 +1,7 @@
 {
   "nav": {
     "accounts": "Konten",
-    "transfers": "Überweisungen",
+    "transfers": "Transfers",
     "add": "Neu",
     "settings": "Einstellungen"
   },
@@ -25,9 +25,11 @@
     "nextMonth": "Nächster Monat",
     "loading": "Transfers werden geladen...",
     "errorDefault": "Fehler beim Laden der Transfers.",
-    "emptyStatus": "Für diesen Monat sind keine Transfers hinterlegt.",
+    "emptyStatus": "Für diesen Monat sind keine Transfers vorhanden.",
     "countFound": "{count} Transfers gefunden.",
-    "emptyBox": "Es gibt keine Transfers für diesen Monat."
+    "emptyBox": "Es gibt keine Transfers für diesen Monat.",
+    "primaryIncome": "EINNAHMEN",
+    "primarySpendings": "AUSGABEN"
   },
   "settings": {
     "title": "Einstellungen",
@@ -57,8 +59,7 @@
         "notSelected": "Bisher keine DB-Datei ausgewählt."
       },
       "summary": {
-        "fileName": "Dateiname",
-        "folderPath": "Ordnerpfad"
+        "dbFile": "Datenbankdatei"
       },
       "actions": {
         "select": "Datenbank auswählen",
@@ -105,8 +106,8 @@
   "sync": {
     "startup": {
       "checking": "Suche nach DB-Updates auf OneDrive...",
-      "toastSyncing": "Synchronisiere mit OneDrive im Hintergrund...",
-      "onlineUnchanged": "Zwischengespeicherte DB ist aktuell mit OneDrive.",
+      "toastSyncing": "Synchronisiere mit OneDrive...",
+      "onlineUnchanged": "Zwischengespeicherte DB ist aktuell",
       "onlineChanged": "Neueste DB von OneDrive heruntergeladen.",
       "offlineCached": "Offline-Modus nutzt die zuletzt zwischengespeicherte DB.",
       "cachedFallback": "Nutze die letzte zwischengespeicherte DB, da die Aktualisierung fehlgeschlagen ist.",
