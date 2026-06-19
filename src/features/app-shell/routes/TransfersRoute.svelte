@@ -1,7 +1,12 @@
 <!-- Implements month navigation controls and swipe handling for transfer-month browsing scaffolding. -->
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { appSyncStateStore, type SyncState, formatEpochDayToDate } from '@shared';
+  import {
+    appSyncStateStore,
+    type SyncState,
+    formatEpochDayToDate,
+    formatAmountDisplay,
+  } from '@shared';
   import { _, locale } from 'svelte-i18n';
   import {
     PRIMARY_INCOME_ACCOUNT_TYPE_ID,
@@ -197,7 +202,11 @@
                 <span
                   class="transfer-card__amount"
                   data-testid={`transfer-amount-${transfer.transferId}`}
-                  >{transfer.amountDisplay}</span
+                  >{formatAmountDisplay(
+                    transfer.amountCents,
+                    transfer.amountSemantic,
+                    $locale,
+                  )}</span
                 >
               </div>
               <div class="transfer-card__details">

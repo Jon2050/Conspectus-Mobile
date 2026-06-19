@@ -76,21 +76,18 @@ describe('AccountsRoute', () => {
               accountId: 12,
               name: 'Cash',
               amountCents: 1250,
-              amountDisplay: '+12,50€',
               amountSemantic: 'positive',
             },
             {
               accountId: 18,
               name: 'Loan',
               amountCents: -9750,
-              amountDisplay: '-97,50€',
               amountSemantic: 'negative',
             },
             {
               accountId: 19,
               name: 'Offset',
               amountCents: 0,
-              amountDisplay: '0,00€',
               amountSemantic: 'neutral',
             },
           ],
@@ -103,12 +100,12 @@ describe('AccountsRoute', () => {
     expect(body).toContain('data-testid="account-card-12"');
     expect(body).toContain('data-testid="account-amount-positive-12"');
     expect(body).toContain('data-amount-semantic="positive"');
-    expect(body).toContain('+12,50€');
+    expect(body).toContain('+12,50\u00A0€');
     expect(body).toContain('data-testid="account-amount-negative-18"');
     expect(body).toContain('data-amount-semantic="negative"');
-    expect(body).toContain('-97,50€');
+    expect(body).toContain('-97,50\u00A0€');
     expect(body).toContain('data-testid="account-amount-neutral-19"');
     expect(body).toContain('data-amount-semantic="neutral"');
-    expect(body).toContain('0,00€');
+    expect(body).toContain('0,00\u00A0€');
   });
 });

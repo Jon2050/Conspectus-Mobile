@@ -1,8 +1,6 @@
 // Loads visible account rows from the DB query service and exposes route-ready view models.
 import type { AccountQueryService, AccountRecord } from '@db';
-import { formatAmountDisplay, type AmountSemantic } from '@shared';
-
-export type AccountsRouteAmountSemantic = 'positive' | 'negative' | 'neutral';
+import { type AmountSemantic } from '@shared';
 
 export type AccountsRouteOperation = 'loading' | 'ready' | 'empty' | 'error';
 
@@ -15,8 +13,7 @@ export interface AccountsRouteAccount {
   readonly accountId: number;
   readonly name: string;
   readonly amountCents: number;
-  readonly amountDisplay: string;
-  readonly amountSemantic: AccountsRouteAmountSemantic;
+  readonly amountSemantic: AmountSemantic;
 }
 
 export interface AccountsRouteState {
@@ -59,7 +56,7 @@ const isDbRuntimeNotOpenError = (error: unknown): boolean =>
   'code' in error &&
   (error as { code?: unknown }).code === 'db_not_open';
 
-const deriveAmountSemantic = (amountCents: number): AccountsRouteAmountSemantic => {
+const deriveAmountSemantic = (amountCents: number): AmountSemantic => {
   if (amountCents > 0) {
     return 'positive';
   }
@@ -76,7 +73,6 @@ const toRouteAccount = (account: AccountRecord): AccountsRouteAccount => {
     accountId: account.accountId,
     name: account.name,
     amountCents: account.amountCents,
-    amountDisplay: formatAmountDisplay(account.amountCents, semantic),
     amountSemantic: semantic,
   };
 };

@@ -874,9 +874,9 @@ test('renders readable account cards with semantic amount styling on narrow mobi
 
   await expect(page.getByTestId('accounts-route-cards')).toBeVisible();
   await expect(page.getByText('Main Household Spending Account with Long Name')).toBeVisible();
-  await expect(page.getByTestId('account-amount-positive-101')).toHaveText('+12.345,67€');
-  await expect(page.getByTestId('account-amount-negative-102')).toHaveText('-4.999,00€');
-  await expect(page.getByTestId('account-amount-neutral-103')).toHaveText('0,00€');
+  await expect(page.getByTestId('account-amount-positive-101')).toHaveText('+€12,345.67');
+  await expect(page.getByTestId('account-amount-negative-102')).toHaveText('-€4,999.00');
+  await expect(page.getByTestId('account-amount-neutral-103')).toHaveText('€0.00');
 
   const hasHorizontalOverflow = await page.getByTestId('route-accounts').evaluate((element) => {
     return element.scrollWidth > element.clientWidth + 1;
