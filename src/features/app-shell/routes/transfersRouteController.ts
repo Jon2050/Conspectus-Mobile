@@ -6,7 +6,7 @@ import {
   type CategoryQueryService,
   type TransferMonthQueryService,
 } from '@db';
-import { formatAmountDisplay, type AmountSemantic } from '@shared';
+import { type AmountSemantic } from '@shared';
 
 export type TransfersRouteOperation = 'loading' | 'ready' | 'empty' | 'error';
 
@@ -20,7 +20,6 @@ export interface TransfersRouteTransfer {
   readonly bookingDateEpochDay: number;
   readonly name: string;
   readonly amountCents: number;
-  readonly amountDisplay: string;
   readonly amountSemantic: AmountSemantic;
   readonly fromAccountName: string;
   readonly toAccountName: string;
@@ -142,7 +141,6 @@ export const createTransfersRouteController = (
             bookingDateEpochDay: t.bookingDateEpochDay,
             name: t.name,
             amountCents: t.amountCents,
-            amountDisplay: formatAmountDisplay(t.amountCents, semantic),
             amountSemantic: semantic,
             fromAccountName: fromAccount?.name ?? `Unknown (${t.fromAccountId})`,
             toAccountName: toAccount?.name ?? `Unknown (${t.toAccountId})`,

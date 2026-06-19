@@ -2,8 +2,8 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
   import { createAccountQueryService } from '@db';
-  import { appSyncStateStore, type SyncState } from '@shared';
-  import { _ } from 'svelte-i18n';
+  import { appSyncStateStore, type SyncState, formatAmountDisplay } from '@shared';
+  import { _, locale } from 'svelte-i18n';
 
   import SkeletonCard from '../components/SkeletonCard.svelte';
   import {
@@ -101,7 +101,7 @@
                 data-account-id={account.accountId}
                 data-amount-cents={account.amountCents}
               >
-                {account.amountDisplay}
+                {formatAmountDisplay(account.amountCents, account.amountSemantic, $locale)}
               </span>
             </div>
           </article>

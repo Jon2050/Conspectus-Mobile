@@ -69,7 +69,6 @@ describe('TransfersRoute', () => {
       bookingDateEpochDay: 20000,
       name: 'Test Transfer',
       amountCents: 5000,
-      amountDisplay: '50,00€',
       amountSemantic: 'neutral',
       fromAccountName: 'Original From Name',
       toAccountName: 'Original To Name',
