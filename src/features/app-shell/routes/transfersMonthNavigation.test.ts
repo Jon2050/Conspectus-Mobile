@@ -9,9 +9,7 @@ import {
   toMonthKey,
 } from './transfersMonthNavigation';
 
-const MILLIS_PER_DAY = 86_400_000;
-const toEpochDay = (year: number, month: number, day: number): number =>
-  Math.floor(Date.UTC(year, month - 1, day) / MILLIS_PER_DAY);
+import { toEpochDay } from '../../../shared/testUtils/dateUtils';
 
 describe('transfers month navigation', () => {
   it('defaults to the first day of the current local month', () => {

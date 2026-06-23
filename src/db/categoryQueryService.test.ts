@@ -1,3 +1,7 @@
+/**
+ * Unit tests for the category query service.
+ * Ensures that categories are correctly extracted and mapped from the DB runtime.
+ */
 import { describe, expect, it } from 'vitest';
 import { createCategoryQueryService } from './categoryQueryService';
 import type { QueryExecResult } from 'sql.js';
