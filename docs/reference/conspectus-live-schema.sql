@@ -1,6 +1,7 @@
 -- Reference SQLite schema snapshot for Conspectus-Mobile PWA SQL validation.
 -- Source command: SELECT sql FROM sqlite_master WHERE sql IS NOT NULL;
--- Source database for this repository snapshot: tests/fixtures/conspectusDB.db.
+-- Source database for this repository snapshot: local private tests/fixtures/conspectusDB.db.
+-- The source database is ignored by Git; this SQL snapshot is the tracked repository reference.
 -- Captured for issue M5-09 on 2026-06-23.
 
 CREATE TABLE account (

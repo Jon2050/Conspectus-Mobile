@@ -1,6 +1,17 @@
 // Exposes the public DB runtime contract and typed entities for read/write services.
 export type { BindParams, QueryExecResult, SqlValue } from 'sql.js';
 export {
+  PRIMARY_INCOME_ACCOUNT_TYPE_ID,
+  PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID,
+  type AccountRecord,
+  type BrowserDbRuntime,
+  type BrowserDbRuntimeOpenOptions,
+  type CategoryRecord,
+  type CreateTransferInput,
+  type CreateTransferResult,
+  type TransferRecord,
+} from './types';
+export {
   appAccountQueryService,
   createAccountQueryService,
   type AccountQueryService,
@@ -21,7 +32,6 @@ export {
   appBrowserDbRuntime,
   createBrowserDbRuntime,
   resolveAppBrowserDbRuntime,
-  type BrowserDbRuntime,
 } from './browserDbRuntime';
 export {
   DbRuntimeError,
@@ -30,44 +40,3 @@ export {
   type DbRuntimeErrorCode,
 } from './dbRuntimeErrors';
 export { appSqlJsLoader, createSqlJsLoader, type SqlJsLoader } from './sqlJsLoader';
-
-export const PRIMARY_INCOME_ACCOUNT_TYPE_ID = 1;
-export const PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID = 2;
-
-export interface AccountRecord {
-  readonly accountId: number;
-  readonly name: string;
-  readonly amountCents: number;
-  readonly accountTypeId: number | null;
-}
-
-export interface CategoryRecord {
-  readonly categoryId: number;
-  readonly name: string;
-}
-
-export interface TransferRecord {
-  readonly transferId: number;
-  readonly bookingDateEpochDay: number;
-  readonly name: string;
-  readonly amountCents: number;
-  readonly fromAccountId: number;
-  readonly toAccountId: number;
-  readonly categoryIds: readonly number[];
-  readonly buyplace: string | null;
-}
-
-export interface CreateTransferInput {
-  readonly bookingDateEpochDay: number;
-  readonly name: string;
-  readonly amountCents: number;
-  readonly fromAccountId: number;
-  readonly toAccountId: number;
-  readonly categoryIds: readonly number[];
-  readonly buyplace: string | null;
-}
-
-export interface CreateTransferResult {
-  readonly transferId: number;
-  readonly persistedAtIso: string;
-}

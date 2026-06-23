@@ -570,7 +570,7 @@ M5-05 implementation clarification:
 M5-09 implementation clarification:
 
 - The PWA SQL schema reference is maintained in `docs/reference/conspectus-live-schema.sql` and validated by `src/db/conspectusSchemaSnapshot.test.ts`.
-- The current snapshot is derived from the full Conspectus SQLite database supplied at `tests/fixtures/conspectusDB.db` for `M5-09` and documents that provenance in `docs/reference/README.md`.
+- The current snapshot is derived from a private local full Conspectus SQLite database supplied at `tests/fixtures/conspectusDB.db` for `M5-09`; that source DB is ignored by Git, and the tracked SQL snapshot is the repository source of truth as documented in `docs/reference/README.md`.
 - Current DB read-query services must stay compatible with this schema snapshot; query drift is covered by the schema compatibility test in the unit test suite.
 
 M5-10 implementation clarification:

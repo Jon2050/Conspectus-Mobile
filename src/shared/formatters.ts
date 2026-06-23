@@ -1,5 +1,5 @@
 // Provides formatting utilities for monetary amounts and epoch-day dates.
-const MILLIS_PER_DAY = 24 * 60 * 60 * 1000;
+import { MILLIS_PER_DAY } from './utils';
 
 export type AmountSemantic = 'positive' | 'negative' | 'neutral';
 

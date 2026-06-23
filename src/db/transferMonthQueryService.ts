@@ -1,7 +1,8 @@
 // Implements inclusive transfer-by-month reads with deterministic sorting and strict row mapping.
 import type { QueryExecResult } from 'sql.js';
+import { MILLIS_PER_DAY } from '@shared';
 
-import type { BrowserDbRuntime, TransferRecord } from './index';
+import type { BrowserDbRuntime, TransferRecord } from './types';
 import { DbRuntimeError, toDbRuntimeError } from './dbRuntimeErrors';
 import { resolveAppBrowserDbRuntime } from './browserDbRuntime';
 
@@ -25,8 +26,6 @@ const TRANSFER_RESULT_COLUMNS = [
   'category_3_id',
   'buyplace',
 ] as const;
-
-const MILLIS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export interface EpochDayMonthBounds {
   readonly startEpochDay: number;
