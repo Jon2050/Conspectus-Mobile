@@ -89,8 +89,8 @@ describe('TransfersRoute', () => {
 
     expect(body).toContain('AUSGABEN');
     expect(body).toContain('EINNAHMEN');
-    expect(body).toContain('Ort:');
-    expect(body).toContain('Local Market');
+    expect(body.indexOf('(Local Market)')).toBeLessThan(body.indexOf('Test Transfer'));
+    expect(body).not.toContain('Ort:');
     expect(body).not.toContain('Original From Name');
     expect(body).not.toContain('Original To Name');
   });

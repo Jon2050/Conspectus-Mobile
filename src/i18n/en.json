@@ -22,7 +22,9 @@
   "transfers": {
     "title": "Transfers",
     "previousMonth": "Previous month",
+    "previousMonthButton": "‹",
     "nextMonth": "Next month",
+    "nextMonthButton": "›",
     "swipeArea": "Transfer month swipe area",
     "loading": "Loading transfers...",
     "errorDefault": "Failed to load transfers.",
@@ -31,7 +33,7 @@
     "emptyBox": "There are no transfers recorded for this month.",
     "primaryIncome": "INCOME",
     "primarySpendings": "SPENDINGS",
-    "buyplace": "Place"
+    "buyplace": "Store"
   },
   "settings": {
     "title": "Settings",
