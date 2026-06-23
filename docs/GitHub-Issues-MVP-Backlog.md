@@ -20,7 +20,7 @@ An issue is only considered done when:
 1. The implementation reaches `main` via a merged PR from a dedicated issue branch.
 2. Required CI checks are green for the merged/pushed commit.
 3. The issue branch is deleted after merge.
-4. The corresponding backlog status marker is updated to `:white_check_mark:`.
+4. The corresponding backlog status marker is updated to `:white_check_mark:` (this update must be committed within the issue branch prior to PR merge so that it reaches `main` automatically).
 
 ## Label Set (create first)
 
@@ -415,7 +415,7 @@ An issue is only considered done when:
 - Depends on: `M5-03, M5-04`
 - GitHub: [#60](https://github.com/Jon2050/Conspectus-Mobile/issues/60)
 
-### :green_circle: M5-07 Add formatting utilities and localization-ready rendering
+### :white_check_mark: M5-07 Add formatting utilities and localization-ready rendering
 
 - Label: `feature`
 - Milestone: `M5 - Accounts + Transfers Read UX`

@@ -240,6 +240,7 @@ Issue completion definition (required):
 - Every commit message belonging to a backlog issue MUST start with the issue prefix in the summary (e.g., `feat: [M5-07] add formatting utility`).
 - PRs must be merged into `main` with `Rebase and merge` (linear history; no merge commits or squash merges). The PR title and description MUST explicitly contain the milestone and issue number (e.g., `feat: [M5-07] Add formatting utilities`).
 - All scoped code/tests/docs changes are committed and pushed.
+- The backlog status marker in `docs/GitHub-Issues-MVP-Backlog.md` must be updated to `:white_check_mark:` (Done) within the issue branch before creating the PR/pushed commits.
 - Local quality gates pass (`format`, `lint`, `typecheck`, `test`, `build`, and `test:e2e` when relevant).
 - Required GitHub checks are green.
 - Merge the PR into `main` and delete the head branch.
