@@ -38,14 +38,15 @@ Always print in which step you are!
 6. Run review gate with one reviewer subagent against acceptance criteria and code review best practices. Use the `docs/prompts/Local-CodeReview-PromptTemplate.md` to prompt the reviewer subagent. Fill in the template the placeholders like `{{BRANCH_NAME}}`, `{{ISSUE_NUMBERS_OR_DESCRIPTION}}`, `{{CONTEXT_FILES}}` with the actual values. If gaps are found and the reviewer subagent does not send APPROVED, fix the issues it found and repeat steps 4-6 (if the reviewer found problems with the task iteself and the acceptance criteria) or 5-6 (if it only found other problems) until satisfied.
 7. Git + GitHub flow:
    - At this point, all local checks and tests must be green and the reviewer subagent must have APPROVED the current diff. If not, go back to step 6.
+   - Update the backlog status marker for this issue in `docs/GitHub-Issues-MVP-Backlog.md` to done (`:white_check_mark:`) so that it is included in the issue branch commits.
    - Open a PR to `main` from the issue branch (direct-main is not allowed for issue delivery). The PR title and description MUST explicitly contain the milestone and issue number (e.g., `feat: [M5-07] Add formatting utilities`). Link the issue (for example: `Closes #<issue-id>`)
    - Use a clear commit message referencing the issue and acceptance criteria mapping. Every commit message belonging to a backlog issue MUST start with the issue prefix in the summary (e.g., `feat: [M5-07] add formatting utility`).
    - Commit and push.
 8. CI gate: wait for required GitHub checks to pass. If any check fails, fix and repeat from step 4.
-9. Completion:
-   - Merge the PR to `main`, then delete the head branch.
-   - Mark issue done in GitHub. Also add a brief comment with a summary of what you did and why. Also mention if you made any assumptions or any problems you encountered. Comment must be well formatted.
-   - Update `docs/GitHub-Issues-MVP-Backlog.md` status marker to done.
+9. Completion (Note: If the PR merge is delayed/asynchronous and your turn ends, the very first step upon resuming or in any follow-up task after the merge is to complete this checklist):
+   - Merge the PR to `main` (or verify it has been merged), then delete the head branch.
+   - Mark the issue as done in GitHub. Also add a brief comment with a summary of what you did and why. Also mention if you made any assumptions or any problems you encountered. Comment must be well formatted.
+   - Verify that `docs/GitHub-Issues-MVP-Backlog.md` status marker is updated to done (`:white_check_mark:`) on the merged `main` branch.
    - Update docs/Architecture-and-Implementation-Plan.md: Append something or modify ONLY the specific section relevant to this issue to reflect implementation realities if something changed, got redefined or became clearer during this task. STRICTLY FORBIDDEN: Do not reformat, summarize, or alter any unrelated parts of this document.
    - Provide final report with changed files, commands/results, CI status, acceptance criteria checklist, and assumptions.
      You are not fully done before step 9 is not completed and all CI pipelines, checks and tests are green. You have to confirm this always after every push or merge!
