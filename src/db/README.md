@@ -21,6 +21,12 @@ Expected public interfaces (`src/db/index.ts`):
 - `TransferRecord`: normalized transfer row shape for Transfers UI.
 - `CreateTransferInput` and `CreateTransferResult`: write-path contract.
 
+Schema source of truth:
+
+- Current PWA SQL must remain compatible with `docs/reference/conspectus-live-schema.sql`.
+- `src/db/conspectusSchemaSnapshot.test.ts` validates the query services against that schema snapshot.
+- When SQL query projections change, update the schema snapshot only from the selected Conspectus SQLite source database.
+
 M5/M6 implementation target:
 
 - Encapsulate SQL details and runtime lifecycle in this module.
