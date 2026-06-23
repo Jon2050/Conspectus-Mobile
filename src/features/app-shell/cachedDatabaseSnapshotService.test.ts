@@ -3,18 +3,15 @@ import 'fake-indexeddb/auto';
 
 import { describe, expect, it, vi } from 'vitest';
 import { createDexieCacheStore } from '@cache';
+import { SQLITE_DATABASE_HEADER } from '@db';
 
 import { createCachedDatabaseSnapshotService } from './cachedDatabaseSnapshotService';
 
 import type { CachedDatabaseSnapshot, CacheStore } from '@cache';
 import type { DriveItemBinding, GraphClient, GraphFileMetadata } from '@graph';
 
-const SQLITE_DATABASE_HEADER_BYTES = Uint8Array.from([
-  0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, 0x20, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x20, 0x33, 0x00,
-]);
-
 const createSqliteBytes = (payloadBytes: readonly number[] = [1, 2, 3, 4]): Uint8Array =>
-  Uint8Array.from([...SQLITE_DATABASE_HEADER_BYTES, ...payloadBytes]);
+  Uint8Array.from([...SQLITE_DATABASE_HEADER, ...payloadBytes]);
 
 const DRIVE_ITEM_BINDING: DriveItemBinding = {
   driveId: 'drive-123',

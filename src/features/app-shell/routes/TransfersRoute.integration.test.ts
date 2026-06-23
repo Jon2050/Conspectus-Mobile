@@ -22,14 +22,14 @@ import { toEpochDay } from '../../../shared/testUtils/dateUtils';
 describe('TransfersRoute Integration', () => {
   beforeAll(() => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date('2024-03-15T12:00:00Z'));
+    vi.setSystemTime(new Date('2024-04-15T12:00:00Z'));
   });
 
   afterAll(() => {
     vi.useRealTimers();
   });
 
-  it('renders transfer cards dynamically from fixture DB for March 2024', async () => {
+  it('renders transfer cards and category badges dynamically from fixture DB', async () => {
     const loader = createNodeSqlJsRuntimeLoader();
     const runtime = createBrowserDbRuntime(loader);
     await runtime.open(loadTransferFixtureBytes());
@@ -44,7 +44,7 @@ describe('TransfersRoute Integration', () => {
       categoryQueryService,
     );
 
-    await controller.load(toEpochDay(2024, 3, 15));
+    await controller.load(toEpochDay(2024, 4, 15));
 
     const { body } = render(TransfersRoute, {
       props: {
@@ -52,8 +52,9 @@ describe('TransfersRoute Integration', () => {
       },
     });
 
-    expect(body).toContain('data-testid="transfer-card-1"');
-    expect(body).toContain('Salary'); // from fixture
+    expect(body).toContain('data-testid="transfer-card-2"');
+    expect(body).toContain('Groceries'); // transfer name and category badge from fixture
+    expect(body).toMatch(/<span class="app-badge svelte-[^"]+">Groceries<\/span>/u);
 
     runtime.close();
   });

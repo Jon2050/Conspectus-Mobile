@@ -33,6 +33,7 @@ export {
   createBrowserDbRuntime,
   resolveAppBrowserDbRuntime,
 } from './browserDbRuntime';
+export { hasSqliteHeader, SQLITE_DATABASE_HEADER } from './sqliteFileSignature';
 export {
   DbRuntimeError,
   isDbRuntimeError,
