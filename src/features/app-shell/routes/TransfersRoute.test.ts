@@ -35,6 +35,8 @@ describe('TransfersRoute', () => {
     expect(body).toContain('data-testid="transfers-month-label"');
     expect(body).toContain('data-testid="transfers-month-swipe-surface"');
     expect(body).toContain('aria-label="Wischbereich für Transfermonate"');
+    expect(body).toContain('transfers-route__drag-track');
+    expect(body).toContain('transform: translateX(0.0px);');
   });
 
   it('exposes a deterministic YYYY-MM month key marker', () => {

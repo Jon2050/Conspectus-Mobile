@@ -3,11 +3,28 @@
  * Ensures that categories are correctly extracted and mapped from the DB runtime.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { createCategoryQueryService } from './categoryQueryService';
 import type { QueryExecResult } from 'sql.js';
-import type { BrowserDbRuntime } from './index';
+import { createBrowserDbRuntime, createCategoryQueryService, type BrowserDbRuntime } from './index';
+import {
+  createNodeSqlJsRuntimeLoader,
+  loadTransferFixtureBytes,
+} from '../shared/testUtils/dbIntegration';
 
 describe('createCategoryQueryService', () => {
+  it('loads categories sorted by name from the tracked SQLite fixture', async () => {
+    const runtime = createBrowserDbRuntime(createNodeSqlJsRuntimeLoader());
+    await runtime.open(loadTransferFixtureBytes());
+    const service = createCategoryQueryService(runtime);
+
+    expect(service.listAllCategories()).toEqual([
+      { categoryId: 1, name: 'Groceries' },
+      { categoryId: 3, name: 'Leisure' },
+      { categoryId: 2, name: 'Rent' },
+    ]);
+
+    runtime.close();
+  });
+
   it('maps valid query results correctly', () => {
     const dbRuntime = {
       exec: () => [

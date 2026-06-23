@@ -168,6 +168,8 @@ Findings that require up to 60 minutes of work, potentially touching multiple fi
 
 #### M-01: Touch Swipe Surface Lacks Visual Feedback and Drag Interception
 
+- **Status:** ✅ Fixed in `review-fixing`
+
 - **Severity:** Medium
 - **Perspective:** UI/UX
 - **Location:** [TransfersRoute.svelte](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/src/features/app-shell/routes/TransfersRoute.svelte#L86-L119)
@@ -194,6 +196,8 @@ This check runs on every CI push via the quality workflow's "Build Verification"
 
 #### M-03: Category Query Service Lacks `listAllCategories` Integration Test Against Real Fixture DB
 
+- **Status:** ✅ Fixed in `review-fixing`
+
 - **Severity:** Low
 - **Perspective:** Testing
 - **Location:** [categoryQueryService.test.ts](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/src/db/categoryQueryService.test.ts)
@@ -202,6 +206,8 @@ This check runs on every CI push via the quality workflow's "Build Verification"
 - **Recommendation:** Add a fixture-backed integration test to `categoryQueryService.test.ts` (similar to the account/transfer service tests) that opens the tracked `tests/fixtures/test.db` fixture, runs `listAllCategories()`, and asserts expected results. Also add a transfer-route integration assertion for at least one rendered category badge so the category enrichment path is covered beyond mocked unit tests.
 
 #### M-04: Redundant SQLite Header Validation in `cachedDatabaseSnapshotService.ts` and `browserDbRuntime.ts`
+
+- **Status:** ✅ Fixed in `review-fixing`
 
 - **Severity:** Low
 - **Perspective:** Code Quality / Maintainability
@@ -297,7 +303,7 @@ There are no blockers for Milestone 6. However, the following risks should be ma
 
 - **Timezone Date Selection Risks:** Form inputs for date selection in the upcoming bottom sheet must resolve dates in a UTC-safe epoch-day format rather than local timestamps, matching the query boundaries established in M5 (`getEpochDayMonthBounds` uses `Date.UTC()` throughout). Local-to-UTC conversion errors could cause day-offset drift at midnight boundaries.
 - **Conflict Resolution on Upload Failure:** When database upload fails with HTTP 412 (eTag mismatch), the local SQLite instance must be re-initialized from a fresh OneDrive download, and form data must be preserved. The M6 implementation must strictly handle this rollback path using the existing supersession guard pattern.
-- **Category Query Service Confidence:** The lack of a fixture-backed integration test for `categoryQueryService` (finding M-03) means that if the M6 write path modifies category associations, there is slightly lower test confidence in the category read path compared to accounts and transfers.
+- **Category Query Service Confidence:** Fixed in `review-fixing`; `categoryQueryService` now has fixture-backed `listAllCategories()` coverage and the transfers route integration test asserts category badge rendering from fixture data.
 - **Runtime/Cache Hardening:** M-06 and M-07 are not blockers for starting M6, but they affect the exact startup/cache invariants that the write path will depend on after a local DB mutation and conditional upload attempt.
 - **Locale and Accessibility Polish:** S-07, S-08, and S-09 were cleaned up in `review-fixing`, reducing the risk of future M6 screens inheriting inconsistent language metadata.
 
@@ -308,6 +314,6 @@ There are no blockers for Milestone 6. However, the following risks should be ma
 | Effort    | Count | Critical | High | Medium | Low | Invalidated | Solved |
 | --------- | ----- | -------- | ---- | ------ | --- | ----------- | ------ |
 | Small     | 11    | 0        | 0    | 0      | 0   | 0           | 11     |
-| Medium    | 7     | 0        | 0    | 4      | 2   | 1           | 0      |
+| Medium    | 7     | 0        | 0    | 3      | 0   | 1           | 3      |
 | Large     | 0     | 0        | 0    | 0      | 0   | 0           | 0      |
-| **Total** | 18    | 0        | 0    | 4      | 2   | 1           | 11     |
+| **Total** | 18    | 0        | 0    | 3      | 0   | 1           | 14     |

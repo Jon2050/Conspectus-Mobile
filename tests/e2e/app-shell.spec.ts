@@ -92,7 +92,7 @@ const dispatchTransferMonthSwipe = async (
         };
       };
       const dispatchTouch = (
-        type: 'touchstart' | 'touchend',
+        type: 'touchstart' | 'touchmove' | 'touchend',
         touches: ArrayLike<{ clientX: number; clientY: number }>,
         changedTouches: ArrayLike<{ clientX: number; clientY: number }>,
       ): void => {
@@ -112,6 +112,7 @@ const dispatchTransferMonthSwipe = async (
       };
 
       dispatchTouch('touchstart', createTouchList(startX, startY), createTouchList(startX, startY));
+      dispatchTouch('touchmove', createTouchList(endX, endY), createTouchList(endX, endY));
       dispatchTouch('touchend', createTouchList(endX, endY), createTouchList(endX, endY));
     },
     {
@@ -120,6 +121,78 @@ const dispatchTransferMonthSwipe = async (
     },
   );
 };
+
+const inspectTransferMonthSwipeMove = async (
+  page: import('@playwright/test').Page,
+  deltaX: number,
+  deltaY = 0,
+): Promise<{ defaultPrevented: boolean; trackTransform: string }> =>
+  page.getByTestId('transfers-month-swipe-surface').evaluate(
+    async (swipeSurface, swipeDelta) => {
+      const element = swipeSurface as HTMLElement;
+      const track = element.querySelector<HTMLElement>('.transfers-route__drag-track');
+      const bounds = element.getBoundingClientRect();
+      const startX = bounds.left + bounds.width / 2;
+      const startY = bounds.top + bounds.height / 2;
+      const endX = startX + swipeDelta.deltaX;
+      const endY = startY + swipeDelta.deltaY;
+
+      const createTouchList = (
+        x: number,
+        y: number,
+      ): ArrayLike<{ clientX: number; clientY: number }> => {
+        const point = {
+          clientX: x,
+          clientY: y,
+        };
+
+        return {
+          0: point,
+          length: 1,
+          item(index: number) {
+            return index === 0 ? point : null;
+          },
+        };
+      };
+      const dispatchTouch = (
+        type: 'touchstart' | 'touchmove' | 'touchend',
+        touches: ArrayLike<{ clientX: number; clientY: number }>,
+        changedTouches: ArrayLike<{ clientX: number; clientY: number }>,
+      ): Event => {
+        const event = new Event(type, {
+          bubbles: true,
+          cancelable: true,
+        });
+        Object.defineProperty(event, 'touches', {
+          value: touches,
+          configurable: true,
+        });
+        Object.defineProperty(event, 'changedTouches', {
+          value: changedTouches,
+          configurable: true,
+        });
+        element.dispatchEvent(event);
+        return event;
+      };
+
+      dispatchTouch('touchstart', createTouchList(startX, startY), createTouchList(startX, startY));
+      const moveEvent = dispatchTouch(
+        'touchmove',
+        createTouchList(endX, endY),
+        createTouchList(endX, endY),
+      );
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+      return {
+        defaultPrevented: moveEvent.defaultPrevented,
+        trackTransform: track?.style.transform ?? '',
+      };
+    },
+    {
+      deltaX,
+      deltaY,
+    },
+  );
 
 type MockAuthClientOptions = {
   readonly initializeDelayMs?: number;
@@ -964,6 +1037,18 @@ test('switches transfer months by buttons and swipe gestures', async ({ page }) 
 
   await dispatchTransferMonthSwipe(page, 30, 120);
   await expect(monthLabel).toHaveAttribute('data-month-key', expectedInitialMonthKey);
+});
+
+test('shows transfer swipe drag feedback and locks horizontal drag scroll', async ({ page }) => {
+  await page.goto(appPath('#/transfers'));
+
+  const horizontalMove = await inspectTransferMonthSwipeMove(page, -80, 6);
+  expect(horizontalMove.defaultPrevented).toBe(true);
+  expect(horizontalMove.trackTransform).toBe('translateX(-28px)');
+
+  const verticalMove = await inspectTransferMonthSwipeMove(page, 8, 80);
+  expect(verticalMove.defaultPrevented).toBe(false);
+  expect(verticalMove.trackTransform).toBe('translateX(0px)');
 });
 
 test('reuses the cached DB on startup when the OneDrive eTag is unchanged', async ({ page }) => {

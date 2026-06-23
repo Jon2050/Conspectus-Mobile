@@ -30,6 +30,9 @@
     toMonthKey,
   } from './transfersMonthNavigation';
 
+  const SWIPE_DRAG_LOCK_THRESHOLD_PX = 10;
+  const SWIPE_DRAG_MAX_OFFSET_PX = 56;
+
   export let controller: TransfersRouteController = createTransfersRouteController(
     appTransferMonthQueryService,
     appAccountQueryService,
@@ -39,6 +42,8 @@
   let monthAnchorEpochDay = getCurrentMonthAnchorEpochDay();
   let swipeStartX: number | null = null;
   let swipeStartY: number | null = null;
+  let swipeDragOffsetX = 0;
+  let swipeLockedHorizontally = false;
   let state: TransfersRouteState = controller.getState();
   let lastObservedSyncState: SyncState = get(appSyncStateStore).state;
 
@@ -75,6 +80,8 @@
   const clearSwipeStart = (): void => {
     swipeStartX = null;
     swipeStartY = null;
+    swipeDragOffsetX = 0;
+    swipeLockedHorizontally = false;
   };
   const shiftMonth = (deltaMonths: number): void => {
     if (deltaMonths === 0) return;
@@ -95,6 +102,32 @@
     }
     swipeStartX = touch.clientX;
     swipeStartY = touch.clientY;
+    swipeDragOffsetX = 0;
+    swipeLockedHorizontally = false;
+  };
+
+  const handleTouchMove = (event: TouchEvent): void => {
+    if (swipeStartX === null || swipeStartY === null) {
+      return;
+    }
+    const touch = event.touches.item(0) ?? event.touches[0];
+    if (touch == null) {
+      clearSwipeStart();
+      return;
+    }
+
+    const deltaX = touch.clientX - swipeStartX;
+    const deltaY = touch.clientY - swipeStartY;
+    const absDeltaX = Math.abs(deltaX);
+    const absDeltaY = Math.abs(deltaY);
+    if (
+      swipeLockedHorizontally ||
+      (absDeltaX >= SWIPE_DRAG_LOCK_THRESHOLD_PX && absDeltaX > absDeltaY)
+    ) {
+      swipeLockedHorizontally = true;
+      event.preventDefault();
+      swipeDragOffsetX = Math.sign(deltaX) * Math.min(absDeltaX * 0.35, SWIPE_DRAG_MAX_OFFSET_PX);
+    }
   };
 
   const handleTouchEnd = (event: TouchEvent): void => {
@@ -163,6 +196,7 @@
     role="group"
     aria-label={$_('transfers.swipeArea')}
     on:touchstart={handleTouchStart}
+    on:touchmove|nonpassive={handleTouchMove}
     on:touchend={handleTouchEnd}
     on:touchcancel={clearSwipeStart}
   >
@@ -184,83 +218,88 @@
       {/if}
     </p>
 
-    {#if state.operation === 'loading'}
-      <div class="transfers-route__loading" data-testid="transfers-route-loading">
-        <SkeletonCard />
-        <SkeletonCard />
-      </div>
-    {:else if state.operation === 'empty'}
-      <div class="transfers-route__empty" data-testid="transfers-route-empty">
-        <p>{$_('transfers.emptyBox')}</p>
-      </div>
-    {:else if state.operation === 'ready'}
-      <ul class="transfers-route__cards" data-testid="transfers-route-cards">
-        {#each state.transfers as transfer (transfer.transferId)}
-          <li class="transfers-route__card-item">
-            <article
-              class={`transfer-card transfer-card--${transfer.amountSemantic}`}
-              data-testid={`transfer-card-${transfer.transferId}`}
-              data-transfer-id={transfer.transferId}
-            >
-              <div class="transfer-card__header">
-                <div>
-                  <p class="transfer-card__date">
-                    {formatEpochDayToDate(transfer.bookingDateEpochDay, $locale)}
-                  </p>
-                  <h3 class="transfer-card__name">
-                    {#if transfer.buyplace}<span class="transfer-card__buyplace-prefix"
-                        >({transfer.buyplace})
-                      </span>
-                    {/if}{transfer.name}
-                  </h3>
+    <div
+      class="transfers-route__drag-track"
+      style={`transform: translateX(${swipeDragOffsetX.toFixed(1)}px);`}
+    >
+      {#if state.operation === 'loading'}
+        <div class="transfers-route__loading" data-testid="transfers-route-loading">
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+      {:else if state.operation === 'empty'}
+        <div class="transfers-route__empty" data-testid="transfers-route-empty">
+          <p>{$_('transfers.emptyBox')}</p>
+        </div>
+      {:else if state.operation === 'ready'}
+        <ul class="transfers-route__cards" data-testid="transfers-route-cards">
+          {#each state.transfers as transfer (transfer.transferId)}
+            <li class="transfers-route__card-item">
+              <article
+                class={`transfer-card transfer-card--${transfer.amountSemantic}`}
+                data-testid={`transfer-card-${transfer.transferId}`}
+                data-transfer-id={transfer.transferId}
+              >
+                <div class="transfer-card__header">
+                  <div>
+                    <p class="transfer-card__date">
+                      {formatEpochDayToDate(transfer.bookingDateEpochDay, $locale)}
+                    </p>
+                    <h3 class="transfer-card__name">
+                      {#if transfer.buyplace}<span class="transfer-card__buyplace-prefix"
+                          >({transfer.buyplace})
+                        </span>
+                      {/if}{transfer.name}
+                    </h3>
+                  </div>
+                  <span
+                    class="transfer-card__amount"
+                    data-testid={`transfer-amount-${transfer.transferId}`}
+                    >{formatAmountDisplay(
+                      transfer.amountCents,
+                      transfer.amountSemantic,
+                      $locale,
+                    )}</span
+                  >
                 </div>
-                <span
-                  class="transfer-card__amount"
-                  data-testid={`transfer-amount-${transfer.transferId}`}
-                  >{formatAmountDisplay(
-                    transfer.amountCents,
-                    transfer.amountSemantic,
-                    $locale,
-                  )}</span
-                >
-              </div>
-              <div class="transfer-card__details">
-                <div class="transfer-card__accounts">
-                  <span class="transfer-card__account transfer-card__account--from">
-                    {#if transfer.fromAccountTypeId === PRIMARY_INCOME_ACCOUNT_TYPE_ID}
-                      {$_('transfers.primaryIncome')}
-                    {:else if transfer.fromAccountTypeId === PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID}
-                      {$_('transfers.primarySpendings')}
-                    {:else}
-                      {transfer.fromAccountName}
-                    {/if}
-                  </span>
-                  <span class="transfer-card__account-arrow">→</span>
-                  <span class="transfer-card__account transfer-card__account--to">
-                    {#if transfer.toAccountTypeId === PRIMARY_INCOME_ACCOUNT_TYPE_ID}
-                      {$_('transfers.primaryIncome')}
-                    {:else if transfer.toAccountTypeId === PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID}
-                      {$_('transfers.primarySpendings')}
-                    {:else}
-                      {transfer.toAccountName}
-                    {/if}
-                  </span>
+                <div class="transfer-card__details">
+                  <div class="transfer-card__accounts">
+                    <span class="transfer-card__account transfer-card__account--from">
+                      {#if transfer.fromAccountTypeId === PRIMARY_INCOME_ACCOUNT_TYPE_ID}
+                        {$_('transfers.primaryIncome')}
+                      {:else if transfer.fromAccountTypeId === PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID}
+                        {$_('transfers.primarySpendings')}
+                      {:else}
+                        {transfer.fromAccountName}
+                      {/if}
+                    </span>
+                    <span class="transfer-card__account-arrow">→</span>
+                    <span class="transfer-card__account transfer-card__account--to">
+                      {#if transfer.toAccountTypeId === PRIMARY_INCOME_ACCOUNT_TYPE_ID}
+                        {$_('transfers.primaryIncome')}
+                      {:else if transfer.toAccountTypeId === PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID}
+                        {$_('transfers.primarySpendings')}
+                      {:else}
+                        {transfer.toAccountName}
+                      {/if}
+                    </span>
+                  </div>
+                  {#if transfer.categoryNames.length > 0}
+                    <ul class="transfer-card__categories">
+                      {#each transfer.categoryNames as category (category)}
+                        <li class="transfer-card__category">
+                          <span class="app-badge">{category}</span>
+                        </li>
+                      {/each}
+                    </ul>
+                  {/if}
                 </div>
-                {#if transfer.categoryNames.length > 0}
-                  <ul class="transfer-card__categories">
-                    {#each transfer.categoryNames as category (category)}
-                      <li class="transfer-card__category">
-                        <span class="app-badge">{category}</span>
-                      </li>
-                    {/each}
-                  </ul>
-                {/if}
-              </div>
-            </article>
-          </li>
-        {/each}
-      </ul>
-    {/if}
+              </article>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </div>
   </div>
 </section>
 
@@ -340,6 +379,10 @@
     border-radius: var(--radius-md);
     color: color-mix(in srgb, var(--negative) 72%, var(--text-primary));
     background: color-mix(in srgb, var(--negative) 14%, var(--surface-strong));
+  }
+
+  .transfers-route__drag-track {
+    will-change: transform;
   }
 
   .transfers-route__loading,
