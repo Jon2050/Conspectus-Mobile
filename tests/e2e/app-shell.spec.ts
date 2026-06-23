@@ -1,5 +1,7 @@
 // Covers the app-shell navigation, auth mock flow, and OneDrive file selection behavior in a browser.
 import { expect, test } from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
 
 test.use({ viewport: { width: 390, height: 844 } });
 
@@ -1595,6 +1597,41 @@ test('reveals deployment footer only when reaching the end of a scrollable page'
     delete trackedWindow.__CONSPECTUS_FOOTER_VISIBILITY_OBSERVER__;
     delete trackedWindow.__CONSPECTUS_FOOTER_VISIBILITY_CHANGE_COUNT__;
   });
+});
+
+test('loads transfers from real DB bytes and navigates months to see fixture data', async ({
+  page,
+}) => {
+  const fixtureBytes = Array.from(
+    fs.readFileSync(path.resolve(process.cwd(), 'tests/fixtures/test.db')),
+  );
+
+  await installMockAuthClient(page, { startAuthenticated: true });
+  await installMockGraphClient(page, { metadataETag: '"etag-1"' });
+  await installMockCacheStore(page, {
+    startupSnapshot: {
+      metadata: { eTag: '"etag-1"' },
+      dbBytes: fixtureBytes,
+    },
+  });
+  await installPersistedBinding(page);
+  await installMockStartupNetworkState(page, true);
+
+  // We set the date to April 15, 2024 to target our fixture data months.
+  await page.clock.setFixedTime(new Date('2024-04-15T12:00:00.000Z'));
+
+  await page.goto(appPath('#/transfers'));
+
+  const monthLabel = page.getByTestId('transfers-month-label');
+  await expect(monthLabel).toBeVisible();
+
+  await expect(monthLabel).toHaveAttribute('data-month-key', '2024-04');
+  await expect(page.getByTestId('transfer-card-2')).toBeVisible();
+  await expect(page.getByTestId('transfer-card-3')).toBeVisible();
+
+  await page.getByTestId('transfers-month-previous-button').click();
+  await expect(monthLabel).toHaveAttribute('data-month-key', '2024-03');
+  await expect(page.getByTestId('transfer-card-1')).toBeVisible();
 });
 
 test('supports sign-in and sign-out auth UX states in settings', async ({ page }) => {
