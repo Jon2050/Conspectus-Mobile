@@ -344,7 +344,7 @@
     class:app-shell__bottom--with-safe-area={showLoadingPlaceholder || !footerIsVisible}
     data-testid="app-shell-bottom"
   >
-    <nav class="app-nav" aria-label="Primary">
+    <nav class="app-nav" aria-label={$_('nav.primary')}>
       {#each APP_ROUTES as route (route.key)}
         <a
           class="app-nav__item"

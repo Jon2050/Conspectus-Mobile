@@ -1,5 +1,6 @@
 {
   "nav": {
+    "primary": "Hauptnavigation",
     "accounts": "Konten",
     "transfers": "Transfers",
     "add": "Neu",

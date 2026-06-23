@@ -1,5 +1,6 @@
 {
   "nav": {
+    "primary": "Primary",
     "accounts": "Accounts",
     "transfers": "Transfers",
     "add": "Add",

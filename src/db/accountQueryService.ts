@@ -1,7 +1,7 @@
 // Implements deterministic visible-account reads and strict row mapping for Accounts feature consumers.
 import type { QueryExecResult } from 'sql.js';
 
-import type { AccountRecord, BrowserDbRuntime } from './index';
+import type { AccountRecord, BrowserDbRuntime } from './types';
 import { DbRuntimeError, toDbRuntimeError } from './dbRuntimeErrors';
 import { resolveAppBrowserDbRuntime } from './browserDbRuntime';
 

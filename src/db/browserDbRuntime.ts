@@ -3,6 +3,7 @@ import type { BindParams, Database, QueryExecResult, SqlJsStatic } from 'sql.js'
 
 import { DbRuntimeError, toDbRuntimeError } from './dbRuntimeErrors';
 import { appSqlJsLoader, type SqlJsLoader } from './sqlJsLoader';
+import type { BrowserDbRuntime, BrowserDbRuntimeOpenOptions } from './types';
 
 const FOREIGN_KEYS_PRAGMA_VALUE = 1;
 const SQLITE_DATABASE_HEADER = Uint8Array.from([
@@ -38,18 +39,6 @@ const applyRequiredPragmas = (database: Database): void => {
     );
   }
 };
-
-export interface BrowserDbRuntime {
-  open(snapshotBytes: Uint8Array, options?: BrowserDbRuntimeOpenOptions): Promise<void>;
-  close(): void;
-  isOpen(): boolean;
-  exec(sql: string, params?: BindParams): readonly QueryExecResult[];
-  exportBytes(): Uint8Array;
-}
-
-export interface BrowserDbRuntimeOpenOptions {
-  readonly canApply?: () => boolean;
-}
 
 declare global {
   interface Window {

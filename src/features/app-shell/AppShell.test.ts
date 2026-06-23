@@ -45,6 +45,7 @@ describe('AppShell component', () => {
       expect(body).not.toContain('data-testid="loading-placeholder"');
       expect(body).toContain(`data-testid="${ROUTE_TEST_IDS[route]}"`);
       expect(body).toContain('data-testid="deployment-info-footer"');
+      expect(body).toContain('aria-label="Hauptnavigation"');
       expect(body).toContain('data-testid="deployment-info-label"');
       expect(body).toContain(formatBuildInfoLabel(getFallbackBuildInfo()));
       expect(body).toContain(`href="#/${route}"`);

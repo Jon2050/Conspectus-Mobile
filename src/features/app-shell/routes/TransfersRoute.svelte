@@ -43,7 +43,7 @@
   let lastObservedSyncState: SyncState = get(appSyncStateStore).state;
 
   $: monthKey = toMonthKey(monthAnchorEpochDay);
-  $: monthLabel = formatMonthLabel(monthAnchorEpochDay);
+  $: monthLabel = formatMonthLabel(monthAnchorEpochDay, $locale);
 
   $: {
     void controller.load(monthAnchorEpochDay);

@@ -24,9 +24,9 @@ Repository: `Jon2050/Conspectus-Mobile`
 | #58   | M5-04 Implement month navigation state and gestures             | ✅ Fully implemented | Touch gestures and Previous/Next buttons are unified in [TransfersRoute.svelte](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/src/features/app-shell/routes/TransfersRoute.svelte). Swipe math is isolated in [transfersMonthNavigation.ts](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/src/features/app-shell/routes/transfersMonthNavigation.ts) with configurable horizontal distance threshold (48px default) and dominance ratio (1.2x), NaN/Infinity guard, and proper DST-safe epoch-day arithmetic.                                                                                                                |
 | #59   | M5-05 Build Accounts screen UI                                  | ✅ Fully implemented | [AccountsRoute.svelte](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/src/features/app-shell/routes/AccountsRoute.svelte) displays account names, locale-formatted amounts, semantic color-coded borders, skeleton loading states, and empty states. Responsive grid with mobile-first card layout and `@media (max-width: 380px)` breakpoint.                                                                                                                                                                                                                                                                                        |
 | #60   | M5-06 Build Transfers screen UI                                 | ✅ Fully implemented | [TransfersRoute.svelte](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/src/features/app-shell/routes/TransfersRoute.svelte) renders transfer cards with UTC epoch-day date formatting, name/buyplace composition, from→to account direction arrows, category badges, and semantic amount coloring. Primary income/spendings accounts display localized labels (EINNAHMEN/AUSGABEN). Dark mode amount colors are overridden via scoped CSS custom properties.                                                                                                                                                                          |
-| #61   | M5-07 Add formatting utilities and localization-ready rendering | ⚠️ Partial           | [formatters.ts](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/src/shared/formatters.ts) provides `formatAmountDisplay` (EUR currency with sign prefix by semantic) and `formatEpochDayToDate` (UTC-safe `Intl.DateTimeFormat`) with German default locale. Core strings are i18n-wired via `svelte-i18n`, but the transfer month header, bottom-nav landmark, and document language still miss active-locale wiring; see S-07, S-08, and S-09.                                                                                                                                                                                       |
+| #61   | M5-07 Add formatting utilities and localization-ready rendering | ✅ Fully implemented | [formatters.ts](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/src/shared/formatters.ts) provides `formatAmountDisplay` (EUR currency with sign prefix by semantic) and `formatEpochDayToDate` (UTC-safe `Intl.DateTimeFormat`) with German default locale. Core strings are i18n-wired via `svelte-i18n`, and the transfer month header, bottom-nav landmark, and document language now follow active-locale wiring.                                                                                                                                                                                                                 |
 | #62   | M5-08 Add read-flow tests (unit + integration + e2e smoke)      | ✅ Fully implemented | Comprehensive multi-layer test suite: (a) DB query service unit tests with real sql.js WASM runtimes and in-memory fixtures, (b) controller unit tests with mock query services, (c) Svelte SSR component tests for all view states, (d) integration tests loading from real fixture DB files, (e) schema snapshot compatibility test, (f) 2100+ line Playwright E2E suite with mock auth/graph/cache/db-runtime stacks.                                                                                                                                                                                                                     |
-| #63   | M5-09 Capture live DB schema as reference artifact              | ✅ Fully implemented | Checked-in live schema at [conspectus-live-schema.sql](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/docs/reference/conspectus-live-schema.sql) with source provenance comment. Validated by [conspectusSchemaSnapshot.test.ts](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/src/db/conspectusSchemaSnapshot.test.ts) which creates a runtime from the schema DDL, verifies required columns via `PRAGMA table_info`, and exercises all three query services against the empty schema. The source-DB provenance documentation should clarify that `conspectusDB.db` is ignored/local; see S-11.                             |
+| #63   | M5-09 Capture live DB schema as reference artifact              | ✅ Fully implemented | Checked-in live schema at [conspectus-live-schema.sql](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/docs/reference/conspectus-live-schema.sql) with source provenance comment. Validated by [conspectusSchemaSnapshot.test.ts](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/src/db/conspectusSchemaSnapshot.test.ts) which creates a runtime from the schema DDL, verifies required columns via `PRAGMA table_info`, and exercises all three query services against the empty schema. The source-DB provenance documentation now clarifies that `conspectusDB.db` is a private ignored local artifact.                     |
 | #174  | M5-10 Follow-up UI cleanup and usability polish                 | ✅ Fully implemented | Transfer cards use `overflow-wrap: anywhere` on name and account spans. Dark-mode amount colors use dedicated `--transfers-amount-positive/negative` overrides. Category badges use pill-rounded `app-badge` styling. Mobile breakpoint at 380px collapses header grid to single column.                                                                                                                                                                                                                                                                                                                                                     |
 
 ---
@@ -103,6 +103,7 @@ Findings that can be resolved in under 20 minutes with isolated, localized chang
 #### S-06: Duplicate `MILLIS_PER_DAY` Constant Across Modules
 
 - **Severity:** Low
+- **Status:** ✅ Fixed in `review-fixing`
 - **Perspective:** Maintainability
 - **Location:** [transferMonthQueryService.ts](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/src/db/transferMonthQueryService.ts#L29), [transfersMonthNavigation.ts](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/src/features/app-shell/routes/transfersMonthNavigation.ts#L2), [formatters.ts](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/src/shared/formatters.ts#L2)
 - **Description:** The constant `MILLIS_PER_DAY = 86_400_000` (or `24 * 60 * 60 * 1000`) is defined independently in three separate source files. While the values are trivially correct, this creates a minor DRY violation.
@@ -112,6 +113,7 @@ Findings that can be resolved in under 20 minutes with isolated, localized chang
 #### S-07: Transfer Month Header Ignores Active App Locale
 
 - **Severity:** Low
+- **Status:** ✅ Fixed in `review-fixing`
 - **Perspective:** UI/UX / Documentation / Testing
 - **Location:** [TransfersRoute.svelte](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/src/features/app-shell/routes/TransfersRoute.svelte#L45-L46), [transfersMonthNavigation.ts](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/src/features/app-shell/routes/transfersMonthNavigation.ts#L59-L68), [i18n/index.ts](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/src/i18n/index.ts#L8-L18)
 - **Description:** `formatMonthLabel()` accepts an optional locale, but `TransfersRoute.svelte` calls it as `formatMonthLabel(monthAnchorEpochDay)` instead of passing `$locale`. The transfer card dates and amounts do pass `$locale`, so the month header can use the browser/default `Intl` locale while the rest of the route follows the Svelte i18n locale.
@@ -121,6 +123,7 @@ Findings that can be resolved in under 20 minutes with isolated, localized chang
 #### S-08: Bottom Navigation Landmark Label Is Hardcoded in English
 
 - **Severity:** Low
+- **Status:** ✅ Fixed in `review-fixing`
 - **Perspective:** Accessibility / UI/UX / Documentation
 - **Location:** [AppShell.svelte](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/src/features/app-shell/AppShell.svelte#L347), [de.json](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/src/i18n/de.json#L2-L7), [en.json](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/src/i18n/en.json#L2-L7)
 - **Description:** The bottom navigation uses localized visual labels via `$_('nav.' + route.key)`, but the navigation landmark remains `aria-label="Primary"`. Neither locale file defines a nav landmark key.
@@ -130,6 +133,7 @@ Findings that can be resolved in under 20 minutes with isolated, localized chang
 #### S-09: Root Document Language Is Hardcoded to English
 
 - **Severity:** Medium
+- **Status:** ✅ Fixed in `review-fixing`
 - **Perspective:** Accessibility / UI/UX
 - **Location:** [index.html](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/index.html#L2), [i18n/index.ts](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/src/i18n/index.ts#L8-L18), [main.ts](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/src/main.ts#L1-L44)
 - **Description:** The static HTML root is `<html lang="en">`, while `svelte-i18n` defaults the app locale to German unless the browser locale starts with English. No startup code updates `document.documentElement.lang` after i18n initialization.
@@ -139,6 +143,7 @@ Findings that can be resolved in under 20 minutes with isolated, localized chang
 #### S-10: Internal DB Services Import Core Types Through the Public Barrel
 
 - **Severity:** Low
+- **Status:** ✅ Fixed in `review-fixing`
 - **Perspective:** Architecture Alignment / Maintainability
 - **Location:** [accountQueryService.ts](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/src/db/accountQueryService.ts#L4), [transferMonthQueryService.ts](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/src/db/transferMonthQueryService.ts#L4), [categoryQueryService.ts](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/src/db/categoryQueryService.ts#L3), [index.ts](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/src/db/index.ts#L36-L56)
 - **Description:** Query-service implementation files import `AccountRecord`, `TransferRecord`, `CategoryRecord`, and `BrowserDbRuntime` types from `./index`, while `index.ts` re-exports those same services and defines the records. This makes the implementation depend on the module's public barrel instead of an internal contract file.
@@ -148,6 +153,7 @@ Findings that can be resolved in under 20 minutes with isolated, localized chang
 #### S-11: Schema Provenance Docs Reference an Ignored Local DB Without Saying So
 
 - **Severity:** Low
+- **Status:** ✅ Fixed in `review-fixing`
 - **Perspective:** Documentation / Maintainability
 - **Location:** [docs/reference/README.md](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/docs/reference/README.md#L18), [conspectus-live-schema.sql](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/docs/reference/conspectus-live-schema.sql#L3), [Architecture-and-Implementation-Plan.md](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/docs/Architecture-and-Implementation-Plan.md#L573), [.gitignore](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/.gitignore#L18)
 - **Description:** The schema documentation says the snapshot is derived from `tests/fixtures/conspectusDB.db`, but that database file is explicitly ignored. A fresh clone therefore receives the SQL snapshot and `tests/fixtures/test.db`, but not the full source DB named in the provenance text.
@@ -267,7 +273,7 @@ _No large findings were identified. The Milestone M5 codebase is highly focused,
 - **ARIA Attributes:** Account and transfer cards use `aria-busy`, `aria-live="polite"`, and `role="alert"` for error states. Month navigation buttons have proper `aria-label` attributes with localized text.
 - **Keyboard Navigation:** Hash routing uses standard `<a>` elements for navigation, providing native keyboard focus and tab order. Navigation items have `:focus-visible` outline styles.
 - **Touch Accessibility:** The swipe surface has an `aria-label` describing its purpose. Button elements within the swipe surface are excluded from swipe detection via `event.target.closest('button')` check.
-- **i18n Coverage:** Most M5 user-visible strings are externalized to `de.json`/`en.json`, and both locale files have matching key structures. The i18n initialization defaults to `de` with English detection via `getLocaleFromNavigator()`, but locale wiring gaps remain for the transfer month header, bottom-nav landmark, and document language; see S-07, S-08, and S-09.
+- **i18n Coverage:** Most M5 user-visible strings are externalized to `de.json`/`en.json`, and both locale files have matching key structures. The i18n initialization defaults to `de` with English detection via `getLocaleFromNavigator()`, and the transfer month header, bottom-nav landmark, and document language now follow the active app locale.
 - **Responsive Design:** Both routes implement `@media (max-width: 380px)` breakpoints that collapse two-column card headers to single-column layouts with left-aligned amounts.
 - **Reduced Motion:** Global `prefers-reduced-motion: reduce` media query in [app.css](file:///c:/Users/Jonas/Repositories/Conspectus-Mobile/src/app.css#L56-L65) disables transitions and animations across all components, including skeleton loading pulses.
 
@@ -293,7 +299,7 @@ There are no blockers for Milestone 6. However, the following risks should be ma
 - **Conflict Resolution on Upload Failure:** When database upload fails with HTTP 412 (eTag mismatch), the local SQLite instance must be re-initialized from a fresh OneDrive download, and form data must be preserved. The M6 implementation must strictly handle this rollback path using the existing supersession guard pattern.
 - **Category Query Service Confidence:** The lack of a fixture-backed integration test for `categoryQueryService` (finding M-03) means that if the M6 write path modifies category associations, there is slightly lower test confidence in the category read path compared to accounts and transfers.
 - **Runtime/Cache Hardening:** M-06 and M-07 are not blockers for starting M6, but they affect the exact startup/cache invariants that the write path will depend on after a local DB mutation and conditional upload attempt.
-- **Locale and Accessibility Polish:** S-07, S-08, and S-09 should be cleaned up before M6 adds more form controls and validation surfaces, otherwise future screens will inherit inconsistent language metadata.
+- **Locale and Accessibility Polish:** S-07, S-08, and S-09 were cleaned up in `review-fixing`, reducing the risk of future M6 screens inheriting inconsistent language metadata.
 
 ---
 
@@ -301,7 +307,7 @@ There are no blockers for Milestone 6. However, the following risks should be ma
 
 | Effort    | Count | Critical | High | Medium | Low | Invalidated | Solved |
 | --------- | ----- | -------- | ---- | ------ | --- | ----------- | ------ |
-| Small     | 11    | 0        | 0    | 1      | 5   | 0           | 5      |
+| Small     | 11    | 0        | 0    | 0      | 0   | 0           | 11     |
 | Medium    | 7     | 0        | 0    | 4      | 2   | 1           | 0      |
 | Large     | 0     | 0        | 0    | 0      | 0   | 0           | 0      |
-| **Total** | 18    | 0        | 0    | 5      | 7   | 1           | 5      |
+| **Total** | 18    | 0        | 0    | 4      | 2   | 1           | 11     |

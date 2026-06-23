@@ -1,6 +1,6 @@
 import type { QueryExecResult } from 'sql.js';
 
-import type { BrowserDbRuntime, CategoryRecord } from './index';
+import type { BrowserDbRuntime, CategoryRecord } from './types';
 import { DbRuntimeError, toDbRuntimeError } from './dbRuntimeErrors';
 import { resolveAppBrowserDbRuntime } from './browserDbRuntime';
 

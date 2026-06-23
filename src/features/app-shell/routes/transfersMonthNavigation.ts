@@ -1,5 +1,5 @@
 // Encapsulates month navigation state math and swipe intent detection for the Transfers route.
-const MILLIS_PER_DAY = 86_400_000;
+import { MILLIS_PER_DAY } from '@shared';
 const DEFAULT_MIN_HORIZONTAL_DISTANCE_PX = 48;
 const DEFAULT_HORIZONTAL_DOMINANCE_RATIO = 1.2;
 
@@ -56,9 +56,9 @@ export const toMonthKey = (monthAnchorEpochDay: number): string => {
   return `${year}-${month}`;
 };
 
-export const formatMonthLabel = (monthAnchorEpochDay: number, locale?: string): string => {
+export const formatMonthLabel = (monthAnchorEpochDay: number, locale?: string | null): string => {
   const safeMonthAnchorEpochDay = toSafeInteger(monthAnchorEpochDay, 'monthAnchorEpochDay');
-  const formatter = new Intl.DateTimeFormat(locale, {
+  const formatter = new Intl.DateTimeFormat(locale || undefined, {
     month: 'long',
     year: 'numeric',
     timeZone: 'UTC',

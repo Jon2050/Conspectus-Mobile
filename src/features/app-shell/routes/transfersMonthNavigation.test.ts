@@ -47,6 +47,7 @@ describe('transfers month navigation', () => {
     const monthAnchor = toEpochDay(2026, 3, 1);
 
     expect(formatMonthLabel(monthAnchor, 'en-US')).toBe('March 2026');
+    expect(formatMonthLabel(monthAnchor, 'de')).toBe('März 2026');
   });
 
   it('resolves swipe intent for clear horizontal gestures', () => {
