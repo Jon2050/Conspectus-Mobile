@@ -24,7 +24,7 @@ Always print in which step you are!
    - `docs/GitHub-Issues-MVP-Backlog.md`
      Then locate `M5-07` and extract implementation steps, acceptance criteria, and dependencies/constraints from GitHub. Also from the comments on GitHub.
 2. Plan with one planning subagent. Refine until concrete, testable, and mapped from each acceptance criterion to file-level code/test changes. Make clear, that the planning subagent should not write any code, just the plan.
-3. Create/use a dedicated issue branch with a proper name.
+3. Create/use a dedicated issue branch with a proper name containing the milestone and issue number (e.g., `feature/M5-07-localize-formatting` or `bug/M5-07-fix-locale`).
    3.1. Increase the app version in `package.json` to `0.<milestone_number>.<issue_title_number>`. (e.g. `0.4.08` for issue `M4-08`)
 4. Implement the approved plan or findings by a reviewer. Keep commits scoped to this issue. Add/update tests for behavior changes.
 5. Run local verification gate:
@@ -37,9 +37,9 @@ Always print in which step you are!
      Fix any issues found during the verification gate before proceeding with step 5.
 6. Run review gate with one reviewer subagent against acceptance criteria and code review best practices. Use the `docs/prompts/Local-CodeReview-PromptTemplate.md` to prompt the reviewer subagent. Fill in the template the placeholders like `{{BRANCH_NAME}}`, `{{ISSUE_NUMBERS_OR_DESCRIPTION}}`, `{{CONTEXT_FILES}}` with the actual values. If gaps are found and the reviewer subagent does not send APPROVED, fix the issues it found and repeat steps 4-6 (if the reviewer found problems with the task iteself and the acceptance criteria) or 5-6 (if it only found other problems) until satisfied.
 7. Git + GitHub flow:
-   - Ath this point, all local checks and tests must be green and the reviewer subagent must have APPROVED the current diff. If not, go back to step 6.
-   - Open a PR to `main` from the issue branch (direct-main is not allowed for issue delivery). Link the issue (for example: `Closes #<issue-id>`)
-   - Use a clear commit message referencing the issue and acceptance criteria mapping.
+   - At this point, all local checks and tests must be green and the reviewer subagent must have APPROVED the current diff. If not, go back to step 6.
+   - Open a PR to `main` from the issue branch (direct-main is not allowed for issue delivery). The PR title and description MUST explicitly contain the milestone and issue number (e.g., `feat: [M5-07] Add formatting utilities`). Link the issue (for example: `Closes #<issue-id>`)
+   - Use a clear commit message referencing the issue and acceptance criteria mapping. Every commit message belonging to a backlog issue MUST start with the issue prefix in the summary (e.g., `feat: [M5-07] add formatting utility`).
    - Commit and push.
 8. CI gate: wait for required GitHub checks to pass. If any check fails, fix and repeat from step 4.
 9. Completion:
