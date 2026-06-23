@@ -113,20 +113,23 @@ export const createBrowserDbRuntime = (
         return;
       }
 
-      if (database !== null) {
-        database.close();
-        database = null;
-      }
-
       let nextDatabase: Database | null = null;
 
       try {
         nextDatabase = new sqlJsRuntime.Database(snapshotBytes);
         applyRequiredPragmas(nextDatabase);
+
+        if (options.canApply !== undefined && !options.canApply()) {
+          nextDatabase.close();
+          return;
+        }
+
+        const previousDatabase = database;
         database = nextDatabase;
+        nextDatabase = null;
+        previousDatabase?.close();
       } catch (error) {
         nextDatabase?.close();
-        database = null;
 
         if (error instanceof DbRuntimeError) {
           throw error;

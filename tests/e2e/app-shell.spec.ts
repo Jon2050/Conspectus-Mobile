@@ -669,6 +669,13 @@ const installMockCacheStore = async (
     (
       window as Window & { __CONSPECTUS_APP_CACHE_STORE__?: unknown }
     ).__CONSPECTUS_APP_CACHE_STORE__ = mockCacheStore;
+    (
+      window as Window & { __CONSPECTUS_APP_SNAPSHOT_VALIDATOR__?: unknown }
+    ).__CONSPECTUS_APP_SNAPSHOT_VALIDATOR__ = {
+      async validate() {
+        return undefined;
+      },
+    };
 
     (
       window as Window & { __CONSPECTUS_CACHE_CLEAR_ALL_CALL_COUNT__?: number }
@@ -753,6 +760,14 @@ const installMockDbRuntime = async (
           ]);
         },
       };
+
+    (
+      window as Window & { __CONSPECTUS_APP_SNAPSHOT_VALIDATOR__?: unknown }
+    ).__CONSPECTUS_APP_SNAPSHOT_VALIDATOR__ = {
+      async validate() {
+        return undefined;
+      },
+    };
 
     (
       window as Window & { __CONSPECTUS_DB_RUNTIME_EXEC_CALL_COUNT__?: number }

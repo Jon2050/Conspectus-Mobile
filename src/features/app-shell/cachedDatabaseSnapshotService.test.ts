@@ -3,15 +3,43 @@ import 'fake-indexeddb/auto';
 
 import { describe, expect, it, vi } from 'vitest';
 import { createDexieCacheStore } from '@cache';
-import { SQLITE_DATABASE_HEADER } from '@db';
+import { createBrowserDbRuntime, createSqlJsLoader, SQLITE_DATABASE_HEADER } from '@db';
 
-import { createCachedDatabaseSnapshotService } from './cachedDatabaseSnapshotService';
+import {
+  createCachedDatabaseSnapshotService,
+  createSqliteSnapshotValidator,
+  type CachedDatabaseSnapshotValidator,
+} from './cachedDatabaseSnapshotService';
 
 import type { CachedDatabaseSnapshot, CacheStore } from '@cache';
 import type { DriveItemBinding, GraphClient, GraphFileMetadata } from '@graph';
 
 const createSqliteBytes = (payloadBytes: readonly number[] = [1, 2, 3, 4]): Uint8Array =>
   Uint8Array.from([...SQLITE_DATABASE_HEADER, ...payloadBytes]);
+
+const createMockSnapshotValidator = (): CachedDatabaseSnapshotValidator => ({
+  validate: vi.fn(async () => {}),
+});
+
+const resolveNodeWasmPath = (): string =>
+  `${process.cwd().replaceAll('\\', '/')}/node_modules/sql.js/dist/sql-wasm.wasm`;
+
+const createValidSqliteSnapshotBytes = async (): Promise<Uint8Array> => {
+  const sqlJsRuntime = await createSqlJsLoader({
+    resolveWasmAssetUrl: resolveNodeWasmPath,
+  }).load();
+  const database = new sqlJsRuntime.Database();
+
+  database.exec(`
+    CREATE TABLE account (account_id INTEGER PRIMARY KEY);
+    CREATE TABLE category (category_id INTEGER PRIMARY KEY);
+    CREATE TABLE transfer (transfer_id INTEGER PRIMARY KEY);
+  `);
+  const bytes = database.export();
+  database.close();
+
+  return bytes;
+};
 
 const DRIVE_ITEM_BINDING: DriveItemBinding = {
   driveId: 'drive-123',
@@ -49,9 +77,11 @@ describe('cached database snapshot service', () => {
     const cacheStore: Pick<CacheStore, 'writeSnapshot'> = {
       writeSnapshot: vi.fn(async () => {}),
     };
+    const snapshotValidator = createMockSnapshotValidator();
     const now = new Date('2026-03-11T09:45:00.000Z');
     const service = createCachedDatabaseSnapshotService(graphClient, cacheStore, {
       now: () => now,
+      snapshotValidator,
     });
     const metadata = createMetadata({}, dbBytes);
 
@@ -66,6 +96,7 @@ describe('cached database snapshot service', () => {
       },
       dbBytes,
     });
+    expect(snapshotValidator.validate).toHaveBeenCalledWith(dbBytes);
     expect(cacheStore.writeSnapshot).toHaveBeenCalledWith(snapshot);
   });
 
@@ -76,7 +107,10 @@ describe('cached database snapshot service', () => {
     const cacheStore: Pick<CacheStore, 'writeSnapshot'> = {
       writeSnapshot: vi.fn(async () => {}),
     };
-    const service = createCachedDatabaseSnapshotService(graphClient, cacheStore);
+    const snapshotValidator = createMockSnapshotValidator();
+    const service = createCachedDatabaseSnapshotService(graphClient, cacheStore, {
+      snapshotValidator,
+    });
 
     await expect(
       service.downloadAndCacheSnapshot(
@@ -84,6 +118,7 @@ describe('cached database snapshot service', () => {
         createMetadata({ sizeBytes: 0 }, new Uint8Array()),
       ),
     ).rejects.toThrow('The selected OneDrive database file is empty and cannot be cached.');
+    expect(snapshotValidator.validate).not.toHaveBeenCalled();
     expect(cacheStore.writeSnapshot).not.toHaveBeenCalled();
   });
 
@@ -95,7 +130,10 @@ describe('cached database snapshot service', () => {
     const cacheStore: Pick<CacheStore, 'writeSnapshot'> = {
       writeSnapshot: vi.fn(async () => {}),
     };
-    const service = createCachedDatabaseSnapshotService(graphClient, cacheStore);
+    const snapshotValidator = createMockSnapshotValidator();
+    const service = createCachedDatabaseSnapshotService(graphClient, cacheStore, {
+      snapshotValidator,
+    });
 
     await expect(
       service.downloadAndCacheSnapshot(
@@ -103,25 +141,35 @@ describe('cached database snapshot service', () => {
         createMetadata({ sizeBytes: dbBytes.length + 5 }, dbBytes),
       ),
     ).rejects.toThrow('The downloaded OneDrive database size did not match the expected metadata.');
+    expect(snapshotValidator.validate).not.toHaveBeenCalled();
     expect(cacheStore.writeSnapshot).not.toHaveBeenCalled();
   });
 
-  it('keeps the previous cached snapshot when the downloaded bytes are corrupt', async () => {
+  it('keeps the previous cached snapshot when downloaded bytes fail full SQLite validation', async () => {
     const databaseName = `conspectus-mobile-cache-test-${crypto.randomUUID()}`;
     const cacheStore = createDexieCacheStore({ databaseName });
+    const previousBytes = await createValidSqliteSnapshotBytes();
     const previousSnapshot: CachedDatabaseSnapshot = {
       binding: DRIVE_ITEM_BINDING,
       metadata: {
         eTag: '"etag-previous"',
         lastSyncAtIso: '2026-03-10T19:00:00.000Z',
       },
-      dbBytes: createSqliteBytes([7, 7, 7, 7]),
+      dbBytes: previousBytes,
     };
-    const corruptBytes = Uint8Array.from([0xde, 0xad, 0xbe, 0xef]);
+    const corruptBytes = createSqliteBytes([0xde, 0xad, 0xbe, 0xef]);
     const graphClient: Pick<GraphClient, 'downloadFile'> = {
       downloadFile: vi.fn(async () => corruptBytes),
     };
-    const service = createCachedDatabaseSnapshotService(graphClient, cacheStore);
+    const service = createCachedDatabaseSnapshotService(graphClient, cacheStore, {
+      snapshotValidator: createSqliteSnapshotValidator(
+        createBrowserDbRuntime(
+          createSqlJsLoader({
+            resolveWasmAssetUrl: resolveNodeWasmPath,
+          }),
+        ),
+      ),
+    });
 
     try {
       await cacheStore.writeSnapshot(previousSnapshot);
@@ -131,12 +179,45 @@ describe('cached database snapshot service', () => {
           DRIVE_ITEM_BINDING,
           createMetadata({ sizeBytes: corruptBytes.length }, corruptBytes),
         ),
-      ).rejects.toThrow('The downloaded OneDrive database payload is not a valid SQLite file.');
+      ).rejects.toMatchObject({
+        name: 'DbRuntimeError',
+        code: 'db_open_failed',
+      });
 
       await expect(cacheStore.readSnapshot(DRIVE_ITEM_BINDING)).resolves.toEqual(previousSnapshot);
     } finally {
       cacheStore.closeConnections();
       await deleteDatabase(databaseName);
     }
+  });
+
+  it('accepts snapshots that pass real SQLite open and pragma validation', async () => {
+    const dbBytes = await createValidSqliteSnapshotBytes();
+    const graphClient: Pick<GraphClient, 'downloadFile'> = {
+      downloadFile: vi.fn(async () => dbBytes),
+    };
+    const cacheStore: Pick<CacheStore, 'writeSnapshot'> = {
+      writeSnapshot: vi.fn(async () => {}),
+    };
+    const service = createCachedDatabaseSnapshotService(graphClient, cacheStore, {
+      snapshotValidator: createSqliteSnapshotValidator(
+        createBrowserDbRuntime(
+          createSqlJsLoader({
+            resolveWasmAssetUrl: resolveNodeWasmPath,
+          }),
+        ),
+      ),
+    });
+
+    await expect(
+      service.downloadAndCacheSnapshot(DRIVE_ITEM_BINDING, createMetadata({}, dbBytes)),
+    ).resolves.toMatchObject({
+      binding: DRIVE_ITEM_BINDING,
+      metadata: {
+        eTag: '"etag-1"',
+      },
+      dbBytes,
+    });
+    expect(cacheStore.writeSnapshot).toHaveBeenCalledTimes(1);
   });
 });

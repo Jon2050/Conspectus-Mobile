@@ -95,6 +95,8 @@ flowchart TD
   - rebuilds the app for production because the production base URL (`/conspectus/webapp/`) differs from the preview URLs
   - the website repo target defaults to `Jon2050/Jon2050_Webpage` and can be overridden with `WEBSITE_REPO_FULL_NAME`
   - production smoke target defaults to `https://jon2050.de/conspectus/webapp/` and can be overridden with `PRODUCTION_APP_BASE_URL`
+  - production smoke currently keeps live response-header verification explicitly disabled through `PRODUCTION_SMOKE_SKIP_SECURITY_HEADER_CHECKS: 'true'` because the website hosting layer does not yet emit the required `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy` headers for the PWA route
+  - `M8-01` owns enabling those live security headers in the hosting layer; once that is implemented, flip `PRODUCTION_SMOKE_SKIP_SECURITY_HEADER_CHECKS` to `false` or remove the flag so `verify-production-deploy-smoke.mjs` uses its strict default
 
 ## GitHub-Managed Pages Workflow
 
