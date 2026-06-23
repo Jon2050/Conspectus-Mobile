@@ -1,0 +1,79 @@
+import { describe, expect, it } from 'vitest';
+import { createTransfersRouteController } from './transfersRouteController';
+import {
+  PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID,
+  type TransferMonthQueryService,
+  type AccountQueryService,
+  type CategoryQueryService,
+} from '@db';
+
+describe('createTransfersRouteController', () => {
+  it('maps and merges DB output correctly', async () => {
+    const transferMonthQueryService = {
+      listTransfersByMonth: () => [
+        {
+          transferId: 10,
+          bookingDateEpochDay: 19800,
+          name: 'Supermarket',
+          amountCents: 5000,
+          fromAccountId: 1,
+          toAccountId: 2,
+          categoryIds: [100],
+          buyplace: 'Local Market',
+        },
+      ],
+    };
+
+    const accountQueryService = {
+      listAllAccounts: () => [
+        {
+          accountId: 1,
+          name: 'Checking',
+          amountCents: 10000,
+          accountTypeId: PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID,
+          isVisible: true,
+        },
+        {
+          accountId: 2,
+          name: 'Groceries Account',
+          amountCents: 0,
+          accountTypeId: 3,
+          isVisible: true,
+        },
+      ],
+    };
+
+    const categoryQueryService = {
+      listAllCategories: () => [{ categoryId: 100, name: 'Food' }],
+    };
+
+    const controller = createTransfersRouteController(
+      transferMonthQueryService as unknown as Pick<
+        TransferMonthQueryService,
+        'listTransfersByMonth'
+      >,
+      accountQueryService as unknown as Pick<AccountQueryService, 'listAllAccounts'>,
+      categoryQueryService as unknown as Pick<CategoryQueryService, 'listAllCategories'>,
+    );
+
+    await controller.load(19800);
+
+    const state = controller.getState();
+    expect(state.operation).toBe('ready');
+    expect(state.transfers).toEqual([
+      {
+        transferId: 10,
+        bookingDateEpochDay: 19800,
+        name: 'Supermarket',
+        amountCents: 5000,
+        amountSemantic: 'positive',
+        fromAccountName: 'Checking',
+        toAccountName: 'Groceries Account',
+        categoryNames: ['Food'],
+        buyplace: 'Local Market',
+        fromAccountTypeId: PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID,
+        toAccountTypeId: 3,
+      },
+    ]);
+  });
+});

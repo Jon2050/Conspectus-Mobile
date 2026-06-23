@@ -423,7 +423,7 @@ An issue is only considered done when:
 - Depends on: `M5-05, M5-06`
 - GitHub: [#61](https://github.com/Jon2050/Conspectus-Mobile/issues/61)
 
-### :green_circle: M5-08 Add read-flow tests (unit + integration + e2e smoke)
+### :white_check_mark: M5-08 Add read-flow tests (unit + integration + e2e smoke)
 
 - Label: `test`
 - Milestone: `M5 - Accounts + Transfers Read UX`
