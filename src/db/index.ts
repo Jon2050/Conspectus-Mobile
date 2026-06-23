@@ -20,6 +20,7 @@ export {
 export {
   appBrowserDbRuntime,
   createBrowserDbRuntime,
+  resolveAppBrowserDbRuntime,
   type BrowserDbRuntime,
 } from './browserDbRuntime';
 export {

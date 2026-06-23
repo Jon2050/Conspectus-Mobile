@@ -2,7 +2,7 @@ import type { QueryExecResult } from 'sql.js';
 
 import type { BrowserDbRuntime, CategoryRecord } from './index';
 import { DbRuntimeError, toDbRuntimeError } from './dbRuntimeErrors';
-import { appBrowserDbRuntime } from './browserDbRuntime';
+import { resolveAppBrowserDbRuntime } from './browserDbRuntime';
 
 const ALL_CATEGORIES_SQL = `
   SELECT category_id, name
@@ -74,12 +74,19 @@ export interface CategoryQueryService {
   listAllCategories(): readonly CategoryRecord[];
 }
 
+type CategoryQueryRuntime = Pick<BrowserDbRuntime, 'exec'>;
+type CategoryQueryRuntimeProvider = CategoryQueryRuntime | (() => CategoryQueryRuntime);
+
+const resolveCategoryQueryRuntime = (
+  provider: CategoryQueryRuntimeProvider,
+): CategoryQueryRuntime => (typeof provider === 'function' ? provider() : provider);
+
 export const createCategoryQueryService = (
-  dbRuntime: Pick<BrowserDbRuntime, 'exec'>,
+  dbRuntime: CategoryQueryRuntimeProvider,
 ): CategoryQueryService => ({
   listAllCategories(): readonly CategoryRecord[] {
     try {
-      const results = dbRuntime.exec(ALL_CATEGORIES_SQL);
+      const results = resolveCategoryQueryRuntime(dbRuntime).exec(ALL_CATEGORIES_SQL);
       return mapCategoryQueryResult(results);
     } catch (error) {
       throw toDbRuntimeError(
@@ -91,4 +98,4 @@ export const createCategoryQueryService = (
   },
 });
 
-export const appCategoryQueryService = createCategoryQueryService(appBrowserDbRuntime);
+export const appCategoryQueryService = createCategoryQueryService(resolveAppBrowserDbRuntime);

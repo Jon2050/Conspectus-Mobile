@@ -1,5 +1,5 @@
 // Loads visible account rows from the DB query service and exposes route-ready view models.
-import type { AccountQueryService, AccountRecord } from '@db';
+import { isDbRuntimeError, type AccountQueryService, type AccountRecord } from '@db';
 import { type AmountSemantic } from '@shared';
 
 export type AccountsRouteOperation = 'loading' | 'ready' | 'empty' | 'error';
@@ -51,10 +51,7 @@ const toAccountsRouteError = (error: unknown, fallbackMessage: string): Accounts
 };
 
 const isDbRuntimeNotOpenError = (error: unknown): boolean =>
-  typeof error === 'object' &&
-  error !== null &&
-  'code' in error &&
-  (error as { code?: unknown }).code === 'db_not_open';
+  isDbRuntimeError(error) && error.code === 'db_not_open';
 
 const deriveAmountSemantic = (amountCents: number): AmountSemantic => {
   if (amountCents > 0) {

@@ -2,6 +2,7 @@
 import {
   PRIMARY_INCOME_ACCOUNT_TYPE_ID,
   PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID,
+  isDbRuntimeError,
   type AccountQueryService,
   type CategoryQueryService,
   type TransferMonthQueryService,
@@ -57,10 +58,7 @@ const toTransfersRouteError = (error: unknown, fallbackMessage: string): Transfe
 };
 
 const isDbRuntimeNotOpenError = (error: unknown): boolean =>
-  typeof error === 'object' &&
-  error !== null &&
-  'code' in error &&
-  (error as { code?: unknown }).code === 'db_not_open';
+  isDbRuntimeError(error) && error.code === 'db_not_open';
 
 export const createTransfersRouteController = (
   transferMonthQueryService: Pick<TransferMonthQueryService, 'listTransfersByMonth'>,

@@ -1,5 +1,5 @@
 // Verifies transfer-by-month query semantics and epoch-day month bounds with deterministic fixture-backed coverage.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { QueryExecResult } from 'sql.js';
 
 import {
@@ -69,6 +69,45 @@ describe('transfer month query service', () => {
       },
     ]);
     runtime.close();
+  });
+
+  it('resolves a runtime provider on each service call', () => {
+    const columns = [
+      'transfer_id',
+      'date',
+      'name',
+      'amount',
+      'from_account',
+      'to_account',
+      'category_1_id',
+      'category_2_id',
+      'category_3_id',
+      'buyplace',
+    ];
+    const firstRuntime = {
+      exec: vi.fn(() => [
+        {
+          columns,
+          values: [[1, 19800, 'First', 100, 1, 2, null, null, null, null]],
+        },
+      ]),
+    };
+    const secondRuntime = {
+      exec: vi.fn(() => [
+        {
+          columns,
+          values: [[2, 19801, 'Second', 200, 2, 3, null, null, null, null]],
+        },
+      ]),
+    };
+    let runtime = firstRuntime;
+    const service = createTransferMonthQueryService(() => runtime);
+
+    expect(service.listTransfersByMonth(toEpochDay(2024, 3, 15))[0]?.name).toBe('First');
+    runtime = secondRuntime;
+    expect(service.listTransfersByMonth(toEpochDay(2024, 3, 15))[0]?.name).toBe('Second');
+    expect(firstRuntime.exec).toHaveBeenCalledTimes(1);
+    expect(secondRuntime.exec).toHaveBeenCalledTimes(1);
   });
 
   it('returns fixture transfers for April 2024 sorted by date then transfer_id', async () => {

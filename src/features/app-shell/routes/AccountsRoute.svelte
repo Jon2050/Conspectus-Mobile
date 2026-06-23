@@ -1,7 +1,8 @@
 <!-- Renders visible non-primary account balances from the local SQLite database. -->
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
-  import { createAccountQueryService } from '@db';
+  import { get } from 'svelte/store';
+  import { appAccountQueryService } from '@db';
   import { appSyncStateStore, type SyncState, formatAmountDisplay } from '@shared';
   import { _, locale } from 'svelte-i18n';
 
@@ -11,14 +12,12 @@
     type AccountsRouteController,
     type AccountsRouteState,
   } from './accountsRouteController';
-  import { resolveAppDbRuntime } from '../dbRuntimeResolver';
 
-  export let controller: AccountsRouteController = createAccountsRouteController(
-    createAccountQueryService(resolveAppDbRuntime()),
-  );
+  export let controller: AccountsRouteController =
+    createAccountsRouteController(appAccountQueryService);
 
   let state: AccountsRouteState = controller.getState();
-  let lastObservedSyncState: SyncState = 'idle';
+  let lastObservedSyncState: SyncState = get(appSyncStateStore).state;
 
   const unsubscribeController = controller.subscribe((nextState) => {
     state = nextState;

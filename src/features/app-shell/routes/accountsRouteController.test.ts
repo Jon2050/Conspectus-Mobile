@@ -1,6 +1,7 @@
 // Verifies account-route load state transitions and view-model mapping.
 import { describe, expect, it, vi } from 'vitest';
 
+import { DbRuntimeError } from '@db';
 import { createAccountsRouteController, type AccountsRouteState } from './accountsRouteController';
 
 const getStateSnapshot = (state: AccountsRouteState): AccountsRouteState => ({
@@ -98,10 +99,7 @@ describe('accounts route controller', () => {
 
   it('treats a db_not_open query failure as an actionable empty state', async () => {
     const listVisibleNonPrimaryAccounts = vi.fn(() => {
-      throw {
-        code: 'db_not_open',
-        message: 'SQLite runtime is not open.',
-      };
+      throw new DbRuntimeError('db_not_open', 'SQLite runtime is not open.');
     });
     const controller = createAccountsRouteController({ listVisibleNonPrimaryAccounts });
 
@@ -111,6 +109,28 @@ describe('accounts route controller', () => {
       operation: 'empty',
       accounts: [],
       error: null,
+    });
+  });
+
+  it('does not treat duck-typed db_not_open objects as DB runtime errors', async () => {
+    const queryError = {
+      code: 'db_not_open',
+      message: 'Duck typed runtime error.',
+    };
+    const listVisibleNonPrimaryAccounts = vi.fn(() => {
+      throw queryError;
+    });
+    const controller = createAccountsRouteController({ listVisibleNonPrimaryAccounts });
+
+    await controller.load();
+
+    expect(controller.getState()).toEqual({
+      operation: 'error',
+      accounts: [],
+      error: {
+        message: 'Failed to load visible non-primary accounts.',
+        cause: queryError,
+      },
     });
   });
 });

@@ -2,7 +2,7 @@
  * Unit tests for the category query service.
  * Ensures that categories are correctly extracted and mapped from the DB runtime.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createCategoryQueryService } from './categoryQueryService';
 import type { QueryExecResult } from 'sql.js';
 import type { BrowserDbRuntime } from './index';
@@ -30,6 +30,33 @@ describe('createCategoryQueryService', () => {
       { categoryId: 1, name: 'Groceries' },
       { categoryId: 2, name: 'Rent' },
     ]);
+  });
+
+  it('resolves a runtime provider on each service call', () => {
+    const firstRuntime = {
+      exec: vi.fn(() => [
+        {
+          columns: ['category_id', 'name'],
+          values: [[1, 'First']],
+        } as QueryExecResult,
+      ]),
+    };
+    const secondRuntime = {
+      exec: vi.fn(() => [
+        {
+          columns: ['category_id', 'name'],
+          values: [[2, 'Second']],
+        } as QueryExecResult,
+      ]),
+    };
+    let runtime = firstRuntime;
+    const service = createCategoryQueryService(() => runtime);
+
+    expect(service.listAllCategories()[0]?.name).toBe('First');
+    runtime = secondRuntime;
+    expect(service.listAllCategories()[0]?.name).toBe('Second');
+    expect(firstRuntime.exec).toHaveBeenCalledTimes(1);
+    expect(secondRuntime.exec).toHaveBeenCalledTimes(1);
   });
 
   it('throws when schema columns do not match', () => {

@@ -1,55 +1,33 @@
-// Verifies the app-shell DB runtime resolver honors localhost overrides and default singleton usage.
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+// Verifies the app-shell DB runtime resolver delegates to the DB module runtime resolver.
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BrowserDbRuntime } from '@db';
 
-const { appBrowserDbRuntimeMock } = vi.hoisted(() => ({
-  appBrowserDbRuntimeMock: {
+const { resolvedRuntimeMock, resolveAppBrowserDbRuntimeMock } = vi.hoisted(() => ({
+  resolvedRuntimeMock: {
     open: vi.fn(async () => {}),
     close: vi.fn(() => {}),
     isOpen: vi.fn(() => false),
     exec: vi.fn(() => []),
     exportBytes: vi.fn(() => Uint8Array.from([1, 2, 3])),
   } satisfies BrowserDbRuntime,
+  resolveAppBrowserDbRuntimeMock: vi.fn(),
 }));
 
 vi.mock('@db', () => ({
-  appBrowserDbRuntime: appBrowserDbRuntimeMock,
+  resolveAppBrowserDbRuntime: resolveAppBrowserDbRuntimeMock,
 }));
 
 describe('db runtime resolver', () => {
   beforeEach(() => {
     vi.resetModules();
-    vi.unstubAllGlobals();
+    resolveAppBrowserDbRuntimeMock.mockReset();
+    resolveAppBrowserDbRuntimeMock.mockReturnValue(resolvedRuntimeMock);
   });
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it('returns the shared app db runtime outside localhost test overrides', async () => {
+  it('returns the DB module app runtime resolution result', async () => {
     const { resolveAppDbRuntime } = await import('./dbRuntimeResolver');
 
-    expect(resolveAppDbRuntime()).toBe(appBrowserDbRuntimeMock);
-  });
-
-  it('uses localhost override runtime when a valid test override is present', async () => {
-    const overrideRuntime: BrowserDbRuntime = {
-      open: vi.fn(async () => {}),
-      close: vi.fn(() => {}),
-      isOpen: vi.fn(() => true),
-      exec: vi.fn(() => []),
-      exportBytes: vi.fn(() => Uint8Array.from([4, 5, 6])),
-    };
-
-    vi.stubGlobal('window', {
-      location: {
-        hostname: 'localhost',
-      },
-      __CONSPECTUS_APP_DB_RUNTIME__: overrideRuntime,
-    });
-
-    const { resolveAppDbRuntime } = await import('./dbRuntimeResolver');
-
-    expect(resolveAppDbRuntime()).toBe(overrideRuntime);
+    expect(resolveAppDbRuntime()).toBe(resolvedRuntimeMock);
+    expect(resolveAppBrowserDbRuntimeMock).toHaveBeenCalledTimes(1);
   });
 });
