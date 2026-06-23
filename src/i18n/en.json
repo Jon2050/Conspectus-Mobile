@@ -23,13 +23,15 @@
     "title": "Transfers",
     "previousMonth": "Previous month",
     "nextMonth": "Next month",
+    "swipeArea": "Transfer month swipe area",
     "loading": "Loading transfers...",
     "errorDefault": "Failed to load transfers.",
     "emptyStatus": "No transfers found for this month.",
     "countFound": "{count} transfers found.",
     "emptyBox": "There are no transfers recorded for this month.",
     "primaryIncome": "INCOME",
-    "primarySpendings": "SPENDINGS"
+    "primarySpendings": "SPENDINGS",
+    "buyplace": "Place"
   },
   "settings": {
     "title": "Settings",
