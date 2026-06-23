@@ -37,6 +37,7 @@
   import { syncDbRuntimeForStartupDecision } from './startupDbRuntimeSync';
   import { resolveAppStartupIsOnline } from './startupNetworkStateResolver';
   import { syncSelectedDriveItemBindingStoreAtStartup } from './startupBindingSync';
+  import { resolveAppSnapshotValidator } from './snapshotValidatorResolver';
 
   export let routeStore: Readable<AppRouteKey> = createHashRouteStore();
   export let syncStateStore: SyncStateStore = appSyncStateStore;
@@ -86,7 +87,9 @@
       const startupFreshnessService = createStartupFreshnessService(
         graphClient,
         cacheStore,
-        createCachedDatabaseSnapshotService(graphClient, cacheStore),
+        createCachedDatabaseSnapshotService(graphClient, cacheStore, {
+          snapshotValidator: resolveAppSnapshotValidator(),
+        }),
       );
       const decision = await startupFreshnessService.resolve(
         binding,

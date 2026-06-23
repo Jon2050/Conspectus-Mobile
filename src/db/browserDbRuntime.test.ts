@@ -145,6 +145,41 @@ describe('browser db runtime', () => {
     expect(runtime.isOpen()).toBe(false);
   });
 
+  it('keeps the current database when a replacement open is superseded after validation', async () => {
+    const runtime = createBrowserDbRuntime(createNodeSqlJsRuntimeLoader());
+    const firstBytes = await createFixtureSnapshotBytes('current');
+    const secondBytes = await createFixtureSnapshotBytes('stale-replacement');
+    let canApplyCalls = 0;
+
+    await runtime.open(firstBytes);
+    await runtime.open(secondBytes, {
+      canApply: () => {
+        canApplyCalls += 1;
+        return canApplyCalls < 3;
+      },
+    });
+
+    expect(runtime.exec('SELECT label FROM sample ORDER BY sample_id ASC;')[0]?.values).toEqual([
+      ['current'],
+    ]);
+  });
+
+  it('keeps the current database when a replacement snapshot fails to open', async () => {
+    const runtime = createBrowserDbRuntime(createNodeSqlJsRuntimeLoader());
+    const firstBytes = await createFixtureSnapshotBytes('current');
+    const invalidSqliteBytes = Uint8Array.from([1, 2, 3]);
+
+    await runtime.open(firstBytes);
+    await expect(runtime.open(invalidSqliteBytes)).rejects.toMatchObject({
+      name: 'DbRuntimeError',
+      code: 'db_open_failed',
+    });
+
+    expect(runtime.exec('SELECT label FROM sample ORDER BY sample_id ASC;')[0]?.values).toEqual([
+      ['current'],
+    ]);
+  });
+
   it('returns the shared app DB runtime outside localhost test overrides', () => {
     vi.stubGlobal('window', {
       location: {
