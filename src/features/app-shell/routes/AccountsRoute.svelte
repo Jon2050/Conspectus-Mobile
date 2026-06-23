@@ -187,13 +187,15 @@
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 0.8rem;
     align-items: start;
+    min-width: 0;
   }
 
   .account-card__name {
     margin: 0;
     font-size: 1rem;
     line-height: 1.2;
-    word-break: break-word;
+    overflow-wrap: anywhere;
+    min-width: 0;
   }
 
   .account-card__amount {
@@ -202,6 +204,7 @@
     white-space: nowrap;
     text-align: right;
     color: var(--text-primary);
+    justify-self: end;
   }
 
   .account-card--positive .account-card__amount {
@@ -214,5 +217,17 @@
 
   .account-card--neutral .account-card__amount {
     color: var(--text-secondary);
+  }
+
+  @media (max-width: 380px) {
+    .account-card__header {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.35rem;
+    }
+
+    .account-card__amount {
+      justify-self: start;
+      text-align: left;
+    }
   }
 </style>

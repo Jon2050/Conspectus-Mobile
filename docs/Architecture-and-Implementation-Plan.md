@@ -573,6 +573,13 @@ M5-09 implementation clarification:
 - The current snapshot is derived from the full Conspectus SQLite database supplied at `tests/fixtures/conspectusDB.db` for `M5-09` and documents that provenance in `docs/reference/README.md`.
 - Current DB read-query services must stay compatible with this schema snapshot; query drift is covered by the schema compatibility test in the unit test suite.
 
+M5-10 implementation clarification:
+
+- The Milestone 5 read UX polish pass keeps scope to existing Accounts and Transfers screens, with no read-query, sync, or write-path behavior changes.
+- Accounts and transfer cards now use responsive wrapping rules for long names, large currency values, account paths, categories, and buyplace text so narrow mobile widths remain readable.
+- Transfer month navigation uses compact arrow controls with localized accessible labels, and the transfer swipe region label is localized through the app i18n files.
+- Reduced-motion preferences are honored globally for transitions and skeleton animations, and duplicate dark-mode amount color token declarations were collapsed.
+
 Deliverables:
 
 - Production-ready viewing experience for accounts and monthly transfers.

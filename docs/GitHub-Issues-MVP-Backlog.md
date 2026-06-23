@@ -439,7 +439,7 @@ An issue is only considered done when:
 - Depends on: `none`
 - GitHub: [#63](https://github.com/Jon2050/Conspectus-Mobile/issues/63)
 
-### :green_circle: M5-10 Follow-up UI cleanup and usability polish
+### :white_check_mark: M5-10 Follow-up UI cleanup and usability polish
 
 - Label: `feature`
 - Milestone: `M5 - Accounts + Transfers Read UX`

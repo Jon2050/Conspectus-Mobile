@@ -30,8 +30,11 @@ describe('TransfersRoute', () => {
     expect(body).toContain('data-testid="transfers-month-navigation"');
     expect(body).toContain('data-testid="transfers-month-previous-button"');
     expect(body).toContain('data-testid="transfers-month-next-button"');
+    expect(body).toContain('aria-label="Vorheriger Monat"');
+    expect(body).toContain('aria-label="Nächster Monat"');
     expect(body).toContain('data-testid="transfers-month-label"');
     expect(body).toContain('data-testid="transfers-month-swipe-surface"');
+    expect(body).toContain('aria-label="Wischbereich für Transfermonate"');
   });
 
   it('exposes a deterministic YYYY-MM month key marker', () => {
@@ -60,6 +63,7 @@ describe('TransfersRoute', () => {
     });
 
     expect(body).toContain('data-testid="transfers-route-empty"');
+    expect(body).toContain('Für diesen Monat sind keine Transfers vorhanden.');
     expect(body).toContain('Es gibt keine Transfers für diesen Monat.');
   });
 
@@ -73,7 +77,7 @@ describe('TransfersRoute', () => {
       fromAccountName: 'Original From Name',
       toAccountName: 'Original To Name',
       categoryNames: [],
-      buyplace: null,
+      buyplace: 'Local Market',
       fromAccountTypeId: 2, // PRIMARY_SPENDINGS -> AUSGABEN
       toAccountTypeId: 1, // PRIMARY_INCOME -> EINNAHMEN
     };
@@ -85,6 +89,8 @@ describe('TransfersRoute', () => {
 
     expect(body).toContain('AUSGABEN');
     expect(body).toContain('EINNAHMEN');
+    expect(body).toContain('Ort:');
+    expect(body).toContain('Local Market');
     expect(body).not.toContain('Original From Name');
     expect(body).not.toContain('Original To Name');
   });

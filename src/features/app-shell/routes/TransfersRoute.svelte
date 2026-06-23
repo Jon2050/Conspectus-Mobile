@@ -131,7 +131,8 @@
       class="app-button app-button--secondary transfers-route__month-button"
       data-testid="transfers-month-previous-button"
       aria-label={$_('transfers.previousMonth')}
-      on:click={handlePreviousMonthClick}>{$_('transfers.previousMonth')}</button
+      title={$_('transfers.previousMonth')}
+      on:click={handlePreviousMonthClick}><span aria-hidden="true">‹</span></button
     >
     <p
       class="transfers-route__month-label"
@@ -145,7 +146,8 @@
       class="app-button app-button--secondary transfers-route__month-button"
       data-testid="transfers-month-next-button"
       aria-label={$_('transfers.nextMonth')}
-      on:click={handleNextMonthClick}>{$_('transfers.nextMonth')}</button
+      title={$_('transfers.nextMonth')}
+      on:click={handleNextMonthClick}><span aria-hidden="true">›</span></button
     >
   </div>
 
@@ -153,7 +155,7 @@
     class="transfers-route__swipe-surface"
     data-testid="transfers-month-swipe-surface"
     role="group"
-    aria-label="Transfer month swipe area"
+    aria-label={$_('transfers.swipeArea')}
     on:touchstart={handleTouchStart}
     on:touchend={handleTouchEnd}
     on:touchcancel={clearSwipeStart}
@@ -169,6 +171,8 @@
         {$_('transfers.loading')}
       {:else if state.operation === 'error'}
         {state.error?.message ?? $_('transfers.errorDefault')}
+      {:else if state.operation === 'empty'}
+        {$_('transfers.emptyStatus')}
       {:else if state.operation === 'ready'}
         {$_('transfers.countFound', { values: { count: state.transfers.length } })}
       {/if}
@@ -240,6 +244,12 @@
                     {/each}
                   </ul>
                 {/if}
+                {#if transfer.buyplace}
+                  <p class="transfer-card__buyplace">
+                    <span>{$_('transfers.buyplace')}:</span>
+                    {transfer.buyplace}
+                  </p>
+                {/if}
               </div>
             </article>
           </li>
@@ -275,8 +285,11 @@
   }
 
   .transfers-route__month-button {
-    min-height: 2.5rem;
-    font-size: 0.88rem;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    padding-inline: 0.75rem;
+    font-size: 1.4rem;
+    line-height: 1;
   }
 
   .transfers-route__month-label {
@@ -346,8 +359,8 @@
   .transfer-card {
     display: flex;
     flex-direction: column;
-    gap: 0.3rem;
-    padding: 0.25rem 0.8rem;
+    gap: 0.45rem;
+    padding: 0.65rem 0.8rem;
     border-radius: var(--radius-lg);
     background: var(--surface-strong);
     box-shadow: var(--shadow-sm);
@@ -369,6 +382,7 @@
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 0.8rem;
     align-items: start;
+    min-width: 0;
   }
 
   .transfer-card__date {
@@ -383,7 +397,8 @@
     margin: 0;
     font-size: 1rem;
     line-height: 1.2;
-    word-break: break-word;
+    overflow-wrap: anywhere;
+    min-width: 0;
   }
 
   .transfer-card__amount {
@@ -392,6 +407,7 @@
     white-space: nowrap;
     text-align: right;
     color: var(--text-primary);
+    justify-self: end;
   }
 
   .transfer-card--positive .transfer-card__amount {
@@ -407,10 +423,10 @@
   .transfer-card__details {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     gap: 0.5rem;
     flex-wrap: wrap;
-    margin-top: -0.4rem;
+    min-width: 0;
   }
 
   .transfer-card__accounts {
@@ -420,10 +436,14 @@
     gap: 0.4rem;
     font-size: 0.85rem;
     color: var(--text-secondary);
+    min-width: 0;
+    flex: 1 1 12rem;
   }
 
   .transfer-card__account {
     font-weight: 500;
+    overflow-wrap: anywhere;
+    min-width: 0;
   }
 
   .transfer-card__account-arrow {
@@ -438,6 +458,7 @@
     flex-wrap: wrap;
     gap: 0.4rem;
     justify-content: flex-end;
+    min-width: 0;
   }
 
   .transfer-card__category {
@@ -451,6 +472,30 @@
     border-radius: 999px;
     background: color-mix(in srgb, var(--text-secondary) 15%, transparent);
     color: var(--text-primary);
-    white-space: nowrap;
+    overflow-wrap: anywhere;
+  }
+
+  .transfer-card__buyplace {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    overflow-wrap: anywhere;
+  }
+
+  .transfer-card__buyplace span {
+    font-weight: 600;
+  }
+
+  @media (max-width: 380px) {
+    .transfer-card__header {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 0.3rem;
+    }
+
+    .transfer-card__amount {
+      justify-self: start;
+      text-align: left;
+    }
   }
 </style>
