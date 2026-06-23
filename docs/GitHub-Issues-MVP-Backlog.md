@@ -431,7 +431,7 @@ An issue is only considered done when:
 - Depends on: `M5-02, M5-03, M5-06`
 - GitHub: [#62](https://github.com/Jon2050/Conspectus-Mobile/issues/62)
 
-### :green_circle: M5-09 Capture live DB schema as reference artifact
+### :white_check_mark: M5-09 Capture live DB schema as reference artifact
 
 - Label: `docs`
 - Milestone: `M5 - Accounts + Transfers Read UX`
