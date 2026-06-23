@@ -1,6 +1,6 @@
 // Verifies account query filtering/sorting and strict row parsing for typed account read models.
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { QueryExecResult, SqlJsStatic } from 'sql.js';
 
 import {
@@ -146,6 +146,33 @@ describe('account query service', () => {
 
     expect(service.listVisibleNonPrimaryAccounts()).toEqual([]);
     runtime.close();
+  });
+
+  it('resolves a runtime provider on each service call', () => {
+    const firstRuntime = {
+      exec: vi.fn(() => [
+        {
+          columns: ['account_id', 'name', 'amount', 'ac_type_id'],
+          values: [[1, 'First', 100, 3]],
+        },
+      ]),
+    };
+    const secondRuntime = {
+      exec: vi.fn(() => [
+        {
+          columns: ['account_id', 'name', 'amount', 'ac_type_id'],
+          values: [[2, 'Second', 200, 4]],
+        },
+      ]),
+    };
+    let runtime = firstRuntime;
+    const service = createAccountQueryService(() => runtime);
+
+    expect(service.listVisibleNonPrimaryAccounts()[0]?.name).toBe('First');
+    runtime = secondRuntime;
+    expect(service.listVisibleNonPrimaryAccounts()[0]?.name).toBe('Second');
+    expect(firstRuntime.exec).toHaveBeenCalledTimes(1);
+    expect(secondRuntime.exec).toHaveBeenCalledTimes(1);
   });
 
   it('rejects results when expected query columns are missing or renamed', () => {

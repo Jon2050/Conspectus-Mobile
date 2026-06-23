@@ -1,9 +1,13 @@
 // Verifies browser DB runtime open/close lifecycle, pragma setup, and deterministic failure normalization.
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SqlJsStatic } from 'sql.js';
 
-import { createBrowserDbRuntime } from './browserDbRuntime';
+import {
+  appBrowserDbRuntime,
+  createBrowserDbRuntime,
+  resolveAppBrowserDbRuntime,
+} from './browserDbRuntime';
 import { DbRuntimeError } from './dbRuntimeErrors';
 import { createSqlJsLoader } from './sqlJsLoader';
 
@@ -45,6 +49,10 @@ const createDeferred = <Value>() => {
 };
 
 describe('browser db runtime', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('opens valid SQLite snapshot bytes and applies required startup pragmas', async () => {
     const runtime = createBrowserDbRuntime(createNodeSqlJsRuntimeLoader());
     const snapshotBytes = await createFixtureSnapshotBytes('alpha');
@@ -135,5 +143,28 @@ describe('browser db runtime', () => {
     await openPromise;
 
     expect(runtime.isOpen()).toBe(false);
+  });
+
+  it('returns the shared app DB runtime outside localhost test overrides', () => {
+    vi.stubGlobal('window', {
+      location: {
+        hostname: 'example.com',
+      },
+    });
+
+    expect(resolveAppBrowserDbRuntime()).toBe(appBrowserDbRuntime);
+  });
+
+  it('uses the localhost override runtime when a valid test override is present', () => {
+    const overrideRuntime = createBrowserDbRuntime(createNodeSqlJsRuntimeLoader());
+
+    vi.stubGlobal('window', {
+      location: {
+        hostname: 'localhost',
+      },
+      __CONSPECTUS_APP_DB_RUNTIME__: overrideRuntime,
+    });
+
+    expect(resolveAppBrowserDbRuntime()).toBe(overrideRuntime);
   });
 });

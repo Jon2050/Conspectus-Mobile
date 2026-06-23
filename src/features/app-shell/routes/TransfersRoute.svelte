@@ -1,6 +1,7 @@
 <!-- Implements month navigation controls and swipe handling for transfer-month browsing scaffolding. -->
 <script lang="ts">
   import { onDestroy } from 'svelte';
+  import { get } from 'svelte/store';
   import {
     appSyncStateStore,
     type SyncState,
@@ -11,12 +12,11 @@
   import {
     PRIMARY_INCOME_ACCOUNT_TYPE_ID,
     PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID,
-    createAccountQueryService,
-    createCategoryQueryService,
-    createTransferMonthQueryService,
+    appAccountQueryService,
+    appCategoryQueryService,
+    appTransferMonthQueryService,
   } from '@db';
   import SkeletonCard from '../components/SkeletonCard.svelte';
-  import { resolveAppDbRuntime } from '../dbRuntimeResolver';
   import {
     createTransfersRouteController,
     type TransfersRouteController,
@@ -31,16 +31,16 @@
   } from './transfersMonthNavigation';
 
   export let controller: TransfersRouteController = createTransfersRouteController(
-    createTransferMonthQueryService(resolveAppDbRuntime()),
-    createAccountQueryService(resolveAppDbRuntime()),
-    createCategoryQueryService(resolveAppDbRuntime()),
+    appTransferMonthQueryService,
+    appAccountQueryService,
+    appCategoryQueryService,
   );
 
   let monthAnchorEpochDay = getCurrentMonthAnchorEpochDay();
   let swipeStartX: number | null = null;
   let swipeStartY: number | null = null;
   let state: TransfersRouteState = controller.getState();
-  let lastObservedSyncState: SyncState = 'idle';
+  let lastObservedSyncState: SyncState = get(appSyncStateStore).state;
 
   $: monthKey = toMonthKey(monthAnchorEpochDay);
   $: monthLabel = formatMonthLabel(monthAnchorEpochDay);

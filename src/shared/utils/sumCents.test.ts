@@ -32,4 +32,16 @@ describe('sumCents', () => {
   it('handles large cent values without overflow', () => {
     expect(sumCents([Number.MAX_SAFE_INTEGER, -1])).toBe(Number.MAX_SAFE_INTEGER - 1);
   });
+
+  it('rejects non-integer cent values', () => {
+    expect(() => sumCents([100, 0.5])).toThrow(RangeError);
+  });
+
+  it('rejects unsafe individual cent values', () => {
+    expect(() => sumCents([Number.MAX_SAFE_INTEGER + 1])).toThrow(RangeError);
+  });
+
+  it('rejects unsafe resulting sums', () => {
+    expect(() => sumCents([Number.MAX_SAFE_INTEGER, 1])).toThrow(RangeError);
+  });
 });

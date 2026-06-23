@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import { createTransfersRouteController } from './transfersRouteController';
 import {
+  DbRuntimeError,
   PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID,
   type TransferMonthQueryService,
   type AccountQueryService,
@@ -79,5 +80,52 @@ describe('createTransfersRouteController', () => {
         toAccountTypeId: 3,
       },
     ]);
+  });
+
+  it('treats a DB runtime not-open error as an empty state', async () => {
+    const controller = createTransfersRouteController(
+      {
+        listTransfersByMonth: () => {
+          throw new DbRuntimeError('db_not_open', 'SQLite runtime is not open.');
+        },
+      },
+      { listAllAccounts: () => [] },
+      { listAllCategories: () => [] },
+    );
+
+    await controller.load(19800);
+
+    expect(controller.getState()).toEqual({
+      operation: 'empty',
+      transfers: [],
+      error: null,
+    });
+  });
+
+  it('does not treat duck-typed db_not_open objects as DB runtime errors', async () => {
+    const queryError = {
+      code: 'db_not_open',
+      message: 'Duck typed runtime error.',
+    };
+    const controller = createTransfersRouteController(
+      {
+        listTransfersByMonth: () => {
+          throw queryError;
+        },
+      },
+      { listAllAccounts: () => [] },
+      { listAllCategories: () => [] },
+    );
+
+    await controller.load(19800);
+
+    expect(controller.getState()).toEqual({
+      operation: 'error',
+      transfers: [],
+      error: {
+        message: 'Failed to load transfers for the selected month.',
+        cause: queryError,
+      },
+    });
   });
 });

@@ -3,7 +3,7 @@ import type { QueryExecResult } from 'sql.js';
 
 import type { BrowserDbRuntime, TransferRecord } from './index';
 import { DbRuntimeError, toDbRuntimeError } from './dbRuntimeErrors';
-import { appBrowserDbRuntime } from './browserDbRuntime';
+import { resolveAppBrowserDbRuntime } from './browserDbRuntime';
 
 const TRANSFERS_BY_MONTH_SQL = `
   SELECT transfer_id, date, name, amount, from_account, to_account,
@@ -135,6 +135,7 @@ export const getEpochDayMonthBounds = (monthAnchorEpochDay: number): EpochDayMon
 
   return {
     startEpochDay: toEpochDayFromUtcDate(year, monthIndex, 1),
+    // Day 0 of the following UTC month is the final day of the selected month.
     endEpochDay: toEpochDayFromUtcDate(year, monthIndex + 1, 0),
   };
 };
@@ -143,14 +144,23 @@ export interface TransferMonthQueryService {
   listTransfersByMonth(monthAnchorEpochDay: number): readonly TransferRecord[];
 }
 
+type TransferMonthQueryRuntime = Pick<BrowserDbRuntime, 'exec'>;
+type TransferMonthQueryRuntimeProvider =
+  | TransferMonthQueryRuntime
+  | (() => TransferMonthQueryRuntime);
+
+const resolveTransferMonthQueryRuntime = (
+  provider: TransferMonthQueryRuntimeProvider,
+): TransferMonthQueryRuntime => (typeof provider === 'function' ? provider() : provider);
+
 export const createTransferMonthQueryService = (
-  dbRuntime: Pick<BrowserDbRuntime, 'exec'>,
+  dbRuntime: TransferMonthQueryRuntimeProvider,
 ): TransferMonthQueryService => ({
   listTransfersByMonth(monthAnchorEpochDay: number): readonly TransferRecord[] {
     const monthBounds = getEpochDayMonthBounds(monthAnchorEpochDay);
 
     try {
-      const results = dbRuntime.exec(TRANSFERS_BY_MONTH_SQL, [
+      const results = resolveTransferMonthQueryRuntime(dbRuntime).exec(TRANSFERS_BY_MONTH_SQL, [
         monthBounds.startEpochDay,
         monthBounds.endEpochDay,
       ]);
@@ -165,4 +175,6 @@ export const createTransferMonthQueryService = (
   },
 });
 
-export const appTransferMonthQueryService = createTransferMonthQueryService(appBrowserDbRuntime);
+export const appTransferMonthQueryService = createTransferMonthQueryService(
+  resolveAppBrowserDbRuntime,
+);

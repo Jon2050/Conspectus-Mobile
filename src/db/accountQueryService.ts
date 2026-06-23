@@ -3,7 +3,7 @@ import type { QueryExecResult } from 'sql.js';
 
 import type { AccountRecord, BrowserDbRuntime } from './index';
 import { DbRuntimeError, toDbRuntimeError } from './dbRuntimeErrors';
-import { appBrowserDbRuntime } from './browserDbRuntime';
+import { resolveAppBrowserDbRuntime } from './browserDbRuntime';
 
 const VISIBLE_NON_PRIMARY_ACCOUNTS_SQL = `
   SELECT account_id, name, amount, ac_type_id
@@ -93,12 +93,18 @@ export interface AccountQueryService {
   listAllAccounts(): readonly AccountRecord[];
 }
 
+type AccountQueryRuntime = Pick<BrowserDbRuntime, 'exec'>;
+type AccountQueryRuntimeProvider = AccountQueryRuntime | (() => AccountQueryRuntime);
+
+const resolveAccountQueryRuntime = (provider: AccountQueryRuntimeProvider): AccountQueryRuntime =>
+  typeof provider === 'function' ? provider() : provider;
+
 export const createAccountQueryService = (
-  dbRuntime: Pick<BrowserDbRuntime, 'exec'>,
+  dbRuntime: AccountQueryRuntimeProvider,
 ): AccountQueryService => ({
   listVisibleNonPrimaryAccounts(): readonly AccountRecord[] {
     try {
-      const results = dbRuntime.exec(VISIBLE_NON_PRIMARY_ACCOUNTS_SQL);
+      const results = resolveAccountQueryRuntime(dbRuntime).exec(VISIBLE_NON_PRIMARY_ACCOUNTS_SQL);
       return mapAccountQueryResult(results);
     } catch (error) {
       throw toDbRuntimeError(
@@ -111,7 +117,7 @@ export const createAccountQueryService = (
 
   listAllAccounts(): readonly AccountRecord[] {
     try {
-      const results = dbRuntime.exec(ALL_ACCOUNTS_SQL);
+      const results = resolveAccountQueryRuntime(dbRuntime).exec(ALL_ACCOUNTS_SQL);
       return mapAccountQueryResult(results);
     } catch (error) {
       throw toDbRuntimeError(
@@ -123,4 +129,4 @@ export const createAccountQueryService = (
   },
 });
 
-export const appAccountQueryService = createAccountQueryService(appBrowserDbRuntime);
+export const appAccountQueryService = createAccountQueryService(resolveAppBrowserDbRuntime);
