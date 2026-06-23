@@ -567,6 +567,12 @@ M5-05 implementation clarification:
 - Bottom navigation now renders icon + label entries from `public/icons` metadata in `src/features/app-shell/hashRouting.ts`, including explicit Settings icon coverage and safe-area separation behavior for notched/gesture devices.
 - Regression coverage for this scope is implemented across unit/UI/E2E in `src/features/app-shell/routes/accountsRouteController.test.ts`, `src/features/app-shell/routes/AccountsRoute.test.ts`, `src/features/app-shell/AppShell.test.ts`, `src/features/app-shell/hashRouting.test.ts`, and `tests/e2e/app-shell.spec.ts`.
 
+M5-09 implementation clarification:
+
+- The PWA SQL schema reference is maintained in `docs/reference/conspectus-live-schema.sql` and validated by `src/db/conspectusSchemaSnapshot.test.ts`.
+- The current snapshot is derived from the full Conspectus SQLite database supplied at `tests/fixtures/conspectusDB.db` for `M5-09` and documents that provenance in `docs/reference/README.md`.
+- Current DB read-query services must stay compatible with this schema snapshot; query drift is covered by the schema compatibility test in the unit test suite.
+
 Deliverables:
 
 - Production-ready viewing experience for accounts and monthly transfers.
