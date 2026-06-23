@@ -132,7 +132,10 @@
       data-testid="transfers-month-previous-button"
       aria-label={$_('transfers.previousMonth')}
       title={$_('transfers.previousMonth')}
-      on:click={handlePreviousMonthClick}><span aria-hidden="true">‹</span></button
+      on:click={handlePreviousMonthClick}
+      ><span class="transfers-route__month-button-content" aria-hidden="true"
+        >{$_('transfers.previousMonthButton')}</span
+      ></button
     >
     <p
       class="transfers-route__month-label"
@@ -147,7 +150,10 @@
       data-testid="transfers-month-next-button"
       aria-label={$_('transfers.nextMonth')}
       title={$_('transfers.nextMonth')}
-      on:click={handleNextMonthClick}><span aria-hidden="true">›</span></button
+      on:click={handleNextMonthClick}
+      ><span class="transfers-route__month-button-content" aria-hidden="true"
+        >{$_('transfers.nextMonthButton')}</span
+      ></button
     >
   </div>
 
@@ -201,7 +207,12 @@
                   <p class="transfer-card__date">
                     {formatEpochDayToDate(transfer.bookingDateEpochDay, $locale)}
                   </p>
-                  <h3 class="transfer-card__name">{transfer.name}</h3>
+                  <h3 class="transfer-card__name">
+                    {#if transfer.buyplace}<span class="transfer-card__buyplace-prefix"
+                        >({transfer.buyplace})
+                      </span>
+                    {/if}{transfer.name}
+                  </h3>
                 </div>
                 <span
                   class="transfer-card__amount"
@@ -244,12 +255,6 @@
                     {/each}
                   </ul>
                 {/if}
-                {#if transfer.buyplace}
-                  <p class="transfer-card__buyplace">
-                    <span>{$_('transfers.buyplace')}:</span>
-                    {transfer.buyplace}
-                  </p>
-                {/if}
               </div>
             </article>
           </li>
@@ -279,17 +284,28 @@
 
   .transfers-route__month-navigation {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-columns: 2.5rem minmax(0, 1fr) 2.5rem;
     gap: 0.5rem;
     align-items: center;
   }
 
   .transfers-route__month-button {
-    min-width: 2.75rem;
-    min-height: 2.75rem;
-    padding-inline: 0.75rem;
-    font-size: 1.4rem;
+    width: 2.5rem;
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+    padding: 0;
+    font-size: 1.35rem;
     line-height: 1;
+  }
+
+  .transfers-route__month-button-content {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1em;
+    height: 1em;
+    line-height: 1;
+    transform: translateY(-0.04em);
   }
 
   .transfers-route__month-label {
@@ -349,7 +365,7 @@
     padding: 0;
     margin: 0;
     display: grid;
-    gap: 0.25rem;
+    gap: 0.2rem;
   }
 
   .transfers-route__card-item {
@@ -359,8 +375,8 @@
   .transfer-card {
     display: flex;
     flex-direction: column;
-    gap: 0.45rem;
-    padding: 0.65rem 0.8rem;
+    gap: 0.08rem;
+    padding: 0.4rem 0.75rem 0.1rem;
     border-radius: var(--radius-lg);
     background: var(--surface-strong);
     box-shadow: var(--shadow-sm);
@@ -388,6 +404,7 @@
   .transfer-card__date {
     margin: 0;
     font-size: 0.7rem;
+    line-height: 1.1;
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.02em;
@@ -396,9 +413,13 @@
   .transfer-card__name {
     margin: 0;
     font-size: 1rem;
-    line-height: 1.2;
+    line-height: 1.25;
     overflow-wrap: anywhere;
     min-width: 0;
+  }
+
+  .transfer-card__buyplace-prefix {
+    font-weight: 600;
   }
 
   .transfer-card__amount {
@@ -408,6 +429,7 @@
     text-align: right;
     color: var(--text-primary);
     justify-self: end;
+    line-height: 1.15;
   }
 
   .transfer-card--positive .transfer-card__amount {
@@ -423,8 +445,8 @@
   .transfer-card__details {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    gap: 0.5rem;
+    align-items: center;
+    gap: 0.35rem;
     flex-wrap: wrap;
     min-width: 0;
   }
@@ -435,6 +457,7 @@
     align-items: center;
     gap: 0.4rem;
     font-size: 0.85rem;
+    line-height: 0.9;
     color: var(--text-secondary);
     min-width: 0;
     flex: 1 1 12rem;
@@ -447,7 +470,7 @@
   }
 
   .transfer-card__account-arrow {
-    opacity: 0.6;
+    opacity: 0.8;
   }
 
   .transfer-card__categories {
@@ -456,7 +479,7 @@
     margin: 0;
     display: flex;
     flex-wrap: wrap;
-    gap: 0.4rem;
+    gap: 0.3rem;
     justify-content: flex-end;
     min-width: 0;
   }
@@ -467,24 +490,13 @@
 
   .app-badge {
     display: inline-block;
-    padding: 0.15rem 0.5rem;
+    padding: 0.06rem 0.45rem;
     font-size: 0.75rem;
+    line-height: 1.2;
     border-radius: 999px;
     background: color-mix(in srgb, var(--text-secondary) 15%, transparent);
     color: var(--text-primary);
     overflow-wrap: anywhere;
-  }
-
-  .transfer-card__buyplace {
-    flex-basis: 100%;
-    margin: 0;
-    font-size: 0.8rem;
-    color: var(--text-secondary);
-    overflow-wrap: anywhere;
-  }
-
-  .transfer-card__buyplace span {
-    font-weight: 600;
   }
 
   @media (max-width: 380px) {

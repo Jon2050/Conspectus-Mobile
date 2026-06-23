@@ -87,6 +87,9 @@ You MUST cover at least these perspectives. You are encouraged to add more persp
 
 6. **Testing** — Verify that every new or changed behavior has appropriate test coverage. Check for missing unit tests, integration tests, or E2E tests. Flag untested edge cases, error paths, and critical business logic.
 
+Pay particular attention to whether the written tests are comprehensive, whether they truly cover all important functionalities, edge cases, error conditions, and failure scenarios, and whether any tests are unnecessary or merely pseudo-tests that do not actually verify real functionality. Evaluate whether the tests would realistically catch regressions and implementation mistakes, rather than simply confirming the current implementation. Also check whether important negative test cases, boundary conditions, integration points, and business-critical paths are missing.
+Assess whether the tests would fail if the implementation contained realistic bugs. A test that always passes regardless of implementation correctness provides little value.
+
 7. **CI/CD** — Review workflow changes for correctness, security (permissions, secret handling), efficiency (unnecessary rebuilds, missing caching), and alignment with `docs/CI-CD-Pipelines.md`.
 
 8. **Documentation** — Verify that docs are up-to-date with implementation reality. Check module READMEs, architecture doc, backlog status markers, and documentation ownership rules.

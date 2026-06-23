@@ -1,4 +1,4 @@
-Task: Implement issue `M5-08` end-to-end with full verification.
+Task: Implement issue `M5-10` end-to-end with full verification.
 
 ## Non-negotiable rules:
 
@@ -22,7 +22,7 @@ Always print in which step you are!
    - `docs/Architecture-and-Implementation-Plan.md`
    - `docs/Conspectus-Desktop-Info.md`
    - `docs/GitHub-Issues-MVP-Backlog.md`
-     Then locate `M5-08` and extract implementation steps, acceptance criteria, and dependencies/constraints from GitHub. Also from the comments on GitHub.
+     Then locate `M5-10` and extract implementation steps, acceptance criteria, and dependencies/constraints from GitHub. Also from the comments on GitHub.
 2. Plan with one planning subagent. Refine until concrete, testable, and mapped from each acceptance criterion to file-level code/test changes. Make clear, that the planning subagent should not write any code, just the plan.
 3. Create/use a dedicated issue branch with a proper name containing the milestone and issue number (e.g., `feature/M5-07-localize-formatting` or `bug/M5-07-fix-locale`).
    3.1. Increase the app version in `package.json` to `0.<milestone_number>.<issue_title_number>`. (e.g. `0.4.08` for issue `M4-08`)
@@ -74,5 +74,5 @@ Always print in which step you are!
 3. **UI/UX:** UI components must be fully responsive across screen sizes. The UI must communicate system status clearly. Always implement loading states for async actions, explicit error/success feedback, and prevent double-submissions. Good and simple but modern and beautiful UX is very important!
 4. **AI Anti-Patterns (STRICTLY FORBIDDEN):** Never implement "backup" solutions, redundant fallbacks, or placeholder code. Do not introduce technical debt.
 5. **Documentation:** Code must be self-explanatory. Add meaningful inline comments only for complex or non-obvious logic. Every file should start with a short description of what the file does and why it is needed.
-6. **Testing:** All new or changed behavior must be accompanied by appropriate, passing tests.
+6. **Testing:** All new or changed behavior must be accompanied by appropriate, passing tests. Tests should verify real functionality, cover important edge cases and failure scenarios, and provide meaningful regression protection.
 7. **Contextual Alignment:** Before coding, verify that prerequisites from previous tasks are complete. Ensure your implementation serves as a solid foundation for related upcoming issues in the backlog.
