@@ -1,36 +1,20 @@
 // Verifies transfer-by-month query semantics and epoch-day month bounds with deterministic fixture-backed coverage.
-import fs from 'node:fs';
-import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { QueryExecResult } from 'sql.js';
 
 import {
   createBrowserDbRuntime,
-  createSqlJsLoader,
   createTransferMonthQueryService,
   DbRuntimeError,
   getEpochDayMonthBounds,
   type BrowserDbRuntime,
 } from './index';
 
-const MILLIS_PER_DAY = 24 * 60 * 60 * 1000;
-
-const toEpochDay = (year: number, month: number, day: number): number =>
-  Math.floor(Date.UTC(year, month - 1, day) / MILLIS_PER_DAY);
-
-const resolveNodeWasmPath = (): string =>
-  path.resolve(process.cwd(), 'node_modules/sql.js/dist/sql-wasm.wasm');
-
-const resolveTransferFixturePath = (): string =>
-  path.resolve(process.cwd(), 'tests/fixtures/test.db');
-
-const createNodeSqlJsRuntimeLoader = () =>
-  createSqlJsLoader({
-    resolveWasmAssetUrl: resolveNodeWasmPath,
-  });
-
-const loadTransferFixtureBytes = (): Uint8Array =>
-  Uint8Array.from(fs.readFileSync(resolveTransferFixturePath()));
+import { toEpochDay } from '../shared/testUtils/dateUtils';
+import {
+  createNodeSqlJsRuntimeLoader,
+  loadTransferFixtureBytes,
+} from '../shared/testUtils/dbIntegration';
 
 const createRuntimeFromTransferFixture = async (): Promise<
   Pick<BrowserDbRuntime, 'exec' | 'close'>

@@ -1,35 +1,23 @@
-import fs from 'node:fs';
-import path from 'node:path';
+/**
+ * Integration tests for the Transfers Route.
+ * Verifies that the route correctly fetches and renders transfer data for a given month from the real SQLite fixture.
+ */
 import { describe, expect, it, vi, beforeAll, afterAll } from 'vitest';
 import { render } from 'svelte/server';
 
 import {
   createBrowserDbRuntime,
-  createSqlJsLoader,
   createTransferMonthQueryService,
   createAccountQueryService,
   createCategoryQueryService,
 } from '@db';
 import TransfersRoute from './TransfersRoute.svelte';
 import { createTransfersRouteController } from './transfersRouteController';
-
-const resolveNodeWasmPath = (): string =>
-  path.resolve(process.cwd(), 'node_modules/sql.js/dist/sql-wasm.wasm');
-
-const resolveTransferFixturePath = (): string =>
-  path.resolve(process.cwd(), 'tests/fixtures/test.db');
-
-const createNodeSqlJsRuntimeLoader = () =>
-  createSqlJsLoader({
-    resolveWasmAssetUrl: resolveNodeWasmPath,
-  });
-
-const loadTransferFixtureBytes = (): Uint8Array =>
-  Uint8Array.from(fs.readFileSync(resolveTransferFixturePath()));
-
-const MILLIS_PER_DAY = 24 * 60 * 60 * 1000;
-const toEpochDay = (year: number, month: number, day: number): number =>
-  Math.floor(Date.UTC(year, month - 1, day) / MILLIS_PER_DAY);
+import {
+  createNodeSqlJsRuntimeLoader,
+  loadTransferFixtureBytes,
+} from '../../../shared/testUtils/dbIntegration';
+import { toEpochDay } from '../../../shared/testUtils/dateUtils';
 
 describe('TransfersRoute Integration', () => {
   beforeAll(() => {

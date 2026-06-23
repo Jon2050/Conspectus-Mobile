@@ -1,25 +1,17 @@
-import fs from 'node:fs';
-import path from 'node:path';
+/**
+ * Integration tests for the Accounts Route.
+ * Verifies that the route correctly renders account data from the real SQLite fixture.
+ */
 import { describe, expect, it } from 'vitest';
 import { render } from 'svelte/server';
 
-import { createBrowserDbRuntime, createSqlJsLoader, createAccountQueryService } from '@db';
+import { createBrowserDbRuntime, createAccountQueryService } from '@db';
 import AccountsRoute from './AccountsRoute.svelte';
 import { createAccountsRouteController } from './accountsRouteController';
-
-const resolveNodeWasmPath = (): string =>
-  path.resolve(process.cwd(), 'node_modules/sql.js/dist/sql-wasm.wasm');
-
-const resolveTransferFixturePath = (): string =>
-  path.resolve(process.cwd(), 'tests/fixtures/test.db');
-
-const createNodeSqlJsRuntimeLoader = () =>
-  createSqlJsLoader({
-    resolveWasmAssetUrl: resolveNodeWasmPath,
-  });
-
-const loadTransferFixtureBytes = (): Uint8Array =>
-  Uint8Array.from(fs.readFileSync(resolveTransferFixturePath()));
+import {
+  createNodeSqlJsRuntimeLoader,
+  loadTransferFixtureBytes,
+} from '../../../shared/testUtils/dbIntegration';
 
 describe('AccountsRoute Integration', () => {
   it('renders account cards dynamically from fixture DB', async () => {

@@ -1,3 +1,7 @@
+/**
+ * Unit tests for the transfers route controller.
+ * Ensures the controller coordinates multiple query services to correctly assemble the state for the transfers view.
+ */
 import { describe, expect, it } from 'vitest';
 import { createTransfersRouteController } from './transfersRouteController';
 import {
