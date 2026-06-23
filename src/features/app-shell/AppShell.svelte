@@ -308,20 +308,6 @@
     <h1>{$_('appShell.title')}</h1>
   </header>
 
-  {#if $syncStateStore.message !== null}
-    <div
-      data-testid="startup-sync-status"
-      data-sync-state={$syncStateStore.state}
-      data-sync-branch={$syncStateStore.branch ?? undefined}
-      style="position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; overflow: hidden;"
-    >
-      {$syncStateStore.message}
-      {#if $syncStateStore.branch === 'online_auth_expired' || $syncStateStore.branch === 'online_auth_expired_cached'}
-        <a href="#settings">{$_('appShell.signInAgain')}</a>
-      {/if}
-    </div>
-  {/if}
-
   {#if $syncStateStore.state === 'syncing' && $syncStateStore.progress !== null}
     <section class="startup-sync-progress" data-testid="startup-sync-progress">
       <ProgressIndicator

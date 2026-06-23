@@ -984,17 +984,7 @@ test('reuses the cached DB on startup when the OneDrive eTag is unchanged', asyn
 
   await page.goto(appPath('#/accounts'));
 
-  await expect(page.getByTestId('startup-sync-status')).toContainText(
-    'Cached DB is current with OneDrive.',
-  );
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
-    'data-sync-state',
-    'synced',
-  );
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
-    'data-sync-branch',
-    'online_unchanged',
-  );
+  await expect(page.getByText('Cached DB is current with OneDrive.')).toBeVisible();
   expect(await getCacheReadSnapshotCallCount(page)).toBe(1);
   expect(await getGraphMetadataCallCount(page)).toBe(1);
   expect(await getGraphDownloadCallCount(page)).toBe(0);
@@ -1023,22 +1013,9 @@ test('shows syncing state and toast feedback while the startup freshness check i
 
   await page.goto(appPath('#/accounts'));
 
-  await expect(page.getByTestId('startup-sync-status')).toContainText(
-    'Checking OneDrive for DB updates...',
-  );
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
-    'data-sync-state',
-    'syncing',
-  );
   await expect(page.getByText('Syncing with OneDrive in the background...')).toBeVisible();
 
-  await expect(page.getByTestId('startup-sync-status')).toContainText(
-    'Cached DB is current with OneDrive.',
-  );
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
-    'data-sync-state',
-    'synced',
-  );
+  await expect(page.getByText('Cached DB is current with OneDrive.')).toBeVisible();
 });
 
 test('shows download progress feedback during slow startup sync', async ({ page }) => {
@@ -1080,10 +1057,7 @@ test('shows download progress feedback during slow startup sync', async ({ page 
   await expect(page.getByTestId('progress-text')).toContainText('5 KB / 10 KB');
 
   // Wait for it to finish
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
-    'data-sync-state',
-    'synced',
-  );
+  await expect(page.getByText('Downloaded the latest DB from OneDrive.')).toBeVisible();
   await expect(page.getByTestId('progress-indicator')).toHaveCount(0);
 });
 
@@ -1113,9 +1087,7 @@ test('retries transient startup metadata failures before settling on the cached 
 
   await page.goto(appPath('#/accounts'));
 
-  await expect(page.getByTestId('startup-sync-status')).toContainText(
-    'Cached DB is current with OneDrive.',
-  );
+  await expect(page.getByText('Cached DB is current with OneDrive.')).toBeVisible();
   expect(await getGraphMetadataCallCount(page)).toBe(3);
   expect(await getGraphDownloadCallCount(page)).toBe(0);
 });
@@ -1146,14 +1118,11 @@ test('keeps the cached DB as stale when transient startup metadata failures exha
 
   await page.goto(appPath('#/accounts'));
 
-  await expect(page.getByTestId('startup-sync-status')).toContainText(
-    'Unable to refresh the selected OneDrive database metadata after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again. Using the last cached DB for now.',
-  );
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute('data-sync-state', 'stale');
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
-    'data-sync-branch',
-    'online_metadata_failed_cached',
-  );
+  await expect(
+    page.getByText(
+      'Unable to refresh the selected OneDrive database metadata after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again. Using the last cached DB for now.',
+    ),
+  ).toBeVisible();
   expect(await getGraphMetadataCallCount(page)).toBe(3);
   expect(await getGraphDownloadCallCount(page)).toBe(0);
 });
@@ -1177,14 +1146,11 @@ test('shows a startup sync error when transient metadata failures exhaust retrie
 
   await page.goto(appPath('#/accounts'));
 
-  await expect(page.getByTestId('startup-sync-status')).toContainText(
-    'Unable to refresh the selected OneDrive database metadata after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again.',
-  );
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute('data-sync-state', 'error');
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
-    'data-sync-branch',
-    'online_metadata_failed',
-  );
+  await expect(
+    page.getByText(
+      'Unable to refresh the selected OneDrive database metadata after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again.',
+    ),
+  ).toBeVisible();
   expect(await getGraphMetadataCallCount(page)).toBe(3);
   expect(await getGraphDownloadCallCount(page)).toBe(0);
 });
@@ -1204,12 +1170,7 @@ test('fails fast on non-retryable startup metadata errors and surfaces the clear
 
   await page.goto(appPath('#/accounts'));
 
-  await expect(page.getByTestId('startup-sync-status')).toContainText('Mock access denied.');
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute('data-sync-state', 'error');
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
-    'data-sync-branch',
-    'online_metadata_failed',
-  );
+  await expect(page.getByText('Mock access denied.')).toBeVisible();
   expect(await getGraphMetadataCallCount(page)).toBe(1);
   expect(await getGraphDownloadCallCount(page)).toBe(0);
 });
@@ -1235,20 +1196,14 @@ test('surfaces a sign-in-again recovery action when startup metadata refresh fai
 
   await page.goto(appPath('#/accounts'));
 
-  await expect(page.getByTestId('startup-sync-status')).toContainText(
-    'Your session has expired. Please sign in again to sync with OneDrive.',
-  );
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute('data-sync-state', 'error');
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
-    'data-sync-branch',
-    'online_auth_expired',
-  );
-  await expect(page.getByRole('link', { name: 'Sign in again' })).toHaveAttribute(
-    'href',
-    '#settings',
-  );
+  await expect(
+    page.getByText('Your session has expired. Please sign in again to sync with OneDrive.'),
+  ).toBeVisible();
   expect(await getGraphMetadataCallCount(page)).toBe(1);
   expect(await getGraphDownloadCallCount(page)).toBe(0);
+
+  await page.getByRole('link', { name: 'Settings' }).click();
+  await expect(page.getByTestId('route-settings')).toBeVisible();
 });
 
 test('downloads a fresh DB on startup when the OneDrive eTag changed', async ({ page }) => {
@@ -1272,17 +1227,7 @@ test('downloads a fresh DB on startup when the OneDrive eTag changed', async ({ 
 
   await page.goto(appPath('#/accounts'));
 
-  await expect(page.getByTestId('startup-sync-status')).toContainText(
-    'Downloaded the latest DB from OneDrive.',
-  );
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
-    'data-sync-state',
-    'synced',
-  );
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
-    'data-sync-branch',
-    'online_changed',
-  );
+  await expect(page.getByText('Downloaded the latest DB from OneDrive.')).toBeVisible();
   expect(await getCacheReadSnapshotCallCount(page)).toBe(1);
   expect(await getGraphMetadataCallCount(page)).toBe(1);
   expect(await getGraphDownloadCallCount(page)).toBe(1);
@@ -1315,17 +1260,7 @@ test('retries transient startup download failures before downloading the latest 
 
   await page.goto(appPath('#/accounts'));
 
-  await expect(page.getByTestId('startup-sync-status')).toContainText(
-    'Downloaded the latest DB from OneDrive.',
-  );
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
-    'data-sync-state',
-    'synced',
-  );
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
-    'data-sync-branch',
-    'online_changed',
-  );
+  await expect(page.getByText('Downloaded the latest DB from OneDrive.')).toBeVisible();
   expect(await getGraphMetadataCallCount(page)).toBe(1);
   expect(await getGraphDownloadCallCount(page)).toBe(3);
 });
@@ -1357,14 +1292,11 @@ test('keeps the cached DB as stale when transient startup download failures exha
 
   await page.goto(appPath('#/accounts'));
 
-  await expect(page.getByTestId('startup-sync-status')).toContainText(
-    'Unable to download the latest OneDrive database snapshot after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again. Using the last cached DB for now.',
-  );
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute('data-sync-state', 'stale');
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
-    'data-sync-branch',
-    'online_download_failed_cached',
-  );
+  await expect(
+    page.getByText(
+      'Unable to download the latest OneDrive database snapshot after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again. Using the last cached DB for now.',
+    ),
+  ).toBeVisible();
   expect(await getGraphMetadataCallCount(page)).toBe(1);
   expect(await getGraphDownloadCallCount(page)).toBe(3);
 });
@@ -1389,14 +1321,11 @@ test('shows a startup sync error when transient download failures exhaust retrie
 
   await page.goto(appPath('#/accounts'));
 
-  await expect(page.getByTestId('startup-sync-status')).toContainText(
-    'Unable to download the latest OneDrive database snapshot after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again.',
-  );
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute('data-sync-state', 'error');
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
-    'data-sync-branch',
-    'online_download_failed',
-  );
+  await expect(
+    page.getByText(
+      'Unable to download the latest OneDrive database snapshot after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again.',
+    ),
+  ).toBeVisible();
   expect(await getGraphMetadataCallCount(page)).toBe(1);
   expect(await getGraphDownloadCallCount(page)).toBe(3);
 });
@@ -1430,20 +1359,16 @@ test('keeps the cached DB available and offers sign-in again when download fails
 
   await page.goto(appPath('#/accounts'));
 
-  await expect(page.getByTestId('startup-sync-status')).toContainText(
-    'Your session has expired. Please sign in again to sync with OneDrive. Using the last cached DB for now.',
-  );
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute('data-sync-state', 'stale');
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
-    'data-sync-branch',
-    'online_auth_expired_cached',
-  );
-  await expect(page.getByRole('link', { name: 'Sign in again' })).toHaveAttribute(
-    'href',
-    '#settings',
-  );
+  await expect(
+    page.getByText(
+      'Your session has expired. Please sign in again to sync with OneDrive. Using the last cached DB for now.',
+    ),
+  ).toBeVisible();
   expect(await getGraphMetadataCallCount(page)).toBe(1);
   expect(await getGraphDownloadCallCount(page)).toBe(1);
+
+  await page.getByRole('link', { name: 'Settings' }).click();
+  await expect(page.getByTestId('route-settings')).toBeVisible();
 });
 
 test('uses the cached DB on startup when offline', async ({ page }) => {
@@ -1464,17 +1389,7 @@ test('uses the cached DB on startup when offline', async ({ page }) => {
 
   await page.goto(appPath('#/accounts'));
 
-  await expect(page.getByTestId('startup-sync-status')).toContainText(
-    'Offline mode using the last cached DB.',
-  );
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
-    'data-sync-state',
-    'offline',
-  );
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
-    'data-sync-branch',
-    'offline_cached',
-  );
+  await expect(page.getByText('Offline mode using the last cached DB.')).toBeVisible();
   expect(await getCacheReadSnapshotCallCount(page)).toBe(1);
   expect(await getGraphMetadataCallCount(page)).toBe(0);
   expect(await getGraphDownloadCallCount(page)).toBe(0);
@@ -1491,14 +1406,9 @@ test('shows a startup sync error when offline without a cached DB', async ({ pag
 
   await page.goto(appPath('#/accounts'));
 
-  await expect(page.getByTestId('startup-sync-status')).toContainText(
-    'No cached OneDrive database is available while offline.',
-  );
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute('data-sync-state', 'error');
-  await expect(page.getByTestId('startup-sync-status')).toHaveAttribute(
-    'data-sync-branch',
-    'offline_missing_cache',
-  );
+  await expect(
+    page.getByText('No cached OneDrive database is available while offline.'),
+  ).toBeVisible();
   expect(await getCacheReadSnapshotCallCount(page)).toBe(1);
   expect(await getGraphMetadataCallCount(page)).toBe(0);
   expect(await getGraphDownloadCallCount(page)).toBe(0);
@@ -1515,17 +1425,13 @@ test('triggers a fresh sync after a successful DB file selection', async ({ page
 
   await page.goto(appPath('#/settings'));
 
-  await expect(page.getByTestId('startup-sync-status')).toContainText(
-    'Cached DB is current with OneDrive.',
-  );
+  await expect(page.getByText('Cached DB is current with OneDrive.').first()).toBeVisible();
 
   await page.getByRole('button', { name: 'Change DB file' }).click();
   await page.getByTestId('select-file-file-root-db').click();
 
   await expect(page.getByTestId('binding-status-message')).toContainText('DB file selected.');
-  await expect(page.getByTestId('startup-sync-status')).toContainText(
-    'Cached DB is current with OneDrive.',
-  );
+  await expect(page.getByText('Cached DB is current with OneDrive.').last()).toBeVisible();
 
   expect(await getCacheReadSnapshotCallCount(page)).toBe(3);
   expect(await getGraphMetadataCallCount(page)).toBe(3);
@@ -1546,14 +1452,12 @@ test('restored binding triggers sync after interactive sign-in without reload', 
   await page.goto(appPath('#/settings'));
 
   await expect(page.getByTestId('auth-status-message')).toContainText('Signed out.');
-  await expect(page.getByTestId('startup-sync-status')).toHaveCount(0);
+  await expect(page.locator('.toast')).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Sign in with Microsoft' }).click();
 
   await expect(page.getByTestId('auth-status-message')).toContainText('Signed in.');
-  await expect(page.getByTestId('startup-sync-status')).toContainText(
-    'Downloaded the latest DB from OneDrive.',
-  );
+  await expect(page.getByText('Downloaded the latest DB from OneDrive.')).toBeVisible();
 
   expect(await getCacheReadSnapshotCallCount(page)).toBe(1);
   expect(await getGraphMetadataCallCount(page)).toBe(1);

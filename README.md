@@ -236,8 +236,9 @@ This enables filtering by agent: `git log --grep="Agent: Claude"`.
 
 Issue completion definition (required):
 
-- Every issue must be implemented from a dedicated issue branch and merged through a PR.
-- PRs must be merged into `main` with `Rebase and merge` (linear history; no merge commits or squash merges).
+- Every issue must be implemented from a dedicated issue branch. The branch name MUST explicitly contain the milestone and issue number (e.g., `feature/M5-07-localize-formatting` or `bug/M5-07-fix-locale`).
+- Every commit message belonging to a backlog issue MUST start with the issue prefix in the summary (e.g., `feat: [M5-07] add formatting utility`).
+- PRs must be merged into `main` with `Rebase and merge` (linear history; no merge commits or squash merges). The PR title and description MUST explicitly contain the milestone and issue number (e.g., `feat: [M5-07] Add formatting utilities`).
 - All scoped code/tests/docs changes are committed and pushed.
 - Local quality gates pass (`format`, `lint`, `typecheck`, `test`, `build`, and `test:e2e` when relevant).
 - Required GitHub checks are green.
