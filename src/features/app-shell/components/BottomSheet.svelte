@@ -100,7 +100,7 @@
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
     display: flex;
     flex-direction: column;
-    max-height: 90vh;
+    max-height: min(90dvh, 90vh);
   }
 
   .bottom-sheet__dialog::backdrop {

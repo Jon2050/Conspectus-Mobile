@@ -447,7 +447,7 @@ An issue is only considered done when:
 - Depends on: `M5-06, M5-07, M5-08, M5-09`
 - GitHub: [#174](https://github.com/Jon2050/Conspectus-Mobile/issues/174)
 
-### :green_circle: M6-01 Build Add Transfer form UI (bottom sheet)
+### :white_check_mark: M6-01 Build Add Transfer form UI (bottom sheet)
 
 - Label: `feature`
 - Milestone: `M6 - Add Transfer Write Path`

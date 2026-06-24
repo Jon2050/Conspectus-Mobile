@@ -36,6 +36,25 @@
     "primarySpendings": "AUSGABEN",
     "buyplace": "Geschäft"
   },
+  "addTransfer": {
+    "title": "Neuer Transfer",
+    "date": "Datum",
+    "name": "Beschreibung",
+    "namePlaceholder": "z.B. Einkauf, Miete...",
+    "amount": "Betrag (€)",
+    "amountPlaceholder": "0,00",
+    "fromAccount": "Von Konto",
+    "fromAccountPlaceholder": "Quellkonto wählen",
+    "toAccount": "Auf Konto",
+    "toAccountPlaceholder": "Zielkonto wählen",
+    "categories": "Kategorien",
+    "categoryPlaceholder": "Keine Kategorie",
+    "buyplace": "Einkaufsort",
+    "buyplacePlaceholder": "z.B. Supermarkt...",
+    "submit": "Transfer speichern",
+    "saving": "Transfer wird gespeichert...",
+    "close": "Schließen"
+  },
   "settings": {
     "title": "Einstellungen",
     "description": "Authentifizierung für den OneDrive-Zugriff.",
