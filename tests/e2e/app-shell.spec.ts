@@ -928,11 +928,53 @@ test('loads a mobile app shell and navigates primary routes', async ({ page }) =
 
   await page.getByRole('link', { name: 'Add' }).click();
   await expect(page).toHaveURL(/#\/add$/);
-  await expect(page.getByRole('heading', { level: 2, name: 'Add' })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 3, name: 'New Transfer' })).toBeVisible();
 
+  await page.getByTestId('add-transfer-close').click();
+  await expect(page).toHaveURL(/#\/transfers$/);
   await page.getByRole('link', { name: 'Settings' }).click();
   await expect(page).toHaveURL(/#\/settings$/);
   await expect(page.getByRole('heading', { level: 2, name: 'Settings' })).toBeVisible();
+});
+
+test('renders an editable add transfer bottom sheet on mobile viewports', async ({ page }) => {
+  await page.goto(appPath('#/add'));
+
+  await expect(page.getByTestId('route-add')).toHaveCount(1);
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByRole('heading', { level: 3, name: 'New Transfer' })).toBeVisible();
+  await expect(page.getByTestId('add-transfer-form')).toBeVisible();
+
+  const editableControls = [
+    'add-transfer-date',
+    'add-transfer-name',
+    'add-transfer-amount',
+    'add-transfer-from-account',
+    'add-transfer-to-account',
+    'add-transfer-category-1',
+    'add-transfer-category-2',
+    'add-transfer-category-3',
+    'add-transfer-buyplace',
+  ];
+
+  for (const testId of editableControls) {
+    const control = page.getByTestId(testId);
+    await expect(control).toBeVisible();
+    await expect(control).toBeEnabled();
+    await expect(control).toHaveClass(/app-input/);
+  }
+
+  await page.getByTestId('add-transfer-date').fill('2024-04-15');
+  await page.getByTestId('add-transfer-name').fill('Groceries');
+  await page.getByTestId('add-transfer-amount').fill('12.34');
+  await page.getByTestId('add-transfer-buyplace').fill('Supermarket');
+
+  const submitButton = page.getByTestId('add-transfer-submit');
+  await expect(submitButton).toBeEnabled();
+  await expect(page.getByTestId('add-transfer-close')).toBeEnabled();
+  await submitButton.scrollIntoViewIfNeeded();
+  await expect(submitButton).toBeInViewport();
+  await expect(page.getByTestId('add-transfer-buyplace')).toHaveValue('Supermarket');
 });
 
 test('renders readable account cards with semantic amount styling on narrow mobile widths', async ({

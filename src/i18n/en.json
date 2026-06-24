@@ -36,6 +36,25 @@
     "primarySpendings": "SPENDINGS",
     "buyplace": "Store"
   },
+  "addTransfer": {
+    "title": "New Transfer",
+    "date": "Date",
+    "name": "Description",
+    "namePlaceholder": "e.g. Groceries, Rent...",
+    "amount": "Amount (€)",
+    "amountPlaceholder": "0.00",
+    "fromAccount": "From account",
+    "fromAccountPlaceholder": "Select source account",
+    "toAccount": "To account",
+    "toAccountPlaceholder": "Select destination account",
+    "categories": "Categories",
+    "categoryPlaceholder": "No category",
+    "buyplace": "Buyplace",
+    "buyplacePlaceholder": "e.g. Supermarket...",
+    "submit": "Save transfer",
+    "saving": "Saving transfer...",
+    "close": "Close"
+  },
   "settings": {
     "title": "Settings",
     "description": "Authentication controls for OneDrive account access.",
