@@ -471,7 +471,7 @@ An issue is only considered done when:
 - Depends on: `M6-01, M6-02`
 - GitHub: [#66](https://github.com/Jon2050/Conspectus-Mobile/issues/66)
 
-### :green_circle: M6-04 Implement transfer type derivation logic
+### :white_check_mark: M6-04 Implement transfer type derivation logic
 
 - Label: `feature`
 - Milestone: `M6 - Add Transfer Write Path`

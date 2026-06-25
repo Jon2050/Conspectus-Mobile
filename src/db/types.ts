@@ -4,6 +4,10 @@ import type { BindParams, QueryExecResult } from 'sql.js';
 export const PRIMARY_INCOME_ACCOUNT_TYPE_ID = 1;
 export const PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID = 2;
 
+export const TRANSFER_TYPE_STD_EXPENSE = 1;
+export const TRANSFER_TYPE_STD_EARNING = 2;
+export const TRANSFER_TYPE_INTERN_TRANSFER = 3;
+
 export interface BrowserDbRuntime {
   open(snapshotBytes: Uint8Array, options?: BrowserDbRuntimeOpenOptions): Promise<void>;
   close(): void;
