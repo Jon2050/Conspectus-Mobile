@@ -253,10 +253,14 @@ type MockDbRuntimeAccountRow = {
   readonly accountId: number;
   readonly name: string;
   readonly amountCents: number;
+  readonly accountTypeId?: number | null;
 };
 
 type MockDbRuntimeOptions = {
   readonly accountRows?: readonly MockDbRuntimeAccountRow[];
+  readonly fromAccountOptionRows?: readonly MockDbRuntimeAccountRow[];
+  readonly toAccountOptionRows?: readonly MockDbRuntimeAccountRow[];
+  readonly categoryRows?: readonly { readonly categoryId: number; readonly name: string }[];
   readonly failAccountsQuery?: boolean;
   readonly accountsQueryErrorCode?: string;
   readonly accountsQueryErrorMessage?: string;
@@ -692,6 +696,9 @@ const installMockDbRuntime = async (
 ): Promise<void> => {
   await page.addInitScript((mockOptions: MockDbRuntimeOptions) => {
     const accountRows = mockOptions.accountRows ?? [];
+    const fromAccountOptionRows = mockOptions.fromAccountOptionRows ?? accountRows;
+    const toAccountOptionRows = mockOptions.toAccountOptionRows ?? accountRows;
+    const categoryRows = mockOptions.categoryRows ?? [];
     let isOpen = mockOptions.forceAlwaysOpen ?? false;
     let execCallCount = 0;
     const isAccountsQuery = (sql: string): boolean => {
@@ -702,6 +709,40 @@ const installMockDbRuntime = async (
         normalizedSql.includes('ac_type_id not in (1, 2)')
       );
     };
+    const isAddTransferFromOptionsQuery = (sql: string): boolean => {
+      const normalizedSql = sql.toLowerCase();
+      return (
+        normalizedSql.includes('from account') &&
+        normalizedSql.includes('ac_type_id = 1') &&
+        normalizedSql.includes('case when ac_type_id = 1')
+      );
+    };
+    const isAddTransferToOptionsQuery = (sql: string): boolean => {
+      const normalizedSql = sql.toLowerCase();
+      return (
+        normalizedSql.includes('from account') &&
+        normalizedSql.includes('ac_type_id = 2') &&
+        normalizedSql.includes('case when ac_type_id = 2')
+      );
+    };
+    const isCategoriesQuery = (sql: string): boolean => {
+      const normalizedSql = sql.toLowerCase();
+      return (
+        normalizedSql.includes('from category') &&
+        normalizedSql.includes('order by lower(name) asc')
+      );
+    };
+    const toAccountQueryResult = (rows: readonly MockDbRuntimeAccountRow[]) => [
+      {
+        columns: ['account_id', 'name', 'amount', 'ac_type_id'],
+        values: rows.map((account) => [
+          account.accountId,
+          account.name,
+          account.amountCents,
+          account.accountTypeId ?? null,
+        ]),
+      },
+    ];
 
     (window as Window & { __CONSPECTUS_APP_DB_RUNTIME__?: unknown }).__CONSPECTUS_APP_DB_RUNTIME__ =
       {
@@ -730,6 +771,14 @@ const installMockDbRuntime = async (
             };
           }
 
+          if (isAddTransferFromOptionsQuery(sql)) {
+            return toAccountQueryResult(fromAccountOptionRows);
+          }
+
+          if (isAddTransferToOptionsQuery(sql)) {
+            return toAccountQueryResult(toAccountOptionRows);
+          }
+
           if (isAccountsQuery(sql)) {
             if (mockOptions.failAccountsQuery) {
               throw {
@@ -738,15 +787,14 @@ const installMockDbRuntime = async (
               };
             }
 
+            return toAccountQueryResult(accountRows);
+          }
+
+          if (isCategoriesQuery(sql)) {
             return [
               {
-                columns: ['account_id', 'name', 'amount', 'ac_type_id'],
-                values: accountRows.map((account) => [
-                  account.accountId,
-                  account.name,
-                  account.amountCents,
-                  null,
-                ]),
+                columns: ['category_id', 'name'],
+                values: categoryRows.map((category) => [category.categoryId, category.name]),
               },
             ];
           }
@@ -938,6 +986,19 @@ test('loads a mobile app shell and navigates primary routes', async ({ page }) =
 });
 
 test('renders an editable add transfer bottom sheet on mobile viewports', async ({ page }) => {
+  await installMockDbRuntime(page, {
+    forceAlwaysOpen: true,
+    fromAccountOptionRows: [
+      { accountId: 1, name: 'Primary Income', amountCents: 0, accountTypeId: 1 },
+      { accountId: 11, name: 'Checking', amountCents: 1000, accountTypeId: 3 },
+    ],
+    toAccountOptionRows: [
+      { accountId: 2, name: 'Primary Spendings', amountCents: 0, accountTypeId: 2 },
+      { accountId: 11, name: 'Checking', amountCents: 1000, accountTypeId: 3 },
+    ],
+    categoryRows: [{ categoryId: 20, name: 'Groceries' }],
+  });
+
   await page.goto(appPath('#/add'));
 
   await expect(page.getByTestId('route-add')).toHaveCount(1);
@@ -975,6 +1036,60 @@ test('renders an editable add transfer bottom sheet on mobile viewports', async 
   await submitButton.scrollIntoViewIfNeeded();
   await expect(submitButton).toBeInViewport();
   await expect(page.getByTestId('add-transfer-buyplace')).toHaveValue('Supermarket');
+});
+
+test('loads add transfer account and category options from the local DB runtime', async ({
+  page,
+}) => {
+  await installMockDbRuntime(page, {
+    forceAlwaysOpen: true,
+    fromAccountOptionRows: [
+      { accountId: 1, name: 'Primary Income', amountCents: 0, accountTypeId: 1 },
+      { accountId: 11, name: 'Checking', amountCents: 1000, accountTypeId: 3 },
+      { accountId: 12, name: 'Wallet', amountCents: 500, accountTypeId: 3 },
+    ],
+    toAccountOptionRows: [
+      { accountId: 2, name: 'Primary Spendings', amountCents: 0, accountTypeId: 2 },
+      { accountId: 11, name: 'Checking', amountCents: 1000, accountTypeId: 3 },
+      { accountId: 12, name: 'Wallet', amountCents: 500, accountTypeId: 3 },
+    ],
+    categoryRows: [
+      { categoryId: 20, name: 'Groceries' },
+      { categoryId: 30, name: 'Rent' },
+      { categoryId: 40, name: 'Travel' },
+    ],
+  });
+
+  await page.goto(appPath('#/add'));
+
+  const fromAccountOptions = page.getByTestId('add-transfer-from-account').locator('option');
+  await expect(fromAccountOptions).toHaveText([
+    'Select source account',
+    'Primary Income',
+    'Checking',
+    'Wallet',
+  ]);
+
+  const toAccountOptions = page.getByTestId('add-transfer-to-account').locator('option');
+  await expect(toAccountOptions).toHaveText([
+    'Select destination account',
+    'Primary Spendings',
+    'Checking',
+    'Wallet',
+  ]);
+
+  for (const testId of [
+    'add-transfer-category-1',
+    'add-transfer-category-2',
+    'add-transfer-category-3',
+  ]) {
+    await expect(page.getByTestId(testId).locator('option')).toHaveText([
+      'No category',
+      'Groceries',
+      'Rent',
+      'Travel',
+    ]);
+  }
 });
 
 test('renders readable account cards with semantic amount styling on narrow mobile widths', async ({

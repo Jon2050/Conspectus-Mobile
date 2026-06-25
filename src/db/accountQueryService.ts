@@ -19,6 +19,28 @@ const ALL_ACCOUNTS_SQL = `
   ORDER BY account_id ASC;
 `;
 
+const ADD_TRANSFER_FROM_ACCOUNT_OPTIONS_SQL = `
+  SELECT account_id, name, amount, ac_type_id
+  FROM account
+  WHERE (visible = 1 AND ac_type_id NOT IN (1, 2))
+    OR ac_type_id = 1
+  ORDER BY CASE WHEN ac_type_id = 1 THEN 0 ELSE 1 END,
+    ac_order ASC,
+    LOWER(name) ASC,
+    account_id ASC;
+`;
+
+const ADD_TRANSFER_TO_ACCOUNT_OPTIONS_SQL = `
+  SELECT account_id, name, amount, ac_type_id
+  FROM account
+  WHERE (visible = 1 AND ac_type_id NOT IN (1, 2))
+    OR ac_type_id = 2
+  ORDER BY CASE WHEN ac_type_id = 2 THEN 0 ELSE 1 END,
+    ac_order ASC,
+    LOWER(name) ASC,
+    account_id ASC;
+`;
+
 const ACCOUNT_RESULT_COLUMNS = ['account_id', 'name', 'amount', 'ac_type_id'] as const;
 
 const hasExpectedColumns = (columns: readonly string[]): boolean =>
@@ -91,6 +113,8 @@ const mapAccountQueryResult = (results: readonly QueryExecResult[]): readonly Ac
 export interface AccountQueryService {
   listVisibleNonPrimaryAccounts(): readonly AccountRecord[];
   listAllAccounts(): readonly AccountRecord[];
+  listAddTransferFromAccountOptions(): readonly AccountRecord[];
+  listAddTransferToAccountOptions(): readonly AccountRecord[];
 }
 
 type AccountQueryRuntime = Pick<BrowserDbRuntime, 'exec'>;
@@ -124,6 +148,36 @@ export const createAccountQueryService = (
         error,
         'db_query_failed',
         'Failed to load all accounts from the local SQLite database.',
+      );
+    }
+  },
+
+  listAddTransferFromAccountOptions(): readonly AccountRecord[] {
+    try {
+      const results = resolveAccountQueryRuntime(dbRuntime).exec(
+        ADD_TRANSFER_FROM_ACCOUNT_OPTIONS_SQL,
+      );
+      return mapAccountQueryResult(results);
+    } catch (error) {
+      throw toDbRuntimeError(
+        error,
+        'db_query_failed',
+        'Failed to load add-transfer source account options from the local SQLite database.',
+      );
+    }
+  },
+
+  listAddTransferToAccountOptions(): readonly AccountRecord[] {
+    try {
+      const results = resolveAccountQueryRuntime(dbRuntime).exec(
+        ADD_TRANSFER_TO_ACCOUNT_OPTIONS_SQL,
+      );
+      return mapAccountQueryResult(results);
+    } catch (error) {
+      throw toDbRuntimeError(
+        error,
+        'db_query_failed',
+        'Failed to load add-transfer destination account options from the local SQLite database.',
       );
     }
   },

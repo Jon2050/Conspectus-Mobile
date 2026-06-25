@@ -49,6 +49,15 @@ describe('createCategoryQueryService', () => {
     ]);
   });
 
+  it('requests categories in case-insensitive name order', () => {
+    const exec = vi.fn(() => [] as readonly QueryExecResult[]);
+    const service = createCategoryQueryService({ exec });
+
+    service.listAllCategories();
+
+    expect(exec).toHaveBeenCalledWith(expect.stringContaining('ORDER BY LOWER(name) ASC'));
+  });
+
   it('resolves a runtime provider on each service call', () => {
     const firstRuntime = {
       exec: vi.fn(() => [

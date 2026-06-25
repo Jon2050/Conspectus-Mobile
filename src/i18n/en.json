@@ -51,6 +51,7 @@
     "categoryPlaceholder": "No category",
     "buyplace": "Buyplace",
     "buyplacePlaceholder": "e.g. Supermarket...",
+    "loadingOptions": "Loading accounts and categories...",
     "submit": "Save transfer",
     "saving": "Saving transfer...",
     "close": "Close"

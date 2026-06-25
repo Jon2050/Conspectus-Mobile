@@ -51,6 +51,7 @@
     "categoryPlaceholder": "Keine Kategorie",
     "buyplace": "Einkaufsort",
     "buyplacePlaceholder": "z.B. Supermarkt...",
+    "loadingOptions": "Konten und Kategorien werden geladen...",
     "submit": "Transfer speichern",
     "saving": "Transfer wird gespeichert...",
     "close": "Schließen"
