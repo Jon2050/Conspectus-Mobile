@@ -227,6 +227,8 @@ type MockGraphClientOptions = {
   readonly downloadBytes?: readonly number[];
   readonly metadataErrorSequence?: readonly MockGraphError[];
   readonly downloadErrorSequence?: readonly MockGraphError[];
+  readonly uploadErrorSequence?: readonly MockGraphError[];
+  readonly uploadDelayMs?: number;
 };
 
 type MockStartupSnapshot = {
@@ -365,6 +367,7 @@ const installMockGraphClient = async (
     let downloadFileCallCount = 0;
     const metadataErrorSequence = [...(mockOptions.metadataErrorSequence ?? [])];
     const downloadErrorSequence = [...(mockOptions.downloadErrorSequence ?? [])];
+    const uploadErrorSequence = [...(mockOptions.uploadErrorSequence ?? [])];
     const defaultDownloadBytes = mockOptions.downloadBytes ?? [
       83, 81, 76, 105, 116, 101, 32, 102, 111, 114, 109, 97, 116, 32, 51, 0, 1, 2, 3, 4,
     ];
@@ -523,19 +526,36 @@ const installMockGraphClient = async (
         _eTag: string,
         onProgress?: (loaded: number, total: number | null) => void,
       ) {
+        uploadFileCallCount += 1;
+
+        if (uploadErrorSequence.length > 0) {
+          const error = uploadErrorSequence.shift();
+          if (error !== undefined) {
+            throw {
+              code: error.code,
+              message: error.message ?? 'Mock upload failure.',
+            };
+          }
+        }
+
         if (onProgress) {
           const total = bytes.length;
           const half = Math.floor(total / 2);
           onProgress(half, total);
           // Small delay for progress visibility in E2E
           await new Promise((resolve) => {
-            setTimeout(resolve, 500);
+            setTimeout(resolve, mockOptions.uploadDelayMs ? mockOptions.uploadDelayMs / 2 : 500);
           });
           onProgress(total, total);
           await new Promise((resolve) => {
-            setTimeout(resolve, 500);
+            setTimeout(resolve, mockOptions.uploadDelayMs ? mockOptions.uploadDelayMs / 2 : 500);
+          });
+        } else if (mockOptions.uploadDelayMs) {
+          await new Promise((resolve) => {
+            setTimeout(resolve, mockOptions.uploadDelayMs);
           });
         }
+
         return {
           eTag: '"etag-2"',
           sizeBytes: bytes.length,
@@ -797,6 +817,10 @@ const installMockDbRuntime = async (
                 values: categoryRows.map((category) => [category.categoryId, category.name]),
               },
             ];
+          }
+
+          if (sql.toLowerCase().includes('last_insert_rowid()')) {
+            return [{ columns: ['transfer_id'], values: [[999]] }];
           }
 
           return [];
@@ -2364,4 +2388,119 @@ test('does not register service worker for parent-site routes outside the app ba
   }, APP_BASE_PATH);
 
   expect(appRegistrationScope).toContain(`${APP_BASE_PATH_WITHOUT_TRAILING_SLASH}/`);
+});
+
+const seedAndBindTestDb = async (
+  page: import('@playwright/test').Page,
+  graphOptions?: MockGraphClientOptions,
+) => {
+  await installPersistedBinding(page);
+  await installMockDbRuntime(page, {
+    forceAlwaysOpen: true,
+    fromAccountOptionRows: [
+      { accountId: 3, name: 'Girokonto', amountCents: 1000, accountTypeId: 3 },
+    ],
+    toAccountOptionRows: [{ accountId: 4, name: 'Kreditkarte', amountCents: 0, accountTypeId: 3 }],
+    categoryRows: [{ categoryId: 1, name: 'Lebensmittel' }],
+  });
+  await installMockCacheStore(page, {
+    initialSnapshot: {
+      metadata: { eTag: 'existing-etag', lastSyncAtIso: new Date().toISOString() },
+      dbBytes: [1, 2, 3],
+    },
+  });
+  await installMockGraphClient(page, graphOptions);
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+};
+
+test('saves transfer happy path, transitions through upload states, and updates sync feedback', async ({
+  page,
+}) => {
+  await seedAndBindTestDb(page, { uploadDelayMs: 200 });
+  await page.goto(appPath('#/add'));
+  await expect(page.getByTestId('add-transfer-date')).toBeVisible();
+
+  await page.getByTestId('add-transfer-name').fill('Happy Path E2E Transfer');
+  await page.getByTestId('add-transfer-amount').fill('15.50');
+  await page.getByTestId('add-transfer-from-account').selectOption({ label: 'Girokonto' });
+  await page.getByTestId('add-transfer-to-account').selectOption({ label: 'Kreditkarte' });
+  await page.getByTestId('add-transfer-category-1').selectOption({ label: 'Lebensmittel' });
+
+  await page.getByTestId('add-transfer-submit').click();
+
+  await expect(page.locator('.toast-container')).toContainText('Transfer saved and uploaded.');
+});
+
+test('shows determinate upload progress during slow upload', async ({ page }) => {
+  await seedAndBindTestDb(page, { uploadDelayMs: 2000 });
+  await page.goto(appPath('#/add'));
+  await expect(page.getByTestId('add-transfer-date')).toBeVisible();
+
+  await page.getByTestId('add-transfer-name').fill('Slow Upload Transfer');
+  await page.getByTestId('add-transfer-amount').fill('1.00');
+  await page.getByTestId('add-transfer-from-account').selectOption({ label: 'Girokonto' });
+  await page.getByTestId('add-transfer-to-account').selectOption({ label: 'Kreditkarte' });
+
+  await page.getByTestId('add-transfer-submit').click();
+
+  await expect(
+    page.getByTestId('add-transfer-upload-status').getByTestId('progress-indicator'),
+  ).toBeVisible();
+
+  await expect(page.locator('.toast-container')).toContainText('Transfer saved and uploaded.', {
+    timeout: 10000,
+  });
+});
+
+test('handles transient upload failure and allows retry without data loss', async ({ page }) => {
+  await seedAndBindTestDb(page, {
+    uploadErrorSequence: [{ code: 'network_error', message: 'Failed to upload' }],
+  });
+  await page.goto(appPath('#/add'));
+  await expect(page.getByTestId('add-transfer-date')).toBeVisible();
+
+  await page.getByTestId('add-transfer-name').fill('Retry Transfer');
+  await page.getByTestId('add-transfer-amount').fill('10.00');
+  await page.getByTestId('add-transfer-from-account').selectOption({ label: 'Girokonto' });
+  await page.getByTestId('add-transfer-to-account').selectOption({ label: 'Kreditkarte' });
+
+  await page.getByTestId('add-transfer-submit').click();
+
+  await expect(page.getByTestId('add-transfer-form-error')).toBeVisible();
+  await expect(page.getByTestId('add-transfer-retry')).toBeVisible();
+
+  await page.getByTestId('add-transfer-retry').click();
+
+  await expect(page.locator('.toast-container')).toContainText('Transfer saved and uploaded.');
+});
+
+test('handles eTag conflict gracefully and blocks immediate retry', async ({ page }) => {
+  await seedAndBindTestDb(page, {
+    uploadErrorSequence: [{ code: 'conflict', message: 'Precondition Failed' }],
+  });
+  await page.goto(appPath('#/add'));
+  await expect(page.getByTestId('add-transfer-date')).toBeVisible();
+
+  await page.getByTestId('add-transfer-name').fill('Conflict Transfer');
+  await page.getByTestId('add-transfer-amount').fill('10.00');
+  await page.getByTestId('add-transfer-from-account').selectOption({ label: 'Girokonto' });
+  await page.getByTestId('add-transfer-to-account').selectOption({ label: 'Kreditkarte' });
+
+  await page.getByTestId('add-transfer-submit').click();
+
+  await expect(page.getByTestId('add-transfer-form-error')).toBeVisible();
+  await expect(page.getByTestId('add-transfer-retry')).not.toBeVisible();
+});
+
+test('blocks transfers when app is offline', async ({ page, context }) => {
+  await seedAndBindTestDb(page);
+  await page.goto(appPath('#/add'));
+  await expect(page.getByTestId('add-transfer-date')).toBeVisible();
+
+  await context.setOffline(true);
+
+  await expect(page.getByTestId('add-transfer-offline-warning')).toBeVisible();
+  await expect(page.getByTestId('add-transfer-submit')).toBeDisabled();
 });
