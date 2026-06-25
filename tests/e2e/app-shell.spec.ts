@@ -1065,7 +1065,7 @@ test('loads add transfer account and category options from the local DB runtime'
   const fromAccountOptions = page.getByTestId('add-transfer-from-account').locator('option');
   await expect(fromAccountOptions).toHaveText([
     'Select source account',
-    'Primary Income',
+    'INCOME',
     'Checking',
     'Wallet',
   ]);
@@ -1073,7 +1073,7 @@ test('loads add transfer account and category options from the local DB runtime'
   const toAccountOptions = page.getByTestId('add-transfer-to-account').locator('option');
   await expect(toAccountOptions).toHaveText([
     'Select destination account',
-    'Primary Spendings',
+    'SPENDINGS',
     'Checking',
     'Wallet',
   ]);
