@@ -647,6 +647,13 @@ M6-06 implementation clarification:
 - The service composes the committed local SQL write with `BrowserDbRuntime.exportBytes()`, validates that the exported SQLite payload is non-empty, clones it, and hands the bytes to an injected upload boundary.
 - Real OneDrive upload, eTag refresh, cache persistence, retry UX, and conflict handling remain intentionally scoped to the later M6 write-path issues.
 
+M6-07 implementation clarification:
+
+- Graph-backed upload orchestration is implemented in `src/features/app-shell/databaseUploadHandoffService.ts` and composed into the real save/export service through `createAppTransferSaveExportService`.
+- The upload handoff reads the current cached eTag for the selected OneDrive file, calls the existing `GraphClient.uploadFile` path with that eTag as the `If-Match` precondition, and refreshes cached DB bytes plus sync metadata with the returned eTag after successful upload.
+- Upload progress is forwarded through both the save/export service callback contract and `SyncStateStore` upload progress updates so later UI work can render determinate upload feedback without adding a second upload path.
+- Precondition conflicts remain a distinct orchestration error (`DatabaseUploadError` with `code: 'conflict'`) and mark sync state stale for the dedicated conflict-recovery UX work in later M6 issues.
+
 Deliverables:
 
 - End-to-end write feature with clear success/error behavior.
