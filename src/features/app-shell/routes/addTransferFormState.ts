@@ -6,6 +6,7 @@ import { MILLIS_PER_DAY } from '@shared';
 export interface AddTransferAccountOption {
   readonly accountId: number;
   readonly name: string;
+  readonly accountTypeId: number | null;
 }
 
 /** A selectable category option for the category dropdowns. */

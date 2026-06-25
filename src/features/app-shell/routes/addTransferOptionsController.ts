@@ -102,12 +102,14 @@ export const createAddTransferOptionsController = (
           .map((account) => ({
             accountId: account.accountId,
             name: account.name,
+            accountTypeId: account.accountTypeId,
           }));
         const toAccountOptions = accountQueryService
           .listAddTransferToAccountOptions()
           .map((account) => ({
             accountId: account.accountId,
             name: account.name,
+            accountTypeId: account.accountTypeId,
           }));
         const categoryOptions = categoryQueryService.listAllCategories().map((category) => ({
           categoryId: category.categoryId,

@@ -10,6 +10,7 @@
     NO_CATEGORY_SELECTED,
     type AddTransferFormFields,
   } from './addTransferFormState';
+  import { validateAddTransfer } from './addTransferValidation';
   import {
     createAddTransferOptionsController,
     shouldReloadAddTransferOptionsForSyncState,
@@ -32,6 +33,26 @@
   $: isOptionsLoading = optionsState.operation === 'loading';
   $: effectiveFormError = formError ?? optionsState.error?.message ?? null;
   $: controlsAreDisabled = isSubmitting || isOptionsLoading;
+
+  let validationErrors: string[] = [];
+
+  const clearValidation = (): void => {
+    if (validationErrors.length > 0) {
+      validationErrors = [];
+    }
+  };
+
+  const handleSubmit = (): void => {
+    validationErrors = validateAddTransfer(
+      fields,
+      optionsState.fromAccountOptions,
+      optionsState.toAccountOptions,
+      $_,
+    );
+    if (validationErrors.length > 0) {
+      return;
+    }
+  };
 
   const navIconBaseUrl = import.meta.env.BASE_URL;
   const categoryIconUrl = `${navIconBaseUrl}icons/category_55.png`;
@@ -89,7 +110,9 @@
       class="add-transfer-form"
       data-testid="add-transfer-form"
       aria-busy={isSubmitting || isOptionsLoading}
-      on:submit|preventDefault
+      on:submit|preventDefault={handleSubmit}
+      on:input={clearValidation}
+      on:change={clearValidation}
     >
       {#if isOptionsLoading}
         <p class="add-transfer-form__status" data-testid="add-transfer-options-loading">
@@ -101,6 +124,18 @@
         <p class="add-transfer-form__error" role="alert" data-testid="add-transfer-form-error">
           {effectiveFormError}
         </p>
+      {/if}
+
+      {#if validationErrors.length > 0}
+        {#each validationErrors as error (error)}
+          <p
+            class="add-transfer-form__error"
+            role="alert"
+            data-testid="add-transfer-validation-error"
+          >
+            {error}
+          </p>
+        {/each}
       {/if}
 
       <div class="add-transfer-form__field">

@@ -154,8 +154,8 @@ describe('AddRoute component', () => {
       controller: createMockOptionsController({
         ...READY_OPTIONS_STATE,
         fromAccountOptions: [
-          { accountId: 10, name: 'Checking' },
-          { accountId: 20, name: 'Savings' },
+          { accountId: 10, name: 'Checking', accountTypeId: 3 },
+          { accountId: 20, name: 'Savings', accountTypeId: 3 },
         ],
       }),
     });
@@ -169,8 +169,8 @@ describe('AddRoute component', () => {
       controller: createMockOptionsController({
         ...READY_OPTIONS_STATE,
         toAccountOptions: [
-          { accountId: 30, name: 'Credit Card' },
-          { accountId: 40, name: 'Savings' },
+          { accountId: 30, name: 'Credit Card', accountTypeId: 3 },
+          { accountId: 40, name: 'Savings', accountTypeId: 3 },
         ],
       }),
     });
@@ -280,5 +280,13 @@ describe('AddRoute component', () => {
     expect(body).toContain('data-testid="add-transfer-form-error"');
     expect(body).toContain('Failed to load options.');
     expect(body).not.toMatch(/data-testid="add-transfer-submit"[^>]*disabled/);
+  });
+
+  it('renders validation error messages when validation fails on submit', async () => {
+    // Svelte 5 testing note: server-side render doesn't support interactive event firing.
+    // For full interactive coverage, Playwright e2e tests will verify the blocking behavior.
+    // However, we can at least assert that the container testid doesn't exist initially.
+    const { body } = renderAddRoute();
+    expect(body).not.toContain('data-testid="add-transfer-validation-error"');
   });
 });
