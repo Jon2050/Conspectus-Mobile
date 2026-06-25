@@ -2,7 +2,12 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
   import { _ } from 'svelte-i18n';
-  import { appAccountQueryService, appCategoryQueryService } from '@db';
+  import {
+    appAccountQueryService,
+    appCategoryQueryService,
+    PRIMARY_INCOME_ACCOUNT_TYPE_ID,
+    PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID,
+  } from '@db';
   import { appSyncStateStore, type SyncState, type SyncStateStore } from '@shared';
   import BottomSheet from '../components/BottomSheet.svelte';
   import {
@@ -52,6 +57,16 @@
     if (validationErrors.length > 0) {
       return;
     }
+  };
+
+  const getAccountName = (account: { name: string; accountTypeId: number | null }) => {
+    if (account.accountTypeId === PRIMARY_INCOME_ACCOUNT_TYPE_ID) {
+      return $_('transfers.primaryIncome');
+    }
+    if (account.accountTypeId === PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID) {
+      return $_('transfers.primarySpendings');
+    }
+    return account.name;
   };
 
   const navIconBaseUrl = import.meta.env.BASE_URL;
@@ -198,7 +213,7 @@
         >
           <option value={null}>{$_('addTransfer.fromAccountPlaceholder')}</option>
           {#each optionsState.fromAccountOptions as account (account.accountId)}
-            <option value={account.accountId}>{account.name}</option>
+            <option value={account.accountId}>{getAccountName(account)}</option>
           {/each}
         </select>
       </div>
@@ -216,7 +231,7 @@
         >
           <option value={null}>{$_('addTransfer.toAccountPlaceholder')}</option>
           {#each optionsState.toAccountOptions as account (account.accountId)}
-            <option value={account.accountId}>{account.name}</option>
+            <option value={account.accountId}>{getAccountName(account)}</option>
           {/each}
         </select>
       </div>
