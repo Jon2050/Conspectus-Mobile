@@ -641,6 +641,12 @@ M6-05 implementation clarification:
 - Rollback behavior is covered for insert failure, source-account update failure, and destination-account update failure so transfer rows and account balances cannot remain partially applied.
 - DB export, OneDrive upload, cache persistence, retry UX, and conflict handling remain intentionally scoped to the later M6 write-path issues.
 
+M6-06 implementation clarification:
+
+- Transfer save export orchestration is implemented in `src/features/app-shell/transferSaveExportService.ts`.
+- The service composes the committed local SQL write with `BrowserDbRuntime.exportBytes()`, validates that the exported SQLite payload is non-empty, clones it, and hands the bytes to an injected upload boundary.
+- Real OneDrive upload, eTag refresh, cache persistence, retry UX, and conflict handling remain intentionally scoped to the later M6 write-path issues.
+
 Deliverables:
 
 - End-to-end write feature with clear success/error behavior.
