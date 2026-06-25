@@ -455,7 +455,7 @@ An issue is only considered done when:
 - Depends on: `M5-06`
 - GitHub: [#64](https://github.com/Jon2050/Conspectus-Mobile/issues/64)
 
-### :green_circle: M6-02 Implement account/category options loading for form
+### :white_check_mark: M6-02 Implement account/category options loading for form
 
 - Label: `feature`
 - Milestone: `M6 - Add Transfer Write Path`
@@ -463,7 +463,7 @@ An issue is only considered done when:
 - Depends on: `M5-01`
 - GitHub: [#65](https://github.com/Jon2050/Conspectus-Mobile/issues/65)
 
-### :green_circle: M6-03 Implement transfer validation rules
+### :white_check_mark: M6-03 Implement transfer validation rules
 
 - Label: `feature`
 - Milestone: `M6 - Add Transfer Write Path`
@@ -511,7 +511,7 @@ An issue is only considered done when:
 - Depends on: `M6-07`
 - GitHub: [#71](https://github.com/Jon2050/Conspectus-Mobile/issues/71)
 
-### :green_circle: M6-09 Block write flow while offline
+### :white_check_mark: M6-09 Block write flow while offline
 
 - Label: `feature`
 - Milestone: `M6 - Add Transfer Write Path`

@@ -242,4 +242,19 @@ describe('addTransferSaveController', () => {
     });
     expect(toastStore.show).toHaveBeenCalledWith('addTransfer.save.conflictToast', 'error');
   });
+
+  it('returns empty validation errors and blocks submit when isOffline is true', async () => {
+    const saveService = createSaveService();
+    const controller = createAddTransferSaveController(saveService, { show: vi.fn() });
+    const result = await controller.submit(createValidFields(), READY_OPTIONS, t, true);
+    expect(result.validationErrors).toEqual([]);
+    expect(saveService.createTransferAndExport).not.toHaveBeenCalled();
+  });
+
+  it('blocks retry when isOffline is true', async () => {
+    const saveService = createSaveService();
+    const controller = createAddTransferSaveController(saveService, { show: vi.fn() });
+    await controller.retry(t, true);
+    expect(saveService.retryExportedDatabaseUpload).not.toHaveBeenCalled();
+  });
 });

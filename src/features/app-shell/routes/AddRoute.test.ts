@@ -387,4 +387,19 @@ describe('AddRoute component', () => {
     const { body } = renderAddRoute();
     expect(body).not.toContain('data-testid="add-transfer-validation-error"');
   });
+
+  it('renders an offline warning and disables submit/retry when offline', () => {
+    const { body } = renderAddRoute({
+      networkStateStore: {
+        subscribe: (cb: (v: boolean) => void) => {
+          cb(false);
+          return () => {};
+        },
+      },
+    });
+
+    expect(body).toContain('data-testid="add-transfer-offline-warning"');
+    expect(body).toMatch(/data-testid="add-transfer-submit"[^>]*disabled/);
+    expect(body).not.toMatch(/data-testid="add-transfer-name"[^>]*disabled/);
+  });
 });
