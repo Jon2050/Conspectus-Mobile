@@ -479,7 +479,7 @@ An issue is only considered done when:
 - Depends on: `M6-02`
 - GitHub: [#67](https://github.com/Jon2050/Conspectus-Mobile/issues/67)
 
-### :green_circle: M6-05 Implement SQL write transaction
+### :white_check_mark: M6-05 Implement SQL write transaction
 
 - Label: `feature`
 - Milestone: `M6 - Add Transfer Write Path`

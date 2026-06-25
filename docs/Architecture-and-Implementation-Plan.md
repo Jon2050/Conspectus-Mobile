@@ -634,6 +634,13 @@ M6-04 implementation clarification:
 - The transfer type ID determination logic is decoupled from UI option lists and explicitly mirrors desktop business logic via `accountTypeId` comparison alone.
 - It resides in `src/features/app-shell/routes/transferTypeDerivation.ts` and gracefully falls back to `INTERN_TRANSFER` (`3`) when incomplete selection states are encountered before form validation.
 
+M6-05 implementation clarification:
+
+- Local transfer persistence is implemented in `src/db/transferWriteService.ts` and exposed through `@db` as `createTransferWriteService`/`appTransferWriteService`.
+- The service performs the desktop-compatible write sequence in one explicit SQLite transaction: insert the `transfer` row, decrement the source account balance, increment the destination account balance, and commit only after all statements succeed.
+- Rollback behavior is covered for insert failure, source-account update failure, and destination-account update failure so transfer rows and account balances cannot remain partially applied.
+- DB export, OneDrive upload, cache persistence, retry UX, and conflict handling remain intentionally scoped to the later M6 write-path issues.
+
 Deliverables:
 
 - End-to-end write feature with clear success/error behavior.

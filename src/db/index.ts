@@ -32,6 +32,11 @@ export {
   type CategoryQueryService,
 } from './categoryQueryService';
 export {
+  appTransferWriteService,
+  createTransferWriteService,
+  type TransferWriteService,
+} from './transferWriteService';
+export {
   appBrowserDbRuntime,
   createBrowserDbRuntime,
   resolveAppBrowserDbRuntime,
