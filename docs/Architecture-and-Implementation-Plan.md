@@ -623,6 +623,12 @@ Substeps:
 9. Optional maintenance toggle:
    - run `VACUUM` every N writes or manual trigger in settings.
 
+M6-01 implementation clarification:
+
+- The Add Transfer route now renders the full MVP data-entry surface in `src/features/app-shell/routes/AddRoute.svelte` using the shared `BottomSheet` component.
+- The route owns only the UI shell and field state for M6-01: date, name, amount, source account, destination account, three category selectors, optional buyplace, form-level loading/error display, and a sheet-local close action.
+- Account/category option loading, desktop-parity validation, SQL writes, DB export/upload, retry/conflict handling, and offline write blocking remain scoped to the later M6 issues that already track those behaviors.
+
 Deliverables:
 
 - End-to-end write feature with clear success/error behavior.
