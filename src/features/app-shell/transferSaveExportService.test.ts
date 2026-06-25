@@ -18,6 +18,7 @@ import {
 } from '../../shared/testUtils/dbIntegration';
 import {
   createTransferSaveExportService,
+  TransferUploadPendingError,
   type DatabaseUploadHandoff,
 } from './transferSaveExportService';
 
@@ -116,14 +117,65 @@ describe('transfer save export service', () => {
       }),
     };
     const onProgress = vi.fn();
+    const onUploadStart = vi.fn();
     const service = createTransferSaveExportService(writeService, runtime, uploadHandoff);
 
-    await service.createTransferAndExport(createBaseInput('Progress write'), { onProgress });
-
-    expect(uploadHandoff.uploadExportedDatabase).toHaveBeenCalledWith(Uint8Array.from([1, 2, 3]), {
+    await service.createTransferAndExport(createBaseInput('Progress write'), {
+      onUploadStart,
       onProgress,
     });
+
+    expect(uploadHandoff.uploadExportedDatabase).toHaveBeenCalledWith(Uint8Array.from([1, 2, 3]), {
+      onUploadStart,
+      onProgress,
+    });
+    expect(onUploadStart).toHaveBeenCalledOnce();
     expect(onProgress).toHaveBeenCalledWith({ loadedBytes: 1, totalBytes: 3 });
+  });
+
+  it('preserves committed exported bytes when upload fails so retry does not write again', async () => {
+    const uploadError = new Error('temporary upload failure');
+    const writeService = {
+      createTransfer: vi.fn(() => ({
+        transferId: 42,
+        persistedAtIso: '2026-06-25T00:00:00.000Z',
+      })),
+    };
+    const runtime = {
+      exportBytes: vi.fn(() => Uint8Array.from([1, 2, 3])),
+    };
+    const uploadHandoff: DatabaseUploadHandoff = {
+      uploadExportedDatabase: vi
+        .fn()
+        .mockRejectedValueOnce(uploadError)
+        .mockResolvedValueOnce(undefined),
+    };
+    const service = createTransferSaveExportService(writeService, runtime, uploadHandoff);
+
+    const pendingError = await service
+      .createTransferAndExport(createBaseInput('Retry upload write'))
+      .catch((error: unknown) => error);
+
+    expect(pendingError).toBeInstanceOf(TransferUploadPendingError);
+    const retryError = pendingError as TransferUploadPendingError;
+    expect(pendingError).toMatchObject({
+      pendingUpload: {
+        transferResult: {
+          transferId: 42,
+          persistedAtIso: '2026-06-25T00:00:00.000Z',
+        },
+        dbBytes: Uint8Array.from([1, 2, 3]),
+      },
+      cause: uploadError,
+    });
+    await service.retryExportedDatabaseUpload(retryError.pendingUpload.dbBytes);
+
+    expect(writeService.createTransfer).toHaveBeenCalledOnce();
+    expect(runtime.exportBytes).toHaveBeenCalledOnce();
+    expect(uploadHandoff.uploadExportedDatabase).toHaveBeenLastCalledWith(
+      Uint8Array.from([1, 2, 3]),
+      undefined,
+    );
   });
 
   it('does not export or upload when the local write fails', async () => {

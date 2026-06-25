@@ -7,6 +7,7 @@ import type {
   AddTransferOptionsController,
   AddTransferOptionsState,
 } from './addTransferOptionsController';
+import type { AddTransferSaveController, AddTransferSaveState } from './addTransferSaveController';
 
 const READY_OPTIONS_STATE: AddTransferOptionsState = {
   operation: 'ready',
@@ -27,10 +28,31 @@ const createMockOptionsController = (
   load: async () => {},
 });
 
+const READY_SAVE_STATE: AddTransferSaveState = {
+  phase: 'idle',
+  errorMessage: null,
+  progress: null,
+  canRetry: false,
+};
+
+const createMockSaveController = (
+  state: AddTransferSaveState = READY_SAVE_STATE,
+): AddTransferSaveController => ({
+  getState: () => state,
+  subscribe: (listener) => {
+    listener(state);
+    return () => {};
+  },
+  submit: async () => ({ validationErrors: [] }),
+  retry: async () => {},
+  reset: () => {},
+});
+
 const renderAddRoute = (props: Record<string, unknown> = {}) =>
   render(AddRoute, {
     props: {
       controller: createMockOptionsController(),
+      saveController: createMockSaveController(),
       ...props,
     },
   });
@@ -241,6 +263,82 @@ describe('AddRoute component', () => {
     expect(body).toMatch(/data-testid="add-transfer-name"[^>]*disabled/);
     expect(body).toMatch(/data-testid="add-transfer-buyplace"[^>]*disabled/);
     expect(body).toMatch(/data-testid="add-transfer-close"[^>]*disabled/);
+  });
+
+  it('renders local save status and disables controls while the local write/export runs', () => {
+    const { body } = renderAddRoute({
+      saveController: createMockSaveController({
+        ...READY_SAVE_STATE,
+        phase: 'local_save',
+      }),
+    });
+
+    expect(body).toContain('data-testid="add-transfer-local-save-status"');
+    expect(body).toContain('Transfer wird lokal gespeichert');
+    expect(body).toContain('aria-busy="true"');
+    expect(body).toMatch(/data-testid="add-transfer-submit"[^>]*disabled/);
+    expect(body).toMatch(/data-testid="add-transfer-close"[^>]*disabled/);
+  });
+
+  it('renders determinate upload progress while the database upload runs', () => {
+    const { body } = renderAddRoute({
+      saveController: createMockSaveController({
+        ...READY_SAVE_STATE,
+        phase: 'uploading',
+        progress: { loadedBytes: 5120, totalBytes: 10240 },
+      }),
+    });
+
+    expect(body).toContain('data-testid="add-transfer-upload-status"');
+    expect(body).toContain('Aktualisierte Datenbank wird auf OneDrive hochgeladen');
+    expect(body).toContain('data-kind="upload"');
+    expect(body).toContain('value="5120"');
+    expect(body).toContain('max="10240"');
+    expect(body).toContain('5 KB / 10 KB hochgeladen');
+    expect(body).toMatch(/data-testid="add-transfer-submit"[^>]*disabled/);
+  });
+
+  it('renders retry action and preserves visible form values after retryable upload failure', () => {
+    const { body } = renderAddRoute({
+      fields: {
+        date: '2024-05-12',
+        name: 'Groceries',
+        amount: '12,34',
+        fromAccountId: null,
+        toAccountId: null,
+        category1Id: -1,
+        category2Id: -1,
+        category3Id: -1,
+        buyplace: 'Market',
+      },
+      saveController: createMockSaveController({
+        ...READY_SAVE_STATE,
+        phase: 'upload_failed',
+        errorMessage: 'Upload failed.',
+        canRetry: true,
+      }),
+    });
+
+    expect(body).toContain('data-testid="add-transfer-form-error"');
+    expect(body).toContain('Upload failed.');
+    expect(body).toContain('data-testid="add-transfer-retry"');
+    expect(body).toContain('Upload wiederholen');
+    expect(body).toContain('value="Groceries"');
+    expect(body).toContain('value="12,34"');
+    expect(body).toContain('value="Market"');
+    expect(body).toMatch(/data-testid="add-transfer-close"[^>]*disabled/);
+  });
+
+  it('renders success status only when the save controller reports a completed upload', () => {
+    const { body } = renderAddRoute({
+      saveController: createMockSaveController({
+        ...READY_SAVE_STATE,
+        phase: 'saved',
+      }),
+    });
+
+    expect(body).toContain('data-testid="add-transfer-success-status"');
+    expect(body).toContain('Transfer gespeichert und hochgeladen.');
   });
 
   it('renders a form-level error without disabling normal editing', () => {

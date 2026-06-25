@@ -55,6 +55,19 @@
     "submit": "Transfer speichern",
     "saving": "Transfer wird gespeichert...",
     "close": "Schließen",
+    "save": {
+      "localSave": "Transfer wird lokal gespeichert und der Datenbank-Upload vorbereitet...",
+      "uploading": "Aktualisierte Datenbank wird auf OneDrive hochgeladen...",
+      "uploadFailed": "Der Upload der Datenbank zu OneDrive ist fehlgeschlagen. Deine Transferdaten bleiben erhalten.",
+      "localFailed": "Der Transfer konnte lokal nicht gespeichert werden. Es wurde nichts hochgeladen.",
+      "retry": "Upload wiederholen",
+      "success": "Transfer gespeichert und hochgeladen.",
+      "successToast": "Transfer gespeichert und hochgeladen.",
+      "uploadFailedToast": "Upload fehlgeschlagen. Wiederhole ihn bei stabiler Verbindung.",
+      "retryFailedToast": "Wiederholung fehlgeschlagen. Die Transferdaten bleiben erhalten.",
+      "localFailedToast": "Transfer konnte lokal nicht gespeichert werden.",
+      "conflictToast": "OneDrive wurde vor Abschluss des Uploads geändert. Aktualisiere vor einem neuen Versuch."
+    },
     "validation": {
       "nameLength": "Beschreibung muss länger als 2 Zeichen sein.",
       "amountPositive": "Betrag muss größer als 0 sein.",

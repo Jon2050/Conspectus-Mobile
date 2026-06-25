@@ -10,23 +10,29 @@
   } from '@db';
   import { appSyncStateStore, type SyncState, type SyncStateStore } from '@shared';
   import BottomSheet from '../components/BottomSheet.svelte';
+  import ProgressIndicator from '../components/ProgressIndicator.svelte';
   import {
     createInitialFormFields,
     NO_CATEGORY_SELECTED,
     type AddTransferFormFields,
   } from './addTransferFormState';
-  import { validateAddTransfer } from './addTransferValidation';
   import {
     createAddTransferOptionsController,
     shouldReloadAddTransferOptionsForSyncState,
     type AddTransferOptionsController,
     type AddTransferOptionsState,
   } from './addTransferOptionsController';
+  import {
+    createAddTransferSaveController,
+    type AddTransferSaveController,
+    type AddTransferSaveState,
+  } from './addTransferSaveController';
 
   export let controller: AddTransferOptionsController = createAddTransferOptionsController(
     appAccountQueryService,
     appCategoryQueryService,
   );
+  export let saveController: AddTransferSaveController = createAddTransferSaveController();
   export let fields: AddTransferFormFields = createInitialFormFields();
   export let isSubmitting = false;
   export let formError: string | null = null;
@@ -34,10 +40,14 @@
 
   let isOpen = true;
   let optionsState: AddTransferOptionsState = controller.getState();
+  let saveState: AddTransferSaveState = saveController.getState();
   let lastObservedSyncState: SyncState = 'idle';
   $: isOptionsLoading = optionsState.operation === 'loading';
-  $: effectiveFormError = formError ?? optionsState.error?.message ?? null;
-  $: controlsAreDisabled = isSubmitting || isOptionsLoading;
+  $: saveIsBusy = saveState.phase === 'local_save' || saveState.phase === 'uploading';
+  $: saveHasPendingUpload = saveState.canRetry || saveState.phase === 'conflict';
+  $: effectiveFormError =
+    formError ?? saveState.errorMessage ?? optionsState.error?.message ?? null;
+  $: controlsAreDisabled = isSubmitting || isOptionsLoading || saveIsBusy || saveHasPendingUpload;
 
   let validationErrors: string[] = [];
 
@@ -47,16 +57,21 @@
     }
   };
 
-  const handleSubmit = (): void => {
-    validationErrors = validateAddTransfer(
-      fields,
-      optionsState.fromAccountOptions,
-      optionsState.toAccountOptions,
-      $_,
-    );
-    if (validationErrors.length > 0) {
-      return;
+  const resetSuccessfulSave = (): void => {
+    if (saveController.getState().phase === 'saved') {
+      fields = createInitialFormFields();
     }
+  };
+
+  const handleSubmit = async (): Promise<void> => {
+    const result = await saveController.submit(fields, optionsState, $_);
+    validationErrors = [...result.validationErrors];
+    resetSuccessfulSave();
+  };
+
+  const handleRetry = async (): Promise<void> => {
+    await saveController.retry($_);
+    resetSuccessfulSave();
   };
 
   const getAccountName = (account: { name: string; accountTypeId: number | null }) => {
@@ -74,6 +89,9 @@
   const unsubscribeController = controller.subscribe((nextState) => {
     optionsState = nextState;
   });
+  const unsubscribeSaveController = saveController.subscribe((nextState) => {
+    saveState = nextState;
+  });
   const unsubscribeSyncState = syncStateStore.subscribe((syncSnapshot) => {
     if (syncSnapshot.state === lastObservedSyncState) {
       return;
@@ -86,6 +104,10 @@
   });
 
   const handleClose = (): void => {
+    if (saveIsBusy || saveController.getState().canRetry) {
+      return;
+    }
+
     isOpen = false;
     if (typeof window !== 'undefined') {
       window.location.hash = '#/transfers';
@@ -94,6 +116,7 @@
 
   const handleReopen = (): void => {
     fields = createInitialFormFields();
+    saveController.reset();
     isOpen = true;
   };
 
@@ -103,6 +126,7 @@
 
   onDestroy(() => {
     unsubscribeController();
+    unsubscribeSaveController();
     unsubscribeSyncState();
   });
 </script>
@@ -120,11 +144,16 @@
     </div>
   {/if}
 
-  <BottomSheet {isOpen} title={$_('addTransfer.title')} on:close={handleClose}>
+  <BottomSheet
+    {isOpen}
+    canClose={!saveIsBusy && !saveState.canRetry}
+    title={$_('addTransfer.title')}
+    on:close={handleClose}
+  >
     <form
       class="add-transfer-form"
       data-testid="add-transfer-form"
-      aria-busy={isSubmitting || isOptionsLoading}
+      aria-busy={isSubmitting || isOptionsLoading || saveIsBusy}
       on:submit|preventDefault={handleSubmit}
       on:input={clearValidation}
       on:change={clearValidation}
@@ -138,6 +167,35 @@
       {#if effectiveFormError !== null}
         <p class="add-transfer-form__error" role="alert" data-testid="add-transfer-form-error">
           {effectiveFormError}
+        </p>
+      {/if}
+
+      {#if saveState.phase === 'local_save'}
+        <p class="add-transfer-form__status" data-testid="add-transfer-local-save-status">
+          {$_('addTransfer.save.localSave')}
+        </p>
+      {/if}
+
+      {#if saveState.phase === 'uploading'}
+        <div class="add-transfer-form__upload" data-testid="add-transfer-upload-status">
+          <p class="add-transfer-form__status">{$_('addTransfer.save.uploading')}</p>
+          {#if saveState.progress !== null}
+            <ProgressIndicator
+              kind="upload"
+              loaded={saveState.progress.loadedBytes}
+              total={saveState.progress.totalBytes}
+            />
+          {/if}
+        </div>
+      {/if}
+
+      {#if saveState.phase === 'saved'}
+        <p
+          class="add-transfer-form__success"
+          role="status"
+          data-testid="add-transfer-success-status"
+        >
+          {$_('addTransfer.save.success')}
         </p>
       {/if}
 
@@ -311,19 +369,31 @@
           type="button"
           class="app-button app-button--secondary add-transfer-form__action"
           data-testid="add-transfer-close"
-          disabled={isSubmitting}
+          disabled={isSubmitting || saveIsBusy || saveState.canRetry}
           on:click={handleClose}
         >
           {$_('addTransfer.close')}
         </button>
-        <button
-          type="submit"
-          class="app-button app-button--primary add-transfer-form__action"
-          data-testid="add-transfer-submit"
-          disabled={controlsAreDisabled}
-        >
-          {isSubmitting ? $_('addTransfer.saving') : $_('addTransfer.submit')}
-        </button>
+        {#if saveState.canRetry}
+          <button
+            type="button"
+            class="app-button app-button--primary add-transfer-form__action"
+            data-testid="add-transfer-retry"
+            disabled={saveIsBusy}
+            on:click={handleRetry}
+          >
+            {$_('addTransfer.save.retry')}
+          </button>
+        {:else}
+          <button
+            type="submit"
+            class="app-button app-button--primary add-transfer-form__action"
+            data-testid="add-transfer-submit"
+            disabled={controlsAreDisabled}
+          >
+            {saveIsBusy || isSubmitting ? $_('addTransfer.saving') : $_('addTransfer.submit')}
+          </button>
+        {/if}
       </div>
     </form>
   </BottomSheet>
@@ -372,11 +442,28 @@
     font-weight: 600;
   }
 
+  .add-transfer-form__success {
+    margin: 0;
+    padding: 0.8rem 0.9rem;
+    border: 1px solid color-mix(in srgb, var(--positive) 45%, transparent);
+    border-radius: var(--radius-md);
+    color: color-mix(in srgb, var(--positive) 76%, black);
+    background: color-mix(in srgb, var(--positive) 10%, var(--surface-strong));
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
   .add-transfer-form__status {
     margin: 0;
     color: var(--text-secondary);
     font-size: 0.9rem;
     font-weight: 600;
+  }
+
+  .add-transfer-form__upload {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
   }
 
   .add-transfer-form__field {

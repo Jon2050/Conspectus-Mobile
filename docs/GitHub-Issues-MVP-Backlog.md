@@ -503,7 +503,7 @@ An issue is only considered done when:
 - Depends on: `M6-06, M4-02`
 - GitHub: [#70](https://github.com/Jon2050/Conspectus-Mobile/issues/70)
 
-### :green_circle: M6-08 Implement write failure and retry UX
+### :white_check_mark: M6-08 Implement write failure and retry UX
 
 - Label: `feature`
 - Milestone: `M6 - Add Transfer Write Path`

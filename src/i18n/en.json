@@ -55,6 +55,19 @@
     "submit": "Save transfer",
     "saving": "Saving transfer...",
     "close": "Close",
+    "save": {
+      "localSave": "Saving transfer locally and preparing the database upload...",
+      "uploading": "Uploading updated database to OneDrive...",
+      "uploadFailed": "Uploading the database to OneDrive failed. Your transfer data is still here.",
+      "localFailed": "Saving the transfer locally failed. Nothing was uploaded.",
+      "retry": "Retry upload",
+      "success": "Transfer saved and uploaded.",
+      "successToast": "Transfer saved and uploaded.",
+      "uploadFailedToast": "Upload failed. Retry when the connection is stable.",
+      "retryFailedToast": "Retry failed. The transfer data is still preserved.",
+      "localFailedToast": "Transfer could not be saved locally.",
+      "conflictToast": "OneDrive changed before upload completed. Refresh before trying again."
+    },
     "validation": {
       "nameLength": "Description must be longer than 2 characters.",
       "amountPositive": "Amount must be greater than 0.",
