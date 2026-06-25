@@ -1,4 +1,4 @@
-Task: Implement issue `M5-10` end-to-end with full verification.
+Task: Implement issue `M6-03` end-to-end with full verification.
 
 ## Non-negotiable rules:
 
@@ -22,10 +22,10 @@ Always print in which step you are!
    - `docs/Architecture-and-Implementation-Plan.md`
    - `docs/Conspectus-Desktop-Info.md`
    - `docs/GitHub-Issues-MVP-Backlog.md`
-     Then locate `M5-10` and extract implementation steps, acceptance criteria, and dependencies/constraints from GitHub. Also from the comments on GitHub.
+     Then locate `M6-03` and extract implementation steps, acceptance criteria, and dependencies/constraints from GitHub. Also from the comments on GitHub.
 2. Plan with one planning subagent. Refine until concrete, testable, and mapped from each acceptance criterion to file-level code/test changes. Make clear, that the planning subagent should not write any code, just the plan.
-3. Create/use a dedicated issue branch with a proper name containing the milestone and issue number (e.g., `feature/M5-07-localize-formatting` or `bug/M5-07-fix-locale`).
-   3.1. Increase the app version in `package.json` to `0.<milestone_number>.<issue_title_number>`. (e.g. `0.4.08` for issue `M4-08`)
+3. Create/use a dedicated issue branch with a proper name containing the milestone and issue number (e.g., `feature/M6-03-localize-formatting` or `bug/M6-03-fix-locale`).
+   3.1. Increase the app version in `package.json` to `0.<milestone_number>.<issue_title_number>`. (e.g. `0.6.03` for issue `M6-03`)
 4. Implement the approved plan or findings by a reviewer. Keep commits scoped to this issue. Add/update tests for behavior changes.
 5. Run local verification gate:
    - `npm run format`
@@ -35,7 +35,7 @@ Always print in which step you are!
    - `npm run build`
    - `npm run test:e2e` when changed behavior is e2e-relevant.
      Fix any issues found during the verification gate before proceeding with step 5.
-6. Run review gate with one reviewer subagent against acceptance criteria and code review best practices. Use the `docs/prompts/Local-CodeReview-PromptTemplate.md` to prompt the reviewer subagent. Fill in the template the placeholders like `{{BRANCH_NAME}}`, `{{ISSUE_NUMBERS_OR_DESCRIPTION}}`, `{{CONTEXT_FILES}}` with the actual values. If gaps are found and the reviewer subagent does not send APPROVED, fix the issues it found and repeat steps 4-6 (if the reviewer found problems with the task iteself and the acceptance criteria) or 5-6 (if it only found other problems) until satisfied.
+6. Run review gate with one reviewer subagent against acceptance criteria and code review best practices. Use the `docs/prompts/Local-CodeReview-Prompt-Template.md` to prompt the reviewer subagent. Fill in the template the placeholders like `{{BRANCH_NAME}}`, `{{ISSUE_NUMBERS_OR_DESCRIPTION}}`, `{{CONTEXT_FILES}}` with the actual values. If gaps are found and the reviewer subagent does not send APPROVED, fix the issues it found and repeat steps 4-6 (if the reviewer found problems with the task iteself and the acceptance criteria) or 5-6 (if it only found other problems) until satisfied.
 7. Git + GitHub flow:
    - At this point, all local checks and tests must be green and the reviewer subagent must have APPROVED the current diff. If not, go back to step 6.
    - Update the backlog status marker for this issue in `docs/GitHub-Issues-MVP-Backlog.md` to done (`:white_check_mark:`) so that it is included in the issue branch commits.
@@ -76,3 +76,5 @@ Always print in which step you are!
 5. **Documentation:** Code must be self-explanatory. Add meaningful inline comments only for complex or non-obvious logic. Every file should start with a short description of what the file does and why it is needed.
 6. **Testing:** All new or changed behavior must be accompanied by appropriate, passing tests. Tests should verify real functionality, cover important edge cases and failure scenarios, and provide meaningful regression protection.
 7. **Contextual Alignment:** Before coding, verify that prerequisites from previous tasks are complete. Ensure your implementation serves as a solid foundation for related upcoming issues in the backlog.
+
+Please include the changes in the Task-Prompt-Template.md into the commit aswell.

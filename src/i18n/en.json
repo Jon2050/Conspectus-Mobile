@@ -54,7 +54,17 @@
     "loadingOptions": "Loading accounts and categories...",
     "submit": "Save transfer",
     "saving": "Saving transfer...",
-    "close": "Close"
+    "close": "Close",
+    "validation": {
+      "nameLength": "Description must be longer than 2 characters.",
+      "amountPositive": "Amount must be greater than 0.",
+      "fromAccountRequired": "Please select a source account.",
+      "toAccountRequired": "Please select a destination account.",
+      "differentAccounts": "Source and destination accounts must be different.",
+      "fromNotSpendings": "Cannot transfer from the PRIMARY SPENDINGS account.",
+      "toNotIncome": "Cannot transfer to the PRIMARY INCOME account.",
+      "incomeToSpendingsInvalid": "Direct transfer from PRIMARY INCOME to PRIMARY SPENDINGS is not allowed."
+    }
   },
   "settings": {
     "title": "Settings",

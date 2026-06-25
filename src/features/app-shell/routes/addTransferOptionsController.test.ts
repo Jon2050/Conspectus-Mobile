@@ -31,12 +31,12 @@ describe('createAddTransferOptionsController', () => {
     expect(controller.getState()).toEqual({
       operation: 'ready',
       fromAccountOptions: [
-        { accountId: 1, name: 'Income' },
-        { accountId: 10, name: 'Cash' },
+        { accountId: 1, name: 'Income', accountTypeId: 1 },
+        { accountId: 10, name: 'Cash', accountTypeId: 3 },
       ],
       toAccountOptions: [
-        { accountId: 2, name: 'Spendings' },
-        { accountId: 10, name: 'Cash' },
+        { accountId: 2, name: 'Spendings', accountTypeId: 2 },
+        { accountId: 10, name: 'Cash', accountTypeId: 3 },
       ],
       categoryOptions: [
         { categoryId: 20, name: 'Groceries' },

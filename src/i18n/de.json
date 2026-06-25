@@ -54,7 +54,17 @@
     "loadingOptions": "Konten und Kategorien werden geladen...",
     "submit": "Transfer speichern",
     "saving": "Transfer wird gespeichert...",
-    "close": "Schließen"
+    "close": "Schließen",
+    "validation": {
+      "nameLength": "Beschreibung muss länger als 2 Zeichen sein.",
+      "amountPositive": "Betrag muss größer als 0 sein.",
+      "fromAccountRequired": "Bitte wähle ein Quellkonto aus.",
+      "toAccountRequired": "Bitte wähle ein Zielkonto aus.",
+      "differentAccounts": "Quell- und Zielkonto dürfen nicht identisch sein.",
+      "fromNotSpendings": "Transfer vom Konto AUSGABEN ist nicht erlaubt.",
+      "toNotIncome": "Transfer auf das Konto EINNAHMEN ist nicht erlaubt.",
+      "incomeToSpendingsInvalid": "Direkter Transfer von EINNAHMEN zu AUSGABEN ist nicht erlaubt."
+    }
   },
   "settings": {
     "title": "Einstellungen",
