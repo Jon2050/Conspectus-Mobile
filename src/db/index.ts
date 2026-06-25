@@ -3,6 +3,9 @@ export type { BindParams, QueryExecResult, SqlValue } from 'sql.js';
 export {
   PRIMARY_INCOME_ACCOUNT_TYPE_ID,
   PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID,
+  TRANSFER_TYPE_STD_EXPENSE,
+  TRANSFER_TYPE_STD_EARNING,
+  TRANSFER_TYPE_INTERN_TRANSFER,
   type AccountRecord,
   type BrowserDbRuntime,
   type BrowserDbRuntimeOpenOptions,
