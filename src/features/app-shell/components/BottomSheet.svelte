@@ -4,17 +4,29 @@
 
   export let isOpen = false;
   export let title = '';
+  export let canClose = true;
 
   let dialogElement: HTMLDialogElement | null = null;
   const dispatch = createEventDispatcher();
 
   const requestClose = () => {
+    if (!canClose) {
+      return;
+    }
+
     if (dialogElement?.open) {
       dialogElement.close();
     }
   };
 
   const handleDialogClose = () => {
+    if (!canClose) {
+      if (dialogElement !== null && !dialogElement.open) {
+        dialogElement.showModal();
+      }
+      return;
+    }
+
     if (!isOpen) {
       return;
     }

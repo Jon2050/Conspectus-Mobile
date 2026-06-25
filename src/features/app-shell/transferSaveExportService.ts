@@ -21,6 +21,7 @@ export interface DatabaseUploadProgress {
 }
 
 export interface DatabaseUploadOptions {
+  readonly onUploadStart?: () => void;
   readonly onProgress?: (progress: DatabaseUploadProgress) => void;
 }
 
@@ -29,6 +30,26 @@ export interface TransferSaveExportService {
     input: CreateTransferInput,
     options?: DatabaseUploadOptions,
   ): Promise<CreateTransferResult>;
+  retryExportedDatabaseUpload(dbBytes: Uint8Array, options?: DatabaseUploadOptions): Promise<void>;
+}
+
+export interface PendingTransferUpload {
+  readonly transferResult: CreateTransferResult;
+  readonly dbBytes: Uint8Array;
+}
+
+export class TransferUploadPendingError extends Error {
+  readonly pendingUpload: PendingTransferUpload;
+  readonly cause?: unknown;
+
+  constructor(pendingUpload: PendingTransferUpload, cause: unknown) {
+    super(cause instanceof Error ? cause.message : 'Uploading the transfer failed.');
+    this.name = 'TransferUploadPendingError';
+    this.pendingUpload = pendingUpload;
+    if (cause !== undefined) {
+      this.cause = cause;
+    }
+  }
 }
 
 type TransferExportRuntime = Pick<BrowserDbRuntime, 'exportBytes'>;
@@ -61,9 +82,28 @@ export const createTransferSaveExportService = (
     const transferResult = transferWriteService.createTransfer(input);
     const exportedBytes = cloneExportedBytes(resolveTransferExportRuntime(dbRuntime).exportBytes());
 
-    await uploadHandoff.uploadExportedDatabase(exportedBytes, options);
+    try {
+      options?.onUploadStart?.();
+      await uploadHandoff.uploadExportedDatabase(exportedBytes, options);
+    } catch (error) {
+      throw new TransferUploadPendingError(
+        {
+          transferResult,
+          dbBytes: exportedBytes,
+        },
+        error,
+      );
+    }
 
     return transferResult;
+  },
+
+  async retryExportedDatabaseUpload(
+    dbBytes: Uint8Array,
+    options?: DatabaseUploadOptions,
+  ): Promise<void> {
+    options?.onUploadStart?.();
+    await uploadHandoff.uploadExportedDatabase(dbBytes, options);
   },
 });
 
