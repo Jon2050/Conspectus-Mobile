@@ -47,6 +47,7 @@ export interface CreateTransferInput {
   readonly bookingDateEpochDay: number;
   readonly name: string;
   readonly amountCents: number;
+  readonly transferTypeId: number;
   readonly fromAccountId: number;
   readonly toAccountId: number;
   readonly categoryIds: readonly number[];
