@@ -629,6 +629,11 @@ M6-01 implementation clarification:
 - The route owns only the UI shell and field state for M6-01: date, name, amount, source account, destination account, three category selectors, optional buyplace, form-level loading/error display, and a sheet-local close action.
 - Account/category option loading, desktop-parity validation, SQL writes, DB export/upload, retry/conflict handling, and offline write blocking remain scoped to the later M6 issues that already track those behaviors.
 
+M6-04 implementation clarification:
+
+- The transfer type ID determination logic is decoupled from UI option lists and explicitly mirrors desktop business logic via `accountTypeId` comparison alone.
+- It resides in `src/features/app-shell/routes/transferTypeDerivation.ts` and gracefully falls back to `INTERN_TRANSFER` (`3`) when incomplete selection states are encountered before form validation.
+
 Deliverables:
 
 - End-to-end write feature with clear success/error behavior.
