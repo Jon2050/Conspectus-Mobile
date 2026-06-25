@@ -38,6 +38,7 @@
   },
   "addTransfer": {
     "title": "New Transfer",
+    "offlineWarning": "You must be online to add a transfer.",
     "date": "Date",
     "name": "Description",
     "namePlaceholder": "e.g. Groceries, Rent...",

@@ -8,7 +8,13 @@
     PRIMARY_INCOME_ACCOUNT_TYPE_ID,
     PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID,
   } from '@db';
-  import { appSyncStateStore, type SyncState, type SyncStateStore } from '@shared';
+  import {
+    appSyncStateStore,
+    appNetworkStateStore,
+    type SyncState,
+    type SyncStateStore,
+    type NetworkStateStore,
+  } from '@shared';
   import BottomSheet from '../components/BottomSheet.svelte';
   import ProgressIndicator from '../components/ProgressIndicator.svelte';
   import {
@@ -37,17 +43,20 @@
   export let isSubmitting = false;
   export let formError: string | null = null;
   export let syncStateStore: SyncStateStore = appSyncStateStore;
+  export let networkStateStore: NetworkStateStore = appNetworkStateStore;
 
   let isOpen = true;
   let optionsState: AddTransferOptionsState = controller.getState();
   let saveState: AddTransferSaveState = saveController.getState();
   let lastObservedSyncState: SyncState = 'idle';
+  $: isOffline = !$networkStateStore;
   $: isOptionsLoading = optionsState.operation === 'loading';
   $: saveIsBusy = saveState.phase === 'local_save' || saveState.phase === 'uploading';
   $: saveHasPendingUpload = saveState.canRetry || saveState.phase === 'conflict';
   $: effectiveFormError =
     formError ?? saveState.errorMessage ?? optionsState.error?.message ?? null;
   $: controlsAreDisabled = isSubmitting || isOptionsLoading || saveIsBusy || saveHasPendingUpload;
+  $: submitIsDisabled = controlsAreDisabled || isOffline;
 
   let validationErrors: string[] = [];
 
@@ -64,13 +73,13 @@
   };
 
   const handleSubmit = async (): Promise<void> => {
-    const result = await saveController.submit(fields, optionsState, $_);
+    const result = await saveController.submit(fields, optionsState, $_, isOffline);
     validationErrors = [...result.validationErrors];
     resetSuccessfulSave();
   };
 
   const handleRetry = async (): Promise<void> => {
-    await saveController.retry($_);
+    await saveController.retry($_, isOffline);
     resetSuccessfulSave();
   };
 
@@ -167,6 +176,12 @@
       {#if effectiveFormError !== null}
         <p class="add-transfer-form__error" role="alert" data-testid="add-transfer-form-error">
           {effectiveFormError}
+        </p>
+      {/if}
+
+      {#if isOffline}
+        <p class="add-transfer-form__error" role="alert" data-testid="add-transfer-offline-warning">
+          {$_('addTransfer.offlineWarning')}
         </p>
       {/if}
 
@@ -379,7 +394,7 @@
             type="button"
             class="app-button app-button--primary add-transfer-form__action"
             data-testid="add-transfer-retry"
-            disabled={saveIsBusy}
+            disabled={saveIsBusy || isOffline}
             on:click={handleRetry}
           >
             {$_('addTransfer.save.retry')}
@@ -389,7 +404,7 @@
             type="submit"
             class="app-button app-button--primary add-transfer-form__action"
             data-testid="add-transfer-submit"
-            disabled={controlsAreDisabled}
+            disabled={submitIsDisabled}
           >
             {saveIsBusy || isSubmitting ? $_('addTransfer.saving') : $_('addTransfer.submit')}
           </button>

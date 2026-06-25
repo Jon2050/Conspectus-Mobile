@@ -51,8 +51,9 @@ export interface AddTransferSaveController {
     fields: AddTransferFormFields,
     optionsState: AddTransferOptionsState,
     t: AddTransferTranslator,
+    isOffline?: boolean,
   ): Promise<AddTransferSubmitResult>;
-  retry(t: AddTransferTranslator): Promise<void>;
+  retry(t: AddTransferTranslator, isOffline?: boolean): Promise<void>;
   reset(): void;
 }
 
@@ -200,7 +201,12 @@ export const createAddTransferSaveController = (
       fields: AddTransferFormFields,
       optionsState: AddTransferOptionsState,
       t: AddTransferTranslator,
+      isOffline: boolean = false,
     ): Promise<AddTransferSubmitResult> {
+      if (isOffline) {
+        return { validationErrors: [] };
+      }
+
       if (isBusyPhase(state.phase)) {
         return { validationErrors: [] };
       }
@@ -246,7 +252,11 @@ export const createAddTransferSaveController = (
       return { validationErrors: [] };
     },
 
-    async retry(t: AddTransferTranslator): Promise<void> {
+    async retry(t: AddTransferTranslator, isOffline: boolean = false): Promise<void> {
+      if (isOffline) {
+        return;
+      }
+
       if (isBusyPhase(state.phase) || pendingUpload === null || !state.canRetry) {
         return;
       }
