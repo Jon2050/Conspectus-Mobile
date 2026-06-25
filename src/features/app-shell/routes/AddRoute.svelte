@@ -1,26 +1,53 @@
 <!-- Renders the Add Transfer bottom-sheet form with all MVP fields for mobile data entry. -->
 <script lang="ts">
+  import { onDestroy, onMount } from 'svelte';
   import { _ } from 'svelte-i18n';
+  import { appAccountQueryService, appCategoryQueryService } from '@db';
+  import { appSyncStateStore, type SyncState, type SyncStateStore } from '@shared';
   import BottomSheet from '../components/BottomSheet.svelte';
   import {
     createInitialFormFields,
     NO_CATEGORY_SELECTED,
-    type AddTransferAccountOption,
-    type AddTransferCategoryOption,
     type AddTransferFormFields,
   } from './addTransferFormState';
+  import {
+    createAddTransferOptionsController,
+    shouldReloadAddTransferOptionsForSyncState,
+    type AddTransferOptionsController,
+    type AddTransferOptionsState,
+  } from './addTransferOptionsController';
 
-  export let fromAccountOptions: readonly AddTransferAccountOption[] = [];
-  export let toAccountOptions: readonly AddTransferAccountOption[] = [];
-  export let categoryOptions: readonly AddTransferCategoryOption[] = [];
+  export let controller: AddTransferOptionsController = createAddTransferOptionsController(
+    appAccountQueryService,
+    appCategoryQueryService,
+  );
   export let fields: AddTransferFormFields = createInitialFormFields();
   export let isSubmitting = false;
   export let formError: string | null = null;
+  export let syncStateStore: SyncStateStore = appSyncStateStore;
 
   let isOpen = true;
+  let optionsState: AddTransferOptionsState = controller.getState();
+  let lastObservedSyncState: SyncState = 'idle';
+  $: isOptionsLoading = optionsState.operation === 'loading';
+  $: effectiveFormError = formError ?? optionsState.error?.message ?? null;
+  $: controlsAreDisabled = isSubmitting || isOptionsLoading;
 
   const navIconBaseUrl = import.meta.env.BASE_URL;
   const categoryIconUrl = `${navIconBaseUrl}icons/category_55.png`;
+  const unsubscribeController = controller.subscribe((nextState) => {
+    optionsState = nextState;
+  });
+  const unsubscribeSyncState = syncStateStore.subscribe((syncSnapshot) => {
+    if (syncSnapshot.state === lastObservedSyncState) {
+      return;
+    }
+
+    lastObservedSyncState = syncSnapshot.state;
+    if (shouldReloadAddTransferOptionsForSyncState(syncSnapshot.state)) {
+      void controller.load();
+    }
+  });
 
   const handleClose = (): void => {
     isOpen = false;
@@ -33,6 +60,15 @@
     fields = createInitialFormFields();
     isOpen = true;
   };
+
+  onMount(() => {
+    void controller.load();
+  });
+
+  onDestroy(() => {
+    unsubscribeController();
+    unsubscribeSyncState();
+  });
 </script>
 
 <section class="add-route" data-testid="route-add">
@@ -52,12 +88,18 @@
     <form
       class="add-transfer-form"
       data-testid="add-transfer-form"
-      aria-busy={isSubmitting}
+      aria-busy={isSubmitting || isOptionsLoading}
       on:submit|preventDefault
     >
-      {#if formError !== null}
+      {#if isOptionsLoading}
+        <p class="add-transfer-form__status" data-testid="add-transfer-options-loading">
+          {$_('addTransfer.loadingOptions')}
+        </p>
+      {/if}
+
+      {#if effectiveFormError !== null}
         <p class="add-transfer-form__error" role="alert" data-testid="add-transfer-form-error">
-          {formError}
+          {effectiveFormError}
         </p>
       {/if}
 
@@ -71,7 +113,7 @@
           class="app-input"
           data-testid="add-transfer-date"
           bind:value={fields.date}
-          disabled={isSubmitting}
+          disabled={controlsAreDisabled}
         />
       </div>
 
@@ -86,7 +128,7 @@
           data-testid="add-transfer-name"
           placeholder={$_('addTransfer.namePlaceholder')}
           bind:value={fields.name}
-          disabled={isSubmitting}
+          disabled={controlsAreDisabled}
           autocomplete="off"
         />
       </div>
@@ -103,7 +145,7 @@
           data-testid="add-transfer-amount"
           placeholder={$_('addTransfer.amountPlaceholder')}
           bind:value={fields.amount}
-          disabled={isSubmitting}
+          disabled={controlsAreDisabled}
           autocomplete="off"
         />
       </div>
@@ -117,10 +159,10 @@
           class="app-input"
           data-testid="add-transfer-from-account"
           bind:value={fields.fromAccountId}
-          disabled={isSubmitting}
+          disabled={controlsAreDisabled}
         >
           <option value={null}>{$_('addTransfer.fromAccountPlaceholder')}</option>
-          {#each fromAccountOptions as account (account.accountId)}
+          {#each optionsState.fromAccountOptions as account (account.accountId)}
             <option value={account.accountId}>{account.name}</option>
           {/each}
         </select>
@@ -135,10 +177,10 @@
           class="app-input"
           data-testid="add-transfer-to-account"
           bind:value={fields.toAccountId}
-          disabled={isSubmitting}
+          disabled={controlsAreDisabled}
         >
           <option value={null}>{$_('addTransfer.toAccountPlaceholder')}</option>
-          {#each toAccountOptions as account (account.accountId)}
+          {#each optionsState.toAccountOptions as account (account.accountId)}
             <option value={account.accountId}>{account.name}</option>
           {/each}
         </select>
@@ -164,10 +206,10 @@
             class="app-input"
             data-testid="add-transfer-category-1"
             bind:value={fields.category1Id}
-            disabled={isSubmitting}
+            disabled={controlsAreDisabled}
           >
             <option value={NO_CATEGORY_SELECTED}>{$_('addTransfer.categoryPlaceholder')}</option>
-            {#each categoryOptions as cat (cat.categoryId)}
+            {#each optionsState.categoryOptions as cat (cat.categoryId)}
               <option value={cat.categoryId}>{cat.name}</option>
             {/each}
           </select>
@@ -176,10 +218,10 @@
             class="app-input"
             data-testid="add-transfer-category-2"
             bind:value={fields.category2Id}
-            disabled={isSubmitting}
+            disabled={controlsAreDisabled}
           >
             <option value={NO_CATEGORY_SELECTED}>{$_('addTransfer.categoryPlaceholder')}</option>
-            {#each categoryOptions as cat (cat.categoryId)}
+            {#each optionsState.categoryOptions as cat (cat.categoryId)}
               <option value={cat.categoryId}>{cat.name}</option>
             {/each}
           </select>
@@ -188,10 +230,10 @@
             class="app-input"
             data-testid="add-transfer-category-3"
             bind:value={fields.category3Id}
-            disabled={isSubmitting}
+            disabled={controlsAreDisabled}
           >
             <option value={NO_CATEGORY_SELECTED}>{$_('addTransfer.categoryPlaceholder')}</option>
-            {#each categoryOptions as cat (cat.categoryId)}
+            {#each optionsState.categoryOptions as cat (cat.categoryId)}
               <option value={cat.categoryId}>{cat.name}</option>
             {/each}
           </select>
@@ -209,7 +251,7 @@
           data-testid="add-transfer-buyplace"
           placeholder={$_('addTransfer.buyplacePlaceholder')}
           bind:value={fields.buyplace}
-          disabled={isSubmitting}
+          disabled={controlsAreDisabled}
           autocomplete="off"
         />
       </div>
@@ -228,7 +270,7 @@
           type="submit"
           class="app-button app-button--primary add-transfer-form__action"
           data-testid="add-transfer-submit"
-          disabled={isSubmitting}
+          disabled={controlsAreDisabled}
         >
           {isSubmitting ? $_('addTransfer.saving') : $_('addTransfer.submit')}
         </button>
@@ -276,6 +318,13 @@
     border-radius: var(--radius-md);
     color: color-mix(in srgb, var(--error) 76%, black);
     background: color-mix(in srgb, var(--error) 10%, var(--surface-strong));
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  .add-transfer-form__status {
+    margin: 0;
+    color: var(--text-secondary);
     font-size: 0.9rem;
     font-weight: 600;
   }

@@ -148,6 +148,70 @@ describe('account query service', () => {
     runtime.close();
   });
 
+  it('returns add-transfer from-account options with primary income first', async () => {
+    const runtime = await createRuntimeWithFixtureRows([
+      {
+        accountId: 1,
+        name: 'Primary Income',
+        amountCents: 0,
+        acOrder: 99,
+        acTypeId: 1,
+        visible: 0,
+      },
+      {
+        accountId: 2,
+        name: 'Primary Spendings',
+        amountCents: 0,
+        acOrder: 0,
+        acTypeId: 2,
+        visible: 1,
+      },
+      { accountId: 3, name: 'Wallet', amountCents: 500, acOrder: 2, acTypeId: 3, visible: 1 },
+      { accountId: 4, name: 'Checking', amountCents: 700, acOrder: 1, acTypeId: 3, visible: 1 },
+      { accountId: 5, name: 'Hidden', amountCents: 900, acOrder: 1, acTypeId: 3, visible: 0 },
+    ]);
+    const service = createAccountQueryService(runtime);
+
+    expect(service.listAddTransferFromAccountOptions()).toEqual([
+      { accountId: 1, name: 'Primary Income', amountCents: 0, accountTypeId: 1 },
+      { accountId: 4, name: 'Checking', amountCents: 700, accountTypeId: 3 },
+      { accountId: 3, name: 'Wallet', amountCents: 500, accountTypeId: 3 },
+    ]);
+    runtime.close();
+  });
+
+  it('returns add-transfer to-account options with primary spendings first', async () => {
+    const runtime = await createRuntimeWithFixtureRows([
+      {
+        accountId: 1,
+        name: 'Primary Income',
+        amountCents: 0,
+        acOrder: 0,
+        acTypeId: 1,
+        visible: 1,
+      },
+      {
+        accountId: 2,
+        name: 'Primary Spendings',
+        amountCents: 0,
+        acOrder: 99,
+        acTypeId: 2,
+        visible: 0,
+      },
+      { accountId: 3, name: 'Wallet', amountCents: 500, acOrder: 2, acTypeId: 3, visible: 1 },
+      { accountId: 4, name: 'Checking', amountCents: 700, acOrder: 1, acTypeId: 3, visible: 1 },
+      { accountId: 5, name: 'Hidden', amountCents: 900, acOrder: 1, acTypeId: 3, visible: 0 },
+    ]);
+    const service = createAccountQueryService(runtime);
+
+    expect(service.listAddTransferToAccountOptions()).toEqual([
+      { accountId: 2, name: 'Primary Spendings', amountCents: 0, accountTypeId: 2 },
+      { accountId: 4, name: 'Checking', amountCents: 700, accountTypeId: 3 },
+      { accountId: 3, name: 'Wallet', amountCents: 500, accountTypeId: 3 },
+    ]);
+    runtime.close();
+  });
+
   it('resolves a runtime provider on each service call', () => {
     const firstRuntime = {
       exec: vi.fn(() => [
