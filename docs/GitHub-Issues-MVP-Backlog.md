@@ -495,7 +495,7 @@ An issue is only considered done when:
 - Depends on: `M6-05`
 - GitHub: [#69](https://github.com/Jon2050/Conspectus-Mobile/issues/69)
 
-### :green_circle: M6-07 Implement Graph upload with `If-Match` eTag
+### :white_check_mark: M6-07 Implement Graph upload with `If-Match` eTag
 
 - Label: `feature`
 - Milestone: `M6 - Add Transfer Write Path`

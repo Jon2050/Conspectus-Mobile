@@ -1,18 +1,34 @@
 // Coordinates a committed local transfer write with SQLite byte export for upload handoff.
 import {
+  appTransferWriteService,
   DbRuntimeError,
+  resolveAppBrowserDbRuntime,
   type BrowserDbRuntime,
   type CreateTransferInput,
   type CreateTransferResult,
   type TransferWriteService,
 } from '@db';
 
+import { createAppDatabaseUploadHandoffService } from './databaseUploadHandoffService';
+
 export interface DatabaseUploadHandoff {
-  uploadExportedDatabase(dbBytes: Uint8Array): Promise<void>;
+  uploadExportedDatabase(dbBytes: Uint8Array, options?: DatabaseUploadOptions): Promise<void>;
+}
+
+export interface DatabaseUploadProgress {
+  readonly loadedBytes: number;
+  readonly totalBytes: number | null;
+}
+
+export interface DatabaseUploadOptions {
+  readonly onProgress?: (progress: DatabaseUploadProgress) => void;
 }
 
 export interface TransferSaveExportService {
-  createTransferAndExport(input: CreateTransferInput): Promise<CreateTransferResult>;
+  createTransferAndExport(
+    input: CreateTransferInput,
+    options?: DatabaseUploadOptions,
+  ): Promise<CreateTransferResult>;
 }
 
 type TransferExportRuntime = Pick<BrowserDbRuntime, 'exportBytes'>;
@@ -38,12 +54,22 @@ export const createTransferSaveExportService = (
   dbRuntime: TransferExportRuntimeProvider,
   uploadHandoff: DatabaseUploadHandoff,
 ): TransferSaveExportService => ({
-  async createTransferAndExport(input: CreateTransferInput): Promise<CreateTransferResult> {
+  async createTransferAndExport(
+    input: CreateTransferInput,
+    options?: DatabaseUploadOptions,
+  ): Promise<CreateTransferResult> {
     const transferResult = transferWriteService.createTransfer(input);
     const exportedBytes = cloneExportedBytes(resolveTransferExportRuntime(dbRuntime).exportBytes());
 
-    await uploadHandoff.uploadExportedDatabase(exportedBytes);
+    await uploadHandoff.uploadExportedDatabase(exportedBytes, options);
 
     return transferResult;
   },
 });
+
+export const createAppTransferSaveExportService = (): TransferSaveExportService =>
+  createTransferSaveExportService(
+    appTransferWriteService,
+    resolveAppBrowserDbRuntime,
+    createAppDatabaseUploadHandoffService(),
+  );

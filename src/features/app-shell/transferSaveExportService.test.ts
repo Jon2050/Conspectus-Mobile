@@ -100,6 +100,32 @@ describe('transfer save export service', () => {
     expect(calls).toEqual(['write:Ordered write', 'export', 'upload']);
   });
 
+  it('passes upload progress options to the upload handoff', async () => {
+    const writeService = {
+      createTransfer: vi.fn(() => ({
+        transferId: 42,
+        persistedAtIso: '2026-06-25T00:00:00.000Z',
+      })),
+    };
+    const runtime = {
+      exportBytes: vi.fn(() => Uint8Array.from([1, 2, 3])),
+    };
+    const uploadHandoff: DatabaseUploadHandoff = {
+      uploadExportedDatabase: vi.fn(async (_dbBytes, options) => {
+        options?.onProgress?.({ loadedBytes: 1, totalBytes: 3 });
+      }),
+    };
+    const onProgress = vi.fn();
+    const service = createTransferSaveExportService(writeService, runtime, uploadHandoff);
+
+    await service.createTransferAndExport(createBaseInput('Progress write'), { onProgress });
+
+    expect(uploadHandoff.uploadExportedDatabase).toHaveBeenCalledWith(Uint8Array.from([1, 2, 3]), {
+      onProgress,
+    });
+    expect(onProgress).toHaveBeenCalledWith({ loadedBytes: 1, totalBytes: 3 });
+  });
+
   it('does not export or upload when the local write fails', async () => {
     const writeError = new DbRuntimeError('db_query_failed', 'write failed');
     const writeService = {
