@@ -487,7 +487,7 @@ An issue is only considered done when:
 - Depends on: `M6-03, M6-04`
 - GitHub: [#68](https://github.com/Jon2050/Conspectus-Mobile/issues/68)
 
-### :green_circle: M6-06 Implement DB export after successful local write
+### :white_check_mark: M6-06 Implement DB export after successful local write
 
 - Label: `feature`
 - Milestone: `M6 - Add Transfer Write Path`
