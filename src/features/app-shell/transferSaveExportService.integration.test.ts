@@ -18,7 +18,7 @@ import {
 } from './transferSaveExportService';
 import { createSyncStateStore } from '../../shared/state/syncStateStore';
 import type { CacheStore, CachedDatabaseSnapshot } from '@cache';
-import type { DriveItemBinding, GraphClient, GraphClientError } from '@graph';
+import type { DriveItemBinding, GraphClient, GraphError } from '@graph';
 
 describe('TransferSaveExportService Integration', () => {
   let dbRuntime: ReturnType<typeof createBrowserDbRuntime>;
@@ -90,24 +90,22 @@ describe('TransferSaveExportService Integration', () => {
 
     // Verify Export and upload handoff
     expect(mockGraphClient.uploadFile).toHaveBeenCalledTimes(1);
-    const uploadCall = vi.mocked(mockGraphClient.uploadFile).mock.calls[0];
+    const uploadCall = vi.mocked(mockGraphClient.uploadFile).mock.calls[0]!;
     expect(uploadCall[0]).toEqual(mockBinding);
     expect(uploadCall[1].length).toBeGreaterThan(100); // exported bytes
     expect(uploadCall[2]).toBe('old-etag');
 
     // Verify metadata refresh
     expect(mockCacheStore.writeSnapshot).toHaveBeenCalledTimes(1);
-    const writeCall = vi.mocked(mockCacheStore.writeSnapshot).mock.calls[0];
+    const writeCall = vi.mocked(mockCacheStore.writeSnapshot).mock.calls[0]!;
     expect(writeCall[0].metadata.eTag).toBe('new-etag-123');
   });
 
   it('propagates conflict error when graph client returns precondition failed', async () => {
     const transferWriteService = createTransferWriteService(dbRuntime);
-    const conflictError: GraphClientError = {
-      name: 'GraphClientError',
-      code: 'conflict',
-      message: 'Conflict',
-    };
+    const conflictError: GraphError & Error = Object.assign(new Error('Conflict'), {
+      code: 'conflict' as const,
+    });
     const mockGraphClient: Pick<GraphClient, 'uploadFile'> = {
       uploadFile: vi.fn().mockRejectedValue(conflictError),
     };
