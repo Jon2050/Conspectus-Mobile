@@ -1,13 +1,7 @@
-Closes #72
+Resolves M6-10.
 
-**Implementation:**
+Added comprehensive write-path tests for the Add Transfer feature, validating:
 
-- Creates a `networkStateStore` to reactively track `navigator.onLine`.
-- Modifies `AddRoute.svelte` to show an offline warning and disable submit/retry buttons.
-- Blocks offline submission at the logic layer in `addTransferSaveController.ts` by passing `isOffline` from UI.
-- Updates the backlog status for `M6-09` to done.
-
-**Validation:**
-
-- Local checks passed (`npm run lint`, `npm run typecheck`, `npm run test`, `npm run build`, `npm run test:e2e`).
-- Code review subagent approved changes after refactoring to remove global window coupling.
+- Unit tests for validation, derivation, and UI phase transitions.
+- Integration coverage for SQLite transaction bounds, upload handoff orchestration, metadata updates, and fallback behavior for synchronization conflicts.
+- E2E flows simulating local successful saves, retrying transient API failures, enforcing online prerequisites, surfacing offline warnings, capturing proper transfer progress, and reporting UI synchronization outcomes with visual toasts.

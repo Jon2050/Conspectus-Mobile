@@ -1,3 +1,0 @@
-feat: [M6-09] block write flow while offline
-
-Agent: Antigravity
