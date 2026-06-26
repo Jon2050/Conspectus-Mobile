@@ -1,4 +1,4 @@
-Task: Implement issue `M6-10` end-to-end with full verification.
+Task: Implement issue `M6-11` end-to-end with full verification.
 
 ## Non-negotiable rules:
 
