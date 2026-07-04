@@ -519,7 +519,7 @@ An issue is only considered done when:
 - Depends on: `M6-01`
 - GitHub: [#72](https://github.com/Jon2050/Conspectus-Mobile/issues/72)
 
-### :green_circle: M6-10 Add write-path tests (unit/integration/e2e)
+### :white_check_mark: M6-10 Add write-path tests (unit/integration/e2e)
 
 - Label: `test`
 - Milestone: `M6 - Add Transfer Write Path`
