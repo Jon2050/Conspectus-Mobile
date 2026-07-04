@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { DatabaseUploadError } from '../databaseUploadHandoffService';
+import type { DatabaseConflictRecoveryService } from '../databaseConflictRecoveryService';
 import {
   TransferUploadPendingError,
   type DatabaseUploadOptions,
@@ -60,6 +61,13 @@ const createSaveService = (): TransferSaveExportService => ({
   }),
 });
 
+const createConflictRecoveryService = (): DatabaseConflictRecoveryService => ({
+  discardStaleRuntime: vi.fn(),
+  syncLatestDatabase: vi.fn(async (options) => {
+    options?.onProgress?.({ loadedBytes: 6, totalBytes: 12 });
+  }),
+});
+
 const collectStates = (
   controller: ReturnType<typeof createAddTransferSaveController>,
 ): AddTransferSaveState[] => {
@@ -74,7 +82,11 @@ describe('addTransferSaveController', () => {
   it('returns validation errors without invoking the save service', async () => {
     const saveService = createSaveService();
     const toastStore = { show: vi.fn() };
-    const controller = createAddTransferSaveController(saveService, toastStore);
+    const controller = createAddTransferSaveController(
+      saveService,
+      toastStore,
+      createConflictRecoveryService(),
+    );
     const invalidFields = { ...createValidFields(), name: 'No' };
 
     const result = await controller.submit(invalidFields, READY_OPTIONS, t);
@@ -87,7 +99,11 @@ describe('addTransferSaveController', () => {
   it('maps validated fields into a transfer input and reports success after upload resolves', async () => {
     const saveService = createSaveService();
     const toastStore = { show: vi.fn() };
-    const controller = createAddTransferSaveController(saveService, toastStore);
+    const controller = createAddTransferSaveController(
+      saveService,
+      toastStore,
+      createConflictRecoveryService(),
+    );
     const states = collectStates(controller);
 
     const result = await controller.submit(createValidFields(), READY_OPTIONS, t);
@@ -133,7 +149,11 @@ describe('addTransferSaveController', () => {
       retryExportedDatabaseUpload: vi.fn(async () => {}),
     };
     const toastStore = { show: vi.fn() };
-    const controller = createAddTransferSaveController(saveService, toastStore);
+    const controller = createAddTransferSaveController(
+      saveService,
+      toastStore,
+      createConflictRecoveryService(),
+    );
 
     const submitPromise = controller.submit(createValidFields(), READY_OPTIONS, t);
     await Promise.resolve();
@@ -166,7 +186,11 @@ describe('addTransferSaveController', () => {
       }),
     };
     const toastStore = { show: vi.fn() };
-    const controller = createAddTransferSaveController(saveService, toastStore);
+    const controller = createAddTransferSaveController(
+      saveService,
+      toastStore,
+      createConflictRecoveryService(),
+    );
     const fields = createValidFields();
 
     await controller.submit(fields, READY_OPTIONS, t);
@@ -204,7 +228,11 @@ describe('addTransferSaveController', () => {
       ),
       retryExportedDatabaseUpload: vi.fn(async () => {}),
     };
-    const controller = createAddTransferSaveController(saveService, { show: vi.fn() });
+    const controller = createAddTransferSaveController(
+      saveService,
+      { show: vi.fn() },
+      createConflictRecoveryService(),
+    );
 
     const firstSubmit = controller.submit(createValidFields(), READY_OPTIONS, t);
     await Promise.resolve();
@@ -231,21 +259,128 @@ describe('addTransferSaveController', () => {
       retryExportedDatabaseUpload: vi.fn(async () => {}),
     };
     const toastStore = { show: vi.fn() };
-    const controller = createAddTransferSaveController(saveService, toastStore);
+    const conflictRecoveryService = createConflictRecoveryService();
+    const controller = createAddTransferSaveController(
+      saveService,
+      toastStore,
+      conflictRecoveryService,
+    );
 
     await controller.submit(createValidFields(), READY_OPTIONS, t);
 
     expect(controller.getState()).toMatchObject({
       phase: 'conflict',
-      errorMessage: 'OneDrive changed.',
+      errorMessage: 'addTransfer.save.conflictMessage',
       canRetry: false,
     });
+    expect(conflictRecoveryService.discardStaleRuntime).toHaveBeenCalledOnce();
+    expect(saveService.retryExportedDatabaseUpload).not.toHaveBeenCalled();
     expect(toastStore.show).toHaveBeenCalledWith('addTransfer.save.conflictToast', 'error');
+  });
+
+  it('downloads the latest database after conflict and then allows a fresh submit', async () => {
+    const saveService = createSaveService();
+    const toastStore = { show: vi.fn() };
+    const conflictRecoveryService = createConflictRecoveryService();
+    const controller = createAddTransferSaveController(
+      saveService,
+      toastStore,
+      conflictRecoveryService,
+    );
+
+    await controller.submit(createValidFields(), READY_OPTIONS, t);
+
+    expect(controller.getState().phase).toBe('saved');
+    controller.reset();
+
+    vi.mocked(saveService.createTransferAndExport)
+      .mockRejectedValueOnce(
+        new TransferUploadPendingError(
+          {
+            transferResult: { transferId: 43, persistedAtIso: '2026-06-25T00:00:00.000Z' },
+            dbBytes: Uint8Array.from([1, 2, 3]),
+          },
+          new DatabaseUploadError('conflict', 'Precondition Failed'),
+        ),
+      )
+      .mockResolvedValueOnce({ transferId: 44, persistedAtIso: '2026-06-25T00:01:00.000Z' });
+
+    await controller.submit(createValidFields(), READY_OPTIONS, t);
+    expect(controller.getState()).toMatchObject({
+      phase: 'conflict',
+      errorMessage: 'addTransfer.save.conflictMessage',
+    });
+
+    await controller.resolveConflict(t);
+
+    expect(conflictRecoveryService.syncLatestDatabase).toHaveBeenCalledWith({
+      onProgress: expect.any(Function),
+    });
+    expect(controller.getState()).toMatchObject({
+      phase: 'conflict_resolved',
+      recoveryProgress: null,
+      canRetry: false,
+    });
+    expect(toastStore.show).toHaveBeenCalledWith(
+      'addTransfer.save.conflictResolvedToast',
+      'success',
+    );
+
+    await controller.submit(createValidFields(), READY_OPTIONS, t);
+
+    expect(saveService.createTransferAndExport).toHaveBeenCalledTimes(3);
+    expect(controller.getState().phase).toBe('saved');
+  });
+
+  it('keeps the transfer draft blocked when conflict recovery fails', async () => {
+    const saveService: TransferSaveExportService = {
+      createTransferAndExport: vi.fn(async (_input, options) => {
+        options?.onUploadStart?.();
+        throw new TransferUploadPendingError(
+          {
+            transferResult: { transferId: 42, persistedAtIso: '2026-06-25T00:00:00.000Z' },
+            dbBytes: Uint8Array.from([1, 2, 3]),
+          },
+          new DatabaseUploadError('conflict', 'OneDrive changed.'),
+        );
+      }),
+      retryExportedDatabaseUpload: vi.fn(async () => {}),
+    };
+    const toastStore = { show: vi.fn() };
+    const conflictRecoveryService = createConflictRecoveryService();
+    vi.mocked(conflictRecoveryService.syncLatestDatabase).mockRejectedValueOnce(
+      new Error('Could not refresh latest database.'),
+    );
+    const controller = createAddTransferSaveController(
+      saveService,
+      toastStore,
+      conflictRecoveryService,
+    );
+
+    await controller.submit(createValidFields(), READY_OPTIONS, t);
+    await controller.resolveConflict(t);
+
+    expect(controller.getState()).toMatchObject({
+      phase: 'conflict',
+      errorMessage: 'Could not refresh latest database.',
+      canRetry: false,
+    });
+    expect(toastStore.show).toHaveBeenCalledWith(
+      'addTransfer.save.conflictSyncFailedToast',
+      'error',
+    );
+
+    await controller.submit(createValidFields(), READY_OPTIONS, t);
+    expect(saveService.createTransferAndExport).toHaveBeenCalledOnce();
   });
 
   it('returns empty validation errors and blocks submit when isOffline is true', async () => {
     const saveService = createSaveService();
-    const controller = createAddTransferSaveController(saveService, { show: vi.fn() });
+    const controller = createAddTransferSaveController(
+      saveService,
+      { show: vi.fn() },
+      createConflictRecoveryService(),
+    );
     const result = await controller.submit(createValidFields(), READY_OPTIONS, t, true);
     expect(result.validationErrors).toEqual([]);
     expect(saveService.createTransferAndExport).not.toHaveBeenCalled();
@@ -253,7 +388,11 @@ describe('addTransferSaveController', () => {
 
   it('blocks retry when isOffline is true', async () => {
     const saveService = createSaveService();
-    const controller = createAddTransferSaveController(saveService, { show: vi.fn() });
+    const controller = createAddTransferSaveController(
+      saveService,
+      { show: vi.fn() },
+      createConflictRecoveryService(),
+    );
     await controller.retry(t, true);
     expect(saveService.retryExportedDatabaseUpload).not.toHaveBeenCalled();
   });

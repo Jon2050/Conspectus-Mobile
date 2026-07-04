@@ -32,6 +32,7 @@ const READY_SAVE_STATE: AddTransferSaveState = {
   phase: 'idle',
   errorMessage: null,
   progress: null,
+  recoveryProgress: null,
   canRetry: false,
 };
 
@@ -45,6 +46,7 @@ const createMockSaveController = (
   },
   submit: async () => ({ validationErrors: [] }),
   retry: async () => {},
+  resolveConflict: async () => {},
   reset: () => {},
 });
 
@@ -327,6 +329,88 @@ describe('AddRoute component', () => {
     expect(body).toContain('value="12,34"');
     expect(body).toContain('value="Market"');
     expect(body).toMatch(/data-testid="add-transfer-close"[^>]*disabled/);
+  });
+
+  it('renders a non-technical conflict dialog and preserves visible form values', () => {
+    const { body } = renderAddRoute({
+      fields: {
+        date: '2024-05-12',
+        name: 'Conflict Transfer',
+        amount: '12,34',
+        fromAccountId: null,
+        toAccountId: null,
+        category1Id: -1,
+        category2Id: -1,
+        category3Id: -1,
+        buyplace: 'Market',
+      },
+      saveController: createMockSaveController({
+        ...READY_SAVE_STATE,
+        phase: 'conflict',
+        errorMessage:
+          'OneDrive enthält neuere Änderungen. Lade zuerst die aktuelle Datenbank, bevor du diesen Transfer erneut speicherst.',
+      }),
+    });
+
+    expect(body).toContain('data-testid="add-transfer-conflict-dialog"');
+    expect(body).toContain('role="alertdialog"');
+    expect(body).toContain('OneDrive enthält neuere Daten');
+    expect(body).toContain('Aktuelle Datenbank laden');
+    expect(body).toContain('value="Conflict Transfer"');
+    expect(body).toContain('value="12,34"');
+    expect(body).toContain('value="Market"');
+    expect(body).toMatch(/data-testid="add-transfer-close"[^>]*disabled/);
+    expect(body).toMatch(/data-testid="add-transfer-resolve-conflict"/);
+    expect(body).not.toContain('Precondition Failed');
+    expect(body).not.toContain('412');
+    expect(body).not.toContain('eTag');
+  });
+
+  it('renders conflict recovery download progress and disables the recovery action while syncing', () => {
+    const { body } = renderAddRoute({
+      saveController: createMockSaveController({
+        ...READY_SAVE_STATE,
+        phase: 'conflict_syncing',
+        recoveryProgress: { loadedBytes: 5120, totalBytes: 10240 },
+      }),
+    });
+
+    expect(body).toContain('data-testid="add-transfer-conflict-sync-status"');
+    expect(body).toContain('Aktuelle Datenbank wird von OneDrive geladen');
+    expect(body).toContain('data-kind="download"');
+    expect(body).toContain('value="5120"');
+    expect(body).toContain('max="10240"');
+    expect(body).toMatch(/data-testid="add-transfer-resolve-conflict"[^>]*disabled/);
+    expect(body).toMatch(/data-testid="add-transfer-name"[^>]*disabled/);
+  });
+
+  it('re-enables save after conflict recovery completes while keeping form data visible', () => {
+    const { body } = renderAddRoute({
+      fields: {
+        date: '2024-05-12',
+        name: 'Recovered Transfer',
+        amount: '12,34',
+        fromAccountId: null,
+        toAccountId: null,
+        category1Id: -1,
+        category2Id: -1,
+        category3Id: -1,
+        buyplace: 'Market',
+      },
+      saveController: createMockSaveController({
+        ...READY_SAVE_STATE,
+        phase: 'conflict_resolved',
+      }),
+    });
+
+    expect(body).toContain('data-testid="add-transfer-conflict-dialog"');
+    expect(body).toContain('Aktuelle Datenbank geladen');
+    expect(body).toContain('value="Recovered Transfer"');
+    expect(body).toContain('value="12,34"');
+    expect(body).toContain('value="Market"');
+    expect(body).toMatch(/data-testid="add-transfer-submit"/);
+    expect(body).not.toMatch(/data-testid="add-transfer-submit"[^>]*disabled/);
+    expect(body).not.toMatch(/data-testid="add-transfer-name"[^>]*disabled/);
   });
 
   it('renders success status only when the save controller reports a completed upload', () => {

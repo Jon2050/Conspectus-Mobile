@@ -527,7 +527,7 @@ An issue is only considered done when:
 - Depends on: `M6-05, M6-07, M6-08, M6-09`
 - GitHub: [#73](https://github.com/Jon2050/Conspectus-Mobile/issues/73)
 
-### :green_circle: M6-11 Implement eTag conflict resolution UX
+### :white_check_mark: M6-11 Implement eTag conflict resolution UX
 
 - Label: `feature`
 - Milestone: `M6 - Add Transfer Write Path`
