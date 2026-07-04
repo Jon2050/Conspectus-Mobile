@@ -654,6 +654,13 @@ M6-07 implementation clarification:
 - Upload progress is forwarded through both the save/export service callback contract and `SyncStateStore` upload progress updates so later UI work can render determinate upload feedback without adding a second upload path.
 - Precondition conflicts remain a distinct orchestration error (`DatabaseUploadError` with `code: 'conflict'`) and mark sync state stale for the dedicated conflict-recovery UX work in later M6 issues.
 
+M6-11 implementation clarification:
+
+- eTag conflict recovery is implemented in `src/features/app-shell/databaseConflictRecoveryService.ts` and composed into the Add Transfer save controller.
+- On upload conflict, the controller discards stale exported upload bytes, closes the current `sql.js` runtime, blocks immediate re-submit, and keeps the visible form draft intact.
+- The recovery action downloads and validates the latest OneDrive DB snapshot, writes it to the local cache, explicitly closes and reopens the shared browser DB runtime with the fresh bytes, then allows the user to review and save the transfer again.
+- The Add Transfer route surfaces this as a non-technical conflict dialog with download progress; direct upload retry remains available only for retryable non-conflict upload failures.
+
 Deliverables:
 
 - End-to-end write feature with clear success/error behavior.

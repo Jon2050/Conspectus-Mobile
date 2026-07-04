@@ -51,11 +51,20 @@
   let lastObservedSyncState: SyncState = 'idle';
   $: isOffline = !$networkStateStore;
   $: isOptionsLoading = optionsState.operation === 'loading';
-  $: saveIsBusy = saveState.phase === 'local_save' || saveState.phase === 'uploading';
-  $: saveHasPendingUpload = saveState.canRetry || saveState.phase === 'conflict';
+  $: saveIsBusy =
+    saveState.phase === 'local_save' ||
+    saveState.phase === 'uploading' ||
+    saveState.phase === 'conflict_syncing';
+  $: conflictRecoveryIsRequired =
+    saveState.phase === 'conflict' || saveState.phase === 'conflict_syncing';
+  $: saveBlocksFormExit = saveState.canRetry || conflictRecoveryIsRequired;
+  $: saveBlocksEditing = saveState.canRetry || conflictRecoveryIsRequired;
   $: effectiveFormError =
-    formError ?? saveState.errorMessage ?? optionsState.error?.message ?? null;
-  $: controlsAreDisabled = isSubmitting || isOptionsLoading || saveIsBusy || saveHasPendingUpload;
+    formError ??
+    (conflictRecoveryIsRequired ? null : saveState.errorMessage) ??
+    optionsState.error?.message ??
+    null;
+  $: controlsAreDisabled = isSubmitting || isOptionsLoading || saveIsBusy || saveBlocksEditing;
   $: submitIsDisabled = controlsAreDisabled || isOffline;
 
   let validationErrors: string[] = [];
@@ -81,6 +90,10 @@
   const handleRetry = async (): Promise<void> => {
     await saveController.retry($_, isOffline);
     resetSuccessfulSave();
+  };
+
+  const handleResolveConflict = async (): Promise<void> => {
+    await saveController.resolveConflict($_, isOffline);
   };
 
   const getAccountName = (account: { name: string; accountTypeId: number | null }) => {
@@ -113,7 +126,7 @@
   });
 
   const handleClose = (): void => {
-    if (saveIsBusy || saveController.getState().canRetry) {
+    if (saveIsBusy || saveBlocksFormExit) {
       return;
     }
 
@@ -155,7 +168,7 @@
 
   <BottomSheet
     {isOpen}
-    canClose={!saveIsBusy && !saveState.canRetry}
+    canClose={!saveIsBusy && !saveBlocksFormExit}
     title={$_('addTransfer.title')}
     on:close={handleClose}
   >
@@ -183,6 +196,44 @@
         <p class="add-transfer-form__error" role="alert" data-testid="add-transfer-offline-warning">
           {$_('addTransfer.offlineWarning')}
         </p>
+      {/if}
+
+      {#if saveState.phase === 'conflict' || saveState.phase === 'conflict_syncing' || saveState.phase === 'conflict_resolved'}
+        <section
+          class={`add-transfer-form__conflict${saveState.phase === 'conflict_resolved' ? ' add-transfer-form__conflict--resolved' : ''}`}
+          role={saveState.phase === 'conflict_resolved' ? 'status' : 'alertdialog'}
+          aria-labelledby="add-transfer-conflict-title"
+          aria-describedby="add-transfer-conflict-description"
+          data-testid="add-transfer-conflict-dialog"
+        >
+          <h4 id="add-transfer-conflict-title">
+            {saveState.phase === 'conflict_resolved'
+              ? $_('addTransfer.save.conflictResolvedTitle')
+              : $_('addTransfer.save.conflictTitle')}
+          </h4>
+          <p id="add-transfer-conflict-description">
+            {saveState.phase === 'conflict_resolved'
+              ? $_('addTransfer.save.conflictResolved')
+              : $_('addTransfer.save.conflictDescription')}
+          </p>
+          {#if saveState.errorMessage !== null && saveState.phase === 'conflict'}
+            <p class="add-transfer-form__conflict-error" role="alert">
+              {saveState.errorMessage}
+            </p>
+          {/if}
+          {#if saveState.phase === 'conflict_syncing'}
+            <div class="add-transfer-form__upload" data-testid="add-transfer-conflict-sync-status">
+              <p class="add-transfer-form__status">{$_('addTransfer.save.conflictSyncing')}</p>
+              {#if saveState.recoveryProgress !== null}
+                <ProgressIndicator
+                  kind="download"
+                  loaded={saveState.recoveryProgress.loadedBytes}
+                  total={saveState.recoveryProgress.totalBytes}
+                />
+              {/if}
+            </div>
+          {/if}
+        </section>
       {/if}
 
       {#if saveState.phase === 'local_save'}
@@ -384,7 +435,7 @@
           type="button"
           class="app-button app-button--secondary add-transfer-form__action"
           data-testid="add-transfer-close"
-          disabled={isSubmitting || saveIsBusy || saveState.canRetry}
+          disabled={isSubmitting || saveIsBusy || saveBlocksFormExit}
           on:click={handleClose}
         >
           {$_('addTransfer.close')}
@@ -398,6 +449,18 @@
             on:click={handleRetry}
           >
             {$_('addTransfer.save.retry')}
+          </button>
+        {:else if saveState.phase === 'conflict' || saveState.phase === 'conflict_syncing'}
+          <button
+            type="button"
+            class="app-button app-button--primary add-transfer-form__action"
+            data-testid="add-transfer-resolve-conflict"
+            disabled={saveState.phase === 'conflict_syncing' || isOffline}
+            on:click={handleResolveConflict}
+          >
+            {saveState.phase === 'conflict_syncing'
+              ? $_('addTransfer.save.conflictSyncingButton')
+              : $_('addTransfer.save.conflictAction')}
           </button>
         {:else}
           <button
@@ -479,6 +542,44 @@
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
+  }
+
+  .add-transfer-form__conflict {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    margin: 0;
+    padding: 0.9rem;
+    border: 1px solid color-mix(in srgb, var(--accent) 42%, transparent);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--accent) 10%, var(--surface-strong));
+    color: var(--text-primary);
+  }
+
+  .add-transfer-form__conflict--resolved {
+    border-color: color-mix(in srgb, var(--positive) 42%, transparent);
+    background: color-mix(in srgb, var(--positive) 10%, var(--surface-strong));
+  }
+
+  .add-transfer-form__conflict h4,
+  .add-transfer-form__conflict p {
+    margin: 0;
+  }
+
+  .add-transfer-form__conflict h4 {
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .add-transfer-form__conflict p {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    line-height: 1.45;
+  }
+
+  .add-transfer-form__conflict-error {
+    font-weight: 700;
+    color: color-mix(in srgb, var(--error) 76%, black);
   }
 
   .add-transfer-form__field {

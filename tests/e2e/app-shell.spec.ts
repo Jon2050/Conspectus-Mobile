@@ -528,6 +528,9 @@ const installMockGraphClient = async (
         onProgress?: (loaded: number, total: number | null) => void,
       ) {
         uploadFileCallCount += 1;
+        (
+          window as Window & { __CONSPECTUS_GRAPH_UPLOAD_FILE_CALL_COUNT__?: number }
+        ).__CONSPECTUS_GRAPH_UPLOAD_FILE_CALL_COUNT__ = uploadFileCallCount;
 
         if (uploadErrorSequence.length > 0) {
           const error = uploadErrorSequence.shift();
@@ -725,6 +728,8 @@ const installMockDbRuntime = async (
     const categoryRows = mockOptions.categoryRows ?? [];
     let isOpen = mockOptions.forceAlwaysOpen ?? false;
     let execCallCount = 0;
+    let openCallCount = 0;
+    let closeCallCount = 0;
     const isAccountsQuery = (sql: string): boolean => {
       const normalizedSql = sql.toLowerCase();
       return (
@@ -771,9 +776,17 @@ const installMockDbRuntime = async (
     (window as Window & { __CONSPECTUS_APP_DB_RUNTIME__?: unknown }).__CONSPECTUS_APP_DB_RUNTIME__ =
       {
         async open() {
+          openCallCount += 1;
+          (
+            window as Window & { __CONSPECTUS_DB_RUNTIME_OPEN_CALL_COUNT__?: number }
+          ).__CONSPECTUS_DB_RUNTIME_OPEN_CALL_COUNT__ = openCallCount;
           isOpen = true;
         },
         close() {
+          closeCallCount += 1;
+          (
+            window as Window & { __CONSPECTUS_DB_RUNTIME_CLOSE_CALL_COUNT__?: number }
+          ).__CONSPECTUS_DB_RUNTIME_CLOSE_CALL_COUNT__ = closeCallCount;
           if (mockOptions.forceAlwaysOpen) {
             return;
           }
@@ -848,6 +861,12 @@ const installMockDbRuntime = async (
     (
       window as Window & { __CONSPECTUS_DB_RUNTIME_EXEC_CALL_COUNT__?: number }
     ).__CONSPECTUS_DB_RUNTIME_EXEC_CALL_COUNT__ = execCallCount;
+    (
+      window as Window & { __CONSPECTUS_DB_RUNTIME_OPEN_CALL_COUNT__?: number }
+    ).__CONSPECTUS_DB_RUNTIME_OPEN_CALL_COUNT__ = openCallCount;
+    (
+      window as Window & { __CONSPECTUS_DB_RUNTIME_CLOSE_CALL_COUNT__?: number }
+    ).__CONSPECTUS_DB_RUNTIME_CLOSE_CALL_COUNT__ = closeCallCount;
   }, options);
 };
 
@@ -943,6 +962,26 @@ const getCacheReadSnapshotCallCount = async (
         __CONSPECTUS_CACHE_READ_SNAPSHOT_CALL_COUNT__?: unknown;
       }
     ).__CONSPECTUS_CACHE_READ_SNAPSHOT_CALL_COUNT__;
+    return typeof value === 'number' ? value : 0;
+  });
+
+const getDbRuntimeOpenCallCount = async (page: import('@playwright/test').Page): Promise<number> =>
+  page.evaluate(() => {
+    const value = (
+      window as Window & {
+        __CONSPECTUS_DB_RUNTIME_OPEN_CALL_COUNT__?: unknown;
+      }
+    ).__CONSPECTUS_DB_RUNTIME_OPEN_CALL_COUNT__;
+    return typeof value === 'number' ? value : 0;
+  });
+
+const getDbRuntimeCloseCallCount = async (page: import('@playwright/test').Page): Promise<number> =>
+  page.evaluate(() => {
+    const value = (
+      window as Window & {
+        __CONSPECTUS_DB_RUNTIME_CLOSE_CALL_COUNT__?: unknown;
+      }
+    ).__CONSPECTUS_DB_RUNTIME_CLOSE_CALL_COUNT__;
     return typeof value === 'number' ? value : 0;
   });
 
@@ -2396,11 +2435,13 @@ test('does not register service worker for parent-site routes outside the app ba
 
 const seedAndBindTestDb = async (
   page: import('@playwright/test').Page,
-  graphOptions?: MockGraphClientOptions,
+  graphOptions: MockGraphClientOptions = {},
+  dbRuntimeOptions: Partial<MockDbRuntimeOptions> = {},
 ) => {
   await installPersistedBinding(page);
   await installMockDbRuntime(page, {
     forceAlwaysOpen: true,
+    ...dbRuntimeOptions,
     fromAccountOptionRows: [
       { accountId: 3, name: 'Girokonto', amountCents: 1000, accountTypeId: 3 },
     ],
@@ -2480,22 +2521,70 @@ test('handles transient upload failure and allows retry without data loss', asyn
   await expect(page.locator('.toast-container')).toContainText('Transfer saved and uploaded.');
 });
 
-test('handles eTag conflict gracefully and blocks immediate retry', async ({ page }) => {
-  await seedAndBindTestDb(page, {
-    uploadErrorSequence: [{ code: 'conflict', message: 'Precondition Failed' }],
-  });
+test('recovers from OneDrive upload conflict by refreshing the DB before resubmitting', async ({
+  page,
+}) => {
+  await seedAndBindTestDb(
+    page,
+    {
+      uploadErrorSequence: [{ code: 'conflict', message: 'Precondition Failed' }],
+      downloadDelayMs: 300,
+    },
+    { forceAlwaysOpen: false },
+  );
   await page.goto(appPath('#/add'));
   await expect(page.getByTestId('add-transfer-date')).toBeVisible();
+  await expect(page.getByTestId('add-transfer-from-account').locator('option')).toHaveText([
+    'Select source account',
+    'Girokonto',
+  ]);
 
   await page.getByTestId('add-transfer-name').fill('Conflict Transfer');
   await page.getByTestId('add-transfer-amount').fill('10.00');
   await page.getByTestId('add-transfer-from-account').selectOption({ label: 'Girokonto' });
   await page.getByTestId('add-transfer-to-account').selectOption({ label: 'Kreditkarte' });
 
+  const initialOpenCount = await getDbRuntimeOpenCallCount(page);
+  const initialCloseCount = await getDbRuntimeCloseCallCount(page);
+  const initialDownloadCount = await getGraphDownloadCallCount(page);
+
   await page.getByTestId('add-transfer-submit').click();
 
-  await expect(page.getByTestId('add-transfer-form-error')).toBeVisible();
+  await expect(page.getByTestId('add-transfer-conflict-dialog')).toBeVisible();
+  await expect(page.getByTestId('add-transfer-conflict-dialog')).toContainText(
+    'OneDrive has newer data',
+  );
+  await expect(page.getByTestId('add-transfer-conflict-dialog')).not.toContainText(
+    'Precondition Failed',
+  );
+  await expect(page.getByTestId('add-transfer-conflict-dialog')).not.toContainText('412');
+  await expect(page.getByTestId('add-transfer-conflict-dialog')).not.toContainText('eTag');
   await expect(page.getByTestId('add-transfer-retry')).not.toBeVisible();
+  await expect(page.getByTestId('add-transfer-resolve-conflict')).toBeVisible();
+  await expect(page.getByTestId('add-transfer-submit')).not.toBeVisible();
+  await expect(page.getByTestId('add-transfer-name')).toHaveValue('Conflict Transfer');
+  await expect(page.getByTestId('add-transfer-amount')).toHaveValue('10.00');
+  await expect(await getDbRuntimeCloseCallCount(page)).toBeGreaterThan(initialCloseCount);
+
+  await page.getByTestId('add-transfer-resolve-conflict').click();
+
+  await expect(page.getByTestId('add-transfer-conflict-sync-status')).toBeVisible();
+  await expect(
+    page.getByTestId('add-transfer-conflict-sync-status').getByTestId('progress-indicator'),
+  ).toBeVisible();
+  await expect(page.getByTestId('add-transfer-conflict-dialog')).toContainText(
+    'Latest database loaded',
+    { timeout: 10000 },
+  );
+  await expect(page.getByTestId('add-transfer-submit')).toBeEnabled();
+  await expect(page.getByTestId('add-transfer-name')).toHaveValue('Conflict Transfer');
+  await expect(page.getByTestId('add-transfer-amount')).toHaveValue('10.00');
+  expect(await getGraphDownloadCallCount(page)).toBeGreaterThan(initialDownloadCount);
+  expect(await getDbRuntimeOpenCallCount(page)).toBeGreaterThan(initialOpenCount);
+
+  await page.getByTestId('add-transfer-submit').click();
+
+  await expect(page.locator('.toast-container')).toContainText('Transfer saved and uploaded.');
 });
 
 test('blocks transfers when app is offline', async ({ page, context }) => {
