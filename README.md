@@ -29,16 +29,29 @@ Provide fast mobile access to a personal Conspectus SQLite database stored in On
 - OneDrive sync via Microsoft Graph
 - SQLite in browser via sql.js
 - Local cache via IndexedDB
-- Architecture rationale, runtime flows, and milestone delivery details live in `docs/Architecture-and-Implementation-Plan.md`.
+- Architecture rationale, runtime flows, and milestone delivery details live in
+  [docs/Architecture-and-Implementation-Plan.md](docs/Architecture-and-Implementation-Plan.md).
+
+## Getting Started
+
+Use Node `>=22`.
+
+1. Install dependencies with `npm install`.
+2. Create `.env` from `.env.example`.
+3. Set `VITE_AZURE_CLIENT_ID` as described in
+   [docs/auth/Entra-App-Registration.md](docs/auth/Entra-App-Registration.md).
+4. Run `npm run dev` and open `http://localhost:5173/`.
 
 ## Environment Setup
 
 Create a `.env` file in the repository root. Use `.env.example` as the template.
-Before setting env values, complete the Entra registration contract in `docs/auth/Entra-App-Registration.md`.
+Before setting env values, complete the Entra registration contract in
+[docs/auth/Entra-App-Registration.md](docs/auth/Entra-App-Registration.md).
 
 Required variable:
 
-- `VITE_AZURE_CLIENT_ID`: Microsoft Entra `Application (client) ID` from the SPA registration in `docs/auth/Entra-App-Registration.md`.
+- `VITE_AZURE_CLIENT_ID`: Microsoft Entra `Application (client) ID` from the SPA
+  registration in [docs/auth/Entra-App-Registration.md](docs/auth/Entra-App-Registration.md).
   - CI/CD requirement: this repository variable must also be set in GitHub Actions repository variables.
 
 Optional deployment variables:
@@ -68,31 +81,32 @@ Important:
 - Preview ports such as `http://localhost:4173/` or `http://localhost:4174/` do not work for real auth unless they are also registered in Entra.
 - If you want to test real auth on another local host/port, add that exact URI to the Entra SPA redirect URI list first.
 
-## Documentation Ownership
+## Documentation Map
 
-Canonical source-of-truth by topic:
+Use these documents as the canonical sources for their topics:
 
-- Environment variables and defaults: this `README.md` (`## Environment Setup`).
-- Entra app registration contract (account type, SPA platform, redirect URIs): `docs/auth/Entra-App-Registration.md`.
-- Module import conventions and aliases: this `README.md` (`## Architecture Modules`).
-- Sync/caching model (`eTag`, `If-Match`, conflict recovery): `docs/Architecture-and-Implementation-Plan.md` (`## 3.4 Sync and Caching Strategy`).
+- Project setup, environment variables, module layout, and contribution conventions: this
+  README.
+- Architecture decisions, runtime flows, sync/write behavior, and milestone detail:
+  [docs/Architecture-and-Implementation-Plan.md](docs/Architecture-and-Implementation-Plan.md).
+- Entra app registration, redirect URIs, and Graph delegated scopes:
+  [docs/auth/Entra-App-Registration.md](docs/auth/Entra-App-Registration.md).
+- CI/CD workflow behavior, artifacts, and failure modes:
+  [docs/CI-CD-Pipelines.md](docs/CI-CD-Pipelines.md).
+- MVP backlog index and issue completion rules:
+  [docs/GitHub-Issues-MVP-Backlog.md](docs/GitHub-Issues-MVP-Backlog.md).
+- Desktop database and business-rule parity reference:
+  [docs/Conspectus-Desktop-Info.md](docs/Conspectus-Desktop-Info.md).
+- Human orchestration workflow and reusable agent prompts:
+  [docs/Human-Workflow.md](docs/Human-Workflow.md) and
+  [docs/prompts/Task-Prompt-Template.md](docs/prompts/Task-Prompt-Template.md).
 
 ## Security
 
-- HTTPS only
+- HTTPS for hosted environments; `http://localhost:5173/` is the local development redirect URI.
 - OAuth2 PKCE (no backend secret)
 - Least-privilege Graph permissions
 - Separate Microsoft account/OneDrive per user
-
-## Related Documents
-
-- Architecture and implementation plan: `docs/Architecture-and-Implementation-Plan.md`
-- Desktop parity reference used for DB/business-rule alignment: `docs/Conspectus-Desktop-Info.md`
-- MVP tracker/index of milestone issues: `docs/GitHub-Issues-MVP-Backlog.md`
-- CI/CD workflow reference: `docs/CI-CD-Pipelines.md`
-- Entra app registration runbook (`M3-01`): `docs/auth/Entra-App-Registration.md`
-- M2-07 installability verification record: [#25](https://github.com/Jon2050/Conspectus-Mobile/issues/25)
-- M2-08 two-repo deployment runbook record: [#27](https://github.com/Jon2050/Conspectus-Mobile/issues/27)
 
 ## Architecture Modules
 
@@ -127,9 +141,10 @@ Local quality scripts:
 
 - `npm run format` - verifies deterministic formatting with Prettier.
 - `npm run lint` - runs ESLint and fails on warnings/errors.
-- `npm run test` - runs baseline unit tests with Vitest.
-- `npm run test:e2e` - runs baseline Playwright app-shell smoke tests.
 - `npm run typecheck` - runs Svelte + TypeScript checks in strict mode.
+- `npm run test` - runs app Vitest tests plus script Vitest tests.
+- `npm run build` - creates a production build in `dist/`.
+- `npm run test:e2e` - runs Playwright browser tests.
 
 The `Quality` workflow runs on every push to non-`gh-pages` branches. Branches whose effective diff is docs-only skip the heavy jobs.
 
@@ -149,100 +164,40 @@ CI test report view in GitHub:
 - `Deploy Production` is manual, only from `main`, and deploys the current `main` commit to [https://jon2050.de/conspectus/webapp/](https://jon2050.de/conspectus/webapp/) after confirming a successful `Quality` run for that commit.
 - GitHub may also show `pages-build-deployment`; that is the GitHub-managed Pages publisher for the `gh-pages` branch, not a project-owned pipeline, and it cannot be renamed in the current branch-based Pages setup.
 
-Detailed workflow behavior, artifacts, and failure modes live in `docs/CI-CD-Pipelines.md`.
+Detailed workflow behavior, artifacts, and failure modes live in
+[docs/CI-CD-Pipelines.md](docs/CI-CD-Pipelines.md).
 
-## Issue Labeling Rules
+## Contribution Workflow
 
-Backlog source of truth:
+The MVP backlog and issue completion rules live in
+[docs/GitHub-Issues-MVP-Backlog.md](docs/GitHub-Issues-MVP-Backlog.md). Use the GitHub
+issue templates in [.github/ISSUE_TEMPLATE](.github/ISSUE_TEMPLATE/) when creating new issues
+instead of copying issue body text from this README.
 
-- `docs/GitHub-Issues-MVP-Backlog.md`
+Required primary issue labels:
 
-Required project labels:
-
-- `feature`: user-visible functionality or behavior changes in the app.
+- `feature`: user-visible functionality or behavior changes.
 - `infra`: repository, CI/CD, tooling, workflow, or deployment plumbing.
-- `bug`: defect fixes for incorrect current behavior.
+- `bug`: incorrect current behavior.
 - `docs`: documentation-only work.
 - `test`: automated test work and QA harness improvements.
-- `security`: security, auth hardening, scopes, headers, dependency risk mitigation.
+- `security`: security, auth hardening, scopes, headers, or dependency risk mitigation.
 
-Usage rules:
+Use exactly one primary label per issue. If work spans multiple areas, choose the dominant work
+type and describe secondary concerns in the issue body.
 
-- Apply exactly one primary label from the required project labels on each issue.
-- If an issue spans multiple areas, choose the dominant work type and capture secondary concerns in the issue body.
-- Assign a milestone to all milestone delivery issues (`M1-*` through `M8-*`).
-- Keep project-management bootstrap issues (`PM-*`) without milestone unless explicitly planned into one.
+For backlog issue delivery:
 
-## Issue Body Template
+- Work from a dedicated issue branch whose name contains the milestone and issue number, such as
+  `feature/M5-07-localize-formatting`.
+- Start commit summaries for backlog issue work with the issue prefix, such as
+  `feat: [M5-07] add formatting utility`.
+- Include an `Agent:` trailer in every commit message. The `commit-msg` hook rejects commits
+  without one.
+- Use the pull request template in [.github/pull_request_template.md](.github/pull_request_template.md).
+- PR titles and descriptions must include the milestone and issue number.
+- Merge PRs into `main` with **Rebase and merge**, then delete the head branch.
 
-Use this as a starting point when creating GitHub issues (especially `feature` work). Keep it short, but make it actionable. MORE THAN THIS CAN ALWAYS BE ADDED IF NEEDED FOR THE ISSUE.
-
-```md
-## Context / Problem
-
-What is the user/dev problem and why does it matter? Link any prior issues/PRs.
-
-## Goals
-
-- ...
-
-## Non-Goals
-
-- ...
-
-## Scope
-
-- Code areas likely touched (modules/paths): ...
-- Config/infra changes (if any): ...
-- Dependencies / prerequisites (if any): ...
-
-## Proposed Approach
-
-High-level steps or design constraints. Keep detailed implementation decisions in the PR when possible.
-
-## Acceptance Criteria
-
-- Observable behavior outcomes (user-visible and/or internal).
-- Edge cases worth explicitly covering.
-
-## Test Plan
-
-- Unit/integration: ...
-- E2E/manual: ...
-
-## Notes / Rollout
-
-- Risks, migration notes, or compatibility concerns.
-- Rollout or verification steps (if relevant).
-```
-
-## Commit Agent Attribution
-
-Every commit by an AI Agent must include an `Agent:` trailer at the end of the commit message identifying who or what created it. This is enforced by a `commit-msg` hook and commits without the trailer are rejected.
-
-Example:
-
-```
-feat: add login button
-
-Agent: Claude
-```
-
-Valid agent names: `Claude`, `Gemini`, `Codex`, `None`, or any descriptive identifier.
-
-This enables filtering by agent: `git log --grep="Agent: Claude"`.
-
-## Issue Delivery Workflow
-
-Issue completion definition (required):
-
-- Every issue must be implemented from a dedicated issue branch. The branch name MUST explicitly contain the milestone and issue number (e.g., `feature/M5-07-localize-formatting` or `bug/M5-07-fix-locale`).
-- Every commit message belonging to a backlog issue MUST start with the issue prefix in the summary (e.g., `feat: [M5-07] add formatting utility`).
-- PRs must be merged into `main` with `Rebase and merge` (linear history; no merge commits or squash merges). The PR title and description MUST explicitly contain the milestone and issue number (e.g., `feat: [M5-07] Add formatting utilities`).
-- All scoped code/tests/docs changes are committed and pushed.
-- The backlog status marker in `docs/GitHub-Issues-MVP-Backlog.md` must be updated to `:white_check_mark:` (Done) within the issue branch before creating the PR/pushed commits.
-- Local quality gates pass (`format`, `lint`, `typecheck`, `test`, `build`, and `test:e2e` when relevant).
-- Required GitHub checks are green.
-- Merge the PR into `main` and delete the head branch.
-
-Do not mark an issue as done until all items above are complete.
+Backlog status markers are updated in the issue branch so the change reaches `main` through the
+PR. An issue is only done after the implementation has reached `main`, required checks are green,
+the head branch is deleted, and the GitHub issue/backlog state is complete.
