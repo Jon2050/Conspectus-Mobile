@@ -365,6 +365,7 @@ const installMockGraphClient = async (
     let listChildrenCallCount = 0;
     let getFileMetadataCallCount = 0;
     let downloadFileCallCount = 0;
+    let uploadFileCallCount = 0;
     const metadataErrorSequence = [...(mockOptions.metadataErrorSequence ?? [])];
     const downloadErrorSequence = [...(mockOptions.downloadErrorSequence ?? [])];
     const uploadErrorSequence = [...(mockOptions.uploadErrorSequence ?? [])];
@@ -572,6 +573,9 @@ const installMockGraphClient = async (
     (
       window as Window & { __CONSPECTUS_GRAPH_DOWNLOAD_FILE_CALL_COUNT__?: number }
     ).__CONSPECTUS_GRAPH_DOWNLOAD_FILE_CALL_COUNT__ = downloadFileCallCount;
+    (
+      window as Window & { __CONSPECTUS_GRAPH_UPLOAD_FILE_CALL_COUNT__?: number }
+    ).__CONSPECTUS_GRAPH_UPLOAD_FILE_CALL_COUNT__ = uploadFileCallCount;
   }, options);
 };
 
@@ -2404,7 +2408,7 @@ const seedAndBindTestDb = async (
     categoryRows: [{ categoryId: 1, name: 'Lebensmittel' }],
   });
   await installMockCacheStore(page, {
-    initialSnapshot: {
+    startupSnapshot: {
       metadata: { eTag: 'existing-etag', lastSyncAtIso: new Date().toISOString() },
       dbBytes: [1, 2, 3],
     },
