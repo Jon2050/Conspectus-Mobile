@@ -38,6 +38,10 @@
   import { resolveAppStartupIsOnline } from './startupNetworkStateResolver';
   import { syncSelectedDriveItemBindingStoreAtStartup } from './startupBindingSync';
   import { resolveAppSnapshotValidator } from './snapshotValidatorResolver';
+  import {
+    createInitialFormFields,
+    type AddTransferFormFields,
+  } from './routes/addTransferFormState';
 
   export let routeStore: Readable<AppRouteKey> = createHashRouteStore();
   export let syncStateStore: SyncStateStore = appSyncStateStore;
@@ -49,6 +53,7 @@
   const FOOTER_VISIBILITY_HYSTERESIS_PX = 48;
 
   let currentRoute: AppRouteKey = DEFAULT_ROUTE;
+  let addTransferFields: AddTransferFormFields = createInitialFormFields();
   let appContentElement: HTMLElement | null = null;
   let appContentPageElement: HTMLDivElement | null = null;
   let footerIsVisible = true;
@@ -335,7 +340,7 @@
       {:else if currentRoute === 'transfers'}
         <TransfersRoute />
       {:else if currentRoute === 'add'}
-        <AddRoute />
+        <AddRoute bind:fields={addTransferFields} />
       {:else}
         <SettingsRoute />
       {/if}

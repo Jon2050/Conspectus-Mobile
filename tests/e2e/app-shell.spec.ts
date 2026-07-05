@@ -1105,6 +1105,54 @@ test('renders an editable add transfer bottom sheet on mobile viewports', async 
   await expect(page.getByTestId('add-transfer-buyplace')).toHaveValue('Supermarket');
 });
 
+test('keeps add transfer draft values after closing and reopening the sheet', async ({ page }) => {
+  await installMockDbRuntime(page, {
+    forceAlwaysOpen: true,
+    fromAccountOptionRows: [
+      { accountId: 1, name: 'Primary Income', amountCents: 0, accountTypeId: 1 },
+      { accountId: 11, name: 'Checking', amountCents: 1000, accountTypeId: 3 },
+    ],
+    toAccountOptionRows: [
+      { accountId: 2, name: 'Primary Spendings', amountCents: 0, accountTypeId: 2 },
+      { accountId: 12, name: 'Savings', amountCents: 5000, accountTypeId: 3 },
+    ],
+    categoryRows: [
+      { categoryId: 20, name: 'Groceries' },
+      { categoryId: 30, name: 'Travel' },
+      { categoryId: 40, name: 'Rent' },
+    ],
+  });
+
+  await page.goto(appPath('#/add'));
+  await expect(page.getByTestId('add-transfer-form')).toBeVisible();
+
+  await page.getByTestId('add-transfer-date').fill('2024-04-15');
+  await page.getByTestId('add-transfer-name').fill('Draft Transfer');
+  await page.getByTestId('add-transfer-amount').fill('12.34');
+  await page.getByTestId('add-transfer-from-account').selectOption({ label: 'Checking' });
+  await page.getByTestId('add-transfer-to-account').selectOption({ label: 'Savings' });
+  await page.getByTestId('add-transfer-category-1').selectOption({ label: 'Groceries' });
+  await page.getByTestId('add-transfer-category-2').selectOption({ label: 'Travel' });
+  await page.getByTestId('add-transfer-category-3').selectOption({ label: 'Rent' });
+  await page.getByTestId('add-transfer-buyplace').fill('Supermarket');
+
+  await page.getByTestId('add-transfer-close').click();
+  await expect(page).toHaveURL(/#\/transfers$/);
+
+  await page.getByRole('link', { name: 'Add' }).click();
+  await expect(page).toHaveURL(/#\/add$/);
+  await expect(page.getByTestId('add-transfer-form')).toBeVisible();
+  await expect(page.getByTestId('add-transfer-date')).toHaveValue('2024-04-15');
+  await expect(page.getByTestId('add-transfer-name')).toHaveValue('Draft Transfer');
+  await expect(page.getByTestId('add-transfer-amount')).toHaveValue('12.34');
+  await expect(page.getByTestId('add-transfer-from-account')).toHaveValue('11');
+  await expect(page.getByTestId('add-transfer-to-account')).toHaveValue('12');
+  await expect(page.getByTestId('add-transfer-category-1')).toHaveValue('20');
+  await expect(page.getByTestId('add-transfer-category-2')).toHaveValue('30');
+  await expect(page.getByTestId('add-transfer-category-3')).toHaveValue('40');
+  await expect(page.getByTestId('add-transfer-buyplace')).toHaveValue('Supermarket');
+});
+
 test('loads add transfer account and category options from the local DB runtime', async ({
   page,
 }) => {
@@ -2476,6 +2524,10 @@ test('saves transfer happy path, transitions through upload states, and updates 
   await page.getByTestId('add-transfer-submit').click();
 
   await expect(page.locator('.toast-container')).toContainText('Transfer saved and uploaded.');
+  await expect(page.getByTestId('add-transfer-name')).toHaveValue('');
+  await expect(page.getByTestId('add-transfer-amount')).toHaveValue('');
+  await expect(page.getByTestId('add-transfer-from-account')).toHaveValue('');
+  await expect(page.getByTestId('add-transfer-to-account')).toHaveValue('');
 });
 
 test('shows determinate upload progress during slow upload', async ({ page }) => {

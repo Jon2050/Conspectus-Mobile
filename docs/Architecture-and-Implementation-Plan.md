@@ -661,6 +661,11 @@ M6-11 implementation clarification:
 - The recovery action downloads and validates the latest OneDrive DB snapshot, writes it to the local cache, explicitly closes and reopens the shared browser DB runtime with the fresh bytes, then allows the user to review and save the transfer again.
 - The Add Transfer route surfaces this as a non-technical conflict dialog with download progress; direct upload retry remains available only for retryable non-conflict upload failures.
 
+M6-12 implementation clarification:
+
+- The app shell owns the in-memory Add Transfer draft and passes it into `AddRoute`, so closing the bottom sheet back to Transfers and reopening Add preserves unsaved form data for the current app session.
+- A completed save/upload still resets the draft before the next transfer entry starts.
+
 Deliverables:
 
 - End-to-end write feature with clear success/error behavior.
