@@ -137,7 +137,6 @@
   };
 
   const handleReopen = (): void => {
-    fields = createInitialFormFields();
     saveController.reset();
     isOpen = true;
   };

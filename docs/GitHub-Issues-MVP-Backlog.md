@@ -535,6 +535,14 @@ An issue is only considered done when:
 - Depends on: `M6-07, M6-08`
 - GitHub: [#74](https://github.com/Jon2050/Conspectus-Mobile/issues/74)
 
+### :white_check_mark: M6-12 Fix Add Transfer draft persistence after close/reopen
+
+- Label: `bug`
+- Milestone: `M6 - Add Transfer Write Path`
+- Summary: Work includes preserving entered Add Transfer form data when the bottom sheet is closed and reopened in the same app session. It also covers keeping successful save behavior reset for the next transfer.
+- Depends on: `M6-01, M6-08, M6-11`
+- GitHub: [#194](https://github.com/Jon2050/Conspectus-Mobile/issues/194)
+
 ### :green_circle: M7-01 Build Settings screen sections
 
 - Label: `feature`
