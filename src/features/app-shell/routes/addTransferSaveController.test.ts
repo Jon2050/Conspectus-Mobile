@@ -40,7 +40,7 @@ const createValidFields = (): AddTransferFormFields => ({
   ...createInitialFormFields(),
   date: '2024-05-12',
   name: 'Groceries',
-  amount: '12,34',
+  amount: '12,34€',
   fromAccountId: 3,
   toAccountId: 4,
   category1Id: 7,

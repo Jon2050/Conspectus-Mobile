@@ -85,7 +85,7 @@ describe('AddRoute component', () => {
 
     expect(body).toContain('data-testid="add-transfer-date"');
     expect(body).toContain('type="date"');
-    expect(body).toMatch(/id="add-transfer-date"[^>]*class="app-input"/);
+    expect(body).toMatch(/id="add-transfer-date"[^>]*class="[^"]*app-input/);
   });
 
   it('renders the name field with app-input class', () => {
@@ -96,26 +96,34 @@ describe('AddRoute component', () => {
     expect(body).toMatch(/id="add-transfer-name"[^>]*class="app-input"/);
   });
 
-  it('renders the amount field with decimal inputmode and app-input class', () => {
+  it('renders the amount field with numeric inputmode and app-input class', () => {
     const { body } = renderAddRoute();
 
     expect(body).toContain('data-testid="add-transfer-amount"');
-    expect(body).toContain('inputmode="decimal"');
+    expect(body).toContain('inputmode="numeric"');
     expect(body).toMatch(/id="add-transfer-amount"[^>]*class="app-input"/);
+  });
+
+  it('renders the buyplace field before the amount field', () => {
+    const { body } = renderAddRoute();
+
+    expect(body.indexOf('data-testid="add-transfer-buyplace"')).toBeLessThan(
+      body.indexOf('data-testid="add-transfer-amount"'),
+    );
   });
 
   it('renders the from-account select with app-input class', () => {
     const { body } = renderAddRoute();
 
     expect(body).toContain('data-testid="add-transfer-from-account"');
-    expect(body).toMatch(/id="add-transfer-from-account"[^>]*class="app-input"/);
+    expect(body).toMatch(/id="add-transfer-from-account"[^>]*class="[^"]*app-input/);
   });
 
   it('renders the to-account select with app-input class', () => {
     const { body } = renderAddRoute();
 
     expect(body).toContain('data-testid="add-transfer-to-account"');
-    expect(body).toMatch(/id="add-transfer-to-account"[^>]*class="app-input"/);
+    expect(body).toMatch(/id="add-transfer-to-account"[^>]*class="[^"]*app-input/);
   });
 
   it('renders all three category selects with app-input class', () => {
@@ -124,9 +132,9 @@ describe('AddRoute component', () => {
     expect(body).toContain('data-testid="add-transfer-category-1"');
     expect(body).toContain('data-testid="add-transfer-category-2"');
     expect(body).toContain('data-testid="add-transfer-category-3"');
-    expect(body).toMatch(/id="add-transfer-category-1"[^>]*class="app-input"/);
-    expect(body).toMatch(/id="add-transfer-category-2"[^>]*class="app-input"/);
-    expect(body).toMatch(/id="add-transfer-category-3"[^>]*class="app-input"/);
+    expect(body).toMatch(/id="add-transfer-category-1"[^>]*class="[^"]*app-input/);
+    expect(body).toMatch(/id="add-transfer-category-2"[^>]*class="[^"]*app-input/);
+    expect(body).toMatch(/id="add-transfer-category-3"[^>]*class="[^"]*app-input/);
   });
 
   it('renders the buyplace field with app-input class', () => {
@@ -134,6 +142,17 @@ describe('AddRoute component', () => {
 
     expect(body).toContain('data-testid="add-transfer-buyplace"');
     expect(body).toMatch(/id="add-transfer-buyplace"[^>]*class="app-input"/);
+  });
+
+  it('renders database-required info without opening the bottom sheet when blocked', () => {
+    const { body } = renderAddRoute({
+      canOpenPanel: false,
+    });
+
+    expect(body).toContain('data-testid="add-transfer-database-required"');
+    expect(body).toContain('Wähle zuerst eine Datenbank aus.');
+    expect(body).not.toContain('<dialog');
+    expect(body).not.toContain('data-testid="add-transfer-form"');
   });
 
   it('renders the submit button with primary styling', () => {
@@ -250,7 +269,7 @@ describe('AddRoute component', () => {
         new RegExp(`<(?:input|select)[^>]*data-testid="${testId}"[^>]*>`),
       );
       expect(controlMatch, `${testId} should render`).not.toBeNull();
-      expect(controlMatch![0], `${testId} should use app-input`).toContain('class="app-input"');
+      expect(controlMatch![0], `${testId} should use app-input`).toMatch(/class="[^"]*app-input/);
     }
   });
 
@@ -305,7 +324,7 @@ describe('AddRoute component', () => {
       fields: {
         date: '2024-05-12',
         name: 'Groceries',
-        amount: '12,34',
+        amount: '12,34€',
         fromAccountId: null,
         toAccountId: null,
         category1Id: -1,
@@ -326,7 +345,7 @@ describe('AddRoute component', () => {
     expect(body).toContain('data-testid="add-transfer-retry"');
     expect(body).toContain('Upload wiederholen');
     expect(body).toContain('value="Groceries"');
-    expect(body).toContain('value="12,34"');
+    expect(body).toContain('value="12,34€"');
     expect(body).toContain('value="Market"');
     expect(body).toMatch(/data-testid="add-transfer-close"[^>]*disabled/);
   });
@@ -336,7 +355,7 @@ describe('AddRoute component', () => {
       fields: {
         date: '2024-05-12',
         name: 'Conflict Transfer',
-        amount: '12,34',
+        amount: '12,34€',
         fromAccountId: null,
         toAccountId: null,
         category1Id: -1,
@@ -357,7 +376,7 @@ describe('AddRoute component', () => {
     expect(body).toContain('OneDrive enthält neuere Daten');
     expect(body).toContain('Aktuelle Datenbank laden');
     expect(body).toContain('value="Conflict Transfer"');
-    expect(body).toContain('value="12,34"');
+    expect(body).toContain('value="12,34€"');
     expect(body).toContain('value="Market"');
     expect(body).toMatch(/data-testid="add-transfer-close"[^>]*disabled/);
     expect(body).toMatch(/data-testid="add-transfer-resolve-conflict"/);
@@ -389,7 +408,7 @@ describe('AddRoute component', () => {
       fields: {
         date: '2024-05-12',
         name: 'Recovered Transfer',
-        amount: '12,34',
+        amount: '12,34€',
         fromAccountId: null,
         toAccountId: null,
         category1Id: -1,
@@ -406,7 +425,7 @@ describe('AddRoute component', () => {
     expect(body).toContain('data-testid="add-transfer-conflict-dialog"');
     expect(body).toContain('Aktuelle Datenbank geladen');
     expect(body).toContain('value="Recovered Transfer"');
-    expect(body).toContain('value="12,34"');
+    expect(body).toContain('value="12,34€"');
     expect(body).toContain('value="Market"');
     expect(body).toMatch(/data-testid="add-transfer-submit"/);
     expect(body).not.toMatch(/data-testid="add-transfer-submit"[^>]*disabled/);
