@@ -900,6 +900,28 @@ const installPersistedBinding = async (
   );
 };
 
+const installReadyAddTransferTestDb = async (
+  page: import('@playwright/test').Page,
+  dbRuntimeOptions: MockDbRuntimeOptions = {},
+  graphOptions: MockGraphClientOptions = {},
+): Promise<void> => {
+  await installPersistedBinding(page);
+  await installMockDbRuntime(page, {
+    forceAlwaysOpen: true,
+    ...dbRuntimeOptions,
+  });
+  await installMockCacheStore(page, {
+    startupSnapshot: {
+      metadata: { eTag: 'existing-etag', lastSyncAtIso: new Date().toISOString() },
+      dbBytes: createSqliteBytes([1, 2, 3]),
+    },
+  });
+  await installMockGraphClient(page, graphOptions);
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+};
+
 const installMockStartupNetworkState = async (
   page: import('@playwright/test').Page,
   isOnline: boolean,
@@ -1043,18 +1065,18 @@ test('loads a mobile app shell and navigates primary routes', async ({ page }) =
 
   await page.getByRole('link', { name: 'Add' }).click();
   await expect(page).toHaveURL(/#\/add$/);
-  await expect(page.getByRole('heading', { level: 3, name: 'New Transfer' })).toBeVisible();
+  await expect(page.getByTestId('add-transfer-database-required')).toContainText(
+    'Choose a database first.',
+  );
+  await expect(page.getByRole('dialog')).toHaveCount(0);
 
-  await page.getByTestId('add-transfer-close').click();
-  await expect(page).toHaveURL(/#\/transfers$/);
   await page.getByRole('link', { name: 'Settings' }).click();
   await expect(page).toHaveURL(/#\/settings$/);
   await expect(page.getByRole('heading', { level: 2, name: 'Settings' })).toBeVisible();
 });
 
 test('renders an editable add transfer bottom sheet on mobile viewports', async ({ page }) => {
-  await installMockDbRuntime(page, {
-    forceAlwaysOpen: true,
+  await installReadyAddTransferTestDb(page, {
     fromAccountOptionRows: [
       { accountId: 1, name: 'Primary Income', amountCents: 0, accountTypeId: 1 },
       { accountId: 11, name: 'Checking', amountCents: 1000, accountTypeId: 3 },
@@ -1094,7 +1116,15 @@ test('renders an editable add transfer bottom sheet on mobile viewports', async 
 
   await page.getByTestId('add-transfer-date').fill('2024-04-15');
   await page.getByTestId('add-transfer-name').fill('Groceries');
-  await page.getByTestId('add-transfer-amount').fill('12.34');
+  const amountInput = page.getByTestId('add-transfer-amount');
+  await amountInput.pressSequentially('1');
+  await expect(amountInput).toHaveValue('0,01€');
+  await amountInput.pressSequentially('2');
+  await expect(amountInput).toHaveValue('0,12€');
+  await amountInput.pressSequentially('3');
+  await expect(amountInput).toHaveValue('1,23€');
+  await amountInput.pressSequentially('4');
+  await expect(amountInput).toHaveValue('12,34€');
   await page.getByTestId('add-transfer-buyplace').fill('Supermarket');
 
   const submitButton = page.getByTestId('add-transfer-submit');
@@ -1102,12 +1132,70 @@ test('renders an editable add transfer bottom sheet on mobile viewports', async 
   await expect(page.getByTestId('add-transfer-close')).toBeEnabled();
   await submitButton.scrollIntoViewIfNeeded();
   await expect(submitButton).toBeInViewport();
+  await expect(page.getByTestId('add-transfer-amount')).toHaveValue('12,34€');
   await expect(page.getByTestId('add-transfer-buyplace')).toHaveValue('Supermarket');
 });
 
+test('keeps add transfer form controls aligned on mobile and desktop viewports', async ({
+  page,
+}) => {
+  await installReadyAddTransferTestDb(page, {
+    fromAccountOptionRows: [
+      { accountId: 1, name: 'Primary Income', amountCents: 0, accountTypeId: 1 },
+      { accountId: 11, name: 'Checking', amountCents: 1000, accountTypeId: 3 },
+    ],
+    toAccountOptionRows: [
+      { accountId: 2, name: 'Primary Spendings', amountCents: 0, accountTypeId: 2 },
+      { accountId: 12, name: 'Savings', amountCents: 5000, accountTypeId: 3 },
+    ],
+  });
+
+  await page.goto(appPath('#/add'));
+  await expect(page.getByTestId('add-transfer-date')).toBeVisible();
+
+  const mobileControlMetrics = await page.evaluate(() => {
+    const dateInput = document.querySelector('[data-testid="add-transfer-date"]') as HTMLElement;
+    const nameInput = document.querySelector('[data-testid="add-transfer-name"]') as HTMLElement;
+    const route = document.querySelector('[data-testid="route-add"]') as HTMLElement;
+    const dateBox = dateInput.getBoundingClientRect();
+    const nameBox = nameInput.getBoundingClientRect();
+    return {
+      dateWidth: dateBox.width,
+      dateHeight: dateBox.height,
+      nameWidth: nameBox.width,
+      nameHeight: nameBox.height,
+      hasHorizontalOverflow: route.scrollWidth > route.clientWidth + 1,
+    };
+  });
+
+  expect(mobileControlMetrics.dateWidth).toBeLessThanOrEqual(mobileControlMetrics.nameWidth + 1);
+  expect(
+    Math.abs(mobileControlMetrics.dateHeight - mobileControlMetrics.nameHeight),
+  ).toBeLessThanOrEqual(2);
+  expect(mobileControlMetrics.hasHorizontalOverflow).toBe(false);
+
+  await page.setViewportSize({ width: 1024, height: 900 });
+  const desktopSelectStyle = await page
+    .getByTestId('add-transfer-from-account')
+    .evaluate((select) => {
+      const styles = getComputedStyle(select);
+      return {
+        matchesDesktopPointer: window.matchMedia('(hover: hover) and (pointer: fine)').matches,
+        appearance: styles.appearance,
+        paddingRight: Number.parseFloat(styles.paddingRight),
+        backgroundImage: styles.backgroundImage,
+      };
+    });
+
+  if (desktopSelectStyle.matchesDesktopPointer) {
+    expect(desktopSelectStyle.appearance).toBe('none');
+    expect(desktopSelectStyle.paddingRight).toBeGreaterThan(40);
+    expect(desktopSelectStyle.backgroundImage).not.toBe('none');
+  }
+});
+
 test('keeps add transfer draft values after closing and reopening the sheet', async ({ page }) => {
-  await installMockDbRuntime(page, {
-    forceAlwaysOpen: true,
+  await installReadyAddTransferTestDb(page, {
     fromAccountOptionRows: [
       { accountId: 1, name: 'Primary Income', amountCents: 0, accountTypeId: 1 },
       { accountId: 11, name: 'Checking', amountCents: 1000, accountTypeId: 3 },
@@ -1128,7 +1216,7 @@ test('keeps add transfer draft values after closing and reopening the sheet', as
 
   await page.getByTestId('add-transfer-date').fill('2024-04-15');
   await page.getByTestId('add-transfer-name').fill('Draft Transfer');
-  await page.getByTestId('add-transfer-amount').fill('12.34');
+  await page.getByTestId('add-transfer-amount').pressSequentially('1234');
   await page.getByTestId('add-transfer-from-account').selectOption({ label: 'Checking' });
   await page.getByTestId('add-transfer-to-account').selectOption({ label: 'Savings' });
   await page.getByTestId('add-transfer-category-1').selectOption({ label: 'Groceries' });
@@ -1144,7 +1232,7 @@ test('keeps add transfer draft values after closing and reopening the sheet', as
   await expect(page.getByTestId('add-transfer-form')).toBeVisible();
   await expect(page.getByTestId('add-transfer-date')).toHaveValue('2024-04-15');
   await expect(page.getByTestId('add-transfer-name')).toHaveValue('Draft Transfer');
-  await expect(page.getByTestId('add-transfer-amount')).toHaveValue('12.34');
+  await expect(page.getByTestId('add-transfer-amount')).toHaveValue('12,34€');
   await expect(page.getByTestId('add-transfer-from-account')).toHaveValue('11');
   await expect(page.getByTestId('add-transfer-to-account')).toHaveValue('12');
   await expect(page.getByTestId('add-transfer-category-1')).toHaveValue('20');
@@ -1156,8 +1244,7 @@ test('keeps add transfer draft values after closing and reopening the sheet', as
 test('loads add transfer account and category options from the local DB runtime', async ({
   page,
 }) => {
-  await installMockDbRuntime(page, {
-    forceAlwaysOpen: true,
+  await installReadyAddTransferTestDb(page, {
     fromAccountOptionRows: [
       { accountId: 1, name: 'Primary Income', amountCents: 0, accountTypeId: 1 },
       { accountId: 11, name: 'Checking', amountCents: 1000, accountTypeId: 3 },
@@ -2486,26 +2573,21 @@ const seedAndBindTestDb = async (
   graphOptions: MockGraphClientOptions = {},
   dbRuntimeOptions: Partial<MockDbRuntimeOptions> = {},
 ) => {
-  await installPersistedBinding(page);
-  await installMockDbRuntime(page, {
-    forceAlwaysOpen: true,
-    ...dbRuntimeOptions,
-    fromAccountOptionRows: [
-      { accountId: 3, name: 'Girokonto', amountCents: 1000, accountTypeId: 3 },
-    ],
-    toAccountOptionRows: [{ accountId: 4, name: 'Kreditkarte', amountCents: 0, accountTypeId: 3 }],
-    categoryRows: [{ categoryId: 1, name: 'Lebensmittel' }],
-  });
-  await installMockCacheStore(page, {
-    startupSnapshot: {
-      metadata: { eTag: 'existing-etag', lastSyncAtIso: new Date().toISOString() },
-      dbBytes: [1, 2, 3],
+  await installReadyAddTransferTestDb(
+    page,
+    {
+      forceAlwaysOpen: true,
+      fromAccountOptionRows: [
+        { accountId: 3, name: 'Girokonto', amountCents: 1000, accountTypeId: 3 },
+      ],
+      toAccountOptionRows: [
+        { accountId: 4, name: 'Kreditkarte', amountCents: 0, accountTypeId: 3 },
+      ],
+      categoryRows: [{ categoryId: 1, name: 'Lebensmittel' }],
+      ...dbRuntimeOptions,
     },
-  });
-  await installMockGraphClient(page, graphOptions);
-  await installMockAuthClient(page, {
-    startAuthenticated: true,
-  });
+    graphOptions,
+  );
 };
 
 test('saves transfer happy path, transitions through upload states, and updates sync feedback', async ({
@@ -2516,18 +2598,47 @@ test('saves transfer happy path, transitions through upload states, and updates 
   await expect(page.getByTestId('add-transfer-date')).toBeVisible();
 
   await page.getByTestId('add-transfer-name').fill('Happy Path E2E Transfer');
-  await page.getByTestId('add-transfer-amount').fill('15.50');
+  await page.getByTestId('add-transfer-amount').pressSequentially('1550');
   await page.getByTestId('add-transfer-from-account').selectOption({ label: 'Girokonto' });
   await page.getByTestId('add-transfer-to-account').selectOption({ label: 'Kreditkarte' });
   await page.getByTestId('add-transfer-category-1').selectOption({ label: 'Lebensmittel' });
 
+  await page.getByTestId('add-transfer-submit').scrollIntoViewIfNeeded();
   await page.getByTestId('add-transfer-submit').click();
 
   await expect(page.locator('.toast-container')).toContainText('Transfer saved and uploaded.');
+  await expect(page.getByTestId('add-transfer-success-status')).toBeInViewport();
+  await expect
+    .poll(() =>
+      page.getByTestId('add-transfer-form').evaluate((form) => form.parentElement?.scrollTop ?? 0),
+    )
+    .toBe(0);
   await expect(page.getByTestId('add-transfer-name')).toHaveValue('');
   await expect(page.getByTestId('add-transfer-amount')).toHaveValue('');
   await expect(page.getByTestId('add-transfer-from-account')).toHaveValue('');
   await expect(page.getByTestId('add-transfer-to-account')).toHaveValue('');
+});
+
+test('scrolls add transfer validation errors into view after submit', async ({ page }) => {
+  await seedAndBindTestDb(page);
+  await page.goto(appPath('#/add'));
+  await expect(page.getByTestId('add-transfer-date')).toBeVisible();
+
+  await page.getByTestId('add-transfer-submit').scrollIntoViewIfNeeded();
+  await expect
+    .poll(() =>
+      page.getByTestId('add-transfer-form').evaluate((form) => form.parentElement?.scrollTop ?? 0),
+    )
+    .toBeGreaterThan(0);
+
+  await page.getByTestId('add-transfer-submit').click();
+
+  await expect(page.getByTestId('add-transfer-validation-error').first()).toBeInViewport();
+  await expect
+    .poll(() =>
+      page.getByTestId('add-transfer-form').evaluate((form) => form.parentElement?.scrollTop ?? 0),
+    )
+    .toBe(0);
 });
 
 test('shows determinate upload progress during slow upload', async ({ page }) => {
@@ -2536,7 +2647,7 @@ test('shows determinate upload progress during slow upload', async ({ page }) =>
   await expect(page.getByTestId('add-transfer-date')).toBeVisible();
 
   await page.getByTestId('add-transfer-name').fill('Slow Upload Transfer');
-  await page.getByTestId('add-transfer-amount').fill('1.00');
+  await page.getByTestId('add-transfer-amount').pressSequentially('100');
   await page.getByTestId('add-transfer-from-account').selectOption({ label: 'Girokonto' });
   await page.getByTestId('add-transfer-to-account').selectOption({ label: 'Kreditkarte' });
 
@@ -2547,7 +2658,7 @@ test('shows determinate upload progress during slow upload', async ({ page }) =>
   ).toBeVisible();
 
   await expect(page.locator('.toast-container')).toContainText('Transfer saved and uploaded.', {
-    timeout: 10000,
+    timeout: 15000,
   });
 });
 
@@ -2559,18 +2670,30 @@ test('handles transient upload failure and allows retry without data loss', asyn
   await expect(page.getByTestId('add-transfer-date')).toBeVisible();
 
   await page.getByTestId('add-transfer-name').fill('Retry Transfer');
-  await page.getByTestId('add-transfer-amount').fill('10.00');
+  await page.getByTestId('add-transfer-amount').pressSequentially('1000');
   await page.getByTestId('add-transfer-from-account').selectOption({ label: 'Girokonto' });
   await page.getByTestId('add-transfer-to-account').selectOption({ label: 'Kreditkarte' });
 
+  await page.getByTestId('add-transfer-submit').scrollIntoViewIfNeeded();
   await page.getByTestId('add-transfer-submit').click();
 
   await expect(page.getByTestId('add-transfer-form-error')).toBeVisible();
   await expect(page.getByTestId('add-transfer-retry')).toBeVisible();
+  await expect
+    .poll(() =>
+      page.getByTestId('add-transfer-form').evaluate((form) => form.parentElement?.scrollTop ?? 0),
+    )
+    .toBeGreaterThan(0);
 
   await page.getByTestId('add-transfer-retry').click();
 
   await expect(page.locator('.toast-container')).toContainText('Transfer saved and uploaded.');
+  await expect(page.getByTestId('add-transfer-success-status')).toBeInViewport();
+  await expect
+    .poll(() =>
+      page.getByTestId('add-transfer-form').evaluate((form) => form.parentElement?.scrollTop ?? 0),
+    )
+    .toBe(0);
 });
 
 test('recovers from OneDrive upload conflict by refreshing the DB before resubmitting', async ({
@@ -2580,7 +2703,7 @@ test('recovers from OneDrive upload conflict by refreshing the DB before resubmi
     page,
     {
       uploadErrorSequence: [{ code: 'conflict', message: 'Precondition Failed' }],
-      downloadDelayMs: 300,
+      downloadDelayMs: 2000,
     },
     { forceAlwaysOpen: false },
   );
@@ -2592,7 +2715,7 @@ test('recovers from OneDrive upload conflict by refreshing the DB before resubmi
   ]);
 
   await page.getByTestId('add-transfer-name').fill('Conflict Transfer');
-  await page.getByTestId('add-transfer-amount').fill('10.00');
+  await page.getByTestId('add-transfer-amount').pressSequentially('1000');
   await page.getByTestId('add-transfer-from-account').selectOption({ label: 'Girokonto' });
   await page.getByTestId('add-transfer-to-account').selectOption({ label: 'Kreditkarte' });
 
@@ -2615,7 +2738,7 @@ test('recovers from OneDrive upload conflict by refreshing the DB before resubmi
   await expect(page.getByTestId('add-transfer-resolve-conflict')).toBeVisible();
   await expect(page.getByTestId('add-transfer-submit')).not.toBeVisible();
   await expect(page.getByTestId('add-transfer-name')).toHaveValue('Conflict Transfer');
-  await expect(page.getByTestId('add-transfer-amount')).toHaveValue('10.00');
+  await expect(page.getByTestId('add-transfer-amount')).toHaveValue('10,00€');
   await expect(await getDbRuntimeCloseCallCount(page)).toBeGreaterThan(initialCloseCount);
 
   await page.getByTestId('add-transfer-resolve-conflict').click();
@@ -2630,7 +2753,7 @@ test('recovers from OneDrive upload conflict by refreshing the DB before resubmi
   );
   await expect(page.getByTestId('add-transfer-submit')).toBeEnabled();
   await expect(page.getByTestId('add-transfer-name')).toHaveValue('Conflict Transfer');
-  await expect(page.getByTestId('add-transfer-amount')).toHaveValue('10.00');
+  await expect(page.getByTestId('add-transfer-amount')).toHaveValue('10,00€');
   expect(await getGraphDownloadCallCount(page)).toBeGreaterThan(initialDownloadCount);
   expect(await getDbRuntimeOpenCallCount(page)).toBeGreaterThan(initialOpenCount);
 

@@ -1,6 +1,6 @@
 <!-- Renders the Add Transfer bottom-sheet form with all MVP fields for mobile data entry. -->
 <script lang="ts">
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, tick } from 'svelte';
   import { _ } from 'svelte-i18n';
   import {
     appAccountQueryService,
@@ -33,6 +33,11 @@
     type AddTransferSaveController,
     type AddTransferSaveState,
   } from './addTransferSaveController';
+  import {
+    appendAmountInputDigit,
+    formatAmountInputValue,
+    removeLastAmountInputDigit,
+  } from './addTransferAmountInput';
 
   export let controller: AddTransferOptionsController = createAddTransferOptionsController(
     appAccountQueryService,
@@ -44,8 +49,13 @@
   export let formError: string | null = null;
   export let syncStateStore: SyncStateStore = appSyncStateStore;
   export let networkStateStore: NetworkStateStore = appNetworkStateStore;
+  export let canOpenPanel = true;
 
   let isOpen = true;
+  let componentHasMounted = false;
+  let hasRequestedOptionsLoad = false;
+  let formElement: HTMLFormElement | null = null;
+  let amountInputElement: HTMLInputElement | null = null;
   let optionsState: AddTransferOptionsState = controller.getState();
   let saveState: AddTransferSaveState = saveController.getState();
   let lastObservedSyncState: SyncState = 'idle';
@@ -68,6 +78,7 @@
   $: submitIsDisabled = controlsAreDisabled || isOffline;
 
   let validationErrors: string[] = [];
+  const allowedAmountNavigationKeys = new Set(['Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End']);
 
   const clearValidation = (): void => {
     if (validationErrors.length > 0) {
@@ -81,15 +92,77 @@
     }
   };
 
+  const scrollFormToTop = async (): Promise<void> => {
+    await tick();
+    formElement?.parentElement?.scrollTo({ top: 0, behavior: 'auto' });
+  };
+
+  const requestOptionsLoad = (): void => {
+    hasRequestedOptionsLoad = true;
+    void controller.load();
+  };
+
+  const focusAmountInputEnd = async (): Promise<void> => {
+    await tick();
+    const valueLength = amountInputElement?.value.length ?? 0;
+    amountInputElement?.setSelectionRange(valueLength, valueLength);
+  };
+
+  const updateAmountValue = (nextValue: string): void => {
+    fields.amount = nextValue;
+    clearValidation();
+    void focusAmountInputEnd();
+  };
+
+  const handleAmountKeydown = (event: KeyboardEvent): void => {
+    if (event.ctrlKey || event.metaKey || event.altKey) {
+      return;
+    }
+
+    if (/^\d$/.test(event.key)) {
+      event.preventDefault();
+      updateAmountValue(appendAmountInputDigit(fields.amount, event.key));
+      return;
+    }
+
+    if (event.key === 'Backspace' || event.key === 'Delete') {
+      event.preventDefault();
+      updateAmountValue(removeLastAmountInputDigit(fields.amount));
+      return;
+    }
+
+    if (!allowedAmountNavigationKeys.has(event.key)) {
+      event.preventDefault();
+    }
+  };
+
+  const handleAmountInput = (event: Event): void => {
+    const input = event.currentTarget as HTMLInputElement;
+    updateAmountValue(formatAmountInputValue(input.value));
+  };
+
+  const handleAmountPaste = (event: ClipboardEvent): void => {
+    event.preventDefault();
+    updateAmountValue(formatAmountInputValue(event.clipboardData?.getData('text') ?? ''));
+  };
+
   const handleSubmit = async (): Promise<void> => {
     const result = await saveController.submit(fields, optionsState, $_, isOffline);
     validationErrors = [...result.validationErrors];
+    const saveCompleted = saveController.getState().phase === 'saved';
     resetSuccessfulSave();
+    if (validationErrors.length > 0 || saveCompleted) {
+      await scrollFormToTop();
+    }
   };
 
   const handleRetry = async (): Promise<void> => {
     await saveController.retry($_, isOffline);
+    const saveCompleted = saveController.getState().phase === 'saved';
     resetSuccessfulSave();
+    if (saveCompleted) {
+      await scrollFormToTop();
+    }
   };
 
   const handleResolveConflict = async (): Promise<void> => {
@@ -141,8 +214,19 @@
     isOpen = true;
   };
 
+  $: if (componentHasMounted && canOpenPanel && !hasRequestedOptionsLoad) {
+    requestOptionsLoad();
+  }
+
+  $: if (canOpenPanel && !isOpen) {
+    isOpen = true;
+  }
+
   onMount(() => {
-    void controller.load();
+    componentHasMounted = true;
+    if (canOpenPanel) {
+      requestOptionsLoad();
+    }
   });
 
   onDestroy(() => {
@@ -153,327 +237,349 @@
 </script>
 
 <section class="add-route" data-testid="route-add">
-  {#if !isOpen}
-    <div class="add-route__closed" data-testid="add-route-closed">
-      <p>{$_('addTransfer.title')}</p>
-      <button
-        type="button"
-        class="app-button app-button--primary"
-        data-testid="add-route-reopen-button"
-        on:click={handleReopen}>{$_('addTransfer.submit')}</button
-      >
-    </div>
-  {/if}
-
-  <BottomSheet
-    {isOpen}
-    canClose={!saveIsBusy && !saveBlocksFormExit}
-    title={$_('addTransfer.title')}
-    on:close={handleClose}
-  >
-    <form
-      class="add-transfer-form"
-      data-testid="add-transfer-form"
-      aria-busy={isSubmitting || isOptionsLoading || saveIsBusy}
-      on:submit|preventDefault={handleSubmit}
-      on:input={clearValidation}
-      on:change={clearValidation}
+  {#if !canOpenPanel}
+    <div
+      class="add-route__closed add-route__closed--info"
+      role="status"
+      data-testid="add-transfer-database-required"
     >
-      {#if isOptionsLoading}
-        <p class="add-transfer-form__status" data-testid="add-transfer-options-loading">
-          {$_('addTransfer.loadingOptions')}
-        </p>
-      {/if}
-
-      {#if effectiveFormError !== null}
-        <p class="add-transfer-form__error" role="alert" data-testid="add-transfer-form-error">
-          {effectiveFormError}
-        </p>
-      {/if}
-
-      {#if isOffline}
-        <p class="add-transfer-form__error" role="alert" data-testid="add-transfer-offline-warning">
-          {$_('addTransfer.offlineWarning')}
-        </p>
-      {/if}
-
-      {#if saveState.phase === 'conflict' || saveState.phase === 'conflict_syncing' || saveState.phase === 'conflict_resolved'}
-        <section
-          class={`add-transfer-form__conflict${saveState.phase === 'conflict_resolved' ? ' add-transfer-form__conflict--resolved' : ''}`}
-          role={saveState.phase === 'conflict_resolved' ? 'status' : 'alertdialog'}
-          aria-labelledby="add-transfer-conflict-title"
-          aria-describedby="add-transfer-conflict-description"
-          data-testid="add-transfer-conflict-dialog"
+      <p>{$_('addTransfer.databaseRequired')}</p>
+    </div>
+  {:else}
+    {#if !isOpen}
+      <div class="add-route__closed" data-testid="add-route-closed">
+        <p>{$_('addTransfer.title')}</p>
+        <button
+          type="button"
+          class="app-button app-button--primary"
+          data-testid="add-route-reopen-button"
+          on:click={handleReopen}>{$_('addTransfer.submit')}</button
         >
-          <h4 id="add-transfer-conflict-title">
-            {saveState.phase === 'conflict_resolved'
-              ? $_('addTransfer.save.conflictResolvedTitle')
-              : $_('addTransfer.save.conflictTitle')}
-          </h4>
-          <p id="add-transfer-conflict-description">
-            {saveState.phase === 'conflict_resolved'
-              ? $_('addTransfer.save.conflictResolved')
-              : $_('addTransfer.save.conflictDescription')}
+      </div>
+    {/if}
+
+    <BottomSheet
+      {isOpen}
+      canClose={!saveIsBusy && !saveBlocksFormExit}
+      title={$_('addTransfer.title')}
+      on:close={handleClose}
+    >
+      <form
+        bind:this={formElement}
+        class="add-transfer-form"
+        data-testid="add-transfer-form"
+        aria-busy={isSubmitting || isOptionsLoading || saveIsBusy}
+        on:submit|preventDefault={handleSubmit}
+        on:input={clearValidation}
+        on:change={clearValidation}
+      >
+        {#if isOptionsLoading}
+          <p class="add-transfer-form__status" data-testid="add-transfer-options-loading">
+            {$_('addTransfer.loadingOptions')}
           </p>
-          {#if saveState.errorMessage !== null && saveState.phase === 'conflict'}
-            <p class="add-transfer-form__conflict-error" role="alert">
-              {saveState.errorMessage}
-            </p>
-          {/if}
-          {#if saveState.phase === 'conflict_syncing'}
-            <div class="add-transfer-form__upload" data-testid="add-transfer-conflict-sync-status">
-              <p class="add-transfer-form__status">{$_('addTransfer.save.conflictSyncing')}</p>
-              {#if saveState.recoveryProgress !== null}
-                <ProgressIndicator
-                  kind="download"
-                  loaded={saveState.recoveryProgress.loadedBytes}
-                  total={saveState.recoveryProgress.totalBytes}
-                />
-              {/if}
-            </div>
-          {/if}
-        </section>
-      {/if}
+        {/if}
 
-      {#if saveState.phase === 'local_save'}
-        <p class="add-transfer-form__status" data-testid="add-transfer-local-save-status">
-          {$_('addTransfer.save.localSave')}
-        </p>
-      {/if}
+        {#if effectiveFormError !== null}
+          <p class="add-transfer-form__error" role="alert" data-testid="add-transfer-form-error">
+            {effectiveFormError}
+          </p>
+        {/if}
 
-      {#if saveState.phase === 'uploading'}
-        <div class="add-transfer-form__upload" data-testid="add-transfer-upload-status">
-          <p class="add-transfer-form__status">{$_('addTransfer.save.uploading')}</p>
-          {#if saveState.progress !== null}
-            <ProgressIndicator
-              kind="upload"
-              loaded={saveState.progress.loadedBytes}
-              total={saveState.progress.totalBytes}
-            />
-          {/if}
-        </div>
-      {/if}
-
-      {#if saveState.phase === 'saved'}
-        <p
-          class="add-transfer-form__success"
-          role="status"
-          data-testid="add-transfer-success-status"
-        >
-          {$_('addTransfer.save.success')}
-        </p>
-      {/if}
-
-      {#if validationErrors.length > 0}
-        {#each validationErrors as error (error)}
+        {#if isOffline}
           <p
             class="add-transfer-form__error"
             role="alert"
-            data-testid="add-transfer-validation-error"
+            data-testid="add-transfer-offline-warning"
           >
-            {error}
+            {$_('addTransfer.offlineWarning')}
           </p>
-        {/each}
-      {/if}
-
-      <div class="add-transfer-form__field">
-        <label class="add-transfer-form__label" for="add-transfer-date"
-          >{$_('addTransfer.date')}</label
-        >
-        <input
-          id="add-transfer-date"
-          type="date"
-          class="app-input"
-          data-testid="add-transfer-date"
-          bind:value={fields.date}
-          disabled={controlsAreDisabled}
-        />
-      </div>
-
-      <div class="add-transfer-form__field">
-        <label class="add-transfer-form__label" for="add-transfer-name"
-          >{$_('addTransfer.name')}</label
-        >
-        <input
-          id="add-transfer-name"
-          type="text"
-          class="app-input"
-          data-testid="add-transfer-name"
-          placeholder={$_('addTransfer.namePlaceholder')}
-          bind:value={fields.name}
-          disabled={controlsAreDisabled}
-          autocomplete="off"
-        />
-      </div>
-
-      <div class="add-transfer-form__field">
-        <label class="add-transfer-form__label" for="add-transfer-amount"
-          >{$_('addTransfer.amount')}</label
-        >
-        <input
-          id="add-transfer-amount"
-          type="text"
-          inputmode="decimal"
-          class="app-input"
-          data-testid="add-transfer-amount"
-          placeholder={$_('addTransfer.amountPlaceholder')}
-          bind:value={fields.amount}
-          disabled={controlsAreDisabled}
-          autocomplete="off"
-        />
-      </div>
-
-      <div class="add-transfer-form__field">
-        <label class="add-transfer-form__label" for="add-transfer-from-account"
-          >{$_('addTransfer.fromAccount')}</label
-        >
-        <select
-          id="add-transfer-from-account"
-          class="app-input"
-          data-testid="add-transfer-from-account"
-          bind:value={fields.fromAccountId}
-          disabled={controlsAreDisabled}
-        >
-          <option value={null}>{$_('addTransfer.fromAccountPlaceholder')}</option>
-          {#each optionsState.fromAccountOptions as account (account.accountId)}
-            <option value={account.accountId}>{getAccountName(account)}</option>
-          {/each}
-        </select>
-      </div>
-
-      <div class="add-transfer-form__field">
-        <label class="add-transfer-form__label" for="add-transfer-to-account"
-          >{$_('addTransfer.toAccount')}</label
-        >
-        <select
-          id="add-transfer-to-account"
-          class="app-input"
-          data-testid="add-transfer-to-account"
-          bind:value={fields.toAccountId}
-          disabled={controlsAreDisabled}
-        >
-          <option value={null}>{$_('addTransfer.toAccountPlaceholder')}</option>
-          {#each optionsState.toAccountOptions as account (account.accountId)}
-            <option value={account.accountId}>{getAccountName(account)}</option>
-          {/each}
-        </select>
-      </div>
-
-      <div class="add-transfer-form__field">
-        <div class="add-transfer-form__label-row">
-          <img
-            class="add-transfer-form__category-icon"
-            src={categoryIconUrl}
-            alt=""
-            aria-hidden="true"
-            width="20"
-            height="20"
-          />
-          <label class="add-transfer-form__label" for="add-transfer-category-1"
-            >{$_('addTransfer.categories')}</label
-          >
-        </div>
-        <div class="add-transfer-form__category-selects">
-          <select
-            id="add-transfer-category-1"
-            class="app-input"
-            data-testid="add-transfer-category-1"
-            bind:value={fields.category1Id}
-            disabled={controlsAreDisabled}
-          >
-            <option value={NO_CATEGORY_SELECTED}>{$_('addTransfer.categoryPlaceholder')}</option>
-            {#each optionsState.categoryOptions as cat (cat.categoryId)}
-              <option value={cat.categoryId}>{cat.name}</option>
-            {/each}
-          </select>
-          <select
-            id="add-transfer-category-2"
-            class="app-input"
-            data-testid="add-transfer-category-2"
-            bind:value={fields.category2Id}
-            disabled={controlsAreDisabled}
-          >
-            <option value={NO_CATEGORY_SELECTED}>{$_('addTransfer.categoryPlaceholder')}</option>
-            {#each optionsState.categoryOptions as cat (cat.categoryId)}
-              <option value={cat.categoryId}>{cat.name}</option>
-            {/each}
-          </select>
-          <select
-            id="add-transfer-category-3"
-            class="app-input"
-            data-testid="add-transfer-category-3"
-            bind:value={fields.category3Id}
-            disabled={controlsAreDisabled}
-          >
-            <option value={NO_CATEGORY_SELECTED}>{$_('addTransfer.categoryPlaceholder')}</option>
-            {#each optionsState.categoryOptions as cat (cat.categoryId)}
-              <option value={cat.categoryId}>{cat.name}</option>
-            {/each}
-          </select>
-        </div>
-      </div>
-
-      <div class="add-transfer-form__field">
-        <label class="add-transfer-form__label" for="add-transfer-buyplace"
-          >{$_('addTransfer.buyplace')}</label
-        >
-        <input
-          id="add-transfer-buyplace"
-          type="text"
-          class="app-input"
-          data-testid="add-transfer-buyplace"
-          placeholder={$_('addTransfer.buyplacePlaceholder')}
-          bind:value={fields.buyplace}
-          disabled={controlsAreDisabled}
-          autocomplete="off"
-        />
-      </div>
-
-      <div class="add-transfer-form__actions">
-        <button
-          type="button"
-          class="app-button app-button--secondary add-transfer-form__action"
-          data-testid="add-transfer-close"
-          disabled={isSubmitting || saveIsBusy || saveBlocksFormExit}
-          on:click={handleClose}
-        >
-          {$_('addTransfer.close')}
-        </button>
-        {#if saveState.canRetry}
-          <button
-            type="button"
-            class="app-button app-button--primary add-transfer-form__action"
-            data-testid="add-transfer-retry"
-            disabled={saveIsBusy || isOffline}
-            on:click={handleRetry}
-          >
-            {$_('addTransfer.save.retry')}
-          </button>
-        {:else if saveState.phase === 'conflict' || saveState.phase === 'conflict_syncing'}
-          <button
-            type="button"
-            class="app-button app-button--primary add-transfer-form__action"
-            data-testid="add-transfer-resolve-conflict"
-            disabled={saveState.phase === 'conflict_syncing' || isOffline}
-            on:click={handleResolveConflict}
-          >
-            {saveState.phase === 'conflict_syncing'
-              ? $_('addTransfer.save.conflictSyncingButton')
-              : $_('addTransfer.save.conflictAction')}
-          </button>
-        {:else}
-          <button
-            type="submit"
-            class="app-button app-button--primary add-transfer-form__action"
-            data-testid="add-transfer-submit"
-            disabled={submitIsDisabled}
-          >
-            {saveIsBusy || isSubmitting ? $_('addTransfer.saving') : $_('addTransfer.submit')}
-          </button>
         {/if}
-      </div>
-    </form>
-  </BottomSheet>
+
+        {#if saveState.phase === 'conflict' || saveState.phase === 'conflict_syncing' || saveState.phase === 'conflict_resolved'}
+          <section
+            class={`add-transfer-form__conflict${saveState.phase === 'conflict_resolved' ? ' add-transfer-form__conflict--resolved' : ''}`}
+            role={saveState.phase === 'conflict_resolved' ? 'status' : 'alertdialog'}
+            aria-labelledby="add-transfer-conflict-title"
+            aria-describedby="add-transfer-conflict-description"
+            data-testid="add-transfer-conflict-dialog"
+          >
+            <h4 id="add-transfer-conflict-title">
+              {saveState.phase === 'conflict_resolved'
+                ? $_('addTransfer.save.conflictResolvedTitle')
+                : $_('addTransfer.save.conflictTitle')}
+            </h4>
+            <p id="add-transfer-conflict-description">
+              {saveState.phase === 'conflict_resolved'
+                ? $_('addTransfer.save.conflictResolved')
+                : $_('addTransfer.save.conflictDescription')}
+            </p>
+            {#if saveState.errorMessage !== null && saveState.phase === 'conflict'}
+              <p class="add-transfer-form__conflict-error" role="alert">
+                {saveState.errorMessage}
+              </p>
+            {/if}
+            {#if saveState.phase === 'conflict_syncing'}
+              <div
+                class="add-transfer-form__upload"
+                data-testid="add-transfer-conflict-sync-status"
+              >
+                <p class="add-transfer-form__status">{$_('addTransfer.save.conflictSyncing')}</p>
+                {#if saveState.recoveryProgress !== null}
+                  <ProgressIndicator
+                    kind="download"
+                    loaded={saveState.recoveryProgress.loadedBytes}
+                    total={saveState.recoveryProgress.totalBytes}
+                  />
+                {/if}
+              </div>
+            {/if}
+          </section>
+        {/if}
+
+        {#if saveState.phase === 'local_save'}
+          <p class="add-transfer-form__status" data-testid="add-transfer-local-save-status">
+            {$_('addTransfer.save.localSave')}
+          </p>
+        {/if}
+
+        {#if saveState.phase === 'uploading'}
+          <div class="add-transfer-form__upload" data-testid="add-transfer-upload-status">
+            <p class="add-transfer-form__status">{$_('addTransfer.save.uploading')}</p>
+            {#if saveState.progress !== null}
+              <ProgressIndicator
+                kind="upload"
+                loaded={saveState.progress.loadedBytes}
+                total={saveState.progress.totalBytes}
+              />
+            {/if}
+          </div>
+        {/if}
+
+        {#if saveState.phase === 'saved'}
+          <p
+            class="add-transfer-form__success"
+            role="status"
+            data-testid="add-transfer-success-status"
+          >
+            {$_('addTransfer.save.success')}
+          </p>
+        {/if}
+
+        {#if validationErrors.length > 0}
+          {#each validationErrors as error (error)}
+            <p
+              class="add-transfer-form__error"
+              role="alert"
+              data-testid="add-transfer-validation-error"
+            >
+              {error}
+            </p>
+          {/each}
+        {/if}
+
+        <div class="add-transfer-form__field">
+          <label class="add-transfer-form__label" for="add-transfer-date"
+            >{$_('addTransfer.date')}</label
+          >
+          <input
+            id="add-transfer-date"
+            type="date"
+            class="app-input"
+            data-testid="add-transfer-date"
+            bind:value={fields.date}
+            disabled={controlsAreDisabled}
+          />
+        </div>
+
+        <div class="add-transfer-form__field">
+          <label class="add-transfer-form__label" for="add-transfer-name"
+            >{$_('addTransfer.name')}</label
+          >
+          <input
+            id="add-transfer-name"
+            type="text"
+            class="app-input"
+            data-testid="add-transfer-name"
+            placeholder={$_('addTransfer.namePlaceholder')}
+            bind:value={fields.name}
+            disabled={controlsAreDisabled}
+            autocomplete="off"
+          />
+        </div>
+
+        <div class="add-transfer-form__field">
+          <label class="add-transfer-form__label" for="add-transfer-buyplace"
+            >{$_('addTransfer.buyplace')}</label
+          >
+          <input
+            id="add-transfer-buyplace"
+            type="text"
+            class="app-input"
+            data-testid="add-transfer-buyplace"
+            placeholder={$_('addTransfer.buyplacePlaceholder')}
+            bind:value={fields.buyplace}
+            disabled={controlsAreDisabled}
+            autocomplete="off"
+          />
+        </div>
+
+        <div class="add-transfer-form__field">
+          <label class="add-transfer-form__label" for="add-transfer-amount"
+            >{$_('addTransfer.amount')}</label
+          >
+          <input
+            bind:this={amountInputElement}
+            id="add-transfer-amount"
+            type="text"
+            inputmode="numeric"
+            class="app-input"
+            data-testid="add-transfer-amount"
+            placeholder={$_('addTransfer.amountPlaceholder')}
+            bind:value={fields.amount}
+            disabled={controlsAreDisabled}
+            autocomplete="off"
+            on:keydown={handleAmountKeydown}
+            on:input={handleAmountInput}
+            on:paste={handleAmountPaste}
+          />
+        </div>
+
+        <div class="add-transfer-form__field">
+          <label class="add-transfer-form__label" for="add-transfer-from-account"
+            >{$_('addTransfer.fromAccount')}</label
+          >
+          <select
+            id="add-transfer-from-account"
+            class="app-input"
+            data-testid="add-transfer-from-account"
+            bind:value={fields.fromAccountId}
+            disabled={controlsAreDisabled}
+          >
+            <option value={null}>{$_('addTransfer.fromAccountPlaceholder')}</option>
+            {#each optionsState.fromAccountOptions as account (account.accountId)}
+              <option value={account.accountId}>{getAccountName(account)}</option>
+            {/each}
+          </select>
+        </div>
+
+        <div class="add-transfer-form__field">
+          <label class="add-transfer-form__label" for="add-transfer-to-account"
+            >{$_('addTransfer.toAccount')}</label
+          >
+          <select
+            id="add-transfer-to-account"
+            class="app-input"
+            data-testid="add-transfer-to-account"
+            bind:value={fields.toAccountId}
+            disabled={controlsAreDisabled}
+          >
+            <option value={null}>{$_('addTransfer.toAccountPlaceholder')}</option>
+            {#each optionsState.toAccountOptions as account (account.accountId)}
+              <option value={account.accountId}>{getAccountName(account)}</option>
+            {/each}
+          </select>
+        </div>
+
+        <div class="add-transfer-form__field">
+          <div class="add-transfer-form__label-row">
+            <img
+              class="add-transfer-form__category-icon"
+              src={categoryIconUrl}
+              alt=""
+              aria-hidden="true"
+              width="20"
+              height="20"
+            />
+            <label class="add-transfer-form__label" for="add-transfer-category-1"
+              >{$_('addTransfer.categories')}</label
+            >
+          </div>
+          <div class="add-transfer-form__category-selects">
+            <select
+              id="add-transfer-category-1"
+              class="app-input"
+              data-testid="add-transfer-category-1"
+              bind:value={fields.category1Id}
+              disabled={controlsAreDisabled}
+            >
+              <option value={NO_CATEGORY_SELECTED}>{$_('addTransfer.categoryPlaceholder')}</option>
+              {#each optionsState.categoryOptions as cat (cat.categoryId)}
+                <option value={cat.categoryId}>{cat.name}</option>
+              {/each}
+            </select>
+            <select
+              id="add-transfer-category-2"
+              class="app-input"
+              data-testid="add-transfer-category-2"
+              bind:value={fields.category2Id}
+              disabled={controlsAreDisabled}
+            >
+              <option value={NO_CATEGORY_SELECTED}>{$_('addTransfer.categoryPlaceholder')}</option>
+              {#each optionsState.categoryOptions as cat (cat.categoryId)}
+                <option value={cat.categoryId}>{cat.name}</option>
+              {/each}
+            </select>
+            <select
+              id="add-transfer-category-3"
+              class="app-input"
+              data-testid="add-transfer-category-3"
+              bind:value={fields.category3Id}
+              disabled={controlsAreDisabled}
+            >
+              <option value={NO_CATEGORY_SELECTED}>{$_('addTransfer.categoryPlaceholder')}</option>
+              {#each optionsState.categoryOptions as cat (cat.categoryId)}
+                <option value={cat.categoryId}>{cat.name}</option>
+              {/each}
+            </select>
+          </div>
+        </div>
+
+        <div class="add-transfer-form__actions">
+          <button
+            type="button"
+            class="app-button app-button--secondary add-transfer-form__action"
+            data-testid="add-transfer-close"
+            disabled={isSubmitting || saveIsBusy || saveBlocksFormExit}
+            on:click={handleClose}
+          >
+            {$_('addTransfer.close')}
+          </button>
+          {#if saveState.canRetry}
+            <button
+              type="button"
+              class="app-button app-button--primary add-transfer-form__action"
+              data-testid="add-transfer-retry"
+              disabled={saveIsBusy || isOffline}
+              on:click={handleRetry}
+            >
+              {$_('addTransfer.save.retry')}
+            </button>
+          {:else if saveState.phase === 'conflict' || saveState.phase === 'conflict_syncing'}
+            <button
+              type="button"
+              class="app-button app-button--primary add-transfer-form__action"
+              data-testid="add-transfer-resolve-conflict"
+              disabled={saveState.phase === 'conflict_syncing' || isOffline}
+              on:click={handleResolveConflict}
+            >
+              {saveState.phase === 'conflict_syncing'
+                ? $_('addTransfer.save.conflictSyncingButton')
+                : $_('addTransfer.save.conflictAction')}
+            </button>
+          {:else}
+            <button
+              type="submit"
+              class="app-button app-button--primary add-transfer-form__action"
+              data-testid="add-transfer-submit"
+              disabled={submitIsDisabled}
+            >
+              {saveIsBusy || isSubmitting ? $_('addTransfer.saving') : $_('addTransfer.submit')}
+            </button>
+          {/if}
+        </div>
+      </form>
+    </BottomSheet>
+  {/if}
 </section>
 
 <style>
@@ -504,7 +610,7 @@
   .add-transfer-form {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.8rem;
     padding-bottom: 0.5rem;
   }
 
@@ -584,7 +690,7 @@
   .add-transfer-form__field {
     display: flex;
     flex-direction: column;
-    gap: 0.35rem;
+    gap: 0.3rem;
   }
 
   .add-transfer-form__label {
@@ -608,7 +714,37 @@
   .add-transfer-form__category-selects {
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
+    gap: 0.35rem;
+  }
+
+  .add-transfer-form input[type='date'].app-input {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    height: 44px;
+    min-height: 44px;
+    line-height: 1.2;
+  }
+
+  .add-transfer-form input[type='date'].app-input::-webkit-date-and-time-value {
+    min-height: 1.2em;
+    text-align: left;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .add-transfer-form select.app-input {
+      appearance: none;
+      padding-right: 2.75rem;
+      background-image:
+        linear-gradient(45deg, transparent 50%, currentColor 50%),
+        linear-gradient(135deg, currentColor 50%, transparent 50%);
+      background-position:
+        calc(100% - 1.35rem) 50%,
+        calc(100% - 1.05rem) 50%;
+      background-repeat: no-repeat;
+      background-size: 0.35rem 0.35rem;
+    }
   }
 
   .add-transfer-form__actions {

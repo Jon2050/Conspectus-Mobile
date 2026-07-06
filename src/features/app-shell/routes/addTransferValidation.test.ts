@@ -12,7 +12,7 @@ describe('validateAddTransfer', () => {
   const validFields = (): AddTransferFormFields => ({
     ...createInitialFormFields(),
     name: 'Valid Transfer',
-    amount: '12.50',
+    amount: '12,50€',
     fromAccountId: 10,
     toAccountId: 20,
   });
@@ -44,11 +44,11 @@ describe('validateAddTransfer', () => {
 
   it('requires amount > 0', () => {
     const fields = validFields();
-    fields.amount = '0';
+    fields.amount = '0,00€';
     let errors = validateAddTransfer(fields, fromOptions, toOptions, t);
     expect(errors).toContain('addTransfer.validation.amountPositive');
 
-    fields.amount = '-10';
+    fields.amount = '-0,10€';
     errors = validateAddTransfer(fields, fromOptions, toOptions, t);
     expect(errors).toContain('addTransfer.validation.amountPositive');
 

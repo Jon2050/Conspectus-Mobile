@@ -54,6 +54,8 @@
 
   let currentRoute: AppRouteKey = DEFAULT_ROUTE;
   let addTransferFields: AddTransferFormFields = createInitialFormFields();
+  let selectedBinding: DriveItemBinding | null = get(appSelectedDriveItemBindingStore);
+  let addTransferHasLoadedDatabase = false;
   let appContentElement: HTMLElement | null = null;
   let appContentPageElement: HTMLDivElement | null = null;
   let footerIsVisible = true;
@@ -68,6 +70,15 @@
   const unsubscribe = routeStore.subscribe((route) => {
     currentRoute = route;
   });
+
+  $: if (selectedBinding === null || $syncStateStore.state === 'idle') {
+    addTransferHasLoadedDatabase = false;
+  } else if (resolveAppDbRuntime().isOpen()) {
+    addTransferHasLoadedDatabase = true;
+  }
+
+  $: addTransferDatabaseIsReady =
+    selectedBinding !== null && addTransferHasLoadedDatabase && $syncStateStore.state !== 'idle';
 
   const resolveNavIconUrl = (iconPath: string): string => `${navIconBaseUrl}${iconPath}`;
 
@@ -141,6 +152,7 @@
   };
 
   const unsubscribeSelectedBinding = appSelectedDriveItemBindingStore.subscribe((binding) => {
+    selectedBinding = binding;
     if (!selectedBindingHasEmitted) {
       selectedBindingHasEmitted = true;
       return;
@@ -340,7 +352,7 @@
       {:else if currentRoute === 'transfers'}
         <TransfersRoute />
       {:else if currentRoute === 'add'}
-        <AddRoute bind:fields={addTransferFields} />
+        <AddRoute bind:fields={addTransferFields} canOpenPanel={addTransferDatabaseIsReady} />
       {:else}
         <SettingsRoute />
       {/if}

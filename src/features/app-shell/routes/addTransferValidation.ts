@@ -1,6 +1,7 @@
 // Implements transfer validation rules from desktop parity.
 import { PRIMARY_INCOME_ACCOUNT_TYPE_ID, PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID } from '@db';
 
+import { parseAmountInputCents } from './addTransferAmountInput';
 import type { AddTransferAccountOption, AddTransferFormFields } from './addTransferFormState';
 
 /**
@@ -19,8 +20,8 @@ export const validateAddTransfer = (
     errors.push(t('addTransfer.validation.nameLength'));
   }
 
-  const amountNumber = parseFloat(fields.amount.trim().replace(',', '.'));
-  if (isNaN(amountNumber) || amountNumber <= 0) {
+  const amountCents = parseAmountInputCents(fields.amount);
+  if (amountCents === null || amountCents <= 0) {
     errors.push(t('addTransfer.validation.amountPositive'));
   }
 

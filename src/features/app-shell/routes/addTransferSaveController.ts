@@ -22,6 +22,7 @@ import {
   type AddTransferAccountOption,
   type AddTransferFormFields,
 } from './addTransferFormState';
+import { parseAmountInputCents } from './addTransferAmountInput';
 import type { AddTransferOptionsState } from './addTransferOptionsController';
 import { validateAddTransfer } from './addTransferValidation';
 import { deriveTransferType } from './transferTypeDerivation';
@@ -80,9 +81,6 @@ const isBusyPhase = (phase: AddTransferSavePhase): boolean =>
 const blocksNewSubmit = (phase: AddTransferSavePhase): boolean =>
   isBusyPhase(phase) || phase === 'conflict';
 
-const parseAmountCents = (amount: string): number =>
-  Math.round(Number.parseFloat(amount.trim().replace(',', '.')) * 100);
-
 const selectedCategoryIds = (fields: AddTransferFormFields): readonly number[] =>
   [fields.category1Id, fields.category2Id, fields.category3Id].filter(
     (categoryId) => categoryId !== NO_CATEGORY_SELECTED,
@@ -105,10 +103,15 @@ const toCreateTransferInput = (
     throw new Error('Selected transfer accounts are no longer available.');
   }
 
+  const amountCents = parseAmountInputCents(fields.amount);
+  if (amountCents === null) {
+    throw new Error('Transfer amount is not valid.');
+  }
+
   return {
     bookingDateEpochDay: isoDateToEpochDay(fields.date),
     name: fields.name.trim(),
-    amountCents: parseAmountCents(fields.amount),
+    amountCents,
     transferTypeId: deriveTransferType(fromAccount.accountTypeId, toAccount.accountTypeId),
     fromAccountId: fromAccount.accountId,
     toAccountId: toAccount.accountId,

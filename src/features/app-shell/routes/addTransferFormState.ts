@@ -23,7 +23,7 @@ export interface AddTransferFormFields {
   /** ISO date string (YYYY-MM-DD) for native date input binding. */
   date: string;
   name: string;
-  /** Raw amount string from the text input (parsed later in M6-03). */
+  /** Formatted euro-cent amount display string such as 12,34€. */
   amount: string;
   fromAccountId: number | null;
   toAccountId: number | null;
