@@ -1,4 +1,4 @@
-Task: Implement issue `M6-11` end-to-end with full verification.
+Task: Implement the issue `{{ISSUE_KEY}}` end-to-end with full verification.
 
 ## Non-negotiable rules:
 
@@ -22,7 +22,7 @@ Always print in which step you are!
    - `docs/Architecture-and-Implementation-Plan.md`
    - `docs/Conspectus-Desktop-Info.md`
    - `docs/GitHub-Issues-MVP-Backlog.md`
-     Then locate `M6-11` and extract implementation steps, acceptance criteria, and dependencies/constraints from GitHub. Also from the comments on GitHub.
+     Then locate `{{ISSUE_KEY}}` and extract implementation steps, acceptance criteria, and dependencies/constraints from GitHub. Also from the comments on GitHub.
 2. Plan with one planning subagent. Refine until concrete, testable, and mapped from each acceptance criterion to file-level code/test changes. Make clear, that the planning subagent should not write any code, just the plan.
 3. Create/use a dedicated issue branch with a proper name containing the milestone and issue number (e.g., `feature/M6-03-localize-formatting` or `bug/M6-03-fix-locale`).
    3.1. Increase the app version in `package.json` to `0.<milestone_number>.<issue_title_number>`. (e.g. `0.6.03` for issue `M6-03`)
