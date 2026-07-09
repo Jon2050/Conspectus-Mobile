@@ -165,6 +165,50 @@
     }
   });
 
+  let foregroundSyncIsQueued = false;
+
+  const flushQueuedForegroundSync = (): void => {
+    foregroundSyncIsQueued = false;
+
+    queueMicrotask(() => {
+      if (
+        !appShellIsMounted ||
+        document.visibilityState !== 'visible' ||
+        get(syncStateStore).state === 'syncing'
+      ) {
+        return;
+      }
+
+      void performSync(get(appSelectedDriveItemBindingStore));
+    });
+  };
+
+  const unsubscribeQueuedForegroundSync = syncStateStore.subscribe((syncSnapshot) => {
+    if (!foregroundSyncIsQueued || syncSnapshot.state === 'syncing') {
+      return;
+    }
+
+    if (syncSnapshot.state === 'synced') {
+      flushQueuedForegroundSync();
+      return;
+    }
+
+    foregroundSyncIsQueued = false;
+  });
+
+  const handleDocumentVisibilityChange = (): void => {
+    if (!hasPerformedInitialSync || document.visibilityState !== 'visible') {
+      return;
+    }
+
+    if (get(syncStateStore).state === 'syncing') {
+      foregroundSyncIsQueued = true;
+      return;
+    }
+
+    void performSync(get(appSelectedDriveItemBindingStore));
+  };
+
   const logStartupFreshnessDecision = (
     decision: StartupFreshnessDecision,
     bindingName: string | null,
@@ -260,6 +304,7 @@
     appShellIsMounted = true;
     let isMounted = true;
     syncStateStore.reset();
+    document.addEventListener('visibilitychange', handleDocumentVisibilityChange);
 
     void (async () => {
       try {
@@ -294,6 +339,7 @@
       if (timerId !== null) {
         window.clearTimeout(timerId);
       }
+      document.removeEventListener('visibilitychange', handleDocumentVisibilityChange);
       disconnectFooterVisibilityTracking();
     };
   });
@@ -318,6 +364,7 @@
   onDestroy(() => {
     unsubscribe();
     unsubscribeSelectedBinding();
+    unsubscribeQueuedForegroundSync();
     resolveAppDbRuntime().close();
     disconnectFooterVisibilityTracking();
   });

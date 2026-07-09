@@ -223,6 +223,7 @@ type MockGraphClientOptions = {
   readonly downloadDelayMs?: number;
   readonly extraRootDbFileCount?: number;
   readonly metadataETag?: string;
+  readonly metadataETagSequence?: readonly string[];
   readonly metadataLastModifiedDateTime?: string;
   readonly downloadBytes?: readonly number[];
   readonly metadataErrorSequence?: readonly MockGraphError[];
@@ -366,6 +367,7 @@ const installMockGraphClient = async (
     let getFileMetadataCallCount = 0;
     let downloadFileCallCount = 0;
     let uploadFileCallCount = 0;
+    const metadataETagSequence = [...(mockOptions.metadataETagSequence ?? [])];
     const metadataErrorSequence = [...(mockOptions.metadataErrorSequence ?? [])];
     const downloadErrorSequence = [...(mockOptions.downloadErrorSequence ?? [])];
     const uploadErrorSequence = [...(mockOptions.uploadErrorSequence ?? [])];
@@ -475,7 +477,7 @@ const installMockGraphClient = async (
         }
 
         return {
-          eTag: mockOptions.metadataETag ?? '"etag-1"',
+          eTag: metadataETagSequence.shift() ?? mockOptions.metadataETag ?? '"etag-1"',
           sizeBytes: defaultDownloadBytes.length,
           lastModifiedDateTime: mockOptions.metadataLastModifiedDateTime ?? '2026-03-09T10:15:00Z',
           downloadUrl: 'https://download.example.com/conspectus.db',
@@ -1451,6 +1453,39 @@ test('reuses the cached DB on startup when the OneDrive eTag is unchanged', asyn
   expect(await getGraphDownloadCallCount(page)).toBe(0);
 });
 
+test('refreshes the selected DB when the PWA returns to the foreground', async ({ page }) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page, {
+    metadataETagSequence: ['"etag-1"', '"etag-2"'],
+    downloadBytes: createSqliteBytes([9, 8, 7, 6]),
+  });
+  await installMockCacheStore(page, {
+    startupSnapshot: {
+      metadata: {
+        eTag: '"etag-1"',
+      },
+      dbBytes: createSqliteBytes([1, 1, 1, 1]),
+    },
+  });
+  await installPersistedBinding(page);
+  await installMockStartupNetworkState(page, true);
+
+  await page.goto(appPath('#/accounts'));
+
+  await expect(page.getByText('Cached DB is current with OneDrive.')).toBeVisible();
+  expect(await getGraphMetadataCallCount(page)).toBe(1);
+
+  await page.evaluate(() => {
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+
+  await expect.poll(() => getGraphMetadataCallCount(page)).toBe(2);
+  await expect(page.getByText('Downloaded the latest DB from OneDrive.')).toBeVisible();
+  expect(await getGraphDownloadCallCount(page)).toBe(1);
+});
+
 test('shows syncing state and toast feedback while the startup freshness check is running', async ({
   page,
 }) => {
@@ -2086,7 +2121,11 @@ test('loads transfers from real DB bytes and navigates months to see fixture dat
 
   await expect(monthLabel).toHaveAttribute('data-month-key', '2024-04');
   await expect(page.getByTestId('transfer-card-2')).toBeVisible();
-  await expect(page.getByTestId('transfer-card-3')).toBeVisible();
+  const categorylessTransferCard = page.getByTestId('transfer-card-3');
+  await expect(categorylessTransferCard).toBeVisible();
+  expect(
+    await categorylessTransferCard.evaluate((card) => window.getComputedStyle(card).paddingBottom),
+  ).toBe('6.4px');
 
   await page.getByTestId('transfers-month-previous-button').click();
   await expect(monthLabel).toHaveAttribute('data-month-key', '2024-03');
@@ -2660,6 +2699,40 @@ test('shows determinate upload progress during slow upload', async ({ page }) =>
   await expect(page.locator('.toast-container')).toContainText('Transfer saved and uploaded.', {
     timeout: 15000,
   });
+});
+
+test('defers foreground refresh until an active upload completes', async ({ page }) => {
+  await seedAndBindTestDb(page, {
+    metadataETag: '"etag-2"',
+    uploadDelayMs: 2000,
+  });
+  await page.goto(appPath('#/add'));
+  await expect(page.getByTestId('add-transfer-date')).toBeVisible();
+
+  await page.getByTestId('add-transfer-name').fill('Foreground Upload Transfer');
+  await page.getByTestId('add-transfer-amount').pressSequentially('100');
+  await page.getByTestId('add-transfer-from-account').selectOption({ label: 'Girokonto' });
+  await page.getByTestId('add-transfer-to-account').selectOption({ label: 'Kreditkarte' });
+  await page.getByTestId('add-transfer-submit').click();
+
+  await expect(
+    page.getByTestId('add-transfer-upload-status').getByTestId('progress-indicator'),
+  ).toBeVisible();
+  const metadataCallsBeforeForegroundEvent = await getGraphMetadataCallCount(page);
+
+  await page.evaluate(() => {
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+
+  await page.waitForTimeout(250);
+  expect(await getGraphMetadataCallCount(page)).toBe(metadataCallsBeforeForegroundEvent);
+
+  await expect(page.locator('.toast-container')).toContainText('Transfer saved and uploaded.', {
+    timeout: 15000,
+  });
+  await expect
+    .poll(() => getGraphMetadataCallCount(page))
+    .toBe(metadataCallsBeforeForegroundEvent + 1);
 });
 
 test('handles transient upload failure and allows retry without data loss', async ({ page }) => {
