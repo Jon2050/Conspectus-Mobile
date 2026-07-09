@@ -248,7 +248,7 @@
                     <h3 class="transfer-card__name">
                       {#if transfer.buyplace}<span class="transfer-card__buyplace-prefix"
                           >({transfer.buyplace})
-                        </span>
+                        </span>&nbsp;
                       {/if}{transfer.name}
                     </h3>
                   </div>
@@ -419,7 +419,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.08rem;
-    padding: 0.4rem 0.75rem 0.1rem;
+    padding: 0.4rem 0.75rem;
     border-radius: var(--radius-lg);
     background: var(--surface-strong);
     box-shadow: var(--shadow-sm);
