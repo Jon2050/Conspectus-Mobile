@@ -326,6 +326,48 @@ describe('addTransferSaveController', () => {
     expect(toastStore.show).toHaveBeenCalledWith('addTransfer.save.conflictToast', 'error');
   });
 
+  it('reconciles a remote commit whose local cache write failed without a retry or second insert', async () => {
+    const saveService: TransferSaveExportService = {
+      createTransferAndExport: vi.fn(async (_input, options) => {
+        options?.onUploadStart?.();
+        throw new TransferUploadPendingError(
+          {
+            transferResult: { transferId: 42, persistedAtIso: '2026-06-25T00:00:00.000Z' },
+            dbBytes: Uint8Array.from([1, 2, 3]),
+          },
+          new DatabaseUploadError(
+            'remote_commit_cache_failed',
+            'The transfer was saved to OneDrive, but the local database cache could not be refreshed.',
+          ),
+        );
+      }),
+      retryExportedDatabaseUpload: vi.fn(async () => {}),
+    };
+    const toastStore = { show: vi.fn() };
+    const conflictRecoveryService = createConflictRecoveryService();
+    const controller = createAddTransferSaveController(
+      saveService,
+      toastStore,
+      conflictRecoveryService,
+    );
+
+    await controller.submit(createValidFields(), READY_OPTIONS, t);
+    await vi.waitFor(() => expect(controller.getState().phase).toBe('remote_commit_recovered'));
+
+    expect(conflictRecoveryService.syncLatestDatabase).toHaveBeenCalledWith({
+      onProgress: expect.any(Function),
+    });
+    expect(controller.getState().canRetry).toBe(false);
+    await controller.retry(t);
+    await controller.submit(createValidFields(), READY_OPTIONS, t);
+    expect(saveService.createTransferAndExport).toHaveBeenCalledOnce();
+    expect(saveService.retryExportedDatabaseUpload).not.toHaveBeenCalled();
+    expect(toastStore.show).toHaveBeenCalledWith(
+      'addTransfer.save.remoteCommitRecoveredToast',
+      'success',
+    );
+  });
+
   it('downloads the latest database after conflict and then allows a fresh submit', async () => {
     const saveService = createSaveService();
     const toastStore = { show: vi.fn() };

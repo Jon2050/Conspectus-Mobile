@@ -22,12 +22,10 @@ describe('loadRuntimeEnv', () => {
       loadRuntimeEnv({
         VITE_AZURE_CLIENT_ID: ' client-id ',
         VITE_DEPLOY_BASE_PATH: ' /conspectus/webapp/ ',
-        VITE_DEPLOY_PUBLIC_URL: ' https://jon2050.de/conspectus/webapp/ ',
       }),
     ).toEqual({
       VITE_AZURE_CLIENT_ID: 'client-id',
       VITE_DEPLOY_BASE_PATH: '/conspectus/webapp/',
-      VITE_DEPLOY_PUBLIC_URL: 'https://jon2050.de/conspectus/webapp/',
     });
   });
 
@@ -36,6 +34,5 @@ describe('loadRuntimeEnv', () => {
 
     expect(result).toEqual({ VITE_AZURE_CLIENT_ID: 'client-id' });
     expect(result).not.toHaveProperty('VITE_DEPLOY_BASE_PATH');
-    expect(result).not.toHaveProperty('VITE_DEPLOY_PUBLIC_URL');
   });
 });

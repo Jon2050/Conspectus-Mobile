@@ -154,6 +154,26 @@ describe('quality workflow contract', () => {
   });
 });
 
+describe('workflow action pinning', () => {
+  it('uses full commit SHAs for every referenced action', () => {
+    const workflowPaths = [
+      qualityWorkflowPath,
+      deployPreviewWorkflowPath,
+      deployProductionWorkflowPath,
+    ];
+
+    for (const workflowPath of workflowPaths) {
+      const workflowSource = fs.readFileSync(workflowPath, 'utf8');
+      const actionReferences = [...workflowSource.matchAll(/^\s*uses:\s+[^@\s]+@([^\s#]+)/gm)];
+
+      expect(actionReferences.length).toBeGreaterThan(0);
+      expect(
+        actionReferences.every((reference) => /^[a-f0-9]{40}$/u.test(reference[1] ?? '')),
+      ).toBe(true);
+    }
+  });
+});
+
 describe('production workflow contracts', () => {
   it('deploys production manually from the current main commit after a successful Quality run', () => {
     const workflowSource = fs.readFileSync(deployProductionWorkflowPath, 'utf8');

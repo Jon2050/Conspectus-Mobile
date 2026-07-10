@@ -1,5 +1,11 @@
 # CI/CD Pipelines
 
+## GitHub Action pinning
+
+All third-party and GitHub-maintained actions in repository workflows are pinned to full commit SHAs with their reviewed release version in an adjacent comment. To update an action, review the upstream release and commit, replace both the SHA and version comment in every workflow use, run the local quality gate, and review the workflow diff before merging.
+
+After these pinned workflows reach the default branch, repository administrators must enable **Require actions to be pinned to a full-length commit SHA** in **Settings → Actions → General**. That repository setting is intentionally applied after publication so it cannot block the unpinned workflow revision already on the default branch.
+
 This document is the operational reference for the project-owned GitHub Actions in this repository.
 It also explains the GitHub-managed Pages workflow that appears in the Actions UI.
 

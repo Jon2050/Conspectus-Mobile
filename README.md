@@ -57,7 +57,6 @@ Required variable:
 Optional deployment variables:
 
 - `VITE_DEPLOY_BASE_PATH`: Optional base-path override for non-channel/local builds.
-- `VITE_DEPLOY_PUBLIC_URL`: Optional full public app URL for deployment/reference tooling.
 
 Startup validation:
 
