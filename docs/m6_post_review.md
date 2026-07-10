@@ -154,9 +154,11 @@ Findings that require more than 60 minutes, involving architectural changes, cro
 
 #### L-01: Retry and conflict recovery state is both modal-trapping and route-lifecycle fragile
 
+- **Status:** ✅ Fixed
 - **Severity:** High
 - **Perspective:** Feature Completeness, UI/UX, Bug Hunting, Testing
 - **Location:** `src/features/app-shell/routes/addTransferSaveController.ts` (lines 137–144, 187–205, 284–297); `src/features/app-shell/routes/AddRoute.svelte` (lines 46, 70, 261–265, 537–543); `src/features/app-shell/components/BottomSheet.svelte` (lines 12–60); `src/features/app-shell/hashRouting.ts` (lines 93–102); `src/features/app-shell/AppShell.svelte` (lines 56, 397–405); `tests/e2e/app-shell.spec.ts` (lines 2738–2770)
+- **Resolution:** `AppShell` now owns the save controller for the app-session lifetime and exposes retry or conflict recovery in a persistent non-modal pending-sync action. Failed sheets can be closed safely without clearing the operation. Playwright covers retry and conflict recovery after hash-route navigation, and confirms retry reuses the original export without a second local SQL write.
 - **Description:** A retryable upload failure sets `canRetry`, which disables the Close button and makes the modal reject cancel/backdrop close; no safe dismiss, durable pending-state surface, or explicit discard/recovery option exists. The exact pending bytes and conflict state are closure-local to the default controller created by `AddRoute`, while AppShell persists only form fields. **Assumption:** if a browser/history/hash navigation completes while this dialog is open, the unguarded hash store replaces `AddRoute`, losing the pending bytes; reopening Add then creates a fresh controller and can perform another local write instead of retrying. The code proves the loss after a completed route change, but no browser execution was permitted to establish the hardware-Back behavior for each supported mobile browser.
 - **Impact:** The confirmed path traps a user during a transient failure, contrary to M6-08's non-trapping retry requirement. Under the stated browser-history assumption, it can also turn a recoverable upload failure or conflict into a duplicate financial write.
 - **Recommendation:** Move the save/recovery operation and pending exported snapshot to app-shell or dedicated operation-store ownership, render a persistent pending-sync state outside the sheet, and provide an explicit safe leave/discard/recovery choice. Guard or restore completed hash/history navigation until resolution. Add browser tests for retryable failure and conflict followed by navigation/history traversal, verifying that the original bytes—not a second SQL write—are used.
@@ -173,7 +175,6 @@ Findings that require more than 60 minutes, involving architectural changes, cro
 
 ### Blockers or Risks
 
-- L-01 still leaves retry and conflict recovery modal-trapping and route-lifecycle fragile; resolve it before exposing more end-user recovery controls in M7.
 - M-04 requires an administrator to enable GitHub's full-length SHA pinning policy after the pinned workflow revision is published to the default branch.
 - M7's planned force refresh, safety notice, diagnostics, stale-token, and moved-file recovery are still future scope rather than completed functionality.
 
@@ -185,5 +186,5 @@ Findings that require more than 60 minutes, involving architectural changes, cro
 | --------- | ----- | -------- | ---- | ------ | --- | ----------- | ------ |
 | Small     | 5     | 0        | 2    | 1      | 2   | 0           | 5      |
 | Medium    | 4     | 0        | 1    | 3      | 0   | 0           | 4      |
-| Large     | 1     | 0        | 1    | 0      | 0   | 0           | 0      |
-| **Total** | 10    | 0        | 4    | 4      | 2   | 0           | 9      |
+| Large     | 1     | 0        | 1    | 0      | 0   | 0           | 1      |
+| **Total** | 10    | 0        | 4    | 4      | 2   | 0           | 10     |

@@ -2917,7 +2917,9 @@ test('defers foreground refresh until an active upload completes', async ({ page
     .toBe(metadataCallsBeforeForegroundEvent + 1);
 });
 
-test('handles transient upload failure and allows retry without data loss', async ({ page }) => {
+test('keeps a failed upload retryable after hash navigation without a second local write', async ({
+  page,
+}) => {
   await seedAndBindTestDb(page, {
     uploadErrorSequence: [{ code: 'network_error', message: 'Failed to upload' }],
   });
@@ -2934,21 +2936,27 @@ test('handles transient upload failure and allows retry without data loss', asyn
 
   await expect(page.getByTestId('add-transfer-form-error')).toBeVisible();
   await expect(page.getByTestId('add-transfer-retry')).toBeVisible();
+  await expect(page.getByTestId('add-transfer-close')).toBeEnabled();
   await expect
     .poll(() =>
       page.getByTestId('add-transfer-form').evaluate((form) => form.parentElement?.scrollTop ?? 0),
     )
     .toBeGreaterThan(0);
 
-  await page.getByTestId('add-transfer-retry').click();
+  expect(await getLocalTransferWriteCallCount(page)).toBe(1);
+  await page.evaluate(() => {
+    window.location.hash = '#/transfers';
+  });
+
+  await expect(page.getByTestId('route-transfers')).toBeVisible();
+  await expect(page.getByTestId('pending-transfer-sync')).toBeVisible();
+  await expect(page.getByTestId('pending-transfer-retry')).toBeEnabled();
+
+  await page.getByTestId('pending-transfer-retry').click();
 
   await expect(page.locator('.toast-container')).toContainText('Transfer saved and uploaded.');
-  await expect(page.getByTestId('add-transfer-success-status')).toBeInViewport();
-  await expect
-    .poll(() =>
-      page.getByTestId('add-transfer-form').evaluate((form) => form.parentElement?.scrollTop ?? 0),
-    )
-    .toBe(0);
+  await expect(page.getByTestId('pending-transfer-sync')).not.toBeVisible();
+  expect(await getLocalTransferWriteCallCount(page)).toBe(1);
 });
 
 test('recovers from OneDrive upload conflict by refreshing the DB before resubmitting', async ({
@@ -2996,16 +3004,19 @@ test('recovers from OneDrive upload conflict by refreshing the DB before resubmi
   await expect(page.getByTestId('add-transfer-amount')).toHaveValue('10,00€');
   await expect(await getDbRuntimeCloseCallCount(page)).toBeGreaterThan(initialCloseCount);
 
-  await page.getByTestId('add-transfer-resolve-conflict').click();
+  await expect(page.getByTestId('add-transfer-close')).toBeEnabled();
+  await page.evaluate(() => {
+    window.location.hash = '#/transfers';
+  });
+  await expect(page.getByTestId('pending-transfer-sync')).toBeVisible();
+  await expect(page.getByTestId('pending-transfer-recover')).toBeEnabled();
 
-  await expect(page.getByTestId('add-transfer-conflict-sync-status')).toBeVisible();
-  await expect(
-    page.getByTestId('add-transfer-conflict-sync-status').getByTestId('progress-indicator'),
-  ).toBeVisible();
-  await expect(page.getByTestId('add-transfer-conflict-dialog')).toContainText(
-    'Latest database loaded',
-    { timeout: 10000 },
-  );
+  await page.getByTestId('pending-transfer-recover').click();
+
+  await expect(page.getByTestId('pending-transfer-sync')).not.toBeVisible({ timeout: 10000 });
+  await page.evaluate(() => {
+    window.location.hash = '#/add';
+  });
   await expect(page.getByTestId('add-transfer-submit')).toBeEnabled();
   await expect(page.getByTestId('add-transfer-name')).toHaveValue('Conflict Transfer');
   await expect(page.getByTestId('add-transfer-amount')).toHaveValue('10,00€');

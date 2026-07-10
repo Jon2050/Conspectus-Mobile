@@ -6,6 +6,10 @@ import { formatBuildInfoLabel, getFallbackBuildInfo } from '@shared';
 
 import AppShell from './AppShell.svelte';
 import { APP_ROUTES, type AppRouteKey } from './hashRouting';
+import type {
+  AddTransferSaveController,
+  AddTransferSaveState,
+} from './routes/addTransferSaveController';
 
 const ROUTE_TEST_IDS: Record<AppRouteKey, string> = {
   accounts: 'route-accounts',
@@ -14,6 +18,26 @@ const ROUTE_TEST_IDS: Record<AppRouteKey, string> = {
   settings: 'route-settings',
 };
 const NAV_ICON_BASE_URL = '/';
+
+const UPLOAD_FAILED_SAVE_STATE: AddTransferSaveState = {
+  phase: 'upload_failed',
+  errorMessage: 'Upload failed.',
+  progress: null,
+  recoveryProgress: null,
+  canRetry: true,
+};
+
+const createMockSaveController = (state: AddTransferSaveState): AddTransferSaveController => ({
+  getState: () => state,
+  subscribe: (listener) => {
+    listener(state);
+    return () => {};
+  },
+  submit: async () => ({ validationErrors: [] }),
+  retry: async () => {},
+  resolveConflict: async () => {},
+  reset: () => {},
+});
 
 describe('AppShell component', () => {
   it('renders loading placeholder before route placeholder content', () => {
@@ -61,4 +85,19 @@ describe('AppShell component', () => {
       expect(body).toContain(ROUTE_LABELS[route]);
     },
   );
+
+  it('keeps a failed transfer sync actionable outside the Add Transfer sheet', () => {
+    const { body } = render(AppShell, {
+      props: {
+        routeStore: readable<AppRouteKey>('transfers'),
+        showLoadingPlaceholder: false,
+        addTransferSaveController: createMockSaveController(UPLOAD_FAILED_SAVE_STATE),
+      },
+    });
+
+    expect(body).toContain('data-testid="pending-transfer-sync"');
+    expect(body).toContain('data-testid="pending-transfer-review"');
+    expect(body).toContain('data-testid="pending-transfer-retry"');
+    expect(body).toContain('Transfersynchronisierung benötigt Aufmerksamkeit');
+  });
 });

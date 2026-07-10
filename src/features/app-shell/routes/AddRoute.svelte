@@ -72,7 +72,6 @@
     saveState.phase === 'remote_commit_syncing' ||
     saveState.phase === 'remote_commit_recovered' ||
     saveState.phase === 'remote_commit_recovery_failed';
-  $: saveBlocksFormExit = saveState.canRetry || conflictRecoveryIsRequired;
   $: saveBlocksEditing =
     saveState.canRetry || conflictRecoveryIsRequired || remoteCommitRecoveryIsRequired;
   $: effectiveFormError =
@@ -205,7 +204,7 @@
   });
 
   const handleClose = (): void => {
-    if (saveIsBusy || saveBlocksFormExit) {
+    if (saveIsBusy) {
       return;
     }
 
@@ -266,7 +265,7 @@
 
     <BottomSheet
       {isOpen}
-      canClose={!saveIsBusy && !saveBlocksFormExit}
+      canClose={!saveIsBusy}
       title={$_('addTransfer.title')}
       on:close={handleClose}
     >
@@ -568,7 +567,7 @@
             type="button"
             class="app-button app-button--secondary add-transfer-form__action"
             data-testid="add-transfer-close"
-            disabled={isSubmitting || saveIsBusy || saveBlocksFormExit}
+            disabled={isSubmitting || saveIsBusy}
             on:click={handleClose}
           >
             {$_('addTransfer.close')}
