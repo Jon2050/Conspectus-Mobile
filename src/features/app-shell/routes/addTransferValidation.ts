@@ -2,7 +2,11 @@
 import { PRIMARY_INCOME_ACCOUNT_TYPE_ID, PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID } from '@db';
 
 import { parseAmountInputCents } from './addTransferAmountInput';
-import type { AddTransferAccountOption, AddTransferFormFields } from './addTransferFormState';
+import {
+  isValidIsoDate,
+  type AddTransferAccountOption,
+  type AddTransferFormFields,
+} from './addTransferFormState';
 
 /**
  * Validates the transfer form fields against desktop-equivalent rules.
@@ -15,6 +19,10 @@ export const validateAddTransfer = (
   t: (key: string) => string,
 ): string[] => {
   const errors: string[] = [];
+
+  if (!isValidIsoDate(fields.date)) {
+    errors.push(t('addTransfer.validation.dateInvalid'));
+  }
 
   if (fields.name.trim().length <= 2) {
     errors.push(t('addTransfer.validation.nameLength'));
@@ -32,29 +40,36 @@ export const validateAddTransfer = (
     errors.push(t('addTransfer.validation.toAccountRequired'));
   }
 
-  if (fields.fromAccountId !== null && fields.toAccountId !== null) {
-    const fromAccount = fromAccountOptions.find((a) => a.accountId === fields.fromAccountId);
-    const toAccount = toAccountOptions.find((a) => a.accountId === fields.toAccountId);
+  const fromAccount = fromAccountOptions.find(
+    (account) => account.accountId === fields.fromAccountId,
+  );
+  const toAccount = toAccountOptions.find((account) => account.accountId === fields.toAccountId);
 
-    if (fromAccount && toAccount) {
-      if (fromAccount.accountId === toAccount.accountId) {
-        errors.push(t('addTransfer.validation.differentAccounts'));
-      }
+  if (fields.fromAccountId !== null && fromAccount === undefined) {
+    errors.push(t('addTransfer.validation.fromAccountUnavailable'));
+  }
+  if (fields.toAccountId !== null && toAccount === undefined) {
+    errors.push(t('addTransfer.validation.toAccountUnavailable'));
+  }
 
-      if (fromAccount.accountTypeId === PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID) {
-        errors.push(t('addTransfer.validation.fromNotSpendings'));
-      }
+  if (fromAccount !== undefined && toAccount !== undefined) {
+    if (fromAccount.accountId === toAccount.accountId) {
+      errors.push(t('addTransfer.validation.differentAccounts'));
+    }
 
-      if (toAccount.accountTypeId === PRIMARY_INCOME_ACCOUNT_TYPE_ID) {
-        errors.push(t('addTransfer.validation.toNotIncome'));
-      }
+    if (fromAccount.accountTypeId === PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID) {
+      errors.push(t('addTransfer.validation.fromNotSpendings'));
+    }
 
-      if (
-        fromAccount.accountTypeId === PRIMARY_INCOME_ACCOUNT_TYPE_ID &&
-        toAccount.accountTypeId === PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID
-      ) {
-        errors.push(t('addTransfer.validation.incomeToSpendingsInvalid'));
-      }
+    if (toAccount.accountTypeId === PRIMARY_INCOME_ACCOUNT_TYPE_ID) {
+      errors.push(t('addTransfer.validation.toNotIncome'));
+    }
+
+    if (
+      fromAccount.accountTypeId === PRIMARY_INCOME_ACCOUNT_TYPE_ID &&
+      toAccount.accountTypeId === PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID
+    ) {
+      errors.push(t('addTransfer.validation.incomeToSpendingsInvalid'));
     }
   }
 

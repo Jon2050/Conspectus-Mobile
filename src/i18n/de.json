@@ -82,10 +82,14 @@
       "conflictToast": "OneDrive wurde vor Abschluss des Uploads geändert. Aktualisiere vor einem neuen Versuch."
     },
     "validation": {
+      "dateInvalid": "Bitte gib ein gültiges Datum ein.",
       "nameLength": "Beschreibung muss länger als 2 Zeichen sein.",
       "amountPositive": "Betrag muss größer als 0 sein.",
       "fromAccountRequired": "Bitte wähle ein Quellkonto aus.",
       "toAccountRequired": "Bitte wähle ein Zielkonto aus.",
+      "fromAccountUnavailable": "Das ausgewählte Quellkonto ist nicht mehr verfügbar. Aktualisiere die Datenbank oder wähle ein anderes Konto.",
+      "toAccountUnavailable": "Das ausgewählte Zielkonto ist nicht mehr verfügbar. Aktualisiere die Datenbank oder wähle ein anderes Konto.",
+      "optionsUnavailable": "Die Konten sind nicht verfügbar. Warte, bis das Laden abgeschlossen ist, oder aktualisiere die Datenbank.",
       "differentAccounts": "Quell- und Zielkonto dürfen nicht identisch sein.",
       "fromNotSpendings": "Transfer vom Konto AUSGABEN ist nicht erlaubt.",
       "toNotIncome": "Transfer auf das Konto EINNAHMEN ist nicht erlaubt.",

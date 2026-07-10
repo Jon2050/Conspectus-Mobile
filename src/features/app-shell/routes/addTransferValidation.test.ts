@@ -42,6 +42,17 @@ describe('validateAddTransfer', () => {
     expect(errors).toContain('addTransfer.validation.nameLength');
   });
 
+  it('requires a real ISO calendar date', () => {
+    for (const date of ['', '2024-2-01', '2024-02-30']) {
+      const fields = validFields();
+      fields.date = date;
+
+      expect(validateAddTransfer(fields, fromOptions, toOptions, t)).toContain(
+        'addTransfer.validation.dateInvalid',
+      );
+    }
+  });
+
   it('requires amount > 0', () => {
     const fields = validFields();
     fields.amount = '0,00€';
@@ -72,6 +83,17 @@ describe('validateAddTransfer', () => {
     fields.toAccountId = 10;
     const errors = validateAddTransfer(fields, fromOptions, toOptions, t);
     expect(errors).toContain('addTransfer.validation.differentAccounts');
+  });
+
+  it('requires selected accounts to remain available in their respective option lists', () => {
+    const fields = validFields();
+    fields.fromAccountId = 999;
+    fields.toAccountId = 998;
+
+    const errors = validateAddTransfer(fields, fromOptions, toOptions, t);
+
+    expect(errors).toContain('addTransfer.validation.fromAccountUnavailable');
+    expect(errors).toContain('addTransfer.validation.toAccountUnavailable');
   });
 
   it('prevents sending from PRIMARY_SPENDINGS', () => {

@@ -75,7 +75,7 @@
     optionsState.error?.message ??
     null;
   $: controlsAreDisabled = isSubmitting || isOptionsLoading || saveIsBusy || saveBlocksEditing;
-  $: submitIsDisabled = controlsAreDisabled || isOffline;
+  $: submitIsDisabled = controlsAreDisabled || isOffline || optionsState.operation !== 'ready';
 
   let validationErrors: string[] = [];
   const allowedAmountNavigationKeys = new Set(['Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End']);
@@ -388,6 +388,7 @@
             data-testid="add-transfer-date"
             bind:value={fields.date}
             disabled={controlsAreDisabled}
+            required
           />
         </div>
 

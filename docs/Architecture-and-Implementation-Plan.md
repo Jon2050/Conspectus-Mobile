@@ -629,6 +629,16 @@ M6-01 implementation clarification:
 - The route owns only the UI shell and field state for M6-01: date, name, amount, source account, destination account, three category selectors, optional buyplace, form-level loading/error display, and a sheet-local close action.
 - Account/category option loading, desktop-parity validation, SQL writes, DB export/upload, retry/conflict handling, and offline write blocking remain scoped to the later M6 issues that already track those behaviors.
 
+M6-02 implementation clarification:
+
+- Add Transfer option loading is owned by `src/features/app-shell/routes/addTransferOptionsController.ts`, which maps the typed `@db` account/category query services into separate source, destination, and category option lists for `AddRoute.svelte`.
+- The controller keeps the form in a loading state until the shared browser DB runtime is available, reports query failures without discarding the user's draft, and is covered by `addTransferOptionsController.test.ts` plus route/browser option-rendering tests.
+
+M6-03 implementation clarification:
+
+- Desktop-parity form validation is centralized in `src/features/app-shell/routes/addTransferValidation.ts`; the form-state helpers strictly validate ISO calendar dates before epoch-day conversion, and validation requires currently available source/destination account IDs before any local write begins.
+- `addTransferSaveController.ts` independently rejects non-ready option states so programmatic calls cannot bypass the UI guard; validation and no-write behavior are covered by the validation, form-state, save-controller, and browser tests.
+
 M6-04 implementation clarification:
 
 - The transfer type ID determination logic is decoupled from UI option lists and explicitly mirrors desktop business logic via `accountTypeId` comparison alone.
@@ -653,6 +663,21 @@ M6-07 implementation clarification:
 - The upload handoff reads the current cached eTag for the selected OneDrive file, calls the existing `GraphClient.uploadFile` path with that eTag as the `If-Match` precondition, and refreshes cached DB bytes plus sync metadata with the returned eTag after successful upload.
 - Upload progress is forwarded through both the save/export service callback contract and `SyncStateStore` upload progress updates so later UI work can render determinate upload feedback without adding a second upload path.
 - Precondition conflicts remain a distinct orchestration error (`DatabaseUploadError` with `code: 'conflict'`) and mark sync state stale for the dedicated conflict-recovery UX work in later M6 issues.
+
+M6-08 implementation clarification:
+
+- Upload retry state and determinate progress are coordinated by `src/features/app-shell/routes/addTransferSaveController.ts` and rendered in `AddRoute.svelte` through the shared `ProgressIndicator` and app toast store.
+- Retry reuses the already exported database bytes rather than repeating the local SQL write; controller and Playwright coverage exercise slow upload, ordinary transient failure, retry, and the absence of premature success feedback.
+
+M6-09 implementation clarification:
+
+- Online-only write enforcement is owned by `AddRoute.svelte` and `addTransferSaveController.ts`, which consume the shared network state to show an explicit offline warning and block both submit and retry paths.
+- The controller guard complements disabled controls, while route and Playwright tests cover the warning and no-write behavior when connectivity is unavailable.
+
+M6-10 implementation clarification:
+
+- M6 write-path regression coverage is intentionally layered: unit tests cover field validation and type derivation; sql.js-backed integration tests cover transaction/export behavior; and `tests/e2e/app-shell.spec.ts` covers happy path, blocked validation/offline submissions, slow upload, retry, and conflict journeys.
+- This separation keeps database invariants independently verifiable while ensuring the user-facing route continues to compose the complete save workflow correctly.
 
 M6-11 implementation clarification:
 

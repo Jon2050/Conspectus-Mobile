@@ -1,12 +1,23 @@
+<script context="module" lang="ts">
+  let nextBottomSheetTitleId = 0;
+
+  const createBottomSheetTitleId = (): string => {
+    nextBottomSheetTitleId += 1;
+    return `bottom-sheet-title-${nextBottomSheetTitleId}`;
+  };
+</script>
+
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
   import { fly } from 'svelte/transition';
 
   export let isOpen = false;
   export let title = '';
+  export let ariaLabel = 'Dialog';
   export let canClose = true;
 
   let dialogElement: HTMLDialogElement | null = null;
+  const titleId = createBottomSheetTitleId();
   const dispatch = createEventDispatcher();
 
   const requestClose = () => {
@@ -75,6 +86,8 @@
     bind:this={dialogElement}
     class="bottom-sheet__dialog"
     aria-modal="true"
+    aria-labelledby={title ? titleId : undefined}
+    aria-label={title ? undefined : ariaLabel}
     in:fly={{ y: '100%', duration: 350, opacity: 1, easing: (t) => 1 - Math.pow(1 - t, 4) }}
     out:fly={{ y: '100%', duration: 250 }}
     on:cancel={handleDialogCancel}
@@ -84,7 +97,7 @@
     <div class="bottom-sheet__handle"></div>
     {#if title}
       <header class="bottom-sheet__header">
-        <h3>{title}</h3>
+        <h3 id={titleId}>{title}</h3>
       </header>
     {/if}
 

@@ -82,10 +82,14 @@
       "conflictToast": "OneDrive changed before upload completed. Refresh before trying again."
     },
     "validation": {
+      "dateInvalid": "Enter a valid date.",
       "nameLength": "Description must be longer than 2 characters.",
       "amountPositive": "Amount must be greater than 0.",
       "fromAccountRequired": "Please select a source account.",
       "toAccountRequired": "Please select a destination account.",
+      "fromAccountUnavailable": "The selected source account is no longer available. Refresh or select another account.",
+      "toAccountUnavailable": "The selected destination account is no longer available. Refresh or select another account.",
+      "optionsUnavailable": "Account options are unavailable. Wait for loading to finish or refresh the database.",
       "differentAccounts": "Source and destination accounts must be different.",
       "fromNotSpendings": "Cannot transfer from the PRIMARY SPENDINGS account.",
       "toNotIncome": "Cannot transfer to the PRIMARY INCOME account.",
