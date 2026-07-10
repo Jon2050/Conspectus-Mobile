@@ -1,21 +1,16 @@
 export const REQUIRED_RUNTIME_ENV_KEYS = ['VITE_AZURE_CLIENT_ID'] as const;
-export const OPTIONAL_RUNTIME_ENV_KEYS = [
-  'VITE_DEPLOY_BASE_PATH',
-  'VITE_DEPLOY_PUBLIC_URL',
-] as const;
+export const OPTIONAL_RUNTIME_ENV_KEYS = ['VITE_DEPLOY_BASE_PATH'] as const;
 
 type RequiredRuntimeEnvKey = (typeof REQUIRED_RUNTIME_ENV_KEYS)[number];
 
 export interface RuntimeEnvSource {
   VITE_AZURE_CLIENT_ID?: string;
   VITE_DEPLOY_BASE_PATH?: string;
-  VITE_DEPLOY_PUBLIC_URL?: string;
 }
 
 export interface RuntimeEnv {
   VITE_AZURE_CLIENT_ID: string;
   VITE_DEPLOY_BASE_PATH?: string;
-  VITE_DEPLOY_PUBLIC_URL?: string;
 }
 
 export class RuntimeEnvError extends Error {
@@ -43,11 +38,9 @@ export const loadRuntimeEnv = (source: RuntimeEnvSource = import.meta.env): Runt
   }
 
   const deployBasePath = normalizeEnvValue(source.VITE_DEPLOY_BASE_PATH);
-  const deployPublicUrl = normalizeEnvValue(source.VITE_DEPLOY_PUBLIC_URL);
 
   return {
     VITE_AZURE_CLIENT_ID: azureClientId,
     ...(deployBasePath ? { VITE_DEPLOY_BASE_PATH: deployBasePath } : {}),
-    ...(deployPublicUrl ? { VITE_DEPLOY_PUBLIC_URL: deployPublicUrl } : {}),
   };
 };

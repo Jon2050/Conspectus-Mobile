@@ -253,10 +253,21 @@ type MockCacheStoreOptions = {
 };
 
 type MockDbRuntimeAccountRow = {
-  readonly accountId: number;
+  accountId: number;
+  name: string;
+  amountCents: number;
+  accountTypeId?: number | null;
+};
+
+type MockDbRuntimeTransferRow = {
+  readonly transferId: number;
+  readonly bookingDateEpochDay: number;
   readonly name: string;
   readonly amountCents: number;
-  readonly accountTypeId?: number | null;
+  readonly fromAccountId: number;
+  readonly toAccountId: number;
+  readonly categoryIds: readonly (number | null)[];
+  readonly buyplace: string | null;
 };
 
 type MockDbRuntimeOptions = {
@@ -264,6 +275,7 @@ type MockDbRuntimeOptions = {
   readonly fromAccountOptionRows?: readonly MockDbRuntimeAccountRow[];
   readonly toAccountOptionRows?: readonly MockDbRuntimeAccountRow[];
   readonly categoryRows?: readonly { readonly categoryId: number; readonly name: string }[];
+  readonly transferRows?: readonly MockDbRuntimeTransferRow[];
   readonly failAccountsQuery?: boolean;
   readonly accountsQueryErrorCode?: string;
   readonly accountsQueryErrorMessage?: string;
@@ -724,10 +736,12 @@ const installMockDbRuntime = async (
   options: MockDbRuntimeOptions = {},
 ): Promise<void> => {
   await page.addInitScript((mockOptions: MockDbRuntimeOptions) => {
-    const accountRows = mockOptions.accountRows ?? [];
+    const accountRows = [...(mockOptions.accountRows ?? [])];
     const fromAccountOptionRows = mockOptions.fromAccountOptionRows ?? accountRows;
     const toAccountOptionRows = mockOptions.toAccountOptionRows ?? accountRows;
     const categoryRows = mockOptions.categoryRows ?? [];
+    const transferRows = [...(mockOptions.transferRows ?? [])];
+    let nextTransferId = Math.max(998, ...transferRows.map((transfer) => transfer.transferId)) + 1;
     let isOpen = mockOptions.forceAlwaysOpen ?? false;
     let execCallCount = 0;
     let openCallCount = 0;
@@ -764,6 +778,16 @@ const installMockDbRuntime = async (
         normalizedSql.includes('order by lower(name) asc')
       );
     };
+    const isAllAccountsQuery = (sql: string): boolean => {
+      const normalizedSql = sql.toLowerCase();
+      return (
+        normalizedSql.includes('from account') && normalizedSql.includes('order by account_id asc')
+      );
+    };
+    const isTransfersByMonthQuery = (sql: string): boolean => {
+      const normalizedSql = sql.toLowerCase();
+      return normalizedSql.includes('from transfer') && normalizedSql.includes('where date >= ?');
+    };
     const toAccountQueryResult = (rows: readonly MockDbRuntimeAccountRow[]) => [
       {
         columns: ['account_id', 'name', 'amount', 'ac_type_id'],
@@ -798,7 +822,7 @@ const installMockDbRuntime = async (
         isOpen() {
           return isOpen;
         },
-        exec(sql: string) {
+        exec(sql: string, params: readonly (string | number | null)[] = []) {
           execCallCount += 1;
           (
             window as Window & { __CONSPECTUS_DB_RUNTIME_EXEC_CALL_COUNT__?: number }
@@ -837,6 +861,10 @@ const installMockDbRuntime = async (
             return toAccountQueryResult(accountRows);
           }
 
+          if (isAllAccountsQuery(sql)) {
+            return toAccountQueryResult(accountRows);
+          }
+
           if (isCategoriesQuery(sql)) {
             return [
               {
@@ -846,8 +874,83 @@ const installMockDbRuntime = async (
             ];
           }
 
+          if (isTransfersByMonthQuery(sql)) {
+            const startEpochDay = params[0];
+            const endEpochDay = params[1];
+            return [
+              {
+                columns: [
+                  'transfer_id',
+                  'date',
+                  'name',
+                  'amount',
+                  'from_account',
+                  'to_account',
+                  'category_1_id',
+                  'category_2_id',
+                  'category_3_id',
+                  'buyplace',
+                ],
+                values: transferRows
+                  .filter(
+                    (transfer) =>
+                      typeof startEpochDay === 'number' &&
+                      typeof endEpochDay === 'number' &&
+                      transfer.bookingDateEpochDay >= startEpochDay &&
+                      transfer.bookingDateEpochDay <= endEpochDay,
+                  )
+                  .map((transfer) => [
+                    transfer.transferId,
+                    transfer.bookingDateEpochDay,
+                    transfer.name,
+                    transfer.amountCents,
+                    transfer.fromAccountId,
+                    transfer.toAccountId,
+                    transfer.categoryIds[0] ?? null,
+                    transfer.categoryIds[1] ?? null,
+                    transfer.categoryIds[2] ?? null,
+                    transfer.buyplace,
+                  ]),
+              },
+            ];
+          }
+
+          if (sql.toLowerCase().includes('insert into transfer')) {
+            transferRows.push({
+              transferId: nextTransferId,
+              name: String(params[0]),
+              fromAccountId: Number(params[1]),
+              toAccountId: Number(params[2]),
+              amountCents: Number(params[3]),
+              categoryIds: [
+                params[5] as number | null,
+                params[6] as number | null,
+                params[7] as number | null,
+              ],
+              bookingDateEpochDay: Number(params[8]),
+              buyplace: params[9] as string | null,
+            });
+            return [];
+          }
+
           if (sql.toLowerCase().includes('last_insert_rowid()')) {
-            return [{ columns: ['transfer_id'], values: [[999]] }];
+            return [{ columns: ['transfer_id'], values: [[nextTransferId++]] }];
+          }
+
+          if (sql.toLowerCase().includes('update account set amount = amount - ?')) {
+            const account = accountRows.find((candidate) => candidate.accountId === params[1]);
+            if (account !== undefined) {
+              account.amountCents -= Number(params[0]);
+            }
+            return [];
+          }
+
+          if (sql.toLowerCase().includes('update account set amount = amount + ?')) {
+            const account = accountRows.find((candidate) => candidate.accountId === params[1]);
+            if (account !== undefined) {
+              account.amountCents += Number(params[0]);
+            }
+            return [];
           }
 
           return [];
@@ -2655,6 +2758,10 @@ const seedAndBindTestDb = async (
       toAccountOptionRows: [
         { accountId: 4, name: 'Kreditkarte', amountCents: 0, accountTypeId: 3 },
       ],
+      accountRows: [
+        { accountId: 3, name: 'Girokonto', amountCents: 1000, accountTypeId: 3 },
+        { accountId: 4, name: 'Kreditkarte', amountCents: 0, accountTypeId: 3 },
+      ],
       categoryRows: [{ categoryId: 1, name: 'Lebensmittel' }],
       ...dbRuntimeOptions,
     },
@@ -2689,6 +2796,19 @@ test('saves transfer happy path, transitions through upload states, and updates 
   await expect(page.getByTestId('add-transfer-amount')).toHaveValue('');
   await expect(page.getByTestId('add-transfer-from-account')).toHaveValue('');
   await expect(page.getByTestId('add-transfer-to-account')).toHaveValue('');
+
+  await page.goto(appPath('#/transfers'));
+  await expect(page.getByRole('heading', { name: 'Transfers' })).toBeVisible();
+  await expect(page.getByTestId('transfer-card-999')).toContainText('Happy Path E2E Transfer');
+
+  await page.goto(appPath('#/accounts'));
+  await expect(page.getByRole('heading', { name: 'Accounts' })).toBeVisible();
+  await expect(
+    page.locator('[data-testid^="account-amount-"][data-account-id="3"]'),
+  ).toHaveAttribute('data-amount-cents', '-550');
+  await expect(
+    page.locator('[data-testid^="account-amount-"][data-account-id="4"]'),
+  ).toHaveAttribute('data-amount-cents', '1550');
 });
 
 test('scrolls add transfer validation errors into view after submit', async ({ page }) => {
@@ -2750,6 +2870,13 @@ test('shows determinate upload progress during slow upload', async ({ page }) =>
   await expect(
     page.getByTestId('add-transfer-upload-status').getByTestId('progress-indicator'),
   ).toBeVisible();
+  await expect(
+    page.getByTestId('add-transfer-upload-status').getByTestId('progress-bar'),
+  ).toHaveAttribute('value', '10');
+  await expect(
+    page.getByTestId('add-transfer-upload-status').getByTestId('progress-bar'),
+  ).toHaveAttribute('max', '20');
+  await expect(page.getByTestId('add-transfer-success-status')).toHaveCount(0);
 
   await expect(page.locator('.toast-container')).toContainText('Transfer saved and uploaded.', {
     timeout: 15000,

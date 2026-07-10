@@ -12,7 +12,8 @@ export type DatabaseUploadErrorCode =
   | 'missing_binding'
   | 'missing_cached_snapshot'
   | 'conflict'
-  | 'upload_failed';
+  | 'upload_failed'
+  | 'remote_commit_cache_failed';
 
 export class DatabaseUploadError extends Error {
   readonly code: DatabaseUploadErrorCode;
@@ -41,6 +42,7 @@ type BindingProvider = Readable<DriveItemBinding | null> | (() => DriveItemBindi
 const DEFAULT_UPLOAD_PROGRESS_BRANCH = 'uploading_database';
 const DEFAULT_UPLOAD_CONFLICT_BRANCH = 'upload_conflict';
 const DEFAULT_UPLOAD_FAILED_BRANCH = 'upload_failed';
+const DEFAULT_UPLOAD_CACHE_RECOVERY_BRANCH = 'upload_cache_recovery_required';
 
 const resolveBinding = (provider: BindingProvider): DriveItemBinding | null =>
   typeof provider === 'function' ? provider() : get(provider);
@@ -94,6 +96,8 @@ export const createDatabaseUploadHandoffService = (
 
       syncStateStore.setSyncing(uploadingMessage, { branch: DEFAULT_UPLOAD_PROGRESS_BRANCH });
 
+      let uploadResult: Awaited<ReturnType<GraphClient['uploadFile']>>;
+
       try {
         const currentSnapshot = await cacheStore.readSnapshot(binding);
         if (currentSnapshot === null) {
@@ -103,7 +107,7 @@ export const createDatabaseUploadHandoffService = (
           );
         }
 
-        const uploadResult = await graphClient.uploadFile(
+        uploadResult = await graphClient.uploadFile(
           binding,
           dbBytes,
           currentSnapshot.metadata.eTag,
@@ -112,17 +116,6 @@ export const createDatabaseUploadHandoffService = (
             uploadOptions?.onProgress?.({ loadedBytes, totalBytes });
           },
         );
-
-        await cacheStore.writeSnapshot({
-          binding,
-          metadata: {
-            eTag: uploadResult.eTag,
-            lastSyncAtIso: now().toISOString(),
-          },
-          dbBytes,
-        });
-
-        syncStateStore.setSynced(uploadedMessage, { branch: DEFAULT_UPLOAD_PROGRESS_BRANCH });
       } catch (error) {
         const uploadError = toUploadError(error, conflictMessage, failureMessage);
 
@@ -138,6 +131,29 @@ export const createDatabaseUploadHandoffService = (
         }
 
         throw uploadError;
+      }
+
+      try {
+        await cacheStore.writeSnapshot({
+          binding,
+          metadata: {
+            eTag: uploadResult.eTag,
+            lastSyncAtIso: now().toISOString(),
+          },
+          dbBytes,
+        });
+
+        syncStateStore.setSynced(uploadedMessage, { branch: DEFAULT_UPLOAD_PROGRESS_BRANCH });
+      } catch (error) {
+        const cacheError = new DatabaseUploadError(
+          'remote_commit_cache_failed',
+          'The transfer was saved to OneDrive, but the local database cache could not be refreshed.',
+          error,
+        );
+        syncStateStore.setStale(cacheError.message, {
+          branch: DEFAULT_UPLOAD_CACHE_RECOVERY_BRANCH,
+        });
+        throw cacheError;
       }
     },
   };

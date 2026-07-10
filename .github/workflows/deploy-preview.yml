@@ -168,12 +168,12 @@ jobs:
       PREVIEW_URL: ${{ needs.prepare-context.outputs.preview_url }}
     steps:
       - name: Checkout source commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ needs.prepare-context.outputs.head_sha }}
 
       - name: Download preview dist from Quality
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           name: quality-preview-dist
           path: dist

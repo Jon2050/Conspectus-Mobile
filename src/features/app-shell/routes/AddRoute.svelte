@@ -64,11 +64,17 @@
   $: saveIsBusy =
     saveState.phase === 'local_save' ||
     saveState.phase === 'uploading' ||
-    saveState.phase === 'conflict_syncing';
+    saveState.phase === 'conflict_syncing' ||
+    saveState.phase === 'remote_commit_syncing';
   $: conflictRecoveryIsRequired =
     saveState.phase === 'conflict' || saveState.phase === 'conflict_syncing';
+  $: remoteCommitRecoveryIsRequired =
+    saveState.phase === 'remote_commit_syncing' ||
+    saveState.phase === 'remote_commit_recovered' ||
+    saveState.phase === 'remote_commit_recovery_failed';
   $: saveBlocksFormExit = saveState.canRetry || conflictRecoveryIsRequired;
-  $: saveBlocksEditing = saveState.canRetry || conflictRecoveryIsRequired;
+  $: saveBlocksEditing =
+    saveState.canRetry || conflictRecoveryIsRequired || remoteCommitRecoveryIsRequired;
   $: effectiveFormError =
     formError ??
     (conflictRecoveryIsRequired ? null : saveState.errorMessage) ??
@@ -332,6 +338,28 @@
                   />
                 {/if}
               </div>
+            {/if}
+          </section>
+        {/if}
+
+        {#if remoteCommitRecoveryIsRequired}
+          <section
+            class="add-transfer-form__conflict add-transfer-form__conflict--resolved"
+            role="status"
+            data-testid="add-transfer-remote-commit-status"
+          >
+            <h4>{$_('addTransfer.save.remoteCommitTitle')}</h4>
+            <p>
+              {saveState.phase === 'remote_commit_recovery_failed'
+                ? $_('addTransfer.save.remoteCommitRecoveryFailed')
+                : $_('addTransfer.save.remoteCommitRecovered')}
+            </p>
+            {#if saveState.phase === 'remote_commit_syncing' && saveState.recoveryProgress !== null}
+              <ProgressIndicator
+                kind="download"
+                loaded={saveState.recoveryProgress.loadedBytes}
+                total={saveState.recoveryProgress.totalBytes}
+              />
             {/if}
           </section>
         {/if}

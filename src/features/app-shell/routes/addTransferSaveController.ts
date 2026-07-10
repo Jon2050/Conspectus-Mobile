@@ -32,6 +32,9 @@ export type AddTransferSavePhase =
   | 'local_save'
   | 'uploading'
   | 'upload_failed'
+  | 'remote_commit_syncing'
+  | 'remote_commit_recovered'
+  | 'remote_commit_recovery_failed'
   | 'conflict'
   | 'conflict_syncing'
   | 'conflict_resolved'
@@ -76,10 +79,17 @@ const INITIAL_STATE: AddTransferSaveState = {
 };
 
 const isBusyPhase = (phase: AddTransferSavePhase): boolean =>
-  phase === 'local_save' || phase === 'uploading' || phase === 'conflict_syncing';
+  phase === 'local_save' ||
+  phase === 'uploading' ||
+  phase === 'conflict_syncing' ||
+  phase === 'remote_commit_syncing';
 
 const blocksNewSubmit = (phase: AddTransferSavePhase): boolean =>
-  isBusyPhase(phase) || phase === 'conflict';
+  isBusyPhase(phase) ||
+  phase === 'conflict' ||
+  phase === 'remote_commit_syncing' ||
+  phase === 'remote_commit_recovered' ||
+  phase === 'remote_commit_recovery_failed';
 
 const selectedCategoryIds = (fields: AddTransferFormFields): readonly number[] =>
   [fields.category1Id, fields.category2Id, fields.category3Id].filter(
@@ -122,6 +132,9 @@ const toCreateTransferInput = (
 
 const isRetryableUploadError = (error: TransferUploadPendingError): boolean =>
   error.cause instanceof DatabaseUploadError ? error.cause.code === 'upload_failed' : true;
+
+const isRemoteCommitCacheFailure = (error: TransferUploadPendingError): boolean =>
+  error.cause instanceof DatabaseUploadError && error.cause.code === 'remote_commit_cache_failed';
 
 const toLocalErrorMessage = (error: unknown, fallbackMessage: string): string =>
   error instanceof Error && error.message.trim().length > 0 ? error.message : fallbackMessage;
@@ -185,6 +198,12 @@ export const createAddTransferSaveController = (
   };
 
   const setUploadFailure = (error: TransferUploadPendingError, t: AddTransferTranslator): void => {
+    if (isRemoteCommitCacheFailure(error)) {
+      pendingUpload = null;
+      void recoverRemoteCommit(t);
+      return;
+    }
+
     const canRetry = isRetryableUploadError(error);
     const phase: AddTransferSavePhase = canRetry ? 'upload_failed' : 'conflict';
     const message = canRetry
@@ -208,6 +227,47 @@ export const createAddTransferSaveController = (
       canRetry ? t('addTransfer.save.uploadFailedToast') : t('addTransfer.save.conflictToast'),
       'error',
     );
+  };
+
+  const recoverRemoteCommit = async (t: AddTransferTranslator): Promise<void> => {
+    updateState({
+      phase: 'remote_commit_syncing',
+      errorMessage: null,
+      progress: null,
+      recoveryProgress: null,
+      canRetry: false,
+    });
+
+    try {
+      await conflictRecoveryService.syncLatestDatabase({
+        onProgress: (recoveryProgress) => {
+          updateState({
+            phase: 'remote_commit_syncing',
+            errorMessage: null,
+            progress: null,
+            recoveryProgress,
+            canRetry: false,
+          });
+        },
+      });
+      updateState({
+        phase: 'remote_commit_recovered',
+        errorMessage: null,
+        progress: null,
+        recoveryProgress: null,
+        canRetry: false,
+      });
+      toastStore.show(t('addTransfer.save.remoteCommitRecoveredToast'), 'success');
+    } catch (error) {
+      updateState({
+        phase: 'remote_commit_recovery_failed',
+        errorMessage: toLocalErrorMessage(error, t('addTransfer.save.remoteCommitRecoveryFailed')),
+        progress: null,
+        recoveryProgress: null,
+        canRetry: false,
+      });
+      toastStore.show(t('addTransfer.save.remoteCommitRecoveryFailedToast'), 'error');
+    }
   };
 
   return {

@@ -108,6 +108,7 @@ Findings that require up to 60 minutes of work, potentially touching multiple fi
 
 #### M-01: A successful remote write can be retried as though it failed when cache persistence fails
 
+- **Status:** ✅ Fixed
 - **Severity:** High
 - **Perspective:** Bug Hunting, Architecture Design, Sync/Caching, Testing
 - **Location:** `src/features/app-shell/databaseUploadHandoffService.ts` (lines 80–140); `src/features/app-shell/transferSaveExportService.ts` (lines 78–96); `src/features/app-shell/routes/addTransferSaveController.ts` (lines 187–205, 284–322); `src/features/app-shell/databaseUploadHandoffService.test.ts` (lines 48–205)
@@ -117,6 +118,7 @@ Findings that require up to 60 minutes of work, potentially touching multiple fi
 
 #### M-02: Browser write-path tests do not prove the user-visible mutation or determinate progress
 
+- **Status:** ✅ Fixed
 - **Severity:** Medium
 - **Perspective:** Testing, Feature Completeness, Regression Prevention
 - **Location:** `tests/e2e/app-shell.spec.ts` (lines 806–845, 2632–2659, 2683–2702); `src/features/app-shell/transferSaveExportService.integration.test.ts` (lines 26–171)
@@ -126,6 +128,7 @@ Findings that require up to 60 minutes of work, potentially touching multiple fi
 
 #### M-03: Documented deployment environment variables do not work as described from `.env`
 
+- **Status:** ✅ Fixed
 - **Severity:** Medium
 - **Perspective:** Configuration Management, Documentation, CI/CD
 - **Location:** `.env.example` (lines 5–7); `README.md` (lines 57–60); `vite.config.ts` (lines 30–51); `src/shared/config/runtimeEnv.ts` (lines 1–5, 39–52)
@@ -135,6 +138,7 @@ Findings that require up to 60 minutes of work, potentially touching multiple fi
 
 #### M-04: Mutable GitHub Action tags are allowed in secret-bearing workflows
 
+- **Status:** ✅ Fixed (repository-policy activation is required after these pinned workflows publish)
 - **Severity:** Medium
 - **Perspective:** Security, CI/CD, Supply-Chain Security
 - **Location:** GitHub Actions repository policy (`allowed_actions: all`, `sha_pinning_required: false`); `.github/workflows/quality.yml` (lines 24, 129, 139, 169, 179, 220, 230, 247, 266, 269, 274, 298, 308, 325, 331); `.github/workflows/deploy-preview.yml` (lines 171, 176); `.github/workflows/deploy-production.yml` (lines 40, 110, 156, 202–252)
@@ -169,9 +173,8 @@ Findings that require more than 60 minutes, involving architectural changes, cro
 
 ### Blockers or Risks
 
-- M-01 and L-01 leave financial-write recovery ambiguous or trapping; these should be resolved before exposing more end-user recovery controls in M7.
-- M-02 leaves the M6 immediate-visibility exit criterion unproven in browser coverage.
-- M-03 and M-04 are deployment/release-safety risks that should be addressed before an M7 branch relies on alternate local or production channels.
+- L-01 still leaves retry and conflict recovery modal-trapping and route-lifecycle fragile; resolve it before exposing more end-user recovery controls in M7.
+- M-04 requires an administrator to enable GitHub's full-length SHA pinning policy after the pinned workflow revision is published to the default branch.
 - M7's planned force refresh, safety notice, diagnostics, stale-token, and moved-file recovery are still future scope rather than completed functionality.
 
 ---
@@ -181,6 +184,6 @@ Findings that require more than 60 minutes, involving architectural changes, cro
 | Effort    | Count | Critical | High | Medium | Low | Invalidated | Solved |
 | --------- | ----- | -------- | ---- | ------ | --- | ----------- | ------ |
 | Small     | 5     | 0        | 2    | 1      | 2   | 0           | 5      |
-| Medium    | 4     | 0        | 1    | 3      | 0   | 0           | 0      |
+| Medium    | 4     | 0        | 1    | 3      | 0   | 0           | 4      |
 | Large     | 1     | 0        | 1    | 0      | 0   | 0           | 0      |
-| **Total** | 10    | 0        | 4    | 4      | 2   | 0           | 5      |
+| **Total** | 10    | 0        | 4    | 4      | 2   | 0           | 9      |

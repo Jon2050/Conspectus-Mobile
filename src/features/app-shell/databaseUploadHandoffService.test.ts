@@ -157,6 +157,34 @@ describe('database upload handoff service', () => {
     });
   });
 
+  it('reports a cache recovery requirement after OneDrive accepts the upload', async () => {
+    const graphClient = createGraphClient();
+    const cacheStore = createCacheStore(createSnapshot());
+    vi.mocked(cacheStore.writeSnapshot).mockRejectedValueOnce(
+      new Error('IndexedDB is unavailable.'),
+    );
+    const syncStateStore = createSyncStateStore();
+    const service = createDatabaseUploadHandoffService(
+      graphClient,
+      cacheStore,
+      () => DRIVE_ITEM_BINDING,
+      syncStateStore,
+    );
+
+    await expect(service.uploadExportedDatabase(Uint8Array.from([1, 2, 3]))).rejects.toMatchObject({
+      name: 'DatabaseUploadError',
+      code: 'remote_commit_cache_failed',
+      message:
+        'The transfer was saved to OneDrive, but the local database cache could not be refreshed.',
+    });
+
+    expect(graphClient.uploadFile).toHaveBeenCalledOnce();
+    expect(get(syncStateStore)).toMatchObject({
+      state: 'stale',
+      branch: 'upload_cache_recovery_required',
+    });
+  });
+
   it('fails before upload when no selected binding is available', async () => {
     const graphClient = createGraphClient();
     const cacheStore = createCacheStore(createSnapshot());
