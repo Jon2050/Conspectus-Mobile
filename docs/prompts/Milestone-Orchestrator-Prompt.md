@@ -75,7 +75,7 @@ Instead of reading the entire log file, check its tail or search for specific pa
     2. Calculate the wait duration in seconds.
     3. Append a note to `docs/prompts/milestone_progress.md` indicating that execution is paused for the quota.
     4. Sleep/wait until that time. Execute this by running a terminal sleep command (e.g., `Start-Sleep -Seconds <seconds>` in PowerShell or `sleep <seconds>` in Bash) or scheduling a timer.
-    5. Send an `Enter` input/keypress to the running terminal task to resume execution.
+    5. Send an `Go on.` plus an Enter input/keypress to the running terminal task to resume execution.
 - **Scenario B: 1-Week Quota Exhausted or Fatal Error**
   - **Indicator:** Output log states that the weekly quota is exhausted, or the process terminates with a fatal authorization/quota error.
   - **Action:** Halt the loop immediately. Notify the user of the block and wait for manual intervention.
