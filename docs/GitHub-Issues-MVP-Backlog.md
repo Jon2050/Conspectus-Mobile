@@ -583,11 +583,11 @@ An issue is only considered done when:
 - Depends on: `M3-06, M4-02`
 - GitHub: [#79](https://github.com/Jon2050/Conspectus-Mobile/issues/79)
 
-### :green_circle: M7-06 Implement diagnostics panel with copy action
+### :white_check_mark: M7-06 [Wont Do] Implement diagnostics panel with copy action
 
 - Label: `feature`
 - Milestone: `M7 - Settings + Recovery`
-- Summary: Work includes auth/network/sync/binding diagnostic values and one-tap copy for support text. It also covers no sensitive tokens are exposed.
+- Summary: Work includes auth/network/sync/binding diagnostic values and one-tap copy for support text. It also covers no sensitive tokens are exposed. (Note: Closed as Wont Do by user request)
 - Depends on: `M7-01`
 - GitHub: [#80](https://github.com/Jon2050/Conspectus-Mobile/issues/80)
 
@@ -596,7 +596,7 @@ An issue is only considered done when:
 - Label: `test`
 - Milestone: `M7 - Settings + Recovery`
 - Summary: Work includes expired token recovery and missing file recovery/rebind path. It also covers reset and force refresh actions.
-- Depends on: `M7-04, M7-05, M7-06`
+- Depends on: `M7-04, M7-05`
 - GitHub: [#81](https://github.com/Jon2050/Conspectus-Mobile/issues/81)
 
 ### :green_circle: M8-01 Implement CSP and security headers for PWA path

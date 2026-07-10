@@ -1,4 +1,4 @@
-Task: Implement the issue `{{ISSUE_KEY}}` end-to-end with full verification.
+Task: Implement the issue `M7-01` end-to-end with full verification.
 
 ## Non-negotiable rules:
 
@@ -22,7 +22,7 @@ Always print in which step you are!
    - `docs/Architecture-and-Implementation-Plan.md`
    - `docs/Conspectus-Desktop-Info.md`
    - `docs/GitHub-Issues-MVP-Backlog.md`
-     Then locate `{{ISSUE_KEY}}` and extract implementation steps, acceptance criteria, and dependencies/constraints from GitHub. Also from the comments on GitHub.
+     Then locate `M7-01` and extract implementation steps, acceptance criteria, and dependencies/constraints from GitHub. Also from the comments on GitHub.
 2. Plan with one planning subagent. Refine until concrete, testable, and mapped from each acceptance criterion to file-level code/test changes. Make clear, that the planning subagent should not write any code, just the plan.
 3. Create/use a dedicated issue branch with a proper name containing the milestone and issue number (e.g., `feature/M6-03-localize-formatting` or `bug/M6-03-fix-locale`).
    3.1. Increase the app version in `package.json` to `0.<milestone_number>.<issue_title_number>`. (e.g. `0.6.03` for issue `M6-03`)
@@ -44,7 +44,7 @@ Always print in which step you are!
    - Commit and push.
 8. CI gate: wait for required GitHub checks to pass. If any check fails, fix and repeat from step 4.
 9. Completion (Note: If the PR merge is delayed/asynchronous and your turn ends, the very first step upon resuming or in any follow-up task after the merge is to complete this checklist):
-   - Merge the PR to `main` (or verify it has been merged), then delete the head branch.
+   - Merge the PR to `main` (or verify it has been merged), then delete the remote head branch. Checkout and pull the latest `main` branch locally and delete the local head branch.
    - Mark the issue as done in GitHub. Also add a brief comment with a summary of what you did and why. Also mention if you made any assumptions or any problems you encountered. Comment must be well formatted.
    - Verify that `docs/GitHub-Issues-MVP-Backlog.md` status marker is updated to done (`:white_check_mark:`) on the merged `main` branch.
    - Update docs/Architecture-and-Implementation-Plan.md: Append something or modify ONLY the specific section relevant to this issue to reflect implementation realities if something changed, got redefined or became clearer during this task. STRICTLY FORBIDDEN: Do not reformat, summarize, or alter any unrelated parts of this document.
