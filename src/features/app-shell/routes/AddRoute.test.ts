@@ -86,6 +86,7 @@ describe('AddRoute component', () => {
     expect(body).toContain('data-testid="add-transfer-date"');
     expect(body).toContain('type="date"');
     expect(body).toMatch(/id="add-transfer-date"[^>]*class="[^"]*app-input/);
+    expect(body).toMatch(/id="add-transfer-date"[^>]*required/);
   });
 
   it('renders the name field with app-input class', () => {
@@ -469,7 +470,7 @@ describe('AddRoute component', () => {
     expect(body).toMatch(/data-testid="add-transfer-submit"[^>]*disabled/);
   });
 
-  it('renders option loading errors without disabling editing', () => {
+  it('renders option loading errors without disabling editing or enabling submit', () => {
     const { body } = renderAddRoute({
       controller: createMockOptionsController({
         ...READY_OPTIONS_STATE,
@@ -480,7 +481,8 @@ describe('AddRoute component', () => {
 
     expect(body).toContain('data-testid="add-transfer-form-error"');
     expect(body).toContain('Failed to load options.');
-    expect(body).not.toMatch(/data-testid="add-transfer-submit"[^>]*disabled/);
+    expect(body).toMatch(/data-testid="add-transfer-submit"[^>]*disabled/);
+    expect(body).not.toMatch(/data-testid="add-transfer-name"[^>]*disabled/);
   });
 
   it('renders validation error messages when validation fails on submit', async () => {

@@ -42,14 +42,23 @@ export const getTodayIsoDate = (): string => {
   return `${year}-${month}-${day}`;
 };
 
-/** Converts an ISO date string (YYYY-MM-DD) to an epoch day number. */
+/** Returns whether a string is a real ISO calendar date in YYYY-MM-DD form. */
+export const isValidIsoDate = (isoDate: string): boolean => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) {
+    return false;
+  }
+
+  const date = new Date(`${isoDate}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === isoDate;
+};
+
+/** Converts a validated ISO date string (YYYY-MM-DD) to an epoch day number. */
 export const isoDateToEpochDay = (isoDate: string): number => {
-  const utcMs = Date.UTC(
-    Number(isoDate.slice(0, 4)),
-    Number(isoDate.slice(5, 7)) - 1,
-    Number(isoDate.slice(8, 10)),
-  );
-  return Math.floor(utcMs / MILLIS_PER_DAY);
+  if (!isValidIsoDate(isoDate)) {
+    throw new RangeError('A valid ISO calendar date is required.');
+  }
+
+  return Math.floor(Date.parse(`${isoDate}T00:00:00.000Z`) / MILLIS_PER_DAY);
 };
 
 /** Creates a fresh set of form field values defaulting to today's date. */

@@ -238,6 +238,10 @@ export const createAddTransferSaveController = (
         return { validationErrors: [] };
       }
 
+      if (optionsState.operation !== 'ready') {
+        return { validationErrors: [t('addTransfer.validation.optionsUnavailable')] };
+      }
+
       const validationErrors = validateAddTransfer(
         fields,
         optionsState.fromAccountOptions,

@@ -732,6 +732,7 @@ const installMockDbRuntime = async (
     let execCallCount = 0;
     let openCallCount = 0;
     let closeCallCount = 0;
+    let localTransferWriteCallCount = 0;
     const isAccountsQuery = (sql: string): boolean => {
       const normalizedSql = sql.toLowerCase();
       return (
@@ -810,6 +811,13 @@ const installMockDbRuntime = async (
             };
           }
 
+          if (sql.toLowerCase().includes('begin immediate transaction')) {
+            localTransferWriteCallCount += 1;
+            (
+              window as Window & { __CONSPECTUS_LOCAL_TRANSFER_WRITE_CALL_COUNT__?: number }
+            ).__CONSPECTUS_LOCAL_TRANSFER_WRITE_CALL_COUNT__ = localTransferWriteCallCount;
+          }
+
           if (isAddTransferFromOptionsQuery(sql)) {
             return toAccountQueryResult(fromAccountOptionRows);
           }
@@ -869,6 +877,9 @@ const installMockDbRuntime = async (
     (
       window as Window & { __CONSPECTUS_DB_RUNTIME_CLOSE_CALL_COUNT__?: number }
     ).__CONSPECTUS_DB_RUNTIME_CLOSE_CALL_COUNT__ = closeCallCount;
+    (
+      window as Window & { __CONSPECTUS_LOCAL_TRANSFER_WRITE_CALL_COUNT__?: number }
+    ).__CONSPECTUS_LOCAL_TRANSFER_WRITE_CALL_COUNT__ = localTransferWriteCallCount;
   }, options);
 };
 
@@ -964,6 +975,28 @@ const getGraphDownloadCallCount = async (page: import('@playwright/test').Page):
         __CONSPECTUS_GRAPH_DOWNLOAD_FILE_CALL_COUNT__?: unknown;
       }
     ).__CONSPECTUS_GRAPH_DOWNLOAD_FILE_CALL_COUNT__;
+    return typeof value === 'number' ? value : 0;
+  });
+
+const getGraphUploadCallCount = async (page: import('@playwright/test').Page): Promise<number> =>
+  page.evaluate(() => {
+    const value = (
+      window as Window & {
+        __CONSPECTUS_GRAPH_UPLOAD_FILE_CALL_COUNT__?: unknown;
+      }
+    ).__CONSPECTUS_GRAPH_UPLOAD_FILE_CALL_COUNT__;
+    return typeof value === 'number' ? value : 0;
+  });
+
+const getLocalTransferWriteCallCount = async (
+  page: import('@playwright/test').Page,
+): Promise<number> =>
+  page.evaluate(() => {
+    const value = (
+      window as Window & {
+        __CONSPECTUS_LOCAL_TRANSFER_WRITE_CALL_COUNT__?: unknown;
+      }
+    ).__CONSPECTUS_LOCAL_TRANSFER_WRITE_CALL_COUNT__;
     return typeof value === 'number' ? value : 0;
   });
 
@@ -2678,6 +2711,28 @@ test('scrolls add transfer validation errors into view after submit', async ({ p
       page.getByTestId('add-transfer-form').evaluate((form) => form.parentElement?.scrollTop ?? 0),
     )
     .toBe(0);
+});
+
+test('blocks a cleared transfer date before any local write or upload', async ({ page }) => {
+  await seedAndBindTestDb(page);
+  await page.goto(appPath('#/add'));
+  await expect(page.getByTestId('add-transfer-date')).toBeVisible();
+
+  await page.getByTestId('add-transfer-date').fill('');
+  await page.getByTestId('add-transfer-name').fill('Valid transfer');
+  await page.getByTestId('add-transfer-amount').pressSequentially('100');
+  await page.getByTestId('add-transfer-from-account').selectOption({ label: 'Girokonto' });
+  await page.getByTestId('add-transfer-to-account').selectOption({ label: 'Kreditkarte' });
+
+  await page.getByTestId('add-transfer-submit').click();
+
+  expect(
+    await page
+      .getByTestId('add-transfer-date')
+      .evaluate((input) => (input as HTMLInputElement).validity.valueMissing),
+  ).toBe(true);
+  expect(await getLocalTransferWriteCallCount(page)).toBe(0);
+  expect(await getGraphUploadCallCount(page)).toBe(0);
 });
 
 test('shows determinate upload progress during slow upload', async ({ page }) => {

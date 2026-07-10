@@ -96,6 +96,54 @@ describe('addTransferSaveController', () => {
     expect(toastStore.show).not.toHaveBeenCalled();
   });
 
+  it('blocks empty or malformed dates before local save begins', async () => {
+    const saveService = createSaveService();
+    const controller = createAddTransferSaveController(
+      saveService,
+      { show: vi.fn() },
+      createConflictRecoveryService(),
+    );
+    const states = collectStates(controller);
+
+    for (const date of ['', '2024-02-30']) {
+      const result = await controller.submit({ ...createValidFields(), date }, READY_OPTIONS, t);
+      expect(result.validationErrors).toContain('addTransfer.validation.dateInvalid');
+    }
+
+    expect(saveService.createTransferAndExport).not.toHaveBeenCalled();
+    expect(states.map((state) => state.phase)).toEqual(['idle']);
+  });
+
+  it('blocks stale account selections and unavailable option states before local save begins', async () => {
+    const saveService = createSaveService();
+    const controller = createAddTransferSaveController(
+      saveService,
+      { show: vi.fn() },
+      createConflictRecoveryService(),
+    );
+    const states = collectStates(controller);
+
+    const staleAccountResult = await controller.submit(
+      { ...createValidFields(), fromAccountId: 999 },
+      READY_OPTIONS,
+      t,
+    );
+    const optionsErrorResult = await controller.submit(
+      createValidFields(),
+      { ...READY_OPTIONS, operation: 'error' },
+      t,
+    );
+
+    expect(staleAccountResult.validationErrors).toContain(
+      'addTransfer.validation.fromAccountUnavailable',
+    );
+    expect(optionsErrorResult.validationErrors).toEqual([
+      'addTransfer.validation.optionsUnavailable',
+    ]);
+    expect(saveService.createTransferAndExport).not.toHaveBeenCalled();
+    expect(states.map((state) => state.phase)).toEqual(['idle']);
+  });
+
   it('maps validated fields into a transfer input and reports success after upload resolves', async () => {
     const saveService = createSaveService();
     const toastStore = { show: vi.fn() };

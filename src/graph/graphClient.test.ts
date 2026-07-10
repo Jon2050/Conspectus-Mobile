@@ -284,7 +284,7 @@ describe('createGraphClient', () => {
     expect(parsedUrl.origin).toBe('https://graph.microsoft.com');
     expect(parsedUrl.pathname).toBe('/v1.0/drives/drive-123/items/item-456');
     expect(parsedUrl.searchParams.get('$select')).toBe(
-      'eTag,size,lastModifiedDateTime,content.downloadUrl',
+      'eTag,size,lastModifiedDateTime,@microsoft.graph.downloadUrl',
     );
 
     const requestHeaders = getRequestHeaders(getFetchCall(fetchFn));

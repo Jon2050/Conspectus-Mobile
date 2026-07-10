@@ -13,7 +13,7 @@ import type {
 
 const GRAPH_API_BASE_URL = 'https://graph.microsoft.com/v1.0';
 const CHILDREN_FIELDS = 'id,name,parentReference,file,folder';
-const METADATA_FIELDS = 'eTag,size,lastModifiedDateTime,content.downloadUrl';
+const METADATA_FIELDS = 'eTag,size,lastModifiedDateTime,@microsoft.graph.downloadUrl';
 
 type FetchFn = (input: string, init?: RequestInit) => Promise<Response>;
 

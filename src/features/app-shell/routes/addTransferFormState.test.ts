@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   createInitialFormFields,
   getTodayIsoDate,
+  isValidIsoDate,
   isoDateToEpochDay,
   NO_CATEGORY_SELECTED,
 } from './addTransferFormState';
@@ -53,6 +54,13 @@ describe('addTransferFormState', () => {
       const expectedEpochDay = Math.floor(expectedMs / (24 * 60 * 60 * 1000));
 
       expect(result).toBe(expectedEpochDay);
+    });
+
+    it('rejects empty, malformed, and impossible calendar dates', () => {
+      for (const isoDate of ['', '2024-2-01', '2024-02-30']) {
+        expect(isValidIsoDate(isoDate)).toBe(false);
+        expect(() => isoDateToEpochDay(isoDate)).toThrow(RangeError);
+      }
     });
   });
 
