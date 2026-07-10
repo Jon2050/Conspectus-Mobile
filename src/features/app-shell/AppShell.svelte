@@ -497,7 +497,7 @@
           canOpenPanel={addTransferDatabaseIsReady}
         />
       {:else}
-        <SettingsRoute />
+        <SettingsRoute {syncStateStore} />
       {/if}
     </div>
   </main>

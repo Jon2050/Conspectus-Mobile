@@ -162,6 +162,22 @@
     "generalActions": {
       "signOut": "Abmelden",
       "signIn": "Mit Microsoft anmelden"
+    },
+    "sync": {
+      "lastSync": "Letzte Synchronisierung",
+      "never": "Noch nicht synchronisiert",
+      "unknown": "Unbekannt"
+    },
+    "actions": {
+      "standard": "Datenbankaktionen",
+      "destructive": "Destruktive Aktionen",
+      "account": "Kontoaktionen"
+    },
+    "build": {
+      "heading": "Build-Informationen",
+      "version": "Version",
+      "builtReleased": "Erstellt / veröffentlicht",
+      "unknown": "Unbekannt"
     }
   },
   "deploymentInfo": {

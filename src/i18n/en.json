@@ -162,6 +162,22 @@
     "generalActions": {
       "signOut": "Sign out",
       "signIn": "Sign in with Microsoft"
+    },
+    "sync": {
+      "lastSync": "Last sync",
+      "never": "Not synced yet",
+      "unknown": "Unknown"
+    },
+    "actions": {
+      "standard": "Database actions",
+      "destructive": "Destructive actions",
+      "account": "Account actions"
+    },
+    "build": {
+      "heading": "Build information",
+      "version": "Version",
+      "builtReleased": "Built / released",
+      "unknown": "Unknown"
     }
   },
   "deploymentInfo": {

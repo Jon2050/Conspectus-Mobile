@@ -3,9 +3,15 @@
   import { onDestroy, onMount } from 'svelte';
   import { get } from 'svelte/store';
   import type { AuthClient } from '@auth';
-  import type { CacheStore } from '@cache';
   import type { GraphClient, GraphDriveItem } from '@graph';
-  import { appSelectedDriveItemBindingStore } from '@shared';
+  import {
+    appSelectedDriveItemBindingStore,
+    appSyncStateStore,
+    getFallbackBuildInfo,
+    loadBuildInfo,
+    type BuildInfo,
+    type SyncStateStore,
+  } from '@shared';
   import { _ } from 'svelte-i18n';
 
   import {
@@ -23,12 +29,14 @@
     type SettingsLocalDataResetState,
   } from './settingsLocalDataController';
   import { resolveSettingsAuthClient } from './settingsAuthClientResolver';
-  import { resolveSettingsCacheStore } from './settingsCacheStoreResolver';
+  import { resolveSettingsCacheStore, type SettingsCacheStore } from './settingsCacheStoreResolver';
   import { resolveSettingsGraphClient } from './settingsGraphClientResolver';
+  import { formatSettingsTimestampUtc } from './settingsInformation';
 
   export let authClient: AuthClient = resolveSettingsAuthClient();
-  export let cacheStore: Pick<CacheStore, 'clearAll'> = resolveSettingsCacheStore();
+  export let cacheStore: SettingsCacheStore = resolveSettingsCacheStore();
   export let graphClient: GraphClient = resolveSettingsGraphClient();
+  export let syncStateStore: SyncStateStore = appSyncStateStore;
 
   let state: SettingsAuthState = {
     session: {
@@ -56,6 +64,10 @@
     error: null,
   };
   let localDataResetDialogElement: HTMLDialogElement | null = null;
+  let lastSyncAtIso: string | null = null;
+  let syncMetadataRequestId = 0;
+  let loadedSyncMetadataBindingKey: string | null = null;
+  let buildInfo: BuildInfo = getFallbackBuildInfo();
 
   const buildStatusMessage = (nextState: SettingsAuthState): string => {
     if (nextState.operation !== 'idle') {
@@ -208,6 +220,47 @@
     return `${parentPath.endsWith('/') ? parentPath : parentPath + '/'}${name}`;
   };
 
+  const loadLastSyncMetadata = async (
+    isAuthenticated: boolean,
+    binding: SettingsFileBindingState['selectedBinding'],
+  ): Promise<void> => {
+    if (!isAuthenticated || binding === null) {
+      loadedSyncMetadataBindingKey = null;
+      syncMetadataRequestId += 1;
+      lastSyncAtIso = null;
+      return;
+    }
+
+    const bindingKey = `${binding.driveId}:${binding.itemId}`;
+    if (bindingKey === loadedSyncMetadataBindingKey) {
+      return;
+    }
+
+    loadedSyncMetadataBindingKey = bindingKey;
+    const requestId = ++syncMetadataRequestId;
+    try {
+      const snapshot = await cacheStore.readSnapshot(binding);
+      if (requestId === syncMetadataRequestId) {
+        lastSyncAtIso = snapshot?.metadata.lastSyncAtIso ?? null;
+      }
+    } catch {
+      if (requestId === syncMetadataRequestId) {
+        lastSyncAtIso = null;
+      }
+    }
+  };
+
+  $: void loadLastSyncMetadata(state.session.isAuthenticated, bindingState.selectedBinding);
+
+  const unsubscribeSyncState = syncStateStore.subscribe((syncState) => {
+    if (syncState.state !== 'synced') {
+      return;
+    }
+
+    loadedSyncMetadataBindingKey = null;
+    void loadLastSyncMetadata(state.session.isAuthenticated, bindingState.selectedBinding);
+  });
+
   $: if (localDataResetDialogElement !== null) {
     if (localDataResetState.operation === 'idle') {
       if (localDataResetDialogElement.open) {
@@ -220,12 +273,16 @@
 
   onMount(() => {
     void authController.initialize();
+    void loadBuildInfo().then((loadedBuildInfo) => {
+      buildInfo = loadedBuildInfo;
+    });
   });
 
   onDestroy(() => {
     unsubscribe();
     unsubscribeFileBinding();
     unsubscribeLocalDataReset();
+    unsubscribeSyncState();
   });
 </script>
 
@@ -271,7 +328,8 @@
       </p>
     {/if}
 
-    <div class="settings-screen__actions">
+    <h4 class="settings-screen__action-heading">{$_('settings.actions.standard')}</h4>
+    <div class="settings-screen__actions" data-testid="standard-settings-actions">
       <button
         class="app-button app-button--primary"
         type="button"
@@ -309,7 +367,10 @@
       {/if}
     </div>
 
-    <div class="settings-screen__actions">
+    <h4 class="settings-screen__action-heading settings-screen__action-heading--danger">
+      {$_('settings.actions.destructive')}
+    </h4>
+    <div class="settings-screen__actions" data-testid="destructive-settings-actions">
       <button
         class="app-button app-button--danger"
         type="button"
@@ -373,6 +434,14 @@
         <div>
           <dt>{$_('settings.db.summary.dbFile')}</dt>
           <dd>{resolveDbFilePath(bindingState.selectedBinding)}</dd>
+        </div>
+        <div>
+          <dt>{$_('settings.sync.lastSync')}</dt>
+          <dd data-testid="settings-last-sync">
+            {lastSyncAtIso === null
+              ? $_('settings.sync.never')
+              : formatSettingsTimestampUtc(lastSyncAtIso) || $_('settings.sync.unknown')}
+          </dd>
         </div>
       </dl>
     {/if}
@@ -447,7 +516,8 @@
     {/if}
   {/if}
 
-  <div class="settings-screen__actions">
+  <h3 class="settings-screen__subheading">{$_('settings.actions.account')}</h3>
+  <div class="settings-screen__actions" data-testid="account-settings-actions">
     {#if state.session.isAuthenticated}
       <button
         class="app-button app-button--secondary"
@@ -468,6 +538,22 @@
       </button>
     {/if}
   </div>
+
+  <section class="settings-screen__information" data-testid="settings-build-information">
+    <h3 class="settings-screen__subheading">{$_('settings.build.heading')}</h3>
+    <dl class="settings-screen__information-list">
+      <div>
+        <dt>{$_('settings.build.version')}</dt>
+        <dd data-testid="settings-build-version">{buildInfo.version}</dd>
+      </div>
+      <div>
+        <dt>{$_('settings.build.builtReleased')}</dt>
+        <dd data-testid="settings-build-time">
+          {formatSettingsTimestampUtc(buildInfo.buildTimeUtc) || $_('settings.build.unknown')}
+        </dd>
+      </div>
+    </dl>
+  </section>
 </section>
 
 <style>
@@ -513,15 +599,27 @@
     font-size: 0.98rem;
   }
 
+  .settings-screen__action-heading {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+  }
+
+  .settings-screen__action-heading--danger {
+    color: var(--settings-error-color);
+  }
+
   .settings-screen__account-summary,
-  .settings-screen__binding-summary {
+  .settings-screen__binding-summary,
+  .settings-screen__information-list {
     margin: 0;
     display: grid;
     gap: 0.55rem;
   }
 
   .settings-screen__account-summary div,
-  .settings-screen__binding-summary div {
+  .settings-screen__binding-summary div,
+  .settings-screen__information-list div {
     display: grid;
     gap: 0.2rem;
     padding: 0.85rem;
@@ -532,18 +630,26 @@
   }
 
   .settings-screen__account-summary dt,
-  .settings-screen__binding-summary dt {
+  .settings-screen__binding-summary dt,
+  .settings-screen__information-list dt {
     margin: 0;
     font-size: 0.8rem;
     color: var(--text-secondary);
   }
 
   .settings-screen__account-summary dd,
-  .settings-screen__binding-summary dd {
+  .settings-screen__binding-summary dd,
+  .settings-screen__information-list dd {
     margin: 0;
     font-size: 0.95rem;
     color: var(--text-primary);
     word-break: break-word;
+  }
+
+  .settings-screen__information {
+    display: grid;
+    gap: 0.55rem;
+    margin-top: 0.4rem;
   }
 
   .settings-screen__actions {

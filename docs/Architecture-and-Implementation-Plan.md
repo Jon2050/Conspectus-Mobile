@@ -718,6 +718,13 @@ Substeps:
    - force refresh from OneDrive
 3. Safety notice card:
    - "Do not use mobile app while desktop app is open"
+
+M7-01 implementation clarification:
+
+- `src/features/app-shell/routes/SettingsRoute.svelte` groups account, database, destructive, and build information while preserving the existing rebind and reset flows.
+- Bound-file details come from the persisted binding, and the last-sync timestamp comes from the cached snapshot metadata. Settings refreshes that metadata when the shared sync state reaches `synced` so a completed download is reflected without polling.
+- The dedicated Settings build section reuses the build-time version and deployment timestamp resolution in `src/shared/config/buildInfo.ts`; its injected bundle metadata remains available offline.
+
 4. Error recovery UX:
    - re-login flow
    - stale token handling
