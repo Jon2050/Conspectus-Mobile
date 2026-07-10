@@ -4,6 +4,8 @@ You are a senior orchestration agent responsible for sequentially processing and
 
 Your goal is to automate the end-to-end execution of these tasks using the `codex` tool in `--yolo` mode, handle quota/rate-limiting events gracefully, and verify successful completion of each issue before moving to the next.
 
+The overall meta task is to fully implement the whole milestone M7 - Settings + Recovery, that means all its issues.
+
 ---
 
 ## 1. Initial Setup & State Tracking
@@ -27,7 +29,7 @@ To prevent loss of context over long-running processes (especially during rate-l
    - [Timestamp] Orchestration started.
    ```
 
-4. **Update Statuses:** As you progress, mark completed issues with `[x]` in the progress file and append updates to the execution log.
+4. **Update Statuses:** As you progress, mark completed issues with `[x]` in the progress file and append updates to the execution log. Also always print in this chat what is currently running.
 
 ---
 
