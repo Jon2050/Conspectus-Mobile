@@ -10,6 +10,7 @@ interface MemoryStorageLike {
 }
 
 const closeAppCacheStoreConnections = vi.fn();
+const appCacheStoreReadSnapshot = vi.fn();
 
 const createMemoryStorage = (initialValues: Record<string, string>): MemoryStorageLike => {
   const values = new Map(Object.entries(initialValues));
@@ -35,6 +36,7 @@ describe('settings cache store resolver', () => {
     vi.unstubAllGlobals();
     vi.clearAllMocks();
     vi.doMock('@cache', () => ({
+      appCacheStore: { readSnapshot: appCacheStoreReadSnapshot },
       closeAppCacheStoreConnections,
     }));
   });
@@ -45,16 +47,34 @@ describe('settings cache store resolver', () => {
 
   it('uses localhost test override cache store when available', async () => {
     const overrideClearAll = vi.fn(async () => {});
+    const overrideReadSnapshot = vi.fn(async () => null);
     vi.stubGlobal('window', {
       location: { hostname: '127.0.0.1' },
-      __CONSPECTUS_CACHE_STORE__: { clearAll: overrideClearAll },
+      __CONSPECTUS_CACHE_STORE__: {
+        clearAll: overrideClearAll,
+        readSnapshot: overrideReadSnapshot,
+      },
     });
 
     const { resolveSettingsCacheStore } = await import('./settingsCacheStoreResolver');
+    const binding = { driveId: 'drive', itemId: 'item', name: 'budget.db', parentPath: '/' };
+    await resolveSettingsCacheStore().readSnapshot(binding);
     await resolveSettingsCacheStore().clearAll();
 
+    expect(overrideReadSnapshot).toHaveBeenCalledWith(binding);
     expect(overrideClearAll).toHaveBeenCalledTimes(1);
     expect(closeAppCacheStoreConnections).not.toHaveBeenCalled();
+  });
+
+  it('reads Settings sync metadata from the app cache store by default', async () => {
+    vi.stubGlobal('window', { location: { hostname: 'jon2050.de' } });
+    const binding = { driveId: 'drive', itemId: 'item', name: 'budget.db', parentPath: '/' };
+    appCacheStoreReadSnapshot.mockResolvedValue(null);
+
+    const { resolveSettingsCacheStore } = await import('./settingsCacheStoreResolver');
+    await resolveSettingsCacheStore().readSnapshot(binding);
+
+    expect(appCacheStoreReadSnapshot).toHaveBeenCalledWith(binding);
   });
 
   it('clears app-owned storage, CacheStorage, and IndexedDB entries by default', async () => {

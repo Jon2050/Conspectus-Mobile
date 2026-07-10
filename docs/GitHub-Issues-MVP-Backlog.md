@@ -543,7 +543,7 @@ An issue is only considered done when:
 - Depends on: `M6-01, M6-08, M6-11`
 - GitHub: [#194](https://github.com/Jon2050/Conspectus-Mobile/issues/194)
 
-### :green_circle: M7-01 Build Settings screen sections
+### :white_check_mark: M7-01 Build Settings screen sections
 
 - Label: `feature`
 - Milestone: `M7 - Settings + Recovery`

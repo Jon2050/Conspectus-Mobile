@@ -3,6 +3,18 @@ import { describe, expect, it } from 'vitest';
 import settingsRouteSource from './SettingsRoute.svelte?raw';
 
 describe('SettingsRoute styling', () => {
+  it('renders dedicated metadata and risk-grouped action sections', () => {
+    expect(settingsRouteSource).toContain('data-testid="settings-last-sync"');
+    expect(settingsRouteSource).toContain('data-testid="standard-settings-actions"');
+    expect(settingsRouteSource).toContain('data-testid="destructive-settings-actions"');
+    expect(settingsRouteSource).toContain('data-testid="settings-build-information"');
+    expect(settingsRouteSource).toContain('data-testid="settings-build-version"');
+    expect(settingsRouteSource).toContain('data-testid="settings-build-time"');
+    expect(settingsRouteSource.indexOf('settings-build-information')).toBeGreaterThan(
+      settingsRouteSource.indexOf('destructive-settings-actions'),
+    );
+  });
+
   it('uses theme-aware custom properties for destructive settings surfaces', () => {
     expect(settingsRouteSource).toContain('--settings-error-color:');
     expect(settingsRouteSource).toContain('--settings-error-surface:');

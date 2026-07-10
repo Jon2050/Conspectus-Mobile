@@ -681,6 +681,9 @@ const installMockCacheStore = async (
         };
         dbBytes: Uint8Array;
       }) {
+        (
+          window as Window & { __CONSPECTUS_LAST_WRITTEN_SYNC_AT__?: string }
+        ).__CONSPECTUS_LAST_WRITTEN_SYNC_AT__ = snapshot.metadata.lastSyncAtIso;
         storedSnapshots.set(toBindingKey(snapshot.binding), {
           binding: { ...snapshot.binding },
           metadata: { ...snapshot.metadata },
@@ -2058,14 +2061,31 @@ test('triggers a fresh sync after a successful DB file selection', async ({ page
   await page.goto(appPath('#/settings'));
 
   await expect(page.getByText('Cached DB is current with OneDrive.').first()).toBeVisible();
+  const initialLastSync = await page.getByTestId('settings-last-sync').textContent();
+  expect(initialLastSync).toContain('2026');
 
   await page.getByRole('button', { name: 'Change DB file' }).click();
   await page.getByTestId('select-file-file-root-db').click();
 
   await expect(page.getByTestId('binding-status-message')).toContainText('DB file selected.');
   await expect(page.getByText('Cached DB is current with OneDrive.').last()).toBeVisible();
+  const expectedLastSync = await page.evaluate(() => {
+    const timestamp = (window as Window & { __CONSPECTUS_LAST_WRITTEN_SYNC_AT__?: string })
+      .__CONSPECTUS_LAST_WRITTEN_SYNC_AT__;
+    if (timestamp === undefined) {
+      return null;
+    }
+    return `${new Intl.DateTimeFormat(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: 'UTC',
+      hour12: false,
+    }).format(new Date(timestamp))} UTC`;
+  });
+  expect(expectedLastSync).not.toBeNull();
+  await expect(page.getByTestId('settings-last-sync')).toHaveText(expectedLastSync ?? '');
 
-  expect(await getCacheReadSnapshotCallCount(page)).toBe(3);
+  expect(await getCacheReadSnapshotCallCount(page)).toBe(6);
   expect(await getGraphMetadataCallCount(page)).toBe(3);
   expect(await getGraphDownloadCallCount(page)).toBe(1);
 });
@@ -2091,7 +2111,7 @@ test('restored binding triggers sync after interactive sign-in without reload', 
   await expect(page.getByTestId('auth-status-message')).toContainText('Signed in.');
   await expect(page.getByText('Downloaded the latest DB from OneDrive.')).toBeVisible();
 
-  expect(await getCacheReadSnapshotCallCount(page)).toBe(1);
+  expect(await getCacheReadSnapshotCallCount(page)).toBe(3);
   expect(await getGraphMetadataCallCount(page)).toBe(1);
   expect(await getGraphDownloadCallCount(page)).toBe(1);
 });
@@ -2329,6 +2349,11 @@ test('allows selecting a OneDrive .db file from the settings browser', async ({ 
   await expect(page.getByTestId('db-file-browser')).toHaveCount(0);
   await expect(page.getByTestId('selected-db-file-summary')).toContainText('budget.db');
   await expect(page.getByTestId('selected-db-file-summary')).toContainText('/Finance');
+  await expect(page.getByTestId('settings-last-sync')).not.toBeEmpty();
+  await expect(page.getByTestId('settings-build-version')).not.toBeEmpty();
+  await expect(page.getByTestId('settings-build-time')).not.toBeEmpty();
+  await page.getByTestId('settings-build-information').scrollIntoViewIfNeeded();
+  await expect(page.getByTestId('settings-build-information')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Change DB file' })).toBeVisible();
 
   await page.getByRole('link', { name: 'Accounts' }).click();

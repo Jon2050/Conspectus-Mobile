@@ -1,15 +1,18 @@
 // Resolves the cache store used by Settings local-reset actions, with localhost-only test override support.
-import { closeAppCacheStoreConnections, type CacheStore } from '@cache';
+import { appCacheStore, closeAppCacheStoreConnections, type CacheStore } from '@cache';
+
+export type SettingsCacheStore = Pick<CacheStore, 'readSnapshot' | 'clearAll'>;
 
 declare global {
   interface Window {
-    __CONSPECTUS_CACHE_STORE__?: Pick<CacheStore, 'clearAll'>;
+    __CONSPECTUS_CACHE_STORE__?: SettingsCacheStore;
   }
 }
 
 const FALLBACK_INDEXEDDB_DATABASE_NAMES = ['conspectus-mobile-cache', 'conspectus-cache'];
 
-const defaultCacheStore: Pick<CacheStore, 'clearAll'> = {
+const defaultCacheStore: SettingsCacheStore = {
+  readSnapshot: (binding) => appCacheStore.readSnapshot(binding),
   async clearAll(): Promise<void> {
     if (typeof window === 'undefined') {
       return;
@@ -121,7 +124,7 @@ const isLocalCacheMockHost = (): boolean => {
   return window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost';
 };
 
-export const resolveSettingsCacheStore = (): Pick<CacheStore, 'clearAll'> => {
+export const resolveSettingsCacheStore = (): SettingsCacheStore => {
   if (isLocalCacheMockHost() && window.__CONSPECTUS_CACHE_STORE__ !== undefined) {
     return window.__CONSPECTUS_CACHE_STORE__;
   }
