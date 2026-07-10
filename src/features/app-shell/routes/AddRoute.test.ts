@@ -348,7 +348,7 @@ describe('AddRoute component', () => {
     expect(body).toContain('value="Groceries"');
     expect(body).toContain('value="12,34€"');
     expect(body).toContain('value="Market"');
-    expect(body).toMatch(/data-testid="add-transfer-close"[^>]*disabled/);
+    expect(body).not.toMatch(/data-testid="add-transfer-close"[^>]*disabled/);
   });
 
   it('renders a non-technical conflict dialog and preserves visible form values', () => {
@@ -379,7 +379,7 @@ describe('AddRoute component', () => {
     expect(body).toContain('value="Conflict Transfer"');
     expect(body).toContain('value="12,34€"');
     expect(body).toContain('value="Market"');
-    expect(body).toMatch(/data-testid="add-transfer-close"[^>]*disabled/);
+    expect(body).not.toMatch(/data-testid="add-transfer-close"[^>]*disabled/);
     expect(body).toMatch(/data-testid="add-transfer-resolve-conflict"/);
     expect(body).not.toContain('Precondition Failed');
     expect(body).not.toContain('412');

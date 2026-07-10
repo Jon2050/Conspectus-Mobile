@@ -6,7 +6,9 @@
   import type { DriveItemBinding } from '@graph';
   import {
     appSelectedDriveItemBindingStore,
+    appNetworkStateStore,
     appSyncStateStore,
+    type NetworkStateStore,
     type SyncStateStore,
   } from '@shared';
   import LoadingPlaceholder from './components/LoadingPlaceholder.svelte';
@@ -42,9 +44,17 @@
     createInitialFormFields,
     type AddTransferFormFields,
   } from './routes/addTransferFormState';
+  import {
+    createAddTransferSaveController,
+    type AddTransferSaveController,
+    type AddTransferSaveState,
+  } from './routes/addTransferSaveController';
 
   export let routeStore: Readable<AppRouteKey> = createHashRouteStore();
   export let syncStateStore: SyncStateStore = appSyncStateStore;
+  export let networkStateStore: NetworkStateStore = appNetworkStateStore;
+  export let addTransferSaveController: AddTransferSaveController =
+    createAddTransferSaveController();
   export let loadingDelayMs = 160;
   export let showLoadingPlaceholder = true;
 
@@ -54,6 +64,7 @@
 
   let currentRoute: AppRouteKey = DEFAULT_ROUTE;
   let addTransferFields: AddTransferFormFields = createInitialFormFields();
+  let addTransferSaveState: AddTransferSaveState = addTransferSaveController.getState();
   let selectedBinding: DriveItemBinding | null = get(appSelectedDriveItemBindingStore);
   let addTransferHasLoadedDatabase = false;
   let appContentElement: HTMLElement | null = null;
@@ -70,6 +81,35 @@
   const unsubscribe = routeStore.subscribe((route) => {
     currentRoute = route;
   });
+  const unsubscribeAddTransferSaveController = addTransferSaveController.subscribe((state) => {
+    const wasSaved = addTransferSaveState.phase === 'saved';
+    addTransferSaveState = state;
+    if (state.phase === 'saved' && !wasSaved) {
+      addTransferFields = createInitialFormFields();
+    }
+  });
+
+  $: pendingTransferNeedsAttention =
+    addTransferSaveState.phase === 'upload_failed' ||
+    addTransferSaveState.phase === 'conflict' ||
+    addTransferSaveState.phase === 'conflict_syncing';
+  $: pendingTransferIsConflict =
+    addTransferSaveState.phase === 'conflict' || addTransferSaveState.phase === 'conflict_syncing';
+  $: pendingTransferIsOffline = !$networkStateStore;
+
+  const openPendingTransfer = (): void => {
+    if (typeof window !== 'undefined') {
+      window.location.hash = '#/add';
+    }
+  };
+
+  const retryPendingTransfer = (): void => {
+    void addTransferSaveController.retry($_, pendingTransferIsOffline);
+  };
+
+  const recoverPendingTransferConflict = (): void => {
+    void addTransferSaveController.resolveConflict($_, pendingTransferIsOffline);
+  };
 
   $: if (selectedBinding === null || $syncStateStore.state === 'idle') {
     addTransferHasLoadedDatabase = false;
@@ -363,6 +403,7 @@
 
   onDestroy(() => {
     unsubscribe();
+    unsubscribeAddTransferSaveController();
     unsubscribeSelectedBinding();
     unsubscribeQueuedForegroundSync();
     resolveAppDbRuntime().close();
@@ -374,6 +415,56 @@
   <header class="app-header">
     <h1>{$_('appShell.title')}</h1>
   </header>
+
+  {#if pendingTransferNeedsAttention}
+    <section
+      class="pending-transfer-sync"
+      role={pendingTransferIsConflict ? 'alert' : 'status'}
+      data-testid="pending-transfer-sync"
+    >
+      <div>
+        <h2>{$_('addTransfer.save.pendingTitle')}</h2>
+        <p>
+          {pendingTransferIsConflict
+            ? $_('addTransfer.save.pendingConflictDescription')
+            : $_('addTransfer.save.pendingRetryDescription')}
+        </p>
+      </div>
+      <div class="pending-transfer-sync__actions">
+        <button
+          type="button"
+          class="app-button app-button--secondary"
+          data-testid="pending-transfer-review"
+          on:click={openPendingTransfer}
+        >
+          {$_('addTransfer.save.pendingReview')}
+        </button>
+        {#if pendingTransferIsConflict}
+          <button
+            type="button"
+            class="app-button app-button--primary"
+            data-testid="pending-transfer-recover"
+            disabled={addTransferSaveState.phase === 'conflict_syncing' || pendingTransferIsOffline}
+            on:click={recoverPendingTransferConflict}
+          >
+            {addTransferSaveState.phase === 'conflict_syncing'
+              ? $_('addTransfer.save.conflictSyncingButton')
+              : $_('addTransfer.save.conflictAction')}
+          </button>
+        {:else}
+          <button
+            type="button"
+            class="app-button app-button--primary"
+            data-testid="pending-transfer-retry"
+            disabled={pendingTransferIsOffline}
+            on:click={retryPendingTransfer}
+          >
+            {$_('addTransfer.save.retry')}
+          </button>
+        {/if}
+      </div>
+    </section>
+  {/if}
 
   {#if $syncStateStore.state === 'syncing' && $syncStateStore.progress !== null}
     <section class="startup-sync-progress" data-testid="startup-sync-progress">
@@ -399,7 +490,12 @@
       {:else if currentRoute === 'transfers'}
         <TransfersRoute />
       {:else if currentRoute === 'add'}
-        <AddRoute bind:fields={addTransferFields} canOpenPanel={addTransferDatabaseIsReady} />
+        <AddRoute
+          bind:fields={addTransferFields}
+          saveController={addTransferSaveController}
+          {networkStateStore}
+          canOpenPanel={addTransferDatabaseIsReady}
+        />
       {:else}
         <SettingsRoute />
       {/if}
@@ -437,6 +533,54 @@
       <DeploymentInfoFooter isVisible={footerIsVisible} />
     {/if}
   </div>
+
+  <style>
+    .pending-transfer-sync {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.875rem 1rem;
+      background: var(--surface-strong);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .pending-transfer-sync h2,
+    .pending-transfer-sync p {
+      margin: 0;
+    }
+
+    .pending-transfer-sync h2 {
+      font-size: 1rem;
+    }
+
+    .pending-transfer-sync p {
+      margin-top: 0.25rem;
+      color: var(--text-secondary);
+    }
+
+    .pending-transfer-sync__actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: flex-end;
+    }
+
+    @media (max-width: 36rem) {
+      .pending-transfer-sync {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .pending-transfer-sync__actions {
+        justify-content: stretch;
+      }
+
+      .pending-transfer-sync__actions :global(.app-button) {
+        flex: 1;
+      }
+    }
+  </style>
 
   <ToastContainer />
 </div>

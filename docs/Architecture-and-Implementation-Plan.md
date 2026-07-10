@@ -666,8 +666,8 @@ M6-07 implementation clarification:
 
 M6-08 implementation clarification:
 
-- Upload retry state and determinate progress are coordinated by `src/features/app-shell/routes/addTransferSaveController.ts` and rendered in `AddRoute.svelte` through the shared `ProgressIndicator` and app toast store.
-- Retry reuses the already exported database bytes rather than repeating the local SQL write; controller and Playwright coverage exercise slow upload, ordinary transient failure, retry, and the absence of premature success feedback.
+- `AppShell.svelte` owns the Add Transfer save controller for the full app-session lifetime and renders a persistent pending-sync action outside the sheet; `AddRoute.svelte` renders the form-specific progress and feedback.
+- Retry reuses the already exported database bytes rather than repeating the local SQL write, even after hash-route navigation; controller and Playwright coverage exercise slow upload, transient failure, retry, conflict recovery, and the absence of premature success feedback.
 
 M6-09 implementation clarification:
 
@@ -684,7 +684,7 @@ M6-11 implementation clarification:
 - eTag conflict recovery is implemented in `src/features/app-shell/databaseConflictRecoveryService.ts` and composed into the Add Transfer save controller.
 - On upload conflict, the controller discards stale exported upload bytes, closes the current `sql.js` runtime, blocks immediate re-submit, and keeps the visible form draft intact.
 - The recovery action downloads and validates the latest OneDrive DB snapshot, writes it to the local cache, explicitly closes and reopens the shared browser DB runtime with the fresh bytes, then allows the user to review and save the transfer again.
-- The Add Transfer route surfaces this as a non-technical conflict dialog with download progress; direct upload retry remains available only for retryable non-conflict upload failures.
+- The Add Transfer route and app-shell pending-sync action surface this as non-technical recovery feedback; direct upload retry remains available only for retryable non-conflict upload failures.
 
 M6-12 implementation clarification:
 
