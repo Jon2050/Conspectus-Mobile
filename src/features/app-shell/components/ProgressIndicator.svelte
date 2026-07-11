@@ -1,12 +1,15 @@
+<!-- Renders determinate byte progress or an indeterminate status for active sync operations. -->
 <script lang="ts">
   import { _ } from 'svelte-i18n';
 
   export let loaded: number;
   export let total: number | null;
   export let kind: 'download' | 'upload';
+  export let statusText: string | null = null;
 
   $: progressText =
-    total !== null
+    statusText ??
+    (total !== null
       ? $_(`appShell.${kind}Progress`, {
           values: {
             loaded: Math.round(loaded / 1024),
@@ -15,7 +18,7 @@
         })
       : $_(`appShell.${kind}edKb`, {
           values: { kb: Math.round(loaded / 1024) },
-        });
+        }));
 </script>
 
 <div class="progress-indicator" data-testid="progress-indicator" data-kind={kind}>

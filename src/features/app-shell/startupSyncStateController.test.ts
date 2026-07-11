@@ -9,6 +9,7 @@ import {
   applyStartupFreshnessDecision,
   applyUnexpectedStartupSyncError,
   beginStartupSync,
+  clearStartupSyncToast,
   updateStartupSyncProgress,
 } from './startupSyncStateController';
 
@@ -16,6 +17,7 @@ import type { StartupFreshnessDecision } from './startupFreshnessService';
 
 const createToastStore = () => ({
   show: vi.fn(() => 'toast-id'),
+  remove: vi.fn(),
 });
 
 describe('startupSyncStateController', () => {
@@ -31,7 +33,22 @@ describe('startupSyncStateController', () => {
       branch: null,
       progress: null,
     });
-    expect(toastStore.show).toHaveBeenCalledWith('Synchronisiere mit OneDrive...', 'info', 2800);
+    expect(toastStore.show).toHaveBeenCalledWith('Synchronisiere mit OneDrive...', 'info', 0);
+  });
+
+  it('replaces and explicitly clears the persistent startup toast', () => {
+    const store = createSyncStateStore();
+    const toastStore = createToastStore();
+
+    beginStartupSync(store, toastStore);
+    beginStartupSync(store, toastStore);
+
+    expect(toastStore.remove).toHaveBeenCalledTimes(1);
+    expect(toastStore.remove).toHaveBeenLastCalledWith('toast-id');
+
+    clearStartupSyncToast(store);
+
+    expect(toastStore.remove).toHaveBeenCalledTimes(2);
   });
 
   it('updates progress in the store when startup sync progress changes', () => {
@@ -85,6 +102,7 @@ describe('startupSyncStateController', () => {
       'success',
       3200,
     );
+    expect(toastStore.remove).toHaveBeenCalledWith('toast-id');
   });
 
   it('applies a successful online unchanged decision and surfaces a success toast', () => {
@@ -126,153 +144,40 @@ describe('startupSyncStateController', () => {
       'success',
       3200,
     );
+    expect(toastStore.remove).toHaveBeenCalledWith('toast-id');
   });
 
-  it('applies an offline cached decision and surfaces an info toast', () => {
+  it('applies offline startup failure as an actionable error', () => {
     const store = createSyncStateStore();
     const toastStore = createToastStore();
     const decision: StartupFreshnessDecision = {
-      kind: 'ready',
-      branch: 'offline_cached',
-      syncState: 'offline',
-      snapshot: {
-        binding: {
-          driveId: 'drive-123',
-          itemId: 'item-456',
-          name: 'conspectus.db',
-          parentPath: '/',
-        },
-        metadata: {
-          eTag: '"etag-1"',
-          lastSyncAtIso: '2026-03-11T10:45:00.000Z',
-        },
-        dbBytes: Uint8Array.from([1, 2, 3, 4]),
-      },
-      failure: null,
-    };
-
-    beginStartupSync(store, toastStore);
-    toastStore.show.mockClear();
-
-    applyStartupFreshnessDecision(store, decision, toastStore);
-
-    expect(get(store)).toEqual({
-      state: 'offline',
-      message: 'Offline-Modus nutzt die zuletzt zwischengespeicherte DB.',
-      branch: 'offline_cached',
-      progress: null,
-    });
-    expect(toastStore.show).toHaveBeenCalledWith(
-      'Offline-Modus nutzt die zuletzt zwischengespeicherte DB.',
-      'info',
-      3200,
-    );
-  });
-
-  it('applies stale cached fallback decisions and surfaces a warning toast', () => {
-    const store = createSyncStateStore({
-      state: 'syncing',
-      message: 'Suche nach DB-Updates auf OneDrive...',
-    });
-    const toastStore = createToastStore();
-    const decision: StartupFreshnessDecision = {
-      kind: 'ready',
-      branch: 'online_metadata_failed_cached',
-      syncState: 'stale',
-      snapshot: {
-        binding: {
-          driveId: 'drive-123',
-          itemId: 'item-456',
-          name: 'conspectus.db',
-          parentPath: '/',
-        },
-        metadata: {
-          eTag: '"etag-1"',
-          lastSyncAtIso: '2026-03-11T09:45:00.000Z',
-        },
-        dbBytes: Uint8Array.from([1, 2, 3, 4]),
-      },
+      kind: 'error',
+      branch: 'offline_unsupported',
+      syncState: 'error',
+      snapshot: null,
       failure: {
-        code: 'metadata_fetch_failed',
-        message:
-          'Unable to refresh the selected OneDrive database metadata after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again.',
-        cause: {
-          code: 'network_error',
-          status: 503,
-        },
+        code: 'offline_unsupported',
+        message: 'Connection is required to load the database.',
+        cause: new Error('Connection is required to load the database.'),
       },
     };
 
     applyStartupFreshnessDecision(store, decision, toastStore);
 
-    expect(get(store)).toEqual({
-      state: 'stale',
-      message:
-        'Unable to refresh the selected OneDrive database metadata after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again. Nutze vorerst die zwischengespeicherte DB.',
-      branch: 'online_metadata_failed_cached',
-      progress: null,
+    expect(get(store)).toMatchObject({
+      state: 'error',
+      message: 'Connection is required to load the database.',
+      branch: 'offline_unsupported',
     });
     expect(toastStore.show).toHaveBeenCalledWith(
-      'Unable to refresh the selected OneDrive database metadata after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again. Nutze vorerst die zwischengespeicherte DB.',
-      'warning',
-      4200,
-    );
-  });
-
-  it('applies auth-expired fallback decisions with the cached-db warning message', () => {
-    const store = createSyncStateStore({
-      state: 'syncing',
-      message: 'Suche nach DB-Updates auf OneDrive...',
-    });
-    const toastStore = createToastStore();
-    const decision: StartupFreshnessDecision = {
-      kind: 'ready',
-      branch: 'online_auth_expired_cached',
-      syncState: 'stale',
-      snapshot: {
-        binding: {
-          driveId: 'drive-123',
-          itemId: 'item-456',
-          name: 'conspectus.db',
-          parentPath: '/',
-        },
-        metadata: {
-          eTag: '"etag-1"',
-          lastSyncAtIso: '2026-03-11T09:45:00.000Z',
-        },
-        dbBytes: Uint8Array.from([1, 2, 3, 4]),
-      },
-      failure: {
-        code: 'auth_expired',
-        message: 'Your session has expired. Please sign in again to sync with OneDrive.',
-        cause: {
-          code: 'unauthorized',
-          status: 401,
-        },
-      },
-    };
-
-    applyStartupFreshnessDecision(store, decision, toastStore);
-
-    expect(get(store)).toEqual({
-      state: 'stale',
-      message:
-        'Your session has expired. Please sign in again to sync with OneDrive. Nutze vorerst die zwischengespeicherte DB.',
-      branch: 'online_auth_expired_cached',
-      progress: null,
-    });
-    expect(toastStore.show).toHaveBeenCalledWith(
-      'Your session has expired. Please sign in again to sync with OneDrive. Nutze vorerst die zwischengespeicherte DB.',
-      'warning',
-      4200,
+      'Connection is required to load the database.',
+      'error',
+      5000,
     );
   });
 
   it('applies auth-expired terminal decisions as actionable errors', () => {
-    const store = createSyncStateStore({
-      state: 'syncing',
-      message: 'Suche nach DB-Updates auf OneDrive...',
-    });
+    const store = createSyncStateStore();
     const toastStore = createToastStore();
     const decision: StartupFreshnessDecision = {
       kind: 'error',
@@ -289,6 +194,8 @@ describe('startupSyncStateController', () => {
       },
     };
 
+    beginStartupSync(store, toastStore);
+    toastStore.show.mockClear();
     applyStartupFreshnessDecision(store, decision, toastStore);
 
     expect(get(store)).toEqual({
@@ -302,13 +209,14 @@ describe('startupSyncStateController', () => {
       'error',
       5000,
     );
+    expect(toastStore.remove).toHaveBeenCalledWith('toast-id');
   });
 
   it('resets to idle when the startup decision is skipped', () => {
     const store = createSyncStateStore({
-      state: 'offline',
-      message: 'Offline-Modus nutzt die zuletzt zwischengespeicherte DB.',
-      branch: 'offline_cached',
+      state: 'error',
+      message: 'Connection is required to load the database.',
+      branch: 'offline_unsupported',
     });
     const toastStore = createToastStore();
     const decision: StartupFreshnessDecision = {
@@ -331,12 +239,11 @@ describe('startupSyncStateController', () => {
   });
 
   it('applies unexpected startup errors and surfaces an error toast', () => {
-    const store = createSyncStateStore({
-      state: 'syncing',
-      message: 'Suche nach DB-Updates auf OneDrive...',
-    });
+    const store = createSyncStateStore();
     const toastStore = createToastStore();
 
+    beginStartupSync(store, toastStore);
+    toastStore.show.mockClear();
     applyUnexpectedStartupSyncError(
       store,
       'Start-Synchronisation unerwartet fehlgeschlagen. Bitte prüfe die Browser-Konsole und versuche es erneut.',
@@ -355,15 +262,15 @@ describe('startupSyncStateController', () => {
       'error',
       5000,
     );
+    expect(toastStore.remove).toHaveBeenCalledWith('toast-id');
   });
 
   it('maps deterministic db runtime open errors into startup sync error state', () => {
-    const store = createSyncStateStore({
-      state: 'syncing',
-      message: 'Suche nach DB-Updates auf OneDrive...',
-    });
+    const store = createSyncStateStore();
     const toastStore = createToastStore();
 
+    beginStartupSync(store, toastStore);
+    toastStore.show.mockClear();
     applyStartupDbRuntimeError(store, new DbRuntimeError('db_open_failed'), toastStore);
 
     expect(get(store)).toEqual({
@@ -378,6 +285,7 @@ describe('startupSyncStateController', () => {
       'error',
       5000,
     );
+    expect(toastStore.remove).toHaveBeenCalledWith('toast-id');
   });
 
   it('falls back to a deterministic generic message for unknown db runtime failures', () => {

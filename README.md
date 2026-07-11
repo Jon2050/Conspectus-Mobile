@@ -12,14 +12,14 @@ Provide fast mobile access to a personal Conspectus SQLite database stored in On
 - View transfers for a selected month (default: current month).
 - Swipe to previous/next month.
 - Add a new transfer.
-- Offline viewing from cached last synced data.
+- Online read access with eTag-verified cached snapshot reuse.
 
 ## Non-Goals (MVP)
 
 - No backend server.
 - No desktop app changes.
 - No DB migrations in PWA.
-- No offline transfer creation.
+- No offline database viewing or transfer creation.
 
 ## Tech Direction
 

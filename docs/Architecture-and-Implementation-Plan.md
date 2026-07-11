@@ -32,7 +32,7 @@ Canonical sections by topic:
 - Hosting: `https://jon2050.de/conspectus/webapp` (HTTPS available).
 - OneDrive file selection: ask once, store binding locally.
 - Settings must include local reset/rebind option.
-- Offline mode: **viewing only** using cached last DB.
+- Offline database viewing and editing: **not supported**; Settings remains available for recovery.
 - Offline add transfer: **not supported**.
 - File transport: raw `.db` only.
 - Keep source code small and simple.
@@ -88,7 +88,7 @@ Rationale:
 5. `Local Cache Module`
 
 - Persist DB blob + metadata (`eTag`, file IDs, last sync).
-- Provide offline read when network unavailable.
+- Retain DB bytes for eTag-verified online reuse only; never provide offline or stale fallback reads.
 
 6. `App State Module`
 
@@ -118,6 +118,10 @@ Read flow on app startup:
 3. Fetch file metadata (including `eTag`).
 4. If cached blob exists and eTag unchanged, load cached DB.
 5. Else download full DB, cache it, and load it.
+
+Startup fails closed when connectivity, authentication, metadata retrieval, or snapshot download
+fails. Cached database bytes are never opened for offline or stale fallback viewing. Settings remains
+accessible so the user can re-authenticate, rebind, or reset local data.
 
 Cache loss is non-critical: if the local IndexedDB cache is evicted (e.g. by iOS after inactivity), the app simply re-downloads the DB from OneDrive on next online startup. No data is lost because OneDrive is always the authoritative source.
 
@@ -409,9 +413,9 @@ Exit criteria:
 
 ---
 
-## Milestone 4: Sync Engine + Local Cache (Offline Read)
+## Milestone 4: Sync Engine + Local Cache (Verified Online Read)
 
-Goal: robust online/offline read behavior with minimal traffic.
+Goal: robust verified-online read behavior with minimal traffic.
 
 Substeps:
 
@@ -426,7 +430,7 @@ Substeps:
 5. Implement startup decision tree:
    - online + unchanged => cached DB
    - online + changed => download
-   - offline => cached DB if present
+   - offline => terminal connection-required error
 6. Add sync state UI:
    - synced
    - stale
@@ -458,8 +462,8 @@ M4-03 implementation clarification:
 M4-04 implementation clarification:
 
 - Startup freshness resolution is implemented in `src/features/app-shell/startupFreshnessService.ts` and invoked during app-shell startup from `src/features/app-shell/AppShell.svelte`.
-- The service emits deterministic result branches for the core decision tree: no binding, online unchanged (`eTag` match), online changed (`eTag` mismatch => re-download), offline with cache, and offline without cache.
-- When startup metadata refresh or snapshot download fails while a cached snapshot exists, the current implementation resolves a `stale` startup state and continues with the cached bytes instead of clearing auth/binding state.
+- The service emits deterministic result branches for the core decision tree: no binding, online unchanged (`eTag` match), online changed (`eTag` mismatch => re-download), and offline unsupported regardless of cache presence.
+- Startup metadata, authentication, and snapshot download failures resolve to a terminal error and close the DB runtime even when cached bytes exist; only a successful online eTag match may reuse cached DB bytes.
 - Development-only telemetry for startup freshness branches is emitted from `AppShell.svelte` so branch selection and fallback/error outcomes remain inspectable without adding production logging noise.
 
 M4-05 implementation clarification:
@@ -474,14 +478,14 @@ M4-06 implementation clarification:
 - Transient startup sync retries are implemented inside `src/features/app-shell/startupFreshnessService.ts`, not in UI code, so metadata refresh and fresh-snapshot download both share the same capped exponential backoff behavior.
 - Retryability is intentionally narrow: only normalized Graph `network_error` failures are retried; auth, permission, not-found, conflict, and local snapshot validation failures still fail fast on the first attempt.
 - The default startup retry policy is 3 total attempts with a `250ms` base delay capped at `1000ms`; when retries are exhausted, the final failure preserves the normalized `network_error` identity for later handling and surfaces actionable user messaging.
-- When retries are exhausted but a cached snapshot already exists, startup still resolves to the existing `stale` branch and continues with the cached DB instead of discarding readable local data.
+- When retries are exhausted, startup resolves to a terminal error and does not open cached DB bytes.
 - Browser snapshot downloads use `@microsoft.graph.downloadUrl` from the metadata response instead of the Graph `/content` redirect endpoint, because the redirect path can fail under browser CORS handling while the preauthenticated download URL avoids that failure mode.
 
 M4-07 implementation clarification:
 
 - Sync/cache regression coverage is split intentionally across service-level Vitest tests in `src/features/app-shell/startupFreshnessService.test.ts` and browser-level Playwright scenarios in `tests/e2e/app-shell.spec.ts`.
-- The automated coverage now includes the full startup decision matrix plus retry exhaustion behavior for both metadata refresh and fresh-snapshot download branches, including cached stale fallback and terminal error outcomes.
-- Offline startup behavior remains covered in Playwright for both cache-hit and cache-miss paths so CI catches regressions in the app-shell orchestration, not only in isolated service mocks.
+- The automated coverage now includes the full startup decision matrix plus retry exhaustion behavior for both metadata refresh and fresh-snapshot download branches, including terminal errors when cached bytes exist.
+- Offline startup behavior remains covered in Playwright for both cache-present and cache-missing paths; both must fail closed without opening database bytes.
 
 M4-08 implementation clarification:
 
@@ -492,12 +496,12 @@ M4-08 implementation clarification:
 
 Deliverables:
 
-- Reliable DB availability for read-only mode offline.
+- Reliable online DB availability with verified cache reuse.
 - Minimal repeated data transfers.
 
 Exit criteria:
 
-- Airplane mode still shows cached accounts/transfers.
+- Airplane mode shows a connection-required error while Settings remains accessible.
 - Online resume refreshes when eTag changed.
 
 ---
@@ -725,6 +729,12 @@ M7-01 implementation clarification:
 - Bound-file details come from the persisted binding, and the last-sync timestamp comes from the cached snapshot metadata. Settings refreshes that metadata when the shared sync state reaches `synced` so a completed download is reflected without polling.
 - The dedicated Settings build section reuses the build-time version and deployment timestamp resolution in `src/shared/config/buildInfo.ts`; its injected bundle metadata remains available offline.
 
+M7-08 implementation clarification:
+
+- Startup database access now fails closed when offline or when authentication, OneDrive metadata, or snapshot download fails; cached bytes are reused only after a successful online eTag match.
+- Terminal startup decisions close the browser DB runtime, and Accounts/Transfers show the persistent sync error instead of stale rows or misleading empty states.
+- Startup toast and progress feedback remain visible for the full sync attempt, including an indeterminate metadata-check phase, while Settings stays accessible for re-authentication and file recovery.
+
 4. Error recovery UX:
    - re-login flow
    - stale token handling
@@ -803,7 +813,7 @@ Exit criteria:
 - File binding and app restart persistence.
 - View accounts and month transfers.
 - Add transfer happy path and failure/retry path.
-- Offline startup with cache.
+- Offline startup failure with and without cached bytes.
 
 ## 6.3 Test Data and Fixtures
 
@@ -859,7 +869,7 @@ Hard gates before release:
 - No client secret in frontend code.
 - HTTPS-only deployment.
 - MFA recommended/required on both Microsoft accounts.
-- Store only minimal local metadata and cached DB necessary for offline read.
+- Store only minimal local metadata and cached DB bytes necessary for eTag-verified online reuse.
 - Provide explicit logout and local reset options.
 
 ---
@@ -994,7 +1004,7 @@ MVP deliverables:
 1. Installable PWA on iOS/Android.
 2. Early integrated deployment on `jon2050.de/conspectus/webapp/` for device testing.
 3. OneDrive-authenticated access to selected SQLite DB.
-4. Cached offline viewing.
+4. eTag-verified cached database reuse during online startup.
 5. Accounts view.
 6. Month-based transfers view with swipe.
 7. Add-transfer write flow with desktop-compatible DB updates.

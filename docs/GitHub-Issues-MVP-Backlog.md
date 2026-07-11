@@ -599,6 +599,14 @@ An issue is only considered done when:
 - Depends on: `M7-04, M7-05`
 - GitHub: [#81](https://github.com/Jon2050/Conspectus-Mobile/issues/81)
 
+### :white_check_mark: M7-08 Disable stale database fallback and persist sync indicators
+
+- Label: `bug`
+- Milestone: `M7 - Settings + Recovery`
+- Summary: Work disables offline and failed-sync database cache fallback, keeps startup sync feedback visible for the full attempt, and surfaces persistent sync errors on Accounts and Transfers while Settings remains available for recovery.
+- Depends on: `M4-04, M4-05, M4-07, M4-08, M7-01`
+- GitHub: [#211](https://github.com/Jon2050/Conspectus-Mobile/issues/211)
+
 ### :green_circle: M8-01 Implement CSP and security headers for PWA path
 
 - Label: `security`
@@ -643,7 +651,7 @@ An issue is only considered done when:
 
 - Label: `test`
 - Milestone: `M8 - Hardening + QA + Release`
-- Summary: Work includes flows: login, bind file, read accounts/transfers, add transfer, retry and offline-read smoke scenario. It also covers flaky-test mitigation and retries policy.
+- Summary: Work includes flows: login, bind file, read accounts/transfers, add transfer, retry and offline-startup failure smoke scenario. It also covers flaky-test mitigation and retries policy.
 - Depends on: `M6-10, M7-07`
 - GitHub: [#87](https://github.com/Jon2050/Conspectus-Mobile/issues/87)
 

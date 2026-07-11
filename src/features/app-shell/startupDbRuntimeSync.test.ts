@@ -34,17 +34,17 @@ const createReadyDecision = (): StartupFreshnessDecision => ({
 });
 
 describe('startup db runtime sync', () => {
-  it('closes the runtime for non-ready startup decisions', async () => {
+  it('closes the runtime for an offline startup failure', async () => {
     const dbRuntime = createDbRuntimeMock();
     const decision: StartupFreshnessDecision = {
       kind: 'error',
-      branch: 'online_metadata_failed',
+      branch: 'offline_unsupported',
       syncState: 'error',
       snapshot: null,
       failure: {
-        code: 'metadata_fetch_failed',
-        message: 'Metadata failed',
-        cause: new Error('Metadata failed'),
+        code: 'offline_unsupported',
+        message: 'Connection is required to load the database.',
+        cause: new Error('Connection is required to load the database.'),
       },
     };
 

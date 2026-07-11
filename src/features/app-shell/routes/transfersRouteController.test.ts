@@ -2,7 +2,7 @@
  * Unit tests for the transfers route controller.
  * Ensures the controller coordinates multiple query services to correctly assemble the state for the transfers view.
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createTransfersRouteController } from './transfersRouteController';
 import {
   DbRuntimeError,
@@ -82,7 +82,7 @@ describe('createTransfersRouteController', () => {
     ]);
   });
 
-  it('treats a DB runtime not-open error as an empty state', async () => {
+  it('treats a DB runtime not-open error as an empty state without a sync error', async () => {
     const controller = createTransfersRouteController(
       {
         listTransfersByMonth: () => {
@@ -99,6 +99,24 @@ describe('createTransfersRouteController', () => {
       operation: 'empty',
       transfers: [],
       error: null,
+    });
+  });
+
+  it('surfaces the startup sync error without querying stale transfer data', async () => {
+    const listTransfersByMonth = vi.fn(() => []);
+    const controller = createTransfersRouteController(
+      { listTransfersByMonth },
+      { listAllAccounts: () => [] },
+      { listAllCategories: () => [] },
+    );
+
+    await controller.load(19800, 'Connection is required to load the database.');
+
+    expect(listTransfersByMonth).not.toHaveBeenCalled();
+    expect(controller.getState()).toEqual({
+      operation: 'error',
+      transfers: [],
+      error: { message: 'Connection is required to load the database.' },
     });
   });
 

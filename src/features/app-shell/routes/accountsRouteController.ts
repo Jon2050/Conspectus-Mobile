@@ -27,7 +27,7 @@ export type AccountsRouteStateListener = (state: AccountsRouteState) => void;
 export interface AccountsRouteController {
   getState(): AccountsRouteState;
   subscribe(listener: AccountsRouteStateListener): () => void;
-  load(): Promise<void>;
+  load(syncErrorMessage?: string | null): Promise<void>;
 }
 
 const INITIAL_STATE: AccountsRouteState = {
@@ -108,12 +108,21 @@ export const createAccountsRouteController = (
       };
     },
 
-    async load(): Promise<void> {
+    async load(syncErrorMessage: string | null = null): Promise<void> {
       updateState({
         operation: 'loading',
         accounts: [],
         error: null,
       });
+
+      if (syncErrorMessage !== null && syncErrorMessage.trim().length > 0) {
+        updateState({
+          operation: 'error',
+          accounts: [],
+          error: { message: syncErrorMessage },
+        });
+        return;
+      }
 
       try {
         const accounts = accountQueryService.listVisibleNonPrimaryAccounts().map(toRouteAccount);

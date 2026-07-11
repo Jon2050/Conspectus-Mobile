@@ -4,7 +4,7 @@ Responsibility:
 
 - Persist and load local database cache and sync metadata.
 - Encapsulate IndexedDB/Dexie schema and migrations.
-- Provide cache invalidation and reset behavior.
+- Provide cache invalidation and reset behavior without exposing snapshots for offline viewing.
 
 Dependency boundaries:
 
@@ -34,4 +34,5 @@ Migration strategy:
 M4 implementation target:
 
 - Keep Dexie schema details private behind `CacheStore`.
-- Expose deterministic cache behavior for online/offline startup decisions.
+- Expose deterministic cache behavior for eTag-verified online startup decisions; connectivity or
+  sync failures must not open cached database bytes.

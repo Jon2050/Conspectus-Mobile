@@ -97,7 +97,7 @@ describe('accounts route controller', () => {
     });
   });
 
-  it('treats a db_not_open query failure as an actionable empty state', async () => {
+  it('treats a db_not_open query failure as an empty state without a sync error', async () => {
     const listVisibleNonPrimaryAccounts = vi.fn(() => {
       throw new DbRuntimeError('db_not_open', 'SQLite runtime is not open.');
     });
@@ -109,6 +109,22 @@ describe('accounts route controller', () => {
       operation: 'empty',
       accounts: [],
       error: null,
+    });
+  });
+
+  it('surfaces the startup sync error without querying stale account data', async () => {
+    const listVisibleNonPrimaryAccounts = vi.fn(() => [
+      { accountId: 12, name: 'Stale account', amountCents: 1250, accountTypeId: null },
+    ]);
+    const controller = createAccountsRouteController({ listVisibleNonPrimaryAccounts });
+
+    await controller.load('Connection is required to load the database.');
+
+    expect(listVisibleNonPrimaryAccounts).not.toHaveBeenCalled();
+    expect(controller.getState()).toEqual({
+      operation: 'error',
+      accounts: [],
+      error: { message: 'Connection is required to load the database.' },
     });
   });
 
