@@ -199,12 +199,7 @@
       "toastSyncing": "Syncing with OneDrive in the background...",
       "onlineUnchanged": "Cached DB is current with OneDrive.",
       "onlineChanged": "Downloaded the latest DB from OneDrive.",
-      "offlineCached": "Offline mode using the last cached DB.",
-      "cachedFallback": "Using the last cached DB because refreshing from OneDrive failed.",
-      "cachedFallbackPrefix": "{message} Using the last cached DB for now.",
       "completed": "DB sync completed.",
-      "stale": "Cached DB is stale.",
-      "offlineActive": "Offline mode is active.",
       "failed": "Startup sync failed.",
       "failedUnexpected": "Startup sync failed unexpectedly. Check the browser console and retry."
     },

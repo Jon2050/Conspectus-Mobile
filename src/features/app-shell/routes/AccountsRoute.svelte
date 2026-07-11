@@ -3,7 +3,12 @@
   import { onDestroy, onMount } from 'svelte';
   import { get } from 'svelte/store';
   import { appAccountQueryService } from '@db';
-  import { appSyncStateStore, type SyncState, formatAmountDisplay } from '@shared';
+  import {
+    appSyncStateStore,
+    type SyncState,
+    type SyncStateStore,
+    formatAmountDisplay,
+  } from '@shared';
   import { _, locale } from 'svelte-i18n';
 
   import SkeletonCard from '../components/SkeletonCard.svelte';
@@ -13,32 +18,34 @@
     type AccountsRouteState,
   } from './accountsRouteController';
 
+  export let syncStateStore: SyncStateStore = appSyncStateStore;
   export let controller: AccountsRouteController =
     createAccountsRouteController(appAccountQueryService);
 
   let state: AccountsRouteState = controller.getState();
-  let lastObservedSyncState: SyncState = get(appSyncStateStore).state;
+  let lastObservedSyncState: SyncState = get(syncStateStore).state;
+
+  const loadForSyncState = (): void => {
+    const syncSnapshot = get(syncStateStore);
+    void controller.load(syncSnapshot.state === 'error' ? syncSnapshot.message : null);
+  };
 
   const unsubscribeController = controller.subscribe((nextState) => {
     state = nextState;
   });
-  const unsubscribeSyncState = appSyncStateStore.subscribe((syncSnapshot) => {
+  const unsubscribeSyncState = syncStateStore.subscribe((syncSnapshot) => {
     if (syncSnapshot.state === lastObservedSyncState) {
       return;
     }
 
     lastObservedSyncState = syncSnapshot.state;
-    if (
-      syncSnapshot.state === 'synced' ||
-      syncSnapshot.state === 'stale' ||
-      syncSnapshot.state === 'offline'
-    ) {
-      void controller.load();
+    if (syncSnapshot.state === 'synced' || syncSnapshot.state === 'error') {
+      loadForSyncState();
     }
   });
 
   onMount(() => {
-    void controller.load();
+    loadForSyncState();
   });
 
   onDestroy(() => {

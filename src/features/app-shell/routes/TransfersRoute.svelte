@@ -5,6 +5,7 @@
   import {
     appSyncStateStore,
     type SyncState,
+    type SyncStateStore,
     formatEpochDayToDate,
     formatAmountDisplay,
   } from '@shared';
@@ -33,6 +34,7 @@
   const SWIPE_DRAG_LOCK_THRESHOLD_PX = 10;
   const SWIPE_DRAG_MAX_OFFSET_PX = 56;
 
+  export let syncStateStore: SyncStateStore = appSyncStateStore;
   export let controller: TransfersRouteController = createTransfersRouteController(
     appTransferMonthQueryService,
     appAccountQueryService,
@@ -45,30 +47,33 @@
   let swipeDragOffsetX = 0;
   let swipeLockedHorizontally = false;
   let state: TransfersRouteState = controller.getState();
-  let lastObservedSyncState: SyncState = get(appSyncStateStore).state;
+  let lastObservedSyncState: SyncState = get(syncStateStore).state;
 
   $: monthKey = toMonthKey(monthAnchorEpochDay);
   $: monthLabel = formatMonthLabel(monthAnchorEpochDay, $locale);
 
   $: {
-    void controller.load(monthAnchorEpochDay);
+    const syncSnapshot = get(syncStateStore);
+    void controller.load(
+      monthAnchorEpochDay,
+      syncSnapshot.state === 'error' ? syncSnapshot.message : null,
+    );
   }
 
   const unsubscribeController = controller.subscribe((nextState) => {
     state = nextState;
   });
 
-  const unsubscribeSyncState = appSyncStateStore.subscribe((syncSnapshot) => {
+  const unsubscribeSyncState = syncStateStore.subscribe((syncSnapshot) => {
     if (syncSnapshot.state === lastObservedSyncState) {
       return;
     }
     lastObservedSyncState = syncSnapshot.state;
-    if (
-      syncSnapshot.state === 'synced' ||
-      syncSnapshot.state === 'stale' ||
-      syncSnapshot.state === 'offline'
-    ) {
-      void controller.load(monthAnchorEpochDay);
+    if (syncSnapshot.state === 'synced' || syncSnapshot.state === 'error') {
+      void controller.load(
+        monthAnchorEpochDay,
+        syncSnapshot.state === 'error' ? syncSnapshot.message : null,
+      );
     }
   });
 

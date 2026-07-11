@@ -114,42 +114,24 @@ describe('startup freshness service', () => {
     expect(snapshotService.downloadAndCacheSnapshot).not.toHaveBeenCalled();
   });
 
-  it('uses the cached snapshot while offline', async () => {
-    const cachedSnapshot = createSnapshot();
+  it('fails fast while offline without reading a cached snapshot', async () => {
     const graphClient = createGraphClient(createMetadata());
-    const cacheStore = createCacheStore(cachedSnapshot);
-    const snapshotService = createSnapshotService(createSnapshot());
-    const service = createStartupFreshnessService(graphClient, cacheStore, snapshotService);
-
-    await expect(service.resolve(DRIVE_ITEM_BINDING, false)).resolves.toEqual({
-      kind: 'ready',
-      branch: 'offline_cached',
-      syncState: 'offline',
-      snapshot: cachedSnapshot,
-      failure: null,
-    });
-
-    expect(graphClient.getFileMetadata).not.toHaveBeenCalled();
-    expect(snapshotService.downloadAndCacheSnapshot).not.toHaveBeenCalled();
-  });
-
-  it('fails deterministically when offline without a cached snapshot', async () => {
-    const graphClient = createGraphClient(createMetadata());
-    const cacheStore = createCacheStore(null);
+    const cacheStore = createCacheStore(createSnapshot());
     const snapshotService = createSnapshotService(createSnapshot());
     const service = createStartupFreshnessService(graphClient, cacheStore, snapshotService);
 
     await expect(service.resolve(DRIVE_ITEM_BINDING, false)).resolves.toMatchObject({
       kind: 'error',
-      branch: 'offline_missing_cache',
+      branch: 'offline_unsupported',
       syncState: 'error',
       snapshot: null,
       failure: {
-        code: 'offline_cache_missing',
-        message: 'No cached OneDrive database is available while offline.',
+        code: 'offline_unsupported',
+        message: 'Connection is required to load the database.',
       },
     });
 
+    expect(cacheStore.readSnapshot).not.toHaveBeenCalled();
     expect(graphClient.getFileMetadata).not.toHaveBeenCalled();
     expect(snapshotService.downloadAndCacheSnapshot).not.toHaveBeenCalled();
   });
@@ -212,7 +194,7 @@ describe('startup freshness service', () => {
     );
   });
 
-  it('falls back to the cached snapshot as stale when metadata refresh fails online', async () => {
+  it('fails when metadata refresh fails online even if a cached snapshot exists', async () => {
     const cachedSnapshot = createSnapshot();
     const graphClient = createGraphClient(new Error('Graph metadata request failed.'));
     const cacheStore = createCacheStore(cachedSnapshot);
@@ -220,10 +202,10 @@ describe('startup freshness service', () => {
     const service = createStartupFreshnessService(graphClient, cacheStore, snapshotService);
 
     await expect(service.resolve(DRIVE_ITEM_BINDING, true)).resolves.toMatchObject({
-      kind: 'ready',
-      branch: 'online_metadata_failed_cached',
-      syncState: 'stale',
-      snapshot: cachedSnapshot,
+      kind: 'error',
+      branch: 'online_metadata_failed',
+      syncState: 'error',
+      snapshot: null,
       failure: {
         code: 'metadata_fetch_failed',
         message: 'Graph metadata request failed.',
@@ -253,7 +235,7 @@ describe('startup freshness service', () => {
     expect(snapshotService.downloadAndCacheSnapshot).not.toHaveBeenCalled();
   });
 
-  it('surfaces session-expired fallback details when metadata refresh fails with an auth error and cached data exists', async () => {
+  it('surfaces a session-expired terminal error when metadata refresh fails with cached data', async () => {
     const cachedSnapshot = createSnapshot();
     const graphClient = createGraphClient(
       createGraphError(
@@ -267,10 +249,10 @@ describe('startup freshness service', () => {
     const service = createStartupFreshnessService(graphClient, cacheStore, snapshotService);
 
     await expect(service.resolve(DRIVE_ITEM_BINDING, true)).resolves.toMatchObject({
-      kind: 'ready',
-      branch: 'online_auth_expired_cached',
-      syncState: 'stale',
-      snapshot: cachedSnapshot,
+      kind: 'error',
+      branch: 'online_auth_expired',
+      syncState: 'error',
+      snapshot: null,
       failure: {
         code: 'auth_expired',
         message: 'Authentication is required to access the selected OneDrive file.',
@@ -314,7 +296,7 @@ describe('startup freshness service', () => {
     expect(snapshotService.downloadAndCacheSnapshot).not.toHaveBeenCalled();
   });
 
-  it('falls back to the cached snapshot as stale when downloading a fresh snapshot fails online', async () => {
+  it('fails when downloading a fresh snapshot fails even if a cached snapshot exists', async () => {
     const cachedSnapshot = createSnapshot({
       metadata: {
         eTag: '"etag-old"',
@@ -327,10 +309,10 @@ describe('startup freshness service', () => {
     const service = createStartupFreshnessService(graphClient, cacheStore, snapshotService);
 
     await expect(service.resolve(DRIVE_ITEM_BINDING, true)).resolves.toMatchObject({
-      kind: 'ready',
-      branch: 'online_download_failed_cached',
-      syncState: 'stale',
-      snapshot: cachedSnapshot,
+      kind: 'error',
+      branch: 'online_download_failed',
+      syncState: 'error',
+      snapshot: null,
       failure: {
         code: 'snapshot_download_failed',
         message: 'Fresh snapshot download failed.',
@@ -338,7 +320,7 @@ describe('startup freshness service', () => {
     });
   });
 
-  it('keeps the cached snapshot and marks the session as expired when downloading a fresh snapshot fails with an auth error', async () => {
+  it('returns a session-expired error when download auth fails with cached data', async () => {
     const cachedSnapshot = createSnapshot({
       metadata: {
         eTag: '"etag-old"',
@@ -357,10 +339,10 @@ describe('startup freshness service', () => {
     const service = createStartupFreshnessService(graphClient, cacheStore, snapshotService);
 
     await expect(service.resolve(DRIVE_ITEM_BINDING, true)).resolves.toMatchObject({
-      kind: 'ready',
-      branch: 'online_auth_expired_cached',
-      syncState: 'stale',
-      snapshot: cachedSnapshot,
+      kind: 'error',
+      branch: 'online_auth_expired',
+      syncState: 'error',
+      snapshot: null,
       failure: {
         code: 'auth_expired',
         message: 'Authentication is required to access the selected OneDrive file.',
@@ -490,7 +472,7 @@ describe('startup freshness service', () => {
     expect(waitFor).toHaveBeenNthCalledWith(2, 500);
   });
 
-  it('keeps the cached snapshot as stale after transient download failures exhaust retries', async () => {
+  it('returns an error after transient download failures exhaust retries with cached data', async () => {
     const cachedSnapshot = createSnapshot({
       metadata: {
         eTag: '"etag-old"',
@@ -512,10 +494,10 @@ describe('startup freshness service', () => {
     });
 
     await expect(service.resolve(DRIVE_ITEM_BINDING, true)).resolves.toMatchObject({
-      kind: 'ready',
-      branch: 'online_download_failed_cached',
-      syncState: 'stale',
-      snapshot: cachedSnapshot,
+      kind: 'error',
+      branch: 'online_download_failed',
+      syncState: 'error',
+      snapshot: null,
       failure: {
         code: 'snapshot_download_failed',
         message:
@@ -642,7 +624,7 @@ describe('startup freshness service', () => {
     expect(snapshotService.downloadAndCacheSnapshot).not.toHaveBeenCalled();
   });
 
-  it('keeps the cached snapshot as stale after transient metadata failures exhaust retries', async () => {
+  it('returns an error after transient metadata failures exhaust retries with cached data', async () => {
     const cachedSnapshot = createSnapshot();
     const graphClient = createGraphClient(
       createGraphError('network_error', 'Temporary metadata outage.', 503),
@@ -659,10 +641,10 @@ describe('startup freshness service', () => {
     });
 
     await expect(service.resolve(DRIVE_ITEM_BINDING, true)).resolves.toMatchObject({
-      kind: 'ready',
-      branch: 'online_metadata_failed_cached',
-      syncState: 'stale',
-      snapshot: cachedSnapshot,
+      kind: 'error',
+      branch: 'online_metadata_failed',
+      syncState: 'error',
+      snapshot: null,
       failure: {
         code: 'metadata_fetch_failed',
         message:

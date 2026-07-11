@@ -34,6 +34,7 @@
     applyStartupDbRuntimeError,
     applyUnexpectedStartupSyncError,
     beginStartupSync,
+    clearStartupSyncToast,
     updateStartupSyncProgress,
   } from './startupSyncStateController';
   import { syncDbRuntimeForStartupDecision } from './startupDbRuntimeSync';
@@ -124,6 +125,7 @@
 
   const performSync = async (binding: DriveItemBinding | null): Promise<void> => {
     const syncId = ++currentSyncId;
+    clearStartupSyncToast(syncStateStore);
     syncStateStore.reset();
     const dbRuntime = resolveAppDbRuntime();
 
@@ -201,6 +203,7 @@
     if (hasPerformedInitialSync) {
       void performSync(binding);
     } else {
+      clearStartupSyncToast(syncStateStore);
       syncStateStore.reset();
     }
   });
@@ -402,6 +405,7 @@
   });
 
   onDestroy(() => {
+    clearStartupSyncToast(syncStateStore);
     unsubscribe();
     unsubscribeAddTransferSaveController();
     unsubscribeSelectedBinding();
@@ -466,12 +470,13 @@
     </section>
   {/if}
 
-  {#if $syncStateStore.state === 'syncing' && $syncStateStore.progress !== null}
+  {#if $syncStateStore.state === 'syncing'}
     <section class="startup-sync-progress" data-testid="startup-sync-progress">
       <ProgressIndicator
-        loaded={$syncStateStore.progress.loaded}
-        total={$syncStateStore.progress.total}
-        kind={$syncStateStore.progress.kind}
+        loaded={$syncStateStore.progress?.loaded ?? 0}
+        total={$syncStateStore.progress?.total ?? null}
+        kind={$syncStateStore.progress?.kind ?? 'download'}
+        statusText={$syncStateStore.progress === null ? $syncStateStore.message : null}
       />
     </section>
   {/if}
@@ -486,9 +491,9 @@
       {#if showLoadingPlaceholder}
         <LoadingPlaceholder />
       {:else if currentRoute === 'accounts'}
-        <AccountsRoute />
+        <AccountsRoute {syncStateStore} />
       {:else if currentRoute === 'transfers'}
-        <TransfersRoute />
+        <TransfersRoute {syncStateStore} />
       {:else if currentRoute === 'add'}
         <AddRoute
           bind:fields={addTransferFields}

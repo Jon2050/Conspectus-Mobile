@@ -9,17 +9,13 @@ export type StartupFreshnessBranch =
   | 'no_binding'
   | 'online_unchanged'
   | 'online_changed'
-  | 'offline_cached'
-  | 'offline_missing_cache'
-  | 'online_metadata_failed_cached'
+  | 'offline_unsupported'
   | 'online_metadata_failed'
-  | 'online_download_failed_cached'
   | 'online_download_failed'
-  | 'online_auth_expired_cached'
   | 'online_auth_expired';
 
 export type StartupFreshnessFailureCode =
-  | 'offline_cache_missing'
+  | 'offline_unsupported'
   | 'metadata_fetch_failed'
   | 'snapshot_download_failed'
   | 'auth_expired';
@@ -45,21 +41,15 @@ export interface StartupFreshnessSkippedDecision extends StartupFreshnessBaseDec
 
 export interface StartupFreshnessReadyDecision extends StartupFreshnessBaseDecision {
   readonly kind: 'ready';
-  readonly branch:
-    | 'online_unchanged'
-    | 'online_changed'
-    | 'offline_cached'
-    | 'online_metadata_failed_cached'
-    | 'online_download_failed_cached'
-    | 'online_auth_expired_cached';
-  readonly syncState: 'synced' | 'offline' | 'stale';
+  readonly branch: 'online_unchanged' | 'online_changed';
+  readonly syncState: 'synced';
   readonly snapshot: CachedDatabaseSnapshot;
 }
 
 export interface StartupFreshnessErrorDecision extends StartupFreshnessBaseDecision {
   readonly kind: 'error';
   readonly branch:
-    | 'offline_missing_cache'
+    | 'offline_unsupported'
     | 'online_metadata_failed'
     | 'online_download_failed'
     | 'online_auth_expired';
@@ -250,31 +240,21 @@ export const createStartupFreshnessService = (
       };
     }
 
-    const cachedSnapshot = await cacheStore.readSnapshot(binding);
-
     if (!isOnline) {
-      if (cachedSnapshot !== null) {
-        return {
-          kind: 'ready',
-          branch: 'offline_cached',
-          syncState: 'offline',
-          snapshot: cachedSnapshot,
-          failure: null,
-        };
-      }
-
       return {
         kind: 'error',
-        branch: 'offline_missing_cache',
+        branch: 'offline_unsupported',
         syncState: 'error',
         snapshot: null,
         failure: createFailure(
-          'offline_cache_missing',
-          new Error('No cached OneDrive database is available while offline.'),
-          'No cached OneDrive database is available while offline.',
+          'offline_unsupported',
+          new Error('Connection is required to load the database.'),
+          'Connection is required to load the database.',
         ),
       };
     }
+
+    const cachedSnapshot = await cacheStore.readSnapshot(binding);
 
     try {
       const retryOptions = normalizeRetryOptions(options.retry);
@@ -317,16 +297,6 @@ export const createStartupFreshnessService = (
 
         const failure = createFailure(failureCode, error, fallbackMessage);
 
-        if (cachedSnapshot !== null) {
-          return {
-            kind: 'ready',
-            branch: isAuthError ? 'online_auth_expired_cached' : 'online_download_failed_cached',
-            syncState: 'stale',
-            snapshot: cachedSnapshot,
-            failure,
-          };
-        }
-
         return {
           kind: 'error',
           branch: isAuthError ? 'online_auth_expired' : 'online_download_failed',
@@ -343,16 +313,6 @@ export const createStartupFreshnessService = (
         : 'Failed to refresh the selected OneDrive database metadata.';
 
       const failure = createFailure(failureCode, error, fallbackMessage);
-
-      if (cachedSnapshot !== null) {
-        return {
-          kind: 'ready',
-          branch: isAuthError ? 'online_auth_expired_cached' : 'online_metadata_failed_cached',
-          syncState: 'stale',
-          snapshot: cachedSnapshot,
-          failure,
-        };
-      }
 
       return {
         kind: 'error',

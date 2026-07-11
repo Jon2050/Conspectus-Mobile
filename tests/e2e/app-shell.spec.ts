@@ -1632,7 +1632,7 @@ test('shows syncing state and toast feedback while the startup freshness check i
     startAuthenticated: true,
   });
   await installMockGraphClient(page, {
-    metadataDelayMs: 1_500,
+    metadataDelayMs: 3_500,
     metadataETag: '"etag-1"',
   });
   await installMockCacheStore(page, {
@@ -1649,8 +1649,16 @@ test('shows syncing state and toast feedback while the startup freshness check i
   await page.goto(appPath('#/accounts'));
 
   await expect(page.getByText('Syncing with OneDrive in the background...')).toBeVisible();
+  await expect(page.getByTestId('startup-sync-progress')).toBeVisible();
+  await expect(page.getByTestId('progress-bar')).not.toHaveAttribute('value', /.+/u);
+
+  await page.waitForTimeout(3_000);
+  await expect(page.getByText('Syncing with OneDrive in the background...')).toBeVisible();
+  await expect(page.getByTestId('startup-sync-progress')).toBeVisible();
 
   await expect(page.getByText('Cached DB is current with OneDrive.')).toBeVisible();
+  await expect(page.getByText('Syncing with OneDrive in the background...')).toHaveCount(0);
+  await expect(page.getByTestId('startup-sync-progress')).toHaveCount(0);
 });
 
 test('shows download progress feedback during slow startup sync', async ({ page }) => {
@@ -1727,7 +1735,7 @@ test('retries transient startup metadata failures before settling on the cached 
   expect(await getGraphDownloadCallCount(page)).toBe(0);
 });
 
-test('keeps the cached DB as stale when transient startup metadata failures exhaust retries', async ({
+test('rejects cached account data when transient startup metadata failures exhaust retries', async ({
   page,
 }) => {
   await installMockAuthClient(page, {
@@ -1748,18 +1756,25 @@ test('keeps the cached DB as stale when transient startup metadata failures exha
       dbBytes: createSqliteBytes([3, 3, 3, 3]),
     },
   });
+  await installMockDbRuntime(page, {
+    accountRows: [
+      { accountId: 99, name: 'Stale cached account', amountCents: 999_999, accountTypeId: 3 },
+    ],
+  });
   await installPersistedBinding(page);
   await installMockStartupNetworkState(page, true);
 
   await page.goto(appPath('#/accounts'));
 
-  await expect(
-    page.getByText(
-      'Unable to refresh the selected OneDrive database metadata after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again. Using the last cached DB for now.',
-    ),
-  ).toBeVisible();
+  await expect(page.getByTestId('accounts-route-status')).toHaveAttribute('role', 'alert');
+  await expect(page.getByTestId('accounts-route-status')).toContainText(
+    'Unable to refresh the selected OneDrive database metadata after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again.',
+  );
+  await expect(page.getByTestId('accounts-route-cards')).toHaveCount(0);
+  await expect(page.getByText('Stale cached account')).toHaveCount(0);
   expect(await getGraphMetadataCallCount(page)).toBe(3);
   expect(await getGraphDownloadCallCount(page)).toBe(0);
+  expect(await getDbRuntimeCloseCallCount(page)).toBeGreaterThan(0);
 });
 
 test('shows a startup sync error when transient metadata failures exhaust retries without a cached DB', async ({
@@ -1781,11 +1796,9 @@ test('shows a startup sync error when transient metadata failures exhaust retrie
 
   await page.goto(appPath('#/accounts'));
 
-  await expect(
-    page.getByText(
-      'Unable to refresh the selected OneDrive database metadata after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again.',
-    ),
-  ).toBeVisible();
+  await expect(page.getByTestId('accounts-route-status')).toContainText(
+    'Unable to refresh the selected OneDrive database metadata after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again.',
+  );
   expect(await getGraphMetadataCallCount(page)).toBe(3);
   expect(await getGraphDownloadCallCount(page)).toBe(0);
 });
@@ -1805,7 +1818,7 @@ test('fails fast on non-retryable startup metadata errors and surfaces the clear
 
   await page.goto(appPath('#/accounts'));
 
-  await expect(page.getByText('Mock access denied.')).toBeVisible();
+  await expect(page.getByTestId('accounts-route-status')).toContainText('Mock access denied.');
   expect(await getGraphMetadataCallCount(page)).toBe(1);
   expect(await getGraphDownloadCallCount(page)).toBe(0);
 });
@@ -1831,9 +1844,9 @@ test('surfaces a sign-in-again recovery action when startup metadata refresh fai
 
   await page.goto(appPath('#/accounts'));
 
-  await expect(
-    page.getByText('Your session has expired. Please sign in again to sync with OneDrive.'),
-  ).toBeVisible();
+  await expect(page.getByTestId('accounts-route-status')).toContainText(
+    'Your session has expired. Please sign in again to sync with OneDrive.',
+  );
   expect(await getGraphMetadataCallCount(page)).toBe(1);
   expect(await getGraphDownloadCallCount(page)).toBe(0);
 
@@ -1900,7 +1913,7 @@ test('retries transient startup download failures before downloading the latest 
   expect(await getGraphDownloadCallCount(page)).toBe(3);
 });
 
-test('keeps the cached DB as stale when transient startup download failures exhaust retries', async ({
+test('rejects cached transfer data when transient startup download failures exhaust retries', async ({
   page,
 }) => {
   await installMockAuthClient(page, {
@@ -1922,18 +1935,41 @@ test('keeps the cached DB as stale when transient startup download failures exha
       dbBytes: createSqliteBytes([1, 1, 1, 1]),
     },
   });
+  await installMockDbRuntime(page, {
+    accountRows: [
+      { accountId: 3, name: 'Checking', amountCents: 1_000, accountTypeId: 3 },
+      { accountId: 4, name: 'Savings', amountCents: 2_000, accountTypeId: 3 },
+    ],
+    transferRows: [
+      {
+        transferId: 99,
+        bookingDateEpochDay: Math.floor(Date.now() / 86_400_000),
+        name: 'Stale cached transfer',
+        amountCents: 500,
+        fromAccountId: 3,
+        toAccountId: 4,
+        categoryIds: [],
+        buyplace: null,
+      },
+    ],
+  });
   await installPersistedBinding(page);
   await installMockStartupNetworkState(page, true);
 
-  await page.goto(appPath('#/accounts'));
+  await page.goto(appPath('#/transfers'));
 
-  await expect(
-    page.getByText(
-      'Unable to download the latest OneDrive database snapshot after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again. Using the last cached DB for now.',
-    ),
-  ).toBeVisible();
+  await expect(page.getByTestId('transfers-route-status')).toHaveAttribute('role', 'alert');
+  await expect(page.getByTestId('transfers-route-status')).toContainText(
+    'Unable to download the latest OneDrive database snapshot after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again.',
+  );
+  await expect(page.getByTestId('transfers-route-cards')).toHaveCount(0);
+  await expect(page.getByText('Stale cached transfer')).toHaveCount(0);
   expect(await getGraphMetadataCallCount(page)).toBe(1);
   expect(await getGraphDownloadCallCount(page)).toBe(3);
+
+  await page.getByRole('link', { name: 'Settings' }).click();
+  await expect(page.getByTestId('route-settings')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Change DB file' })).toBeVisible();
 });
 
 test('shows a startup sync error when transient download failures exhaust retries without a cached DB', async ({
@@ -1956,16 +1992,14 @@ test('shows a startup sync error when transient download failures exhaust retrie
 
   await page.goto(appPath('#/accounts'));
 
-  await expect(
-    page.getByText(
-      'Unable to download the latest OneDrive database snapshot after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again.',
-    ),
-  ).toBeVisible();
+  await expect(page.getByTestId('accounts-route-status')).toContainText(
+    'Unable to download the latest OneDrive database snapshot after 3 attempts because OneDrive or the network remained unavailable. Check your connection and try again.',
+  );
   expect(await getGraphMetadataCallCount(page)).toBe(1);
   expect(await getGraphDownloadCallCount(page)).toBe(3);
 });
 
-test('keeps the cached DB available and offers sign-in again when download fails because the session expired', async ({
+test('rejects the cached DB and offers sign-in again when download auth expires', async ({
   page,
 }) => {
   await installMockAuthClient(page, {
@@ -1994,11 +2028,11 @@ test('keeps the cached DB available and offers sign-in again when download fails
 
   await page.goto(appPath('#/accounts'));
 
-  await expect(
-    page.getByText(
-      'Your session has expired. Please sign in again to sync with OneDrive. Using the last cached DB for now.',
-    ),
-  ).toBeVisible();
+  await expect(page.getByTestId('accounts-route-status')).toContainText(
+    'Your session has expired. Please sign in again to sync with OneDrive.',
+  );
+  await expect(page.getByTestId('accounts-route-status')).toHaveAttribute('role', 'alert');
+  await expect(page.getByTestId('accounts-route-cards')).toHaveCount(0);
   expect(await getGraphMetadataCallCount(page)).toBe(1);
   expect(await getGraphDownloadCallCount(page)).toBe(1);
 
@@ -2006,7 +2040,7 @@ test('keeps the cached DB available and offers sign-in again when download fails
   await expect(page.getByTestId('route-settings')).toBeVisible();
 });
 
-test('uses the cached DB on startup when offline', async ({ page }) => {
+test('rejects cached DB data when startup is offline', async ({ page }) => {
   await installMockAuthClient(page, {
     startAuthenticated: true,
   });
@@ -2024,8 +2058,12 @@ test('uses the cached DB on startup when offline', async ({ page }) => {
 
   await page.goto(appPath('#/accounts'));
 
-  await expect(page.getByText('Offline mode using the last cached DB.')).toBeVisible();
-  expect(await getCacheReadSnapshotCallCount(page)).toBe(1);
+  await expect(page.getByTestId('accounts-route-status')).toContainText(
+    'Connection is required to load the database.',
+  );
+  await expect(page.getByTestId('accounts-route-status')).toHaveAttribute('role', 'alert');
+  await expect(page.getByTestId('accounts-route-cards')).toHaveCount(0);
+  expect(await getCacheReadSnapshotCallCount(page)).toBe(0);
   expect(await getGraphMetadataCallCount(page)).toBe(0);
   expect(await getGraphDownloadCallCount(page)).toBe(0);
 });
@@ -2041,10 +2079,11 @@ test('shows a startup sync error when offline without a cached DB', async ({ pag
 
   await page.goto(appPath('#/accounts'));
 
-  await expect(
-    page.getByText('No cached OneDrive database is available while offline.'),
-  ).toBeVisible();
-  expect(await getCacheReadSnapshotCallCount(page)).toBe(1);
+  await expect(page.getByTestId('accounts-route-status')).toContainText(
+    'Connection is required to load the database.',
+  );
+  await expect(page.getByTestId('accounts-route-status')).toBeVisible();
+  expect(await getCacheReadSnapshotCallCount(page)).toBe(0);
   expect(await getGraphMetadataCallCount(page)).toBe(0);
   expect(await getGraphDownloadCallCount(page)).toBe(0);
 });

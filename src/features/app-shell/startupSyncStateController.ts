@@ -8,6 +8,7 @@ import { _ } from 'svelte-i18n';
 
 interface ToastStoreLike {
   show(message: string, type?: ToastType, durationMs?: number): string;
+  remove(id: string): void;
 }
 
 const STARTUP_SYNCING_MESSAGE = 'sync.startup.checking';
@@ -23,10 +24,12 @@ const STARTUP_DB_RUNTIME_FAILURE_MESSAGES: Record<DbRuntimeErrorCode, string> = 
   db_export_failed: 'sync.dbRuntimeError.exportFailed',
 };
 
-const buildCachedFallbackMessage = (failure: StartupFreshnessDecision['failure']): string =>
-  failure === null
-    ? get(_)('sync.startup.cachedFallback')
-    : get(_)('sync.startup.cachedFallbackPrefix', { values: { message: failure.message } });
+interface ActiveStartupToast {
+  readonly id: string;
+  readonly store: ToastStoreLike;
+}
+
+const activeStartupToasts = new WeakMap<SyncStateStore, ActiveStartupToast>();
 
 const buildStartupSyncMessage = (decision: StartupFreshnessDecision): string | null => {
   switch (decision.branch) {
@@ -36,14 +39,8 @@ const buildStartupSyncMessage = (decision: StartupFreshnessDecision): string | n
       return get(_)('sync.startup.onlineUnchanged');
     case 'online_changed':
       return get(_)('sync.startup.onlineChanged');
-    case 'offline_cached':
-      return get(_)('sync.startup.offlineCached');
-    case 'online_auth_expired_cached':
-    case 'online_metadata_failed_cached':
-    case 'online_download_failed_cached':
-      return buildCachedFallbackMessage(decision.failure);
     case 'online_auth_expired':
-    case 'offline_missing_cache':
+    case 'offline_unsupported':
     case 'online_metadata_failed':
     case 'online_download_failed':
       return decision.failure.message;
@@ -66,16 +63,8 @@ const showDecisionToast = (
     case 'online_changed':
       toastStore.show(message, 'success', 3200);
       return;
-    case 'offline_cached':
-      toastStore.show(message, 'info', 3200);
-      return;
-    case 'online_auth_expired_cached':
-    case 'online_metadata_failed_cached':
-    case 'online_download_failed_cached':
-      toastStore.show(message, 'warning', 4200);
-      return;
     case 'online_auth_expired':
-    case 'offline_missing_cache':
+    case 'offline_unsupported':
     case 'online_metadata_failed':
     case 'online_download_failed':
       toastStore.show(message, 'error', 5000);
@@ -89,8 +78,20 @@ export const beginStartupSync = (
   syncStateStore: SyncStateStore,
   toastStore: ToastStoreLike = appToastStore,
 ): void => {
+  clearStartupSyncToast(syncStateStore);
   syncStateStore.setSyncing(get(_)(STARTUP_SYNCING_MESSAGE));
-  toastStore.show(get(_)(STARTUP_SYNCING_TOAST_MESSAGE), 'info', 2800);
+  const id = toastStore.show(get(_)(STARTUP_SYNCING_TOAST_MESSAGE), 'info', 0);
+  activeStartupToasts.set(syncStateStore, { id, store: toastStore });
+};
+
+export const clearStartupSyncToast = (syncStateStore: SyncStateStore): void => {
+  const activeToast = activeStartupToasts.get(syncStateStore);
+  if (activeToast === undefined) {
+    return;
+  }
+
+  activeStartupToasts.delete(syncStateStore);
+  activeToast.store.remove(activeToast.id);
 };
 
 export const updateStartupSyncProgress = (
@@ -106,6 +107,7 @@ export const applyStartupFreshnessDecision = (
   decision: StartupFreshnessDecision,
   toastStore: ToastStoreLike = appToastStore,
 ): void => {
+  clearStartupSyncToast(syncStateStore);
   const message = buildStartupSyncMessage(decision);
 
   switch (decision.syncState) {
@@ -114,16 +116,6 @@ export const applyStartupFreshnessDecision = (
       return;
     case 'synced':
       syncStateStore.setSynced(message ?? get(_)('sync.startup.completed'), {
-        branch: decision.branch,
-      });
-      break;
-    case 'stale':
-      syncStateStore.setStale(message ?? get(_)('sync.startup.stale'), {
-        branch: decision.branch,
-      });
-      break;
-    case 'offline':
-      syncStateStore.setOffline(message ?? get(_)('sync.startup.offlineActive'), {
         branch: decision.branch,
       });
       break;
@@ -142,6 +134,7 @@ export const applyUnexpectedStartupSyncError = (
   message: string,
   toastStore: ToastStoreLike = appToastStore,
 ): void => {
+  clearStartupSyncToast(syncStateStore);
   syncStateStore.setError(message);
   toastStore.show(message, 'error', 5000);
 };
@@ -151,6 +144,7 @@ export const applyStartupDbRuntimeError = (
   error: unknown,
   toastStore: ToastStoreLike = appToastStore,
 ): void => {
+  clearStartupSyncToast(syncStateStore);
   const message = get(_)(
     isDbRuntimeError(error)
       ? STARTUP_DB_RUNTIME_FAILURE_MESSAGES[error.code]
@@ -164,6 +158,7 @@ export const applyStartupDbRuntimeError = (
 
 export const startupSyncStateController = {
   beginStartupSync,
+  clearStartupSyncToast,
   updateStartupSyncProgress,
   applyStartupFreshnessDecision,
   applyStartupDbRuntimeError,

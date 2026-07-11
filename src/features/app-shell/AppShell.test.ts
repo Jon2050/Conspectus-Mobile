@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { readable } from 'svelte/store';
 import { render } from 'svelte/server';
-import { formatBuildInfoLabel, getFallbackBuildInfo } from '@shared';
+import { createSyncStateStore, formatBuildInfoLabel, getFallbackBuildInfo } from '@shared';
 
 import AppShell from './AppShell.svelte';
 import { APP_ROUTES, type AppRouteKey } from './hashRouting';
@@ -99,5 +99,24 @@ describe('AppShell component', () => {
     expect(body).toContain('data-testid="pending-transfer-review"');
     expect(body).toContain('data-testid="pending-transfer-retry"');
     expect(body).toContain('Transfersynchronisierung benötigt Aufmerksamkeit');
+  });
+
+  it('renders indeterminate progress throughout the startup metadata check', () => {
+    const syncStateStore = createSyncStateStore({
+      state: 'syncing',
+      message: 'Checking OneDrive database freshness...',
+    });
+    const { body } = render(AppShell, {
+      props: {
+        routeStore: readable<AppRouteKey>('settings'),
+        showLoadingPlaceholder: false,
+        syncStateStore,
+      },
+    });
+
+    expect(body).toContain('data-testid="startup-sync-progress"');
+    expect(body).toContain('data-testid="progress-bar"');
+    expect(body).toContain('Checking OneDrive database freshness...');
+    expect(body).not.toMatch(/<progress[^>]*\svalue=/u);
   });
 });

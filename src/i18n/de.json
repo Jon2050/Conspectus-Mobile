@@ -199,12 +199,7 @@
       "toastSyncing": "Synchronisiere mit OneDrive...",
       "onlineUnchanged": "Zwischengespeicherte DB ist aktuell",
       "onlineChanged": "Neueste DB von OneDrive heruntergeladen.",
-      "offlineCached": "Offline-Modus nutzt die zuletzt zwischengespeicherte DB.",
-      "cachedFallback": "Nutze die letzte zwischengespeicherte DB, da die Aktualisierung fehlgeschlagen ist.",
-      "cachedFallbackPrefix": "{message} Nutze vorerst die zwischengespeicherte DB.",
       "completed": "DB-Synchronisation abgeschlossen.",
-      "stale": "Zwischengespeicherte DB ist veraltet.",
-      "offlineActive": "Offline-Modus ist aktiv.",
       "failed": "Start-Synchronisation fehlgeschlagen.",
       "failedUnexpected": "Start-Synchronisation unerwartet fehlgeschlagen. Bitte prüfe die Browser-Konsole und versuche es erneut."
     },

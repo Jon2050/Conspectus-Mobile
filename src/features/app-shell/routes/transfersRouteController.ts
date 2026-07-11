@@ -41,7 +41,7 @@ export type TransfersRouteStateListener = (state: TransfersRouteState) => void;
 export interface TransfersRouteController {
   getState(): TransfersRouteState;
   subscribe(listener: TransfersRouteStateListener): () => void;
-  load(monthAnchorEpochDay: number): Promise<void>;
+  load(monthAnchorEpochDay: number, syncErrorMessage?: string | null): Promise<void>;
 }
 
 const INITIAL_STATE: TransfersRouteState = {
@@ -92,12 +92,21 @@ export const createTransfersRouteController = (
       };
     },
 
-    async load(monthAnchorEpochDay: number): Promise<void> {
+    async load(monthAnchorEpochDay: number, syncErrorMessage: string | null = null): Promise<void> {
       updateState({
         operation: 'loading',
         transfers: [],
         error: null,
       });
+
+      if (syncErrorMessage !== null && syncErrorMessage.trim().length > 0) {
+        updateState({
+          operation: 'error',
+          transfers: [],
+          error: { message: syncErrorMessage },
+        });
+        return;
+      }
 
       try {
         const rawTransfers = transferMonthQueryService.listTransfersByMonth(monthAnchorEpochDay);
