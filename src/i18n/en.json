@@ -166,7 +166,9 @@
     "sync": {
       "lastSync": "Last sync",
       "never": "Not synced yet",
-      "unknown": "Unknown"
+      "unknown": "Unknown",
+      "refresh": "Refresh from OneDrive",
+      "refreshing": "Refreshing from OneDrive..."
     },
     "actions": {
       "standard": "Database actions",

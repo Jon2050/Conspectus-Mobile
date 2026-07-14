@@ -37,6 +37,7 @@
   export let cacheStore: SettingsCacheStore = resolveSettingsCacheStore();
   export let graphClient: GraphClient = resolveSettingsGraphClient();
   export let syncStateStore: SyncStateStore = appSyncStateStore;
+  export let onForceRefresh: (() => Promise<void>) | null = null;
 
   let state: SettingsAuthState = {
     session: {
@@ -68,6 +69,9 @@
   let syncMetadataRequestId = 0;
   let loadedSyncMetadataBindingKey: string | null = null;
   let buildInfo: BuildInfo = getFallbackBuildInfo();
+  let forceRefreshIsPending = false;
+  let forceRefreshStatusIsVisible = false;
+  let syncSnapshot = get(syncStateStore);
 
   const buildStatusMessage = (nextState: SettingsAuthState): string => {
     if (nextState.operation !== 'idle') {
@@ -195,6 +199,20 @@
     void localDataController.confirmReset();
   };
 
+  const handleForceRefreshClick = async (): Promise<void> => {
+    if (onForceRefresh === null || forceRefreshIsPending || syncSnapshot.state === 'syncing') {
+      return;
+    }
+
+    forceRefreshIsPending = true;
+    forceRefreshStatusIsVisible = true;
+    try {
+      await onForceRefresh();
+    } finally {
+      forceRefreshIsPending = false;
+    }
+  };
+
   const handleLocalResetDialogCancel = (event: Event): void => {
     event.preventDefault();
     localDataController.cancelReset();
@@ -223,11 +241,13 @@
   const loadLastSyncMetadata = async (
     isAuthenticated: boolean,
     binding: SettingsFileBindingState['selectedBinding'],
+    resetForceRefreshStatus = true,
   ): Promise<void> => {
     if (!isAuthenticated || binding === null) {
       loadedSyncMetadataBindingKey = null;
       syncMetadataRequestId += 1;
       lastSyncAtIso = null;
+      forceRefreshStatusIsVisible = false;
       return;
     }
 
@@ -237,6 +257,9 @@
     }
 
     loadedSyncMetadataBindingKey = bindingKey;
+    if (resetForceRefreshStatus) {
+      forceRefreshStatusIsVisible = false;
+    }
     const requestId = ++syncMetadataRequestId;
     try {
       const snapshot = await cacheStore.readSnapshot(binding);
@@ -253,12 +276,13 @@
   $: void loadLastSyncMetadata(state.session.isAuthenticated, bindingState.selectedBinding);
 
   const unsubscribeSyncState = syncStateStore.subscribe((syncState) => {
+    syncSnapshot = syncState;
     if (syncState.state !== 'synced') {
       return;
     }
 
     loadedSyncMetadataBindingKey = null;
-    void loadLastSyncMetadata(state.session.isAuthenticated, bindingState.selectedBinding);
+    void loadLastSyncMetadata(state.session.isAuthenticated, bindingState.selectedBinding, false);
   });
 
   $: if (localDataResetDialogElement !== null) {
@@ -342,6 +366,23 @@
           ? $_('settings.db.actions.select')
           : $_('settings.db.actions.change')}
       </button>
+
+      {#if bindingState.selectedBinding !== null && onForceRefresh !== null}
+        <button
+          class="app-button app-button--secondary"
+          type="button"
+          data-testid="force-refresh-button"
+          aria-busy={forceRefreshIsPending}
+          on:click={() => void handleForceRefreshClick()}
+          disabled={authOperationIsPending ||
+            bindingState.operation !== 'idle' ||
+            localDataResetState.operation !== 'idle' ||
+            forceRefreshIsPending ||
+            syncSnapshot.state === 'syncing'}
+        >
+          {forceRefreshIsPending ? $_('settings.sync.refreshing') : $_('settings.sync.refresh')}
+        </button>
+      {/if}
 
       {#if bindingState.browserIsOpen}
         {#if bindingState.canGoBack}
@@ -444,6 +485,17 @@
           </dd>
         </div>
       </dl>
+
+      {#if forceRefreshStatusIsVisible && syncSnapshot.state !== 'idle' && syncSnapshot.message !== null}
+        <p
+          class="settings-screen__sync-status"
+          data-testid="force-refresh-status"
+          role={syncSnapshot.state === 'error' ? 'alert' : 'status'}
+          aria-live="polite"
+        >
+          {syncSnapshot.message}
+        </p>
+      {/if}
     {/if}
 
     {#if bindingState.browserIsOpen}
@@ -583,6 +635,14 @@
   .settings-screen__binding-status {
     margin: 0;
     color: var(--text-secondary);
+  }
+
+  .settings-screen__sync-status {
+    margin: 0;
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--accent) 10%, var(--surface-strong));
+    color: var(--text-primary);
   }
 
   .settings-screen__binding-error {

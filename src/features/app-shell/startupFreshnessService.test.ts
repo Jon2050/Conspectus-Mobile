@@ -158,6 +158,70 @@ describe('startup freshness service', () => {
     expect(snapshotService.downloadAndCacheSnapshot).not.toHaveBeenCalled();
   });
 
+  it('forces a download when requested even if the OneDrive eTag is unchanged', async () => {
+    const cachedSnapshot = createSnapshot({
+      metadata: {
+        eTag: '"etag-unchanged"',
+        lastSyncAtIso: '2026-03-11T09:45:00.000Z',
+      },
+    });
+    const metadata = createMetadata({ eTag: '"etag-unchanged"' });
+    const downloadedSnapshot = createSnapshot({
+      metadata: {
+        eTag: '"etag-unchanged"',
+        lastSyncAtIso: '2026-03-11T10:45:00.000Z',
+      },
+      dbBytes: Uint8Array.from([9, 8, 7, 6]),
+    });
+    const graphClient = createGraphClient(metadata);
+    const cacheStore = createCacheStore(cachedSnapshot);
+    const snapshotService = createSnapshotService(downloadedSnapshot);
+    const service = createStartupFreshnessService(graphClient, cacheStore, snapshotService);
+
+    await expect(
+      service.resolve(DRIVE_ITEM_BINDING, true, undefined, 'force_download'),
+    ).resolves.toEqual({
+      kind: 'ready',
+      branch: 'online_changed',
+      syncState: 'synced',
+      snapshot: downloadedSnapshot,
+      failure: null,
+    });
+
+    expect(graphClient.getFileMetadata).toHaveBeenCalledTimes(1);
+    expect(snapshotService.downloadAndCacheSnapshot).toHaveBeenCalledWith(
+      DRIVE_ITEM_BINDING,
+      metadata,
+      undefined,
+    );
+  });
+
+  it('reports a forced-download failure without returning the cached snapshot as success', async () => {
+    const cachedSnapshot = createSnapshot({
+      metadata: {
+        eTag: '"etag-unchanged"',
+        lastSyncAtIso: '2026-03-11T09:45:00.000Z',
+      },
+    });
+    const graphClient = createGraphClient(createMetadata({ eTag: '"etag-unchanged"' }));
+    const cacheStore = createCacheStore(cachedSnapshot);
+    const snapshotService = createSnapshotService(new Error('Forced refresh download failed.'));
+    const service = createStartupFreshnessService(graphClient, cacheStore, snapshotService);
+
+    await expect(
+      service.resolve(DRIVE_ITEM_BINDING, true, undefined, 'force_download'),
+    ).resolves.toMatchObject({
+      kind: 'error',
+      branch: 'online_download_failed',
+      syncState: 'error',
+      snapshot: null,
+      failure: {
+        code: 'snapshot_download_failed',
+        message: 'Forced refresh download failed.',
+      },
+    });
+  });
+
   it('downloads and returns a fresh snapshot when the OneDrive eTag changed', async () => {
     const cachedSnapshot = createSnapshot({
       metadata: {

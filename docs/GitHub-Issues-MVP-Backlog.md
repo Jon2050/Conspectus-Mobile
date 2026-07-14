@@ -551,7 +551,7 @@ An issue is only considered done when:
 - Depends on: `M3-08, M4-05`
 - GitHub: [#75](https://github.com/Jon2050/Conspectus-Mobile/issues/75)
 
-### :green_circle: M7-02 Implement force refresh action
+### :white_check_mark: M7-02 Implement force refresh action
 
 - Label: `feature`
 - Milestone: `M7 - Settings + Recovery`

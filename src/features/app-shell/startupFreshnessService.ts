@@ -20,6 +20,8 @@ export type StartupFreshnessFailureCode =
   | 'snapshot_download_failed'
   | 'auth_expired';
 
+export type StartupFreshnessMode = 'reuse_if_current' | 'force_download';
+
 export interface StartupFreshnessFailure {
   readonly code: StartupFreshnessFailureCode;
   readonly message: string;
@@ -64,10 +66,12 @@ export type StartupFreshnessDecision =
   | StartupFreshnessErrorDecision;
 
 export interface StartupFreshnessService {
+  /** Resolves online freshness; force_download bypasses unchanged-eTag cache reuse. */
   resolve(
     binding: DriveItemBinding | null,
     isOnline: boolean,
     onProgress?: (loadedBytes: number, totalBytes: number | null) => void,
+    mode?: StartupFreshnessMode,
   ): Promise<StartupFreshnessDecision>;
 }
 
@@ -229,6 +233,7 @@ export const createStartupFreshnessService = (
     binding: DriveItemBinding | null,
     isOnline: boolean,
     onProgress?: (loadedBytes: number, totalBytes: number | null) => void,
+    mode: StartupFreshnessMode = 'reuse_if_current',
   ): Promise<StartupFreshnessDecision> {
     if (binding === null) {
       return {
@@ -264,7 +269,11 @@ export const createStartupFreshnessService = (
         retryOptions,
       );
 
-      if (cachedSnapshot !== null && cachedSnapshot.metadata.eTag === metadata.eTag) {
+      if (
+        mode === 'reuse_if_current' &&
+        cachedSnapshot !== null &&
+        cachedSnapshot.metadata.eTag === metadata.eTag
+      ) {
         return {
           kind: 'ready',
           branch: 'online_unchanged',
