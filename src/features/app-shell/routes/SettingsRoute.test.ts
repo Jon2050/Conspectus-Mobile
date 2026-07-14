@@ -10,6 +10,9 @@ describe('SettingsRoute styling', () => {
     expect(settingsRouteSource).toContain('data-testid="settings-build-information"');
     expect(settingsRouteSource).toContain('data-testid="settings-build-version"');
     expect(settingsRouteSource).toContain('data-testid="settings-build-time"');
+    expect(settingsRouteSource).toContain('data-testid="force-refresh-button"');
+    expect(settingsRouteSource).toContain('data-testid="force-refresh-status"');
+    expect(settingsRouteSource).toContain('onForceRefresh');
     expect(settingsRouteSource.indexOf('settings-build-information')).toBeGreaterThan(
       settingsRouteSource.indexOf('destructive-settings-actions'),
     );

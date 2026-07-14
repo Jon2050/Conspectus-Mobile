@@ -166,7 +166,9 @@
     "sync": {
       "lastSync": "Letzte Synchronisierung",
       "never": "Noch nicht synchronisiert",
-      "unknown": "Unbekannt"
+      "unknown": "Unbekannt",
+      "refresh": "Von OneDrive aktualisieren",
+      "refreshing": "Aktualisierung von OneDrive läuft..."
     },
     "actions": {
       "standard": "Datenbankaktionen",

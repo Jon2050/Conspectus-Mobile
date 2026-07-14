@@ -1594,6 +1594,84 @@ test('reuses the cached DB on startup when the OneDrive eTag is unchanged', asyn
   expect(await getGraphDownloadCallCount(page)).toBe(0);
 });
 
+test('force refresh downloads an unchanged DB and reports progress plus the new sync timestamp', async ({
+  page,
+}) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page, {
+    metadataETag: '"etag-1"',
+    downloadDelayMs: 1_200,
+  });
+  await installMockCacheStore(page, {
+    startupSnapshot: {
+      metadata: {
+        eTag: '"etag-1"',
+        lastSyncAtIso: '2026-03-11T09:45:00.000Z',
+      },
+      dbBytes: createSqliteBytes([7, 7, 7, 7]),
+    },
+  });
+  await installPersistedBinding(page);
+  await installMockStartupNetworkState(page, true);
+  await installMockDbRuntime(page, { forceAlwaysOpen: true });
+
+  await page.goto(appPath('#/settings'));
+
+  await expect(page.getByTestId('force-refresh-button')).toBeEnabled();
+  const initialLastSync = await page.getByTestId('settings-last-sync').textContent();
+  const metadataCallsBeforeRefresh = await getGraphMetadataCallCount(page);
+
+  await page.getByTestId('force-refresh-button').click();
+
+  await expect(page.getByTestId('force-refresh-button')).toBeDisabled();
+  await expect(page.getByTestId('startup-sync-progress')).toBeVisible();
+  await expect(page.getByTestId('force-refresh-status')).toContainText(
+    'Checking OneDrive for DB updates...',
+  );
+  await expect(page.getByTestId('force-refresh-status')).toContainText(
+    'Downloaded the latest DB from OneDrive.',
+  );
+  await expect(page.getByTestId('force-refresh-button')).toBeEnabled();
+
+  const refreshedLastSync = await page.getByTestId('settings-last-sync').textContent();
+  expect(refreshedLastSync).not.toBe(initialLastSync);
+  expect(await getGraphMetadataCallCount(page)).toBe(metadataCallsBeforeRefresh + 1);
+  expect(await getGraphDownloadCallCount(page)).toBe(1);
+});
+
+test('force refresh reports an offline failure and remains retryable', async ({ page }) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+  });
+  await installMockGraphClient(page);
+  await installMockCacheStore(page, {
+    startupSnapshot: {
+      metadata: {
+        eTag: '"etag-1"',
+      },
+      dbBytes: createSqliteBytes([7, 7, 7, 7]),
+    },
+  });
+  await installPersistedBinding(page);
+  await installMockStartupNetworkState(page, false);
+
+  await page.goto(appPath('#/settings'));
+
+  const refreshButton = page.getByTestId('force-refresh-button');
+  await expect(refreshButton).toBeEnabled();
+  await refreshButton.click();
+
+  await expect(page.getByTestId('force-refresh-status')).toHaveAttribute('role', 'alert');
+  await expect(page.getByTestId('force-refresh-status')).toContainText(
+    'Connection is required to load the database.',
+  );
+  await expect(refreshButton).toBeEnabled();
+  expect(await getGraphMetadataCallCount(page)).toBe(0);
+  expect(await getGraphDownloadCallCount(page)).toBe(0);
+});
+
 test('preserves the selected transfer month while refreshing in the foreground', async ({
   page,
 }) => {

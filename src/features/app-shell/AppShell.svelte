@@ -77,6 +77,7 @@
   let currentSyncId = 0;
   let footerVisibilityTrackingIsActive = false;
   let lastRenderedRoute: AppRouteKey | null = null;
+  let forceRefreshIsRunning = false;
   let stopFooterVisibilityTracking = (): void => {};
   const navIconBaseUrl = import.meta.env.BASE_URL;
   const unsubscribe = routeStore.subscribe((route) => {
@@ -131,6 +132,7 @@
   const performSync = async (
     binding: DriveItemBinding | null,
     isInitialSync = false,
+    mode: 'reuse_if_current' | 'force_download' = 'reuse_if_current',
   ): Promise<void> => {
     const syncId = ++currentSyncId;
     dataRoutesAwaitInitialSync = isInitialSync;
@@ -165,6 +167,7 @@
             updateStartupSyncProgress(syncStateStore, loadedBytes, totalBytes);
           }
         },
+        mode,
       );
 
       if (!appShellIsMounted || syncId !== currentSyncId) {
@@ -198,6 +201,19 @@
         syncStateStore,
         'Startup sync failed unexpectedly. Check the browser console and retry.',
       );
+    }
+  };
+
+  const requestForceRefresh = async (): Promise<void> => {
+    if (forceRefreshIsRunning || get(syncStateStore).state === 'syncing') {
+      return;
+    }
+
+    forceRefreshIsRunning = true;
+    try {
+      await performSync(get(appSelectedDriveItemBindingStore), false, 'force_download');
+    } finally {
+      forceRefreshIsRunning = false;
     }
   };
 
@@ -512,7 +528,7 @@
           canOpenPanel={addTransferDatabaseIsReady}
         />
       {:else}
-        <SettingsRoute {syncStateStore} />
+        <SettingsRoute {syncStateStore} onForceRefresh={requestForceRefresh} />
       {/if}
     </div>
   </main>
