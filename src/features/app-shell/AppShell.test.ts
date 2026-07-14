@@ -157,4 +157,25 @@ describe('AppShell component', () => {
     expect(body).not.toContain('data-testid="stale-token-recovery"');
     expect(body).not.toContain('data-testid="stale-token-recovery-button"');
   });
+
+  it('offers the rebind path only for a definitively missing saved file', () => {
+    const syncStateStore = createSyncStateStore({
+      state: 'error',
+      branch: 'online_file_missing',
+      message: 'The selected file is missing.',
+    });
+    const { body } = render(AppShell, {
+      props: {
+        routeStore: readable<AppRouteKey>('accounts'),
+        showLoadingPlaceholder: false,
+        syncStateStore,
+      },
+    });
+
+    expect(body).toContain('data-testid="missing-file-recovery"');
+    expect(body).toContain('data-testid="missing-file-recovery-button"');
+    expect(body).toContain('OneDrive-Datenbank nicht gefunden');
+    expect(body).toContain('Andere Datenbank auswählen');
+    expect(body).not.toContain('data-testid="stale-token-recovery"');
+  });
 });

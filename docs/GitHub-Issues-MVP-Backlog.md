@@ -575,7 +575,7 @@ An issue is only considered done when:
 - Depends on: `M3-03, M3-04`
 - GitHub: [#78](https://github.com/Jon2050/Conspectus-Mobile/issues/78)
 
-### :green_circle: M7-05 Implement missing/moved OneDrive file recovery
+### :white_check_mark: M7-05 Implement missing/moved OneDrive file recovery
 
 - Label: `feature`
 - Milestone: `M7 - Settings + Recovery`

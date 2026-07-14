@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { createStartupFreshnessService } from './startupFreshnessService';
+import { MissingFileRecoveryError } from './missingFileRecoveryService';
 
 import type { CacheStore, CachedDatabaseSnapshot } from '@cache';
 import type { DriveItemBinding, GraphClient, GraphError, GraphFileMetadata } from '@graph';
@@ -11,6 +12,11 @@ const DRIVE_ITEM_BINDING: DriveItemBinding = {
   itemId: 'item-456',
   name: 'conspectus.db',
   parentPath: '/Finance',
+};
+
+const RECOVERED_DRIVE_ITEM_BINDING: DriveItemBinding = {
+  ...DRIVE_ITEM_BINDING,
+  itemId: 'item-789',
 };
 
 const createSnapshot = (
@@ -133,6 +139,99 @@ describe('startup freshness service', () => {
     expect(cacheStore.readSnapshot).not.toHaveBeenCalled();
     expect(graphClient.getFileMetadata).not.toHaveBeenCalled();
     expect(snapshotService.downloadAndCacheSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('continues verified sync with an exact-path replacement after the saved item ID returns 404', async () => {
+    const metadata = createMetadata({ eTag: '"etag-recovered"' });
+    const graphClient = createGraphClient(
+      createGraphError('not_found', 'Old item ID not found.', 404),
+      metadata,
+    );
+    const cacheStore = createCacheStore(null);
+    const downloadedSnapshot = createSnapshot({
+      binding: RECOVERED_DRIVE_ITEM_BINDING,
+      metadata: {
+        eTag: metadata.eTag,
+        lastSyncAtIso: '2026-03-11T10:30:00.000Z',
+      },
+    });
+    const snapshotService = createSnapshotService(downloadedSnapshot);
+    const recover = vi.fn(async () => RECOVERED_DRIVE_ITEM_BINDING);
+    const service = createStartupFreshnessService(graphClient, cacheStore, snapshotService, {
+      missingFileRecovery: { recover },
+    });
+
+    await expect(service.resolve(DRIVE_ITEM_BINDING, true)).resolves.toEqual({
+      kind: 'ready',
+      branch: 'online_changed',
+      syncState: 'synced',
+      snapshot: downloadedSnapshot,
+      failure: null,
+      recoveredBinding: RECOVERED_DRIVE_ITEM_BINDING,
+    });
+
+    expect(recover).toHaveBeenCalledWith(DRIVE_ITEM_BINDING);
+    expect(graphClient.getFileMetadata).toHaveBeenNthCalledWith(1, DRIVE_ITEM_BINDING);
+    expect(graphClient.getFileMetadata).toHaveBeenNthCalledWith(2, RECOVERED_DRIVE_ITEM_BINDING);
+    expect(cacheStore.readSnapshot).toHaveBeenCalledWith(RECOVERED_DRIVE_ITEM_BINDING);
+    expect(snapshotService.downloadAndCacheSnapshot).toHaveBeenCalledWith(
+      RECOVERED_DRIVE_ITEM_BINDING,
+      metadata,
+      undefined,
+    );
+  });
+
+  it('returns a distinct rebind-required decision when the exact saved path is missing', async () => {
+    const graphClient = createGraphClient(
+      createGraphError('not_found', 'Old item ID not found.', 404),
+    );
+    const cacheStore = createCacheStore(createSnapshot());
+    const snapshotService = createSnapshotService(createSnapshot());
+    const recover = vi.fn(async () => {
+      throw new MissingFileRecoveryError('No file exists at the saved path.', {
+        code: 'not_found',
+      });
+    });
+    const service = createStartupFreshnessService(graphClient, cacheStore, snapshotService, {
+      missingFileRecovery: { recover },
+    });
+
+    await expect(service.resolve(DRIVE_ITEM_BINDING, true)).resolves.toMatchObject({
+      kind: 'error',
+      branch: 'online_file_missing',
+      syncState: 'error',
+      snapshot: null,
+      failure: {
+        code: 'file_not_found',
+      },
+    });
+
+    expect(cacheStore.readSnapshot).not.toHaveBeenCalled();
+    expect(snapshotService.downloadAndCacheSnapshot).not.toHaveBeenCalled();
+  });
+
+  it('keeps transient path lookup failures in the normal retryable metadata error flow', async () => {
+    const graphClient = createGraphClient(
+      createGraphError('not_found', 'Old item ID not found.', 404),
+    );
+    const cacheStore = createCacheStore(null);
+    const snapshotService = createSnapshotService(createSnapshot());
+    const recover = vi.fn(async () => {
+      throw createGraphError('network_error', 'Path lookup temporarily failed.', 503);
+    });
+    const service = createStartupFreshnessService(graphClient, cacheStore, snapshotService, {
+      missingFileRecovery: { recover },
+      retry: { maxAttempts: 1 },
+    });
+
+    await expect(service.resolve(DRIVE_ITEM_BINDING, true)).resolves.toMatchObject({
+      kind: 'error',
+      branch: 'online_metadata_failed',
+      failure: {
+        code: 'metadata_fetch_failed',
+        cause: { code: 'network_error' },
+      },
+    });
   });
 
   it('reuses the cached snapshot when the OneDrive eTag is unchanged', async () => {

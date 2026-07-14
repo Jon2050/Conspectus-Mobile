@@ -30,6 +30,7 @@ const createStubAuthClient = (): AuthClient => ({
 
 const createStubGraphClient = (): GraphClient => ({
   listChildren: vi.fn(async () => []),
+  resolveFileByPath: vi.fn(async (binding) => ({ ...binding, itemId: 'replacement-item-id' })),
   getFileMetadata: vi.fn(async () => ({
     eTag: '"etag-1"',
     sizeBytes: 1,

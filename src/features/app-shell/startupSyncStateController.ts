@@ -30,6 +30,8 @@ const buildStartupSyncMessage = (decision: StartupFreshnessDecision): string | n
       return get(_)('sync.startup.onlineUnchanged');
     case 'online_changed':
       return get(_)('sync.startup.onlineChanged');
+    case 'online_file_missing':
+      return get(_)('sync.startup.fileMissing');
     case 'online_auth_expired':
     case 'offline_unsupported':
     case 'online_metadata_failed':
@@ -54,6 +56,7 @@ const showDecisionToast = (
     case 'online_changed':
       toastStore.show(message, 'success', 3200);
       return;
+    case 'online_file_missing':
     case 'online_auth_expired':
     case 'offline_unsupported':
     case 'online_metadata_failed':

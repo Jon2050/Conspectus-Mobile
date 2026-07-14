@@ -32,6 +32,7 @@ describe('graph barrel contract', () => {
     expect(client).toEqual(
       expect.objectContaining({
         listChildren: expect.any(Function),
+        resolveFileByPath: expect.any(Function),
         getFileMetadata: expect.any(Function),
         getFileDownloadUrl: expect.any(Function),
         downloadFile: expect.any(Function),

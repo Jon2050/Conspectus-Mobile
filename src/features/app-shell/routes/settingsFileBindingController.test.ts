@@ -76,6 +76,7 @@ const createGraphClientHarness = (): {
   return {
     graphClient: {
       listChildren,
+      resolveFileByPath: vi.fn(async (binding) => binding),
       getFileMetadata: vi.fn(async () => ({
         eTag: '"etag-1"',
         sizeBytes: 2048,

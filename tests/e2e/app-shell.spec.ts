@@ -229,6 +229,13 @@ type MockGraphClientOptions = {
   readonly metadataLastModifiedDateTime?: string;
   readonly downloadBytes?: readonly number[];
   readonly metadataErrorSequence?: readonly MockGraphError[];
+  readonly resolvedPathBinding?: {
+    readonly driveId: string;
+    readonly itemId: string;
+    readonly name: string;
+    readonly parentPath: string;
+  };
+  readonly resolvePathError?: MockGraphError;
   readonly downloadErrorSequence?: readonly MockGraphError[];
   readonly uploadErrorSequence?: readonly MockGraphError[];
   readonly uploadDelayMs?: number;
@@ -392,6 +399,7 @@ const installMockGraphClient = async (
 ): Promise<void> => {
   await page.addInitScript((mockOptions: MockGraphClientOptions) => {
     let listChildrenCallCount = 0;
+    let resolveFileByPathCallCount = 0;
     let getFileMetadataCallCount = 0;
     let downloadFileCallCount = 0;
     let uploadFileCallCount = 0;
@@ -481,6 +489,28 @@ const installMockGraphClient = async (
         }
 
         return rootItems;
+      },
+      async resolveFileByPath(binding: {
+        driveId: string;
+        itemId: string;
+        name: string;
+        parentPath: string;
+      }) {
+        resolveFileByPathCallCount += 1;
+        (
+          window as Window & { __CONSPECTUS_GRAPH_RESOLVE_PATH_CALL_COUNT__?: number }
+        ).__CONSPECTUS_GRAPH_RESOLVE_PATH_CALL_COUNT__ = resolveFileByPathCallCount;
+
+        if (mockOptions.resolvePathError !== undefined) {
+          throw mockOptions.resolvePathError;
+        }
+
+        return (
+          mockOptions.resolvedPathBinding ?? {
+            ...binding,
+            itemId: 'recovered-file-id',
+          }
+        );
       },
       async getFileMetadata() {
         getFileMetadataCallCount += 1;
@@ -602,6 +632,9 @@ const installMockGraphClient = async (
     (
       window as Window & { __CONSPECTUS_GRAPH_LIST_CHILDREN_CALL_COUNT__?: number }
     ).__CONSPECTUS_GRAPH_LIST_CHILDREN_CALL_COUNT__ = listChildrenCallCount;
+    (
+      window as Window & { __CONSPECTUS_GRAPH_RESOLVE_PATH_CALL_COUNT__?: number }
+    ).__CONSPECTUS_GRAPH_RESOLVE_PATH_CALL_COUNT__ = resolveFileByPathCallCount;
     (
       window as Window & { __CONSPECTUS_GRAPH_GET_FILE_METADATA_CALL_COUNT__?: number }
     ).__CONSPECTUS_GRAPH_GET_FILE_METADATA_CALL_COUNT__ = getFileMetadataCallCount;
@@ -1089,6 +1122,18 @@ const getGraphMetadataCallCount = async (page: import('@playwright/test').Page):
         __CONSPECTUS_GRAPH_GET_FILE_METADATA_CALL_COUNT__?: unknown;
       }
     ).__CONSPECTUS_GRAPH_GET_FILE_METADATA_CALL_COUNT__;
+    return typeof value === 'number' ? value : 0;
+  });
+
+const getGraphResolvePathCallCount = async (
+  page: import('@playwright/test').Page,
+): Promise<number> =>
+  page.evaluate(() => {
+    const value = (
+      window as Window & {
+        __CONSPECTUS_GRAPH_RESOLVE_PATH_CALL_COUNT__?: unknown;
+      }
+    ).__CONSPECTUS_GRAPH_RESOLVE_PATH_CALL_COUNT__;
     return typeof value === 'number' ? value : 0;
   });
 
@@ -1835,6 +1880,136 @@ test('shows download progress feedback during slow startup sync', async ({ page 
   // Wait for it to finish
   await expect(page.getByText('Downloaded the latest DB from OneDrive.')).toBeVisible();
   await expect(page.getByTestId('progress-indicator')).toHaveCount(0);
+});
+
+test('silently repairs a changed OneDrive item ID at the exact saved path', async ({ page }) => {
+  const oldBinding = {
+    driveId: 'drive-123',
+    itemId: 'old-safe-save-id',
+    name: 'conspectus.db',
+    parentPath: '/',
+  };
+  const recoveredBinding = { ...oldBinding, itemId: 'new-safe-save-id' };
+  await installMockAuthClient(page, { startAuthenticated: true });
+  await installMockGraphClient(page, {
+    metadataErrorSequence: [
+      createMockGraphError('not_found', 'Old safe-save item ID is gone.', 404),
+    ],
+    resolvedPathBinding: recoveredBinding,
+    metadataETag: '"etag-recovered"',
+  });
+  await installMockCacheStore(page, {
+    startupSnapshot: {
+      binding: oldBinding,
+      metadata: { eTag: '"etag-old"' },
+      dbBytes: createSqliteBytes([9, 9, 9]),
+    },
+  });
+  await installMockDbRuntime(page, {
+    accountRows: [
+      { accountId: 7, name: 'Recovered account', amountCents: 12_300, accountTypeId: 3 },
+    ],
+  });
+  await installPersistedBinding(page, oldBinding);
+  await installMockStartupNetworkState(page, true);
+
+  await page.goto(appPath('#/accounts'));
+
+  await expect(page.getByText('Downloaded the latest DB from OneDrive.')).toBeVisible();
+  await expect(page.getByText('Recovered account')).toBeVisible();
+  await expect(page.getByTestId('missing-file-recovery')).toHaveCount(0);
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const rawValue = window.localStorage.getItem('conspectus.selectedDriveItemBinding');
+        if (rawValue === null) {
+          return null;
+        }
+        return JSON.parse(rawValue).bindingsByAccountId['mock-home-account'];
+      }),
+    )
+    .toEqual(recoveredBinding);
+
+  await page.waitForTimeout(250);
+  expect(await getGraphResolvePathCallCount(page)).toBe(1);
+  expect(await getGraphMetadataCallCount(page)).toBe(2);
+  expect(await getGraphDownloadCallCount(page)).toBe(1);
+});
+
+test('keeps the app usable and offers rebind when the exact saved path is missing', async ({
+  page,
+}) => {
+  const oldBinding = {
+    driveId: 'drive-123',
+    itemId: 'deleted-item-id',
+    name: 'conspectus.db',
+    parentPath: '/',
+  };
+  await installMockAuthClient(page, { startAuthenticated: true });
+  await installMockGraphClient(page, {
+    metadataErrorSequence: [createMockGraphError('not_found', 'Deleted item ID.', 404)],
+    resolvePathError: createMockGraphError('not_found', 'No file at the saved path.', 404),
+  });
+  await installMockCacheStore(page, {
+    startupSnapshot: {
+      binding: oldBinding,
+      metadata: { eTag: '"etag-stale"' },
+      dbBytes: createSqliteBytes([8, 8, 8]),
+    },
+  });
+  await installMockDbRuntime(page, {
+    accountRows: [
+      { accountId: 8, name: 'Account after rebind', amountCents: 45_600, accountTypeId: 3 },
+    ],
+  });
+  await installPersistedBinding(page, oldBinding);
+  await installMockStartupNetworkState(page, true);
+
+  await page.goto(appPath('#/accounts'));
+
+  await expect(page.getByTestId('missing-file-recovery')).toBeVisible();
+  await expect(page.getByTestId('accounts-route-cards')).toHaveCount(0);
+  await expect(page.getByText('Account after rebind')).toHaveCount(0);
+  expect(await getGraphResolvePathCallCount(page)).toBe(1);
+  expect(await getGraphDownloadCallCount(page)).toBe(0);
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const rawValue = window.localStorage.getItem('conspectus.selectedDriveItemBinding');
+        return rawValue === null
+          ? null
+          : JSON.parse(rawValue).bindingsByAccountId['mock-home-account'].itemId;
+      }),
+    )
+    .toBe(oldBinding.itemId);
+
+  await page.getByTestId('missing-file-recovery-button').click();
+  await expect(page.getByTestId('route-settings')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Change DB file' })).toBeVisible();
+  await page.getByRole('button', { name: 'Change DB file' }).click();
+  await page.getByTestId('open-folder-folder-finance').click();
+  await page.getByTestId('select-file-file-finance-db').click();
+
+  await expect(page.getByTestId('missing-file-recovery')).toHaveCount(0);
+  await expect(page.getByText('Downloaded the latest DB from OneDrive.').last()).toBeVisible();
+  await expect
+    .poll(async () =>
+      page.evaluate(() => {
+        const rawValue = window.localStorage.getItem('conspectus.selectedDriveItemBinding');
+        return rawValue === null
+          ? null
+          : JSON.parse(rawValue).bindingsByAccountId['mock-home-account'];
+      }),
+    )
+    .toMatchObject({
+      driveId: 'drive-123',
+      itemId: 'file-finance-db',
+      name: 'budget.db',
+      parentPath: '/Finance',
+    });
+
+  await page.getByRole('link', { name: 'Accounts' }).click();
+  await expect(page.getByText('Account after rebind')).toBeVisible();
 });
 
 test('retries transient startup metadata failures before settling on the cached DB state', async ({
