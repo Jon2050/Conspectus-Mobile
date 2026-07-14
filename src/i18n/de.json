@@ -11,6 +11,9 @@
     "sessionExpiredTitle": "Microsoft-Sitzung abgelaufen",
     "reauthenticating": "Microsoft-Anmeldung wird geöffnet...",
     "reauthenticationFailed": "Die Microsoft-Anmeldung konnte nicht geöffnet werden. Versuche es erneut.",
+    "missingFileTitle": "OneDrive-Datenbank nicht gefunden",
+    "missingFileDescription": "Die Datenbank ist am gespeicherten Pfad nicht mehr verfügbar. Öffne die Einstellungen und wähle Datenbank ändern, um sie erneut auszuwählen.",
+    "selectAnotherFile": "Andere Datenbank auswählen",
     "downloadedKb": "{kb} KB heruntergeladen...",
     "downloadProgress": "{loaded} KB / {total} KB",
     "uploadedKb": "{kb} KB hochgeladen...",
@@ -211,6 +214,7 @@
       "checking": "Suche nach DB-Updates auf OneDrive...",
       "onlineUnchanged": "Zwischengespeicherte DB ist aktuell",
       "onlineChanged": "Neueste DB von OneDrive heruntergeladen.",
+      "fileMissing": "Die ausgewählte OneDrive-Datenbank ist am gespeicherten Pfad nicht mehr verfügbar. Wähle in den Einstellungen eine andere Datenbank aus.",
       "completed": "DB-Synchronisation abgeschlossen.",
       "failed": "Start-Synchronisation fehlgeschlagen.",
       "failedUnexpected": "Start-Synchronisation unerwartet fehlgeschlagen. Bitte prüfe die Browser-Konsole und versuche es erneut."

@@ -157,6 +157,94 @@ describe('createGraphClient', () => {
     );
   });
 
+  it('resolves a replacement file by its exact saved path with segment encoding', async () => {
+    const authClient = createAuthClient();
+    const fetchFn = vi.fn(async () =>
+      createJsonResponse({
+        id: 'new-item-id',
+        name: 'budget #100%.db',
+        parentReference: {
+          driveId: 'drive-123',
+          path: '/drive/root:/Finanzen 2026/Überblick',
+        },
+        file: {},
+      }),
+    );
+    const client = createGraphClient({ authClient, fetchFn });
+
+    await expect(
+      client.resolveFileByPath({
+        driveId: 'drive-123',
+        itemId: 'old-item-id',
+        name: 'budget #100%.db',
+        parentPath: '/Finanzen 2026/Überblick',
+      }),
+    ).resolves.toEqual({
+      driveId: 'drive-123',
+      itemId: 'new-item-id',
+      name: 'budget #100%.db',
+      parentPath: '/Finanzen 2026/Überblick',
+    });
+
+    const [requestUrl] = getFetchCall(fetchFn);
+    expect(requestUrl).toBe(
+      'https://graph.microsoft.com/v1.0/drives/drive-123/root:/Finanzen%202026/%C3%9Cberblick/budget%20%23100%25.db?$select=id%2Cname%2CparentReference%2Cfile%2Cfolder',
+    );
+  });
+
+  it('resolves a root-level replacement without adding an empty path segment', async () => {
+    const authClient = createAuthClient();
+    const fetchFn = vi.fn(async () =>
+      createJsonResponse({
+        id: 'new-item-id',
+        name: 'conspectus.db',
+        parentReference: {
+          driveId: 'drive-123',
+          path: '/drive/root:',
+        },
+        file: {},
+      }),
+    );
+    const client = createGraphClient({ authClient, fetchFn });
+
+    await client.resolveFileByPath({ ...DRIVE_ITEM_BINDING, parentPath: '/' });
+
+    expect(getFetchCall(fetchFn)[0]).toBe(
+      'https://graph.microsoft.com/v1.0/drives/drive-123/root:/conspectus.db?$select=id%2Cname%2CparentReference%2Cfile%2Cfolder',
+    );
+  });
+
+  it('treats a folder at the saved file path as a definitively missing file', async () => {
+    const authClient = createAuthClient();
+    const fetchFn = vi.fn(async () =>
+      createJsonResponse({
+        id: 'folder-id',
+        name: 'conspectus.db',
+        parentReference: {
+          driveId: 'drive-123',
+          path: '/drive/root:/Apps/Conspectus',
+        },
+        folder: {},
+      }),
+    );
+    const client = createGraphClient({ authClient, fetchFn });
+
+    await expect(client.resolveFileByPath(DRIVE_ITEM_BINDING)).rejects.toMatchObject({
+      code: 'not_found',
+    });
+  });
+
+  it('normalizes a missing exact path as not_found', async () => {
+    const authClient = createAuthClient();
+    const fetchFn = vi.fn(async () => createJsonResponse({}, 404));
+    const client = createGraphClient({ authClient, fetchFn });
+
+    await expect(client.resolveFileByPath(DRIVE_ITEM_BINDING)).rejects.toMatchObject({
+      code: 'not_found',
+      status: 404,
+    });
+  });
+
   it('follows paginated children responses until all browse items are loaded', async () => {
     const authClient = createAuthClient();
     const fetchFn = vi

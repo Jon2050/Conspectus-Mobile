@@ -13,6 +13,7 @@ import type {
 
 const GRAPH_API_BASE_URL = 'https://graph.microsoft.com/v1.0';
 const CHILDREN_FIELDS = 'id,name,parentReference,file,folder';
+const FILE_BINDING_FIELDS = 'id,name,parentReference,file,folder';
 const METADATA_FIELDS = 'eTag,size,lastModifiedDateTime';
 const DOWNLOAD_URL_FIELDS = 'id,@microsoft.graph.downloadUrl';
 
@@ -123,6 +124,17 @@ const buildFolderChildrenUrl = (folder?: DriveFolderReference): string => {
   const driveId = encodeURIComponent(folder.driveId);
   const itemId = encodeURIComponent(folder.itemId);
   return `${GRAPH_API_BASE_URL}/drives/${driveId}/items/${itemId}/children`;
+};
+
+const encodeDrivePath = (parentPath: string, name: string): string =>
+  [...parentPath.split('/').filter((segment) => segment.length > 0), name]
+    .map((segment) => encodeURIComponent(segment))
+    .join('/');
+
+const buildDriveItemPathUrl = (binding: DriveItemBinding): string => {
+  const driveId = encodeURIComponent(binding.driveId);
+  const itemPath = encodeDrivePath(binding.parentPath, binding.name);
+  return `${GRAPH_API_BASE_URL}/drives/${driveId}/root:/${itemPath}`;
 };
 
 const normalizeParentPath = (value: string): string => {
@@ -457,6 +469,35 @@ export const createGraphClient = (options: CreateGraphClientOptions): GraphClien
 
         return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
       });
+    },
+
+    async resolveFileByPath(binding): Promise<DriveItemBinding> {
+      const pathUrl = `${buildDriveItemPathUrl(binding)}?$select=${encodeURIComponent(FILE_BINDING_FIELDS)}`;
+      const response = await executeRequest(pathUrl);
+      const invalidResponseMessage =
+        'Microsoft Graph path lookup response did not include the required file fields.';
+      const payload = await readJsonPayload(response, invalidResponseMessage);
+      const item = normalizeDriveItem(payload, invalidResponseMessage);
+
+      if (item?.kind === 'folder') {
+        throw new GraphClientError(
+          'not_found',
+          getDefaultErrorMessage('not_found'),
+          undefined,
+          payload,
+        );
+      }
+
+      if (item === null) {
+        throw new GraphClientError('unknown', invalidResponseMessage, response.status, payload);
+      }
+
+      return {
+        driveId: item.driveId,
+        itemId: item.itemId,
+        name: item.name,
+        parentPath: item.parentPath,
+      };
     },
 
     async getFileMetadata(binding): Promise<GraphFileMetadata> {

@@ -51,6 +51,7 @@ export interface GraphError {
 
 export interface GraphClient {
   listChildren(folder?: DriveFolderReference): Promise<readonly GraphDriveItem[]>;
+  resolveFileByPath(binding: DriveItemBinding): Promise<DriveItemBinding>;
   getFileMetadata(binding: DriveItemBinding): Promise<GraphFileMetadata>;
   getFileDownloadUrl(binding: DriveItemBinding): Promise<string>;
   downloadFile(

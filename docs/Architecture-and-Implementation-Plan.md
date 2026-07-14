@@ -748,6 +748,12 @@ M7-04 implementation clarification:
 - Re-authentication uses MSAL `acquireTokenRedirect` with the existing OneDrive scope and active account, preserving the selected account/file ownership instead of opening the general account picker.
 - The current hash-route URL is passed as MSAL's `redirectStartPage`, so successful recovery returns to the screen that requested it. The recovery action exposes pending and failure feedback and blocks duplicate redirect attempts.
 
+M7-05 implementation clarification:
+
+- An item-ID metadata `404` triggers one direct Graph lookup at the saved drive, parent path, and filename; the app does not search for renamed or moved files.
+- Self-healing accepts only a file with the exact unchanged drive, normalized parent path, and filename plus a different non-empty item ID. The replacement ID is persisted only after the recovered snapshot passes the established metadata, download, cache, and SQLite-open verification flow.
+- If the exact saved path is definitively missing, database access remains fail-closed, the previous binding and cached bytes are preserved without being opened, and a global recovery action directs the user to the existing Settings rebind flow.
+
 M7-08 implementation clarification:
 
 - Startup database access now fails closed when offline or when authentication, OneDrive metadata, or snapshot download fails; cached bytes are reused only after a successful online eTag match.

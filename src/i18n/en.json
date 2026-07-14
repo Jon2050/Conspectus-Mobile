@@ -11,6 +11,9 @@
     "sessionExpiredTitle": "Microsoft session expired",
     "reauthenticating": "Opening Microsoft sign-in...",
     "reauthenticationFailed": "Microsoft sign-in could not be opened. Try again.",
+    "missingFileTitle": "OneDrive database not found",
+    "missingFileDescription": "The database is no longer available at its saved path. Open Settings and choose Change DB file to select it again.",
+    "selectAnotherFile": "Select another DB file",
     "downloadedKb": "{kb} KB downloaded...",
     "downloadProgress": "{loaded} KB / {total} KB",
     "uploadedKb": "{kb} KB uploaded...",
@@ -211,6 +214,7 @@
       "checking": "Checking OneDrive for DB updates...",
       "onlineUnchanged": "Cached DB is current with OneDrive.",
       "onlineChanged": "Downloaded the latest DB from OneDrive.",
+      "fileMissing": "The selected OneDrive database is no longer available at its saved path. Select another DB file in Settings.",
       "completed": "DB sync completed.",
       "failed": "Startup sync failed.",
       "failedUnexpected": "Startup sync failed unexpectedly. Check the browser console and retry."

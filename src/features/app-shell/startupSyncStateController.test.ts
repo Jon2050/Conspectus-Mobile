@@ -181,6 +181,35 @@ describe('startupSyncStateController', () => {
     expect(toastStore.show).not.toHaveBeenCalled();
   });
 
+  it('preserves a distinct localized missing-file branch without a toast', () => {
+    const store = createSyncStateStore();
+    const toastStore = createToastStore();
+    const decision: StartupFreshnessDecision = {
+      kind: 'error',
+      branch: 'online_file_missing',
+      syncState: 'error',
+      snapshot: null,
+      failure: {
+        code: 'file_not_found',
+        message: 'Internal missing file detail.',
+        cause: { code: 'rebind_required' },
+      },
+    };
+
+    beginStartupSync(store);
+    toastStore.show.mockClear();
+    applyStartupFreshnessDecision(store, decision, toastStore);
+
+    expect(get(store)).toEqual({
+      state: 'error',
+      message:
+        'Die ausgewählte OneDrive-Datenbank ist am gespeicherten Pfad nicht mehr verfügbar. Wähle in den Einstellungen eine andere Datenbank aus.',
+      branch: 'online_file_missing',
+      progress: null,
+    });
+    expect(toastStore.show).not.toHaveBeenCalled();
+  });
+
   it('resets to idle when the startup decision is skipped', () => {
     const store = createSyncStateStore({
       state: 'error',

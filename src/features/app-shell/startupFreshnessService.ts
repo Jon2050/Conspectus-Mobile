@@ -1,9 +1,13 @@
 // Decides whether startup should use the cached DB snapshot, download a fresh one, or fail deterministically.
 import type { CacheStore, CachedDatabaseSnapshot } from '@cache';
-import type { DriveItemBinding, GraphClient, GraphError } from '@graph';
+import type { DriveItemBinding, GraphClient, GraphError, GraphFileMetadata } from '@graph';
 import type { SyncState } from '@shared';
 
 import type { CachedDatabaseSnapshotService } from './cachedDatabaseSnapshotService';
+import {
+  isMissingFileRecoveryError,
+  type MissingFileRecoveryService,
+} from './missingFileRecoveryService';
 
 export type StartupFreshnessBranch =
   | 'no_binding'
@@ -12,13 +16,15 @@ export type StartupFreshnessBranch =
   | 'offline_unsupported'
   | 'online_metadata_failed'
   | 'online_download_failed'
-  | 'online_auth_expired';
+  | 'online_auth_expired'
+  | 'online_file_missing';
 
 export type StartupFreshnessFailureCode =
   | 'offline_unsupported'
   | 'metadata_fetch_failed'
   | 'snapshot_download_failed'
-  | 'auth_expired';
+  | 'auth_expired'
+  | 'file_not_found';
 
 export type StartupFreshnessMode = 'reuse_if_current' | 'force_download';
 
@@ -32,6 +38,7 @@ interface StartupFreshnessBaseDecision {
   readonly branch: StartupFreshnessBranch;
   readonly syncState: SyncState;
   readonly failure: StartupFreshnessFailure | null;
+  readonly recoveredBinding?: DriveItemBinding;
 }
 
 export interface StartupFreshnessSkippedDecision extends StartupFreshnessBaseDecision {
@@ -54,7 +61,8 @@ export interface StartupFreshnessErrorDecision extends StartupFreshnessBaseDecis
     | 'offline_unsupported'
     | 'online_metadata_failed'
     | 'online_download_failed'
-    | 'online_auth_expired';
+    | 'online_auth_expired'
+    | 'online_file_missing';
   readonly syncState: 'error';
   readonly snapshot: null;
   readonly failure: StartupFreshnessFailure;
@@ -84,6 +92,7 @@ export interface StartupFreshnessRetryOptions {
 
 export interface CreateStartupFreshnessServiceOptions {
   readonly retry?: StartupFreshnessRetryOptions;
+  readonly missingFileRecovery?: Pick<MissingFileRecoveryService, 'recover'>;
 }
 
 interface NormalizedStartupFreshnessRetryOptions {
@@ -259,15 +268,63 @@ export const createStartupFreshnessService = (
       };
     }
 
-    const cachedSnapshot = await cacheStore.readSnapshot(binding);
-
     try {
       const retryOptions = normalizeRetryOptions(options.retry);
-      const metadata = await executeWithRetry(
-        'refresh the selected OneDrive database metadata',
-        async () => graphClient.getFileMetadata(binding),
-        retryOptions,
-      );
+      const missingFileRecovery = options.missingFileRecovery;
+      let effectiveBinding = binding;
+      let recoveredBinding: DriveItemBinding | undefined;
+      let metadata: GraphFileMetadata;
+
+      try {
+        metadata = await executeWithRetry(
+          'refresh the selected OneDrive database metadata',
+          async () => graphClient.getFileMetadata(effectiveBinding),
+          retryOptions,
+        );
+      } catch (error) {
+        if (
+          missingFileRecovery === undefined ||
+          !isGraphError(error) ||
+          error.code !== 'not_found'
+        ) {
+          throw error;
+        }
+
+        try {
+          effectiveBinding = await executeWithRetry(
+            'resolve the selected OneDrive database at its saved path',
+            async () => missingFileRecovery.recover(binding),
+            retryOptions,
+          );
+          recoveredBinding = effectiveBinding;
+          metadata = await executeWithRetry(
+            'refresh the recovered OneDrive database metadata',
+            async () => graphClient.getFileMetadata(effectiveBinding),
+            retryOptions,
+          );
+        } catch (recoveryError) {
+          if (
+            isMissingFileRecoveryError(recoveryError) ||
+            (isGraphError(recoveryError) && recoveryError.code === 'not_found')
+          ) {
+            return {
+              kind: 'error',
+              branch: 'online_file_missing',
+              syncState: 'error',
+              snapshot: null,
+              failure: createFailure(
+                'file_not_found',
+                recoveryError,
+                'The selected OneDrive database no longer exists at its saved path.',
+              ),
+            };
+          }
+
+          throw recoveryError;
+        }
+      }
+
+      const cachedSnapshot = await cacheStore.readSnapshot(effectiveBinding);
 
       if (
         mode === 'reuse_if_current' &&
@@ -280,13 +337,15 @@ export const createStartupFreshnessService = (
           syncState: 'synced',
           snapshot: cachedSnapshot,
           failure: null,
+          ...(recoveredBinding === undefined ? {} : { recoveredBinding }),
         };
       }
 
       try {
         const downloadedSnapshot = await executeWithRetry(
           'download the latest OneDrive database snapshot',
-          async () => snapshotService.downloadAndCacheSnapshot(binding, metadata, onProgress),
+          async () =>
+            snapshotService.downloadAndCacheSnapshot(effectiveBinding, metadata, onProgress),
           retryOptions,
         );
 
@@ -296,6 +355,7 @@ export const createStartupFreshnessService = (
           syncState: 'synced',
           snapshot: downloadedSnapshot,
           failure: null,
+          ...(recoveredBinding === undefined ? {} : { recoveredBinding }),
         };
       } catch (error) {
         const isAuthError = isGraphError(error) && error.code === 'unauthorized';

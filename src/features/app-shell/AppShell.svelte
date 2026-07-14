@@ -46,6 +46,7 @@
   import { resolveAppStartupIsOnline } from './startupNetworkStateResolver';
   import { syncSelectedDriveItemBindingStoreAtStartup } from './startupBindingSync';
   import { resolveAppSnapshotValidator } from './snapshotValidatorResolver';
+  import { createMissingFileRecoveryService } from './missingFileRecoveryService';
   import {
     createInitialFormFields,
     type AddTransferFormFields,
@@ -86,6 +87,7 @@
   let forceRefreshIsRunning = false;
   let authRecoveryIsPending = false;
   let authRecoveryError: string | null = null;
+  let bindingRepairPersistenceIsRunning = false;
   let stopFooterVisibilityTracking = (): void => {};
   const navIconBaseUrl = import.meta.env.BASE_URL;
   const unsubscribe = routeStore.subscribe((route) => {
@@ -109,6 +111,8 @@
   $: startupSyncIsActive = $syncStateStore.state === 'syncing' && $syncStateStore.branch === null;
   $: staleTokenRecoveryIsRequired =
     $syncStateStore.state === 'error' && $syncStateStore.branch === 'online_auth_expired';
+  $: missingFileRecoveryIsRequired =
+    $syncStateStore.state === 'error' && $syncStateStore.branch === 'online_file_missing';
   $: if (!staleTokenRecoveryIsRequired && authRecoveryError !== null) {
     authRecoveryError = null;
   }
@@ -120,6 +124,12 @@
   const openPendingTransfer = (): void => {
     if (typeof window !== 'undefined') {
       window.location.hash = '#/add';
+    }
+  };
+
+  const openMissingFileRecovery = (): void => {
+    if (typeof window !== 'undefined') {
+      window.location.hash = '#/settings';
     }
   };
 
@@ -200,6 +210,9 @@
         createCachedDatabaseSnapshotService(graphClient, cacheStore, {
           snapshotValidator: resolveAppSnapshotValidator(),
         }),
+        {
+          missingFileRecovery: createMissingFileRecoveryService(graphClient),
+        },
       );
       const decision = await startupFreshnessService.resolve(
         binding,
@@ -228,6 +241,15 @@
         console.warn('Opening cached OneDrive database snapshot failed.', error);
         applyStartupDbRuntimeError(syncStateStore, error);
         return;
+      }
+
+      if (decision.kind === 'ready' && decision.recoveredBinding !== undefined) {
+        bindingRepairPersistenceIsRunning = true;
+        try {
+          appSelectedDriveItemBindingStore.setBinding(decision.recoveredBinding);
+        } finally {
+          bindingRepairPersistenceIsRunning = false;
+        }
       }
 
       applyStartupFreshnessDecision(syncStateStore, decision);
@@ -263,6 +285,10 @@
     selectedBinding = binding;
     if (!selectedBindingHasEmitted) {
       selectedBindingHasEmitted = true;
+      return;
+    }
+
+    if (bindingRepairPersistenceIsRunning) {
       return;
     }
 
@@ -508,6 +534,23 @@
     </section>
   {/if}
 
+  {#if missingFileRecoveryIsRequired}
+    <section class="file-recovery" role="alert" data-testid="missing-file-recovery">
+      <div>
+        <h2>{$_('appShell.missingFileTitle')}</h2>
+        <p>{$_('appShell.missingFileDescription')}</p>
+      </div>
+      <button
+        type="button"
+        class="app-button app-button--primary"
+        data-testid="missing-file-recovery-button"
+        on:click={openMissingFileRecovery}
+      >
+        {$_('appShell.selectAnotherFile')}
+      </button>
+    </section>
+  {/if}
+
   {#if pendingTransferNeedsAttention}
     <section
       class="pending-transfer-sync"
@@ -633,7 +676,8 @@
 
   <style>
     .auth-recovery,
-    .pending-transfer-sync {
+    .pending-transfer-sync,
+    .file-recovery {
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -648,10 +692,17 @@
       border-bottom: 1px solid color-mix(in srgb, var(--negative) 24%, var(--border));
     }
 
+    .file-recovery {
+      background: color-mix(in srgb, var(--accent) 12%, var(--surface-strong));
+      border-bottom: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border));
+    }
+
     .auth-recovery h2,
     .auth-recovery p,
     .pending-transfer-sync h2,
-    .pending-transfer-sync p {
+    .pending-transfer-sync p,
+    .file-recovery h2,
+    .file-recovery p {
       margin: 0;
     }
 
@@ -663,7 +714,8 @@
       color: color-mix(in srgb, var(--negative) 72%, var(--text-primary));
     }
 
-    .pending-transfer-sync h2 {
+    .pending-transfer-sync h2,
+    .file-recovery h2 {
       font-size: 1rem;
     }
 
@@ -681,12 +733,14 @@
 
     @media (max-width: 36rem) {
       .auth-recovery,
-      .pending-transfer-sync {
+      .pending-transfer-sync,
+      .file-recovery {
         align-items: stretch;
         flex-direction: column;
       }
 
-      .auth-recovery :global(.app-button) {
+      .auth-recovery :global(.app-button),
+      .file-recovery :global(.app-button) {
         width: 100%;
       }
 
