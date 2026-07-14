@@ -754,6 +754,11 @@ M7-05 implementation clarification:
 - Self-healing accepts only a file with the exact unchanged drive, normalized parent path, and filename plus a different non-empty item ID. The replacement ID is persisted only after the recovered snapshot passes the established metadata, download, cache, and SQLite-open verification flow.
 - If the exact saved path is definitively missing, database access remains fail-closed, the previous binding and cached bytes are preserved without being opened, and a global recovery action directs the user to the existing Settings rebind flow.
 
+M7-07 implementation clarification:
+
+- Recovery-flow regression coverage is intentionally layered: focused unit and component tests cover expired-session classification and re-authentication, exact-path file recovery, force-download behavior, and confirmed local reset; `tests/e2e/app-shell.spec.ts` covers the corresponding user journeys, including route preservation and missing-file rebind.
+- The repository Quality workflow runs both Vitest and the complete Playwright suite for code-bearing changes, so regressions in these recovery-critical paths fail CI without duplicating scenario coverage in a second test harness.
+
 M7-08 implementation clarification:
 
 - Startup database access now fails closed when offline or when authentication, OneDrive metadata, or snapshot download fails; cached bytes are reused only after a successful online eTag match.

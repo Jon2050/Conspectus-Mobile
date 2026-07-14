@@ -591,7 +591,7 @@ An issue is only considered done when:
 - Depends on: `M7-01`
 - GitHub: [#80](https://github.com/Jon2050/Conspectus-Mobile/issues/80)
 
-### :green_circle: M7-07 Add recovery-flow tests
+### :white_check_mark: M7-07 Add recovery-flow tests
 
 - Label: `test`
 - Milestone: `M7 - Settings + Recovery`
