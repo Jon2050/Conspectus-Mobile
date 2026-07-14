@@ -352,6 +352,7 @@ M3-03 implementation clarification:
 
 - Auth bootstrap is implemented in `src/auth/msalAuthClient.ts` and exposed through `@auth` as `createAuthClient`.
 - Login/logout interactive actions use MSAL redirect flow (`loginRedirect`/`logoutRedirect`) with personal-account authority (`https://login.microsoftonline.com/consumers`).
+- MSAL receives an explicit redirect/post-logout URI derived from the resolved Vite app base; local development always resolves to `http://localhost:5173/` even when `.env` contains a deployment-only base-path override.
 - Startup initialization restores active account in deterministic order:
   1. account returned by `handleRedirectPromise()`
   2. currently active account in MSAL cache
@@ -449,13 +450,13 @@ M4-01 implementation clarification:
 M4-02 implementation clarification:
 
 - Graph metadata fetch is implemented in `src/graph/graphClient.ts` and exposed through `@graph` as `getFileMetadata`.
-- The metadata request selects `eTag`, `size`, and `lastModifiedDateTime` for the bound OneDrive item and normalizes them into the public `GraphFileMetadata` contract.
+- The freshness metadata request selects `eTag`, `size`, and `lastModifiedDateTime` for the bound OneDrive item and normalizes them into the public `GraphFileMetadata` contract without depending on a short-lived download annotation.
 - Metadata payload validation rejects missing, blank, or otherwise malformed `eTag`/timestamp fields plus invalid file sizes before the data is allowed into later sync decisions.
 - Metadata fetch failures are normalized into the existing Graph error categories (`unauthorized`, `forbidden`, `not_found`, `conflict`, `network_error`, `unknown`) so later sync-state work can branch deterministically on stable error codes.
 
 M4-03 implementation clarification:
 
-- File download plus cache persistence is implemented in `src/features/app-shell/cachedDatabaseSnapshotService.ts` as a small orchestration service above `@graph` and `@cache`.
+- File download plus cache persistence is implemented in `src/features/app-shell/cachedDatabaseSnapshotService.ts` as a small orchestration service above `@graph` and `@cache`; it requests the short-lived preauthenticated download URL only immediately before downloading changed content.
 - Successful cache writes require three integrity checks on the downloaded payload before `writeSnapshot(...)` is allowed to run: non-empty metadata/file size, exact byte-length match with Graph `sizeBytes`, and the standard SQLite file header (`SQLite format 3\0`).
 - Invalid downloads fail closed and do not overwrite an existing cached snapshot, which keeps later startup freshness decisions deterministic for `M4-04`.
 
@@ -470,8 +471,9 @@ M4-05 implementation clarification:
 
 - The app-wide sync status state machine is implemented in `src/shared/state/syncStateStore.ts` and exposed as `appSyncStateStore` for cross-route consumers such as the app shell and upcoming Settings work.
 - Legal transitions are enforced in the store itself so UI code cannot jump directly from `idle` to terminal success states without first entering `syncing` when an online startup refresh is actually running.
-- Startup-specific sync status orchestration lives in `src/features/app-shell/startupSyncStateController.ts`, which maps `startupFreshnessService` decisions into a single visible UI state/message and emits non-blocking toast feedback through `appToastStore`.
-- Browser coverage for the new `syncing` state and toast-based background feedback is implemented in `tests/e2e/app-shell.spec.ts`, while unit coverage verifies guarded transitions and startup decision mapping.
+- Startup-specific sync status orchestration lives in `src/features/app-shell/startupSyncStateController.ts`, which maps `startupFreshnessService` decisions into a single visible UI state/message and emits a transient toast only after successful completion.
+- During active startup sync, `AppShell.svelte` renders one in-page progress surface and temporarily withholds Accounts/Transfers content while keeping Settings and Add flows mounted; terminal errors are rendered persistently by data routes without an additional startup error toast.
+- Browser coverage for the consolidated `syncing` state and completion feedback is implemented in `tests/e2e/app-shell.spec.ts`, while unit coverage verifies guarded transitions and startup decision mapping.
 
 M4-06 implementation clarification:
 
@@ -479,7 +481,7 @@ M4-06 implementation clarification:
 - Retryability is intentionally narrow: only normalized Graph `network_error` failures are retried; auth, permission, not-found, conflict, and local snapshot validation failures still fail fast on the first attempt.
 - The default startup retry policy is 3 total attempts with a `250ms` base delay capped at `1000ms`; when retries are exhausted, the final failure preserves the normalized `network_error` identity for later handling and surfaces actionable user messaging.
 - When retries are exhausted, startup resolves to a terminal error and does not open cached DB bytes.
-- Browser snapshot downloads use `@microsoft.graph.downloadUrl` from the metadata response instead of the Graph `/content` redirect endpoint, because the redirect path can fail under browser CORS handling while the preauthenticated download URL avoids that failure mode.
+- Browser snapshot downloads request `@microsoft.graph.downloadUrl` separately and immediately before downloading changed content, using Graph's documented non-dollar `select=id,@microsoft.graph.downloadUrl` query form; the app does not use the Graph `/content` redirect endpoint because that authorized redirect flow is incompatible with browser CORS handling.
 
 M4-07 implementation clarification:
 

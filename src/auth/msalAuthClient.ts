@@ -1,3 +1,4 @@
+// Implements Microsoft personal-account authentication with deterministic SPA redirect handling.
 import {
   BrowserAuthErrorCodes,
   BrowserCacheLocation,
@@ -188,10 +189,15 @@ const toAuthAccount = (account: AccountInfo | null): AuthAccount | null => {
   };
 };
 
-const createMsalConfiguration = (clientId: string): Configuration => ({
+export const resolveAuthRedirectUri = (origin: string, appBasePath: string): string =>
+  new URL(appBasePath, `${origin.replace(/\/+$/u, '')}/`).toString();
+
+export const createMsalConfiguration = (clientId: string, redirectUri: string): Configuration => ({
   auth: {
     clientId,
     authority: MSAL_CONSUMERS_AUTHORITY,
+    redirectUri,
+    postLogoutRedirectUri: redirectUri,
   },
   cache: {
     cacheLocation: BrowserCacheLocation.LocalStorage,
@@ -200,7 +206,8 @@ const createMsalConfiguration = (clientId: string): Configuration => ({
 
 const createDefaultMsalInstance = (): MsalInstance => {
   const { VITE_AZURE_CLIENT_ID } = loadRuntimeEnv();
-  return new PublicClientApplication(createMsalConfiguration(VITE_AZURE_CLIENT_ID));
+  const redirectUri = resolveAuthRedirectUri(window.location.origin, import.meta.env.BASE_URL);
+  return new PublicClientApplication(createMsalConfiguration(VITE_AZURE_CLIENT_ID, redirectUri));
 };
 
 const notInitializedError = (): AuthClientError =>

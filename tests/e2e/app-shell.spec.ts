@@ -492,8 +492,10 @@ const installMockGraphClient = async (
           eTag: metadataETagSequence.shift() ?? mockOptions.metadataETag ?? '"etag-1"',
           sizeBytes: defaultDownloadBytes.length,
           lastModifiedDateTime: mockOptions.metadataLastModifiedDateTime ?? '2026-03-09T10:15:00Z',
-          downloadUrl: 'https://download.example.com/conspectus.db',
         };
+      },
+      async getFileDownloadUrl() {
+        return 'https://download.example.com/conspectus.db';
       },
       async downloadFile(
         _downloadUrl: string,
@@ -1592,12 +1594,15 @@ test('reuses the cached DB on startup when the OneDrive eTag is unchanged', asyn
   expect(await getGraphDownloadCallCount(page)).toBe(0);
 });
 
-test('refreshes the selected DB when the PWA returns to the foreground', async ({ page }) => {
+test('preserves the selected transfer month while refreshing in the foreground', async ({
+  page,
+}) => {
   await installMockAuthClient(page, {
     startAuthenticated: true,
   });
   await installMockGraphClient(page, {
     metadataETagSequence: ['"etag-1"', '"etag-2"'],
+    metadataDelayMs: 600,
     downloadBytes: createSqliteBytes([9, 8, 7, 6]),
   });
   await installMockCacheStore(page, {
@@ -1610,24 +1615,38 @@ test('refreshes the selected DB when the PWA returns to the foreground', async (
   });
   await installPersistedBinding(page);
   await installMockStartupNetworkState(page, true);
+  await installMockDbRuntime(page, { forceAlwaysOpen: true });
 
-  await page.goto(appPath('#/accounts'));
+  await page.goto(appPath('#/transfers'));
 
   await expect(page.getByText('Cached DB is current with OneDrive.')).toBeVisible();
   expect(await getGraphMetadataCallCount(page)).toBe(1);
+  await page.getByTestId('transfers-month-previous-button').click();
+  const selectedMonthKey = await page
+    .getByTestId('transfers-month-label')
+    .getAttribute('data-month-key');
+  expect(selectedMonthKey).not.toBeNull();
 
   await page.evaluate(() => {
     document.dispatchEvent(new Event('visibilitychange'));
   });
 
+  await expect(page.getByTestId('startup-sync-progress')).toBeVisible();
+  await expect(page.getByTestId('route-transfers')).toBeVisible();
+  await expect(page.getByTestId('transfers-month-label')).toHaveAttribute(
+    'data-month-key',
+    selectedMonthKey!,
+  );
   await expect.poll(() => getGraphMetadataCallCount(page)).toBe(2);
   await expect(page.getByText('Downloaded the latest DB from OneDrive.')).toBeVisible();
+  await expect(page.getByTestId('transfers-month-label')).toHaveAttribute(
+    'data-month-key',
+    selectedMonthKey!,
+  );
   expect(await getGraphDownloadCallCount(page)).toBe(1);
 });
 
-test('shows syncing state and toast feedback while the startup freshness check is running', async ({
-  page,
-}) => {
+test('shows one startup status surface while the freshness check is running', async ({ page }) => {
   await installMockAuthClient(page, {
     startAuthenticated: true,
   });
@@ -1648,17 +1667,37 @@ test('shows syncing state and toast feedback while the startup freshness check i
 
   await page.goto(appPath('#/accounts'));
 
-  await expect(page.getByText('Syncing with OneDrive in the background...')).toBeVisible();
   await expect(page.getByTestId('startup-sync-progress')).toBeVisible();
+  await expect(page.locator('.toast')).toHaveCount(0);
+  await expect(page.getByTestId('route-accounts')).toHaveCount(0);
   await expect(page.getByTestId('progress-bar')).not.toHaveAttribute('value', /.+/u);
 
+  await page.evaluate(() => {
+    window.location.hash = '#/transfers';
+  });
+  await expect(page.getByTestId('route-transfers')).toHaveCount(0);
+
+  await page.evaluate(() => {
+    window.location.hash = '#/settings';
+  });
+  await expect(page.getByTestId('route-settings')).toBeVisible();
+
+  await page.evaluate(() => {
+    window.location.hash = '#/add';
+  });
+  await expect(page.getByTestId('route-add')).toBeVisible();
+
+  await page.evaluate(() => {
+    window.location.hash = '#/accounts';
+  });
+
   await page.waitForTimeout(3_000);
-  await expect(page.getByText('Syncing with OneDrive in the background...')).toBeVisible();
   await expect(page.getByTestId('startup-sync-progress')).toBeVisible();
+  await expect(page.locator('.toast')).toHaveCount(0);
 
   await expect(page.getByText('Cached DB is current with OneDrive.')).toBeVisible();
-  await expect(page.getByText('Syncing with OneDrive in the background...')).toHaveCount(0);
   await expect(page.getByTestId('startup-sync-progress')).toHaveCount(0);
+  await expect(page.getByTestId('route-accounts')).toBeVisible();
 });
 
 test('shows download progress feedback during slow startup sync', async ({ page }) => {

@@ -54,7 +54,7 @@ const toErrorMessage = (error: unknown, fallbackMessage: string): string => {
 };
 
 export const createDatabaseConflictRecoveryService = (
-  graphClient: Pick<GraphClient, 'getFileMetadata' | 'downloadFile'>,
+  graphClient: Pick<GraphClient, 'getFileMetadata' | 'getFileDownloadUrl' | 'downloadFile'>,
   cacheStore: Pick<CacheStore, 'writeSnapshot'>,
   bindingProvider: BindingProvider,
   dbRuntime: Pick<BrowserDbRuntime, 'close' | 'open'>,

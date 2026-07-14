@@ -261,7 +261,6 @@ describe('createGraphClient', () => {
         eTag: '"etag-1"',
         size: 2048,
         lastModifiedDateTime: '2026-03-09T10:15:00Z',
-        '@microsoft.graph.downloadUrl': 'https://download.example.com/conspectus.db',
       }),
     );
     const client = createGraphClient({ authClient, fetchFn });
@@ -272,7 +271,6 @@ describe('createGraphClient', () => {
       eTag: '"etag-1"',
       sizeBytes: 2048,
       lastModifiedDateTime: '2026-03-09T10:15:00Z',
-      downloadUrl: 'https://download.example.com/conspectus.db',
     });
     expect(authClient.getAccessToken).toHaveBeenCalledWith(['Files.ReadWrite']);
 
@@ -283,12 +281,34 @@ describe('createGraphClient', () => {
     const parsedUrl = new URL(requestUrl as string);
     expect(parsedUrl.origin).toBe('https://graph.microsoft.com');
     expect(parsedUrl.pathname).toBe('/v1.0/drives/drive-123/items/item-456');
-    expect(parsedUrl.searchParams.get('$select')).toBe(
-      'eTag,size,lastModifiedDateTime,@microsoft.graph.downloadUrl',
-    );
+    expect(parsedUrl.searchParams.get('$select')).toBe('eTag,size,lastModifiedDateTime');
 
     const requestHeaders = getRequestHeaders(getFetchCall(fetchFn));
     expect(requestHeaders.get('Authorization')).toBe('Bearer graph-token');
+  });
+
+  it('fetches a short-lived download URL only when file content is needed', async () => {
+    const authClient = createAuthClient();
+    const fetchFn = vi.fn(async () =>
+      createJsonResponse({
+        id: 'item-456',
+        '@microsoft.graph.downloadUrl': 'https://download.example.com/conspectus.db',
+      }),
+    );
+    const client = createGraphClient({ authClient, fetchFn });
+
+    await expect(client.getFileDownloadUrl(DRIVE_ITEM_BINDING)).resolves.toBe(
+      'https://download.example.com/conspectus.db',
+    );
+
+    const [requestUrl] = getFetchCall(fetchFn);
+    const parsedUrl = new URL(requestUrl as string);
+    expect(parsedUrl.pathname).toBe('/v1.0/drives/drive-123/items/item-456');
+    expect(parsedUrl.searchParams.get('select')).toBe('id,@microsoft.graph.downloadUrl');
+    expect(parsedUrl.searchParams.has('$select')).toBe(false);
+    expect(getRequestHeaders(getFetchCall(fetchFn)).get('Authorization')).toBe(
+      'Bearer graph-token',
+    );
   });
 
   it('downloads file bytes from the preauthenticated OneDrive download URL without auth headers', async () => {
@@ -468,31 +488,13 @@ describe('createGraphClient', () => {
     });
   });
 
-  it('rejects metadata responses missing the download URL with an unknown Graph error', async () => {
+  it('accepts valid freshness metadata when the download URL annotation is absent', async () => {
     const authClient = createAuthClient();
     const fetchFn = vi.fn(async () =>
       createJsonResponse({
         eTag: '"etag-1"',
         size: 2048,
         lastModifiedDateTime: '2026-03-09T10:15:00Z',
-      }),
-    );
-    const client = createGraphClient({ authClient, fetchFn });
-
-    await expect(client.getFileMetadata(DRIVE_ITEM_BINDING)).rejects.toMatchObject({
-      code: 'unknown',
-      message: 'Microsoft Graph metadata response did not include the required file fields.',
-    });
-  });
-
-  it('accepts the legacy content download URL annotation shape from Graph metadata', async () => {
-    const authClient = createAuthClient();
-    const fetchFn = vi.fn(async () =>
-      createJsonResponse({
-        eTag: '"etag-1"',
-        size: 2048,
-        lastModifiedDateTime: '2026-03-09T10:15:00Z',
-        '@content.downloadUrl': 'https://download.example.com/conspectus.db',
       }),
     );
     const client = createGraphClient({ authClient, fetchFn });
@@ -501,7 +503,31 @@ describe('createGraphClient', () => {
       eTag: '"etag-1"',
       sizeBytes: 2048,
       lastModifiedDateTime: '2026-03-09T10:15:00Z',
-      downloadUrl: 'https://download.example.com/conspectus.db',
+    });
+  });
+
+  it('accepts the legacy content annotation from a download URL response', async () => {
+    const authClient = createAuthClient();
+    const fetchFn = vi.fn(async () =>
+      createJsonResponse({
+        '@content.downloadUrl': 'https://download.example.com/conspectus.db',
+      }),
+    );
+    const client = createGraphClient({ authClient, fetchFn });
+
+    await expect(client.getFileDownloadUrl(DRIVE_ITEM_BINDING)).resolves.toBe(
+      'https://download.example.com/conspectus.db',
+    );
+  });
+
+  it('rejects download URL responses without a supported annotation', async () => {
+    const authClient = createAuthClient();
+    const fetchFn = vi.fn(async () => createJsonResponse({ id: 'item-456' }));
+    const client = createGraphClient({ authClient, fetchFn });
+
+    await expect(client.getFileDownloadUrl(DRIVE_ITEM_BINDING)).rejects.toMatchObject({
+      code: 'unknown',
+      message: 'Microsoft Graph response did not include a download URL for the selected file.',
     });
   });
 

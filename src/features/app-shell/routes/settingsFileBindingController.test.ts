@@ -80,8 +80,8 @@ const createGraphClientHarness = (): {
         eTag: '"etag-1"',
         sizeBytes: 2048,
         lastModifiedDateTime: '2026-03-09T10:15:00Z',
-        downloadUrl: 'https://download.example.com/conspectus.db',
       })),
+      getFileDownloadUrl: vi.fn(async () => 'https://download.example.com/conspectus.db'),
       downloadFile: vi.fn(async () => Uint8Array.from([1, 2, 3])),
       uploadFile: vi.fn(async () => ({
         eTag: '"etag-2"',

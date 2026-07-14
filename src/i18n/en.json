@@ -196,7 +196,6 @@
   "sync": {
     "startup": {
       "checking": "Checking OneDrive for DB updates...",
-      "toastSyncing": "Syncing with OneDrive in the background...",
       "onlineUnchanged": "Cached DB is current with OneDrive.",
       "onlineChanged": "Downloaded the latest DB from OneDrive.",
       "completed": "DB sync completed.",

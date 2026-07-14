@@ -1,3 +1,4 @@
+// Verifies MSAL redirect configuration, session restoration, and normalized auth behavior.
 import {
   BrowserAuthErrorCodes,
   InteractionRequiredAuthError,
@@ -7,7 +8,11 @@ import {
 } from '@azure/msal-browser';
 import { describe, expect, it, vi } from 'vitest';
 
-import { createAuthClient } from './index';
+import {
+  createAuthClient,
+  createMsalConfiguration,
+  resolveAuthRedirectUri,
+} from './msalAuthClient';
 import { AUTH_REQUEST_SCOPES } from './scopes';
 
 type CreateAuthClientArg = NonNullable<Parameters<typeof createAuthClient>[0]>;
@@ -103,6 +108,27 @@ const createMockMsalInstance = (options: MockMsalOptions = {}) => {
 };
 
 describe('createAuthClient', () => {
+  it('pins redirect handling to the resolved app root', () => {
+    expect(resolveAuthRedirectUri('http://localhost:5173', '/')).toBe('http://localhost:5173/');
+    expect(resolveAuthRedirectUri('https://jon2050.de', '/conspectus/webapp/')).toBe(
+      'https://jon2050.de/conspectus/webapp/',
+    );
+    expect(
+      resolveAuthRedirectUri('https://jon2050.github.io', '/Conspectus-Mobile/previews/test/'),
+    ).toBe('https://jon2050.github.io/Conspectus-Mobile/previews/test/');
+  });
+
+  it('uses the same explicit URI for sign-in callbacks and post-logout navigation', () => {
+    const redirectUri = 'https://jon2050.de/conspectus/webapp/';
+
+    expect(createMsalConfiguration('client-id', redirectUri).auth).toMatchObject({
+      clientId: 'client-id',
+      authority: 'https://login.microsoftonline.com/consumers',
+      redirectUri,
+      postLogoutRedirectUri: redirectUri,
+    });
+  });
+
   it('returns an unauthenticated session before initialization', () => {
     const mockMsal = createMockMsalInstance();
     const client = createAuthClient({ msalInstance: mockMsal.instance });

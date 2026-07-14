@@ -1,4 +1,4 @@
-// Downloads a OneDrive SQLite DB snapshot, validates its integrity, and persists it for later offline/startup reads.
+// Downloads a OneDrive SQLite DB snapshot, validates its integrity, and caches it for verified startup reuse.
 import type { CacheStore, CachedDatabaseSnapshot } from '@cache';
 import {
   createBrowserDbRuntime,
@@ -105,7 +105,7 @@ export const createSqliteSnapshotValidator = (
 });
 
 export const createCachedDatabaseSnapshotService = (
-  graphClient: Pick<GraphClient, 'downloadFile'>,
+  graphClient: Pick<GraphClient, 'getFileDownloadUrl' | 'downloadFile'>,
   cacheStore: Pick<CacheStore, 'writeSnapshot'>,
   options: CreateCachedDatabaseSnapshotServiceOptions = {},
 ): CachedDatabaseSnapshotService => {
@@ -118,7 +118,8 @@ export const createCachedDatabaseSnapshotService = (
       metadata: GraphFileMetadata,
       onProgress?: (loadedBytes: number, totalBytes: number | null) => void,
     ): Promise<CachedDatabaseSnapshot> {
-      const dbBytes = await graphClient.downloadFile(metadata.downloadUrl, onProgress);
+      const downloadUrl = await graphClient.getFileDownloadUrl(binding);
+      const dbBytes = await graphClient.downloadFile(downloadUrl, onProgress);
       validateDownloadedBytes(dbBytes, metadata);
       await snapshotValidator.validate(dbBytes);
 

@@ -33,6 +33,7 @@ Redirect URI matching note:
 - Matching is exact.
 - `http://localhost:5173/` does not match `http://127.0.0.1:5173/`.
 - `npm run dev` is pinned to `http://localhost:5173/` with `--strictPort` so local auth testing stays on the registered SPA redirect URI.
+- Local development ignores `VITE_DEPLOY_BASE_PATH`; that setting is reserved for non-channel builds and cannot change the localhost auth callback.
 - If local sign-in is tested from a different host or port, that exact URI must also be registered in the SPA redirect URI list.
 
 ## Frontend Configuration Contract
@@ -42,6 +43,7 @@ After registration, copy the `Application (client) ID` and configure:
 1. Local development:
    - `.env` -> `VITE_AZURE_CLIENT_ID=<application-client-id>`
    - Run `npm run dev` and open `http://localhost:5173/` when testing real Microsoft sign-in unless another exact local redirect URI is registered.
+   - MSAL is configured explicitly with `http://localhost:5173/`; restart the dev server after changing `.env`.
 2. CI/CD:
    - GitHub repository variable `VITE_AZURE_CLIENT_ID=<application-client-id>`
 

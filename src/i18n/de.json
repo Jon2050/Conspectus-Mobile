@@ -196,7 +196,6 @@
   "sync": {
     "startup": {
       "checking": "Suche nach DB-Updates auf OneDrive...",
-      "toastSyncing": "Synchronisiere mit OneDrive...",
       "onlineUnchanged": "Zwischengespeicherte DB ist aktuell",
       "onlineChanged": "Neueste DB von OneDrive heruntergeladen.",
       "completed": "DB-Synchronisation abgeschlossen.",

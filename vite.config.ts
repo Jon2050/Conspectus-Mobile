@@ -1,4 +1,4 @@
-// Configures the app build, shared aliases, and build-time metadata injected into the client bundle.
+// Configures deterministic app base paths, shared aliases, and PWA build metadata.
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
@@ -52,14 +52,20 @@ export const resolveBasePath = (environment: Record<string, string | undefined>)
   return '/';
 };
 
+export const resolveViteBasePath = (
+  environment: Record<string, string | undefined>,
+  command: 'build' | 'serve',
+  mode: string,
+): string => (command === 'serve' && mode === 'development' ? '/' : resolveBasePath(environment));
+
 export const loadBuildEnvironment = (
   mode: string,
   envDirectory: string = process.cwd(),
 ): Record<string, string | undefined> => ({ ...loadEnv(mode, envDirectory, ''), ...process.env });
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ command, mode }) => {
   const environment = loadBuildEnvironment(mode);
-  const basePath = resolveBasePath(environment);
+  const basePath = resolveViteBasePath(environment, command, mode);
 
   return {
     base: basePath,

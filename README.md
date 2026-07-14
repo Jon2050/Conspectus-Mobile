@@ -56,7 +56,8 @@ Required variable:
 
 Optional deployment variables:
 
-- `VITE_DEPLOY_BASE_PATH`: Optional base-path override for non-channel/local builds.
+- `VITE_DEPLOY_BASE_PATH`: Optional base-path override for non-channel builds. `npm run dev`
+  always serves from `/` so its Microsoft redirect URI remains `http://localhost:5173/`.
 
 Startup validation:
 
@@ -72,6 +73,8 @@ Current local contract:
 - Use `http://localhost:5173/` for local auth testing.
 - Run `npm run dev`. It is pinned to `localhost:5173` and fails fast if that port is already occupied.
 - Open exactly `http://localhost:5173/` in the browser.
+- Restart the dev server after changing `.env`; deployment base-path overrides are intentionally
+  ignored by `npm run dev` so MSAL always sends the registered localhost root as `redirect_uri`.
 
 Important:
 

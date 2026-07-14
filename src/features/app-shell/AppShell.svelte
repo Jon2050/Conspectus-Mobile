@@ -34,7 +34,6 @@
     applyStartupDbRuntimeError,
     applyUnexpectedStartupSyncError,
     beginStartupSync,
-    clearStartupSyncToast,
     updateStartupSyncProgress,
   } from './startupSyncStateController';
   import { syncDbRuntimeForStartupDecision } from './startupDbRuntimeSync';
@@ -74,6 +73,7 @@
   let appShellIsMounted = false;
   let selectedBindingHasEmitted = false;
   let hasPerformedInitialSync = false;
+  let dataRoutesAwaitInitialSync = false;
   let currentSyncId = 0;
   let footerVisibilityTrackingIsActive = false;
   let lastRenderedRoute: AppRouteKey | null = null;
@@ -97,6 +97,11 @@
   $: pendingTransferIsConflict =
     addTransferSaveState.phase === 'conflict' || addTransferSaveState.phase === 'conflict_syncing';
   $: pendingTransferIsOffline = !$networkStateStore;
+  $: startupSyncIsActive = $syncStateStore.state === 'syncing' && $syncStateStore.branch === null;
+  $: startupSyncBlocksDataRoute =
+    dataRoutesAwaitInitialSync &&
+    startupSyncIsActive &&
+    (currentRoute === 'accounts' || currentRoute === 'transfers');
 
   const openPendingTransfer = (): void => {
     if (typeof window !== 'undefined') {
@@ -123,9 +128,12 @@
 
   const resolveNavIconUrl = (iconPath: string): string => `${navIconBaseUrl}${iconPath}`;
 
-  const performSync = async (binding: DriveItemBinding | null): Promise<void> => {
+  const performSync = async (
+    binding: DriveItemBinding | null,
+    isInitialSync = false,
+  ): Promise<void> => {
     const syncId = ++currentSyncId;
-    clearStartupSyncToast(syncStateStore);
+    dataRoutesAwaitInitialSync = isInitialSync;
     syncStateStore.reset();
     const dbRuntime = resolveAppDbRuntime();
 
@@ -203,7 +211,6 @@
     if (hasPerformedInitialSync) {
       void performSync(binding);
     } else {
-      clearStartupSyncToast(syncStateStore);
       syncStateStore.reset();
     }
   });
@@ -365,7 +372,7 @@
 
       hasPerformedInitialSync = true;
       const binding = get(appSelectedDriveItemBindingStore);
-      void performSync(binding);
+      void performSync(binding, true);
     })();
 
     let timerId: number | null = null;
@@ -405,7 +412,6 @@
   });
 
   onDestroy(() => {
-    clearStartupSyncToast(syncStateStore);
     unsubscribe();
     unsubscribeAddTransferSaveController();
     unsubscribeSelectedBinding();
@@ -470,7 +476,7 @@
     </section>
   {/if}
 
-  {#if $syncStateStore.state === 'syncing'}
+  {#if startupSyncIsActive}
     <section class="startup-sync-progress" data-testid="startup-sync-progress">
       <ProgressIndicator
         loaded={$syncStateStore.progress?.loaded ?? 0}
@@ -491,9 +497,13 @@
       {#if showLoadingPlaceholder}
         <LoadingPlaceholder />
       {:else if currentRoute === 'accounts'}
-        <AccountsRoute {syncStateStore} />
+        {#if !startupSyncBlocksDataRoute}
+          <AccountsRoute {syncStateStore} />
+        {/if}
       {:else if currentRoute === 'transfers'}
-        <TransfersRoute {syncStateStore} />
+        {#if !startupSyncBlocksDataRoute}
+          <TransfersRoute {syncStateStore} />
+        {/if}
       {:else if currentRoute === 'add'}
         <AddRoute
           bind:fields={addTransferFields}

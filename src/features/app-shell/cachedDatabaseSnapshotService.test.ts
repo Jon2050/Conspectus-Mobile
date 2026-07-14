@@ -47,6 +47,7 @@ const DRIVE_ITEM_BINDING: DriveItemBinding = {
   name: 'conspectus.db',
   parentPath: '/Finance',
 };
+const DOWNLOAD_URL = 'https://download.example.com/conspectus.db';
 
 const createMetadata = (
   overrides: Partial<GraphFileMetadata> = {},
@@ -55,7 +56,6 @@ const createMetadata = (
   eTag: '"etag-1"',
   sizeBytes: defaultBytes.length,
   lastModifiedDateTime: '2026-03-11T08:30:00.000Z',
-  downloadUrl: 'https://download.example.com/conspectus.db',
   ...overrides,
 });
 
@@ -71,7 +71,8 @@ const deleteDatabase = async (databaseName: string): Promise<void> => {
 describe('cached database snapshot service', () => {
   it('downloads a fresh OneDrive DB and persists the validated snapshot', async () => {
     const dbBytes = createSqliteBytes([9, 8, 7]);
-    const graphClient: Pick<GraphClient, 'downloadFile'> = {
+    const graphClient: Pick<GraphClient, 'getFileDownloadUrl' | 'downloadFile'> = {
+      getFileDownloadUrl: vi.fn(async () => DOWNLOAD_URL),
       downloadFile: vi.fn(async () => dbBytes),
     };
     const cacheStore: Pick<CacheStore, 'writeSnapshot'> = {
@@ -87,7 +88,8 @@ describe('cached database snapshot service', () => {
 
     const snapshot = await service.downloadAndCacheSnapshot(DRIVE_ITEM_BINDING, metadata);
 
-    expect(graphClient.downloadFile).toHaveBeenCalledWith(metadata.downloadUrl, undefined);
+    expect(graphClient.getFileDownloadUrl).toHaveBeenCalledWith(DRIVE_ITEM_BINDING);
+    expect(graphClient.downloadFile).toHaveBeenCalledWith(DOWNLOAD_URL, undefined);
     expect(snapshot).toEqual<CachedDatabaseSnapshot>({
       binding: DRIVE_ITEM_BINDING,
       metadata: {
@@ -101,7 +103,8 @@ describe('cached database snapshot service', () => {
   });
 
   it('rejects empty downloads before they can overwrite the cache', async () => {
-    const graphClient: Pick<GraphClient, 'downloadFile'> = {
+    const graphClient: Pick<GraphClient, 'getFileDownloadUrl' | 'downloadFile'> = {
+      getFileDownloadUrl: vi.fn(async () => DOWNLOAD_URL),
       downloadFile: vi.fn(async () => new Uint8Array()),
     };
     const cacheStore: Pick<CacheStore, 'writeSnapshot'> = {
@@ -124,7 +127,8 @@ describe('cached database snapshot service', () => {
 
   it('rejects size mismatches before writing a new snapshot', async () => {
     const dbBytes = createSqliteBytes([1, 2, 3]);
-    const graphClient: Pick<GraphClient, 'downloadFile'> = {
+    const graphClient: Pick<GraphClient, 'getFileDownloadUrl' | 'downloadFile'> = {
+      getFileDownloadUrl: vi.fn(async () => DOWNLOAD_URL),
       downloadFile: vi.fn(async () => dbBytes),
     };
     const cacheStore: Pick<CacheStore, 'writeSnapshot'> = {
@@ -158,7 +162,8 @@ describe('cached database snapshot service', () => {
       dbBytes: previousBytes,
     };
     const corruptBytes = createSqliteBytes([0xde, 0xad, 0xbe, 0xef]);
-    const graphClient: Pick<GraphClient, 'downloadFile'> = {
+    const graphClient: Pick<GraphClient, 'getFileDownloadUrl' | 'downloadFile'> = {
+      getFileDownloadUrl: vi.fn(async () => DOWNLOAD_URL),
       downloadFile: vi.fn(async () => corruptBytes),
     };
     const service = createCachedDatabaseSnapshotService(graphClient, cacheStore, {
@@ -193,7 +198,8 @@ describe('cached database snapshot service', () => {
 
   it('accepts snapshots that pass real SQLite open and pragma validation', async () => {
     const dbBytes = await createValidSqliteSnapshotBytes();
-    const graphClient: Pick<GraphClient, 'downloadFile'> = {
+    const graphClient: Pick<GraphClient, 'getFileDownloadUrl' | 'downloadFile'> = {
+      getFileDownloadUrl: vi.fn(async () => DOWNLOAD_URL),
       downloadFile: vi.fn(async () => dbBytes),
     };
     const cacheStore: Pick<CacheStore, 'writeSnapshot'> = {
