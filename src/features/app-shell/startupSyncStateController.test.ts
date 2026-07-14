@@ -1,4 +1,4 @@
-// Verifies startup sync-state transitions and toast feedback stay deterministic for UI consumers.
+// Verifies startup sync-state transitions use one active status surface and deterministic completion feedback.
 import { get } from 'svelte/store';
 import { describe, expect, it, vi } from 'vitest';
 import { DbRuntimeError } from '@db';
@@ -9,7 +9,6 @@ import {
   applyStartupFreshnessDecision,
   applyUnexpectedStartupSyncError,
   beginStartupSync,
-  clearStartupSyncToast,
   updateStartupSyncProgress,
 } from './startupSyncStateController';
 
@@ -17,15 +16,13 @@ import type { StartupFreshnessDecision } from './startupFreshnessService';
 
 const createToastStore = () => ({
   show: vi.fn(() => 'toast-id'),
-  remove: vi.fn(),
 });
 
 describe('startupSyncStateController', () => {
-  it('enters syncing state and shows an info toast when startup sync begins', () => {
+  it('enters syncing state without creating a duplicate activity toast', () => {
     const store = createSyncStateStore();
-    const toastStore = createToastStore();
 
-    beginStartupSync(store, toastStore);
+    beginStartupSync(store);
 
     expect(get(store)).toEqual({
       state: 'syncing',
@@ -33,29 +30,12 @@ describe('startupSyncStateController', () => {
       branch: null,
       progress: null,
     });
-    expect(toastStore.show).toHaveBeenCalledWith('Synchronisiere mit OneDrive...', 'info', 0);
-  });
-
-  it('replaces and explicitly clears the persistent startup toast', () => {
-    const store = createSyncStateStore();
-    const toastStore = createToastStore();
-
-    beginStartupSync(store, toastStore);
-    beginStartupSync(store, toastStore);
-
-    expect(toastStore.remove).toHaveBeenCalledTimes(1);
-    expect(toastStore.remove).toHaveBeenLastCalledWith('toast-id');
-
-    clearStartupSyncToast(store);
-
-    expect(toastStore.remove).toHaveBeenCalledTimes(2);
   });
 
   it('updates progress in the store when startup sync progress changes', () => {
     const store = createSyncStateStore();
-    const toastStore = createToastStore();
 
-    beginStartupSync(store, toastStore);
+    beginStartupSync(store);
     updateStartupSyncProgress(store, 1024, 2048);
     expect(get(store).progress).toEqual({ loaded: 1024, total: 2048, kind: 'download' });
 
@@ -86,7 +66,7 @@ describe('startupSyncStateController', () => {
       failure: null,
     };
 
-    beginStartupSync(store, toastStore);
+    beginStartupSync(store);
     toastStore.show.mockClear();
 
     applyStartupFreshnessDecision(store, decision, toastStore);
@@ -102,7 +82,6 @@ describe('startupSyncStateController', () => {
       'success',
       3200,
     );
-    expect(toastStore.remove).toHaveBeenCalledWith('toast-id');
   });
 
   it('applies a successful online unchanged decision and surfaces a success toast', () => {
@@ -128,7 +107,7 @@ describe('startupSyncStateController', () => {
       failure: null,
     };
 
-    beginStartupSync(store, toastStore);
+    beginStartupSync(store);
     toastStore.show.mockClear();
 
     applyStartupFreshnessDecision(store, decision, toastStore);
@@ -144,7 +123,6 @@ describe('startupSyncStateController', () => {
       'success',
       3200,
     );
-    expect(toastStore.remove).toHaveBeenCalledWith('toast-id');
   });
 
   it('applies offline startup failure as an actionable error', () => {
@@ -169,11 +147,7 @@ describe('startupSyncStateController', () => {
       message: 'Connection is required to load the database.',
       branch: 'offline_unsupported',
     });
-    expect(toastStore.show).toHaveBeenCalledWith(
-      'Connection is required to load the database.',
-      'error',
-      5000,
-    );
+    expect(toastStore.show).not.toHaveBeenCalled();
   });
 
   it('applies auth-expired terminal decisions as actionable errors', () => {
@@ -194,7 +168,7 @@ describe('startupSyncStateController', () => {
       },
     };
 
-    beginStartupSync(store, toastStore);
+    beginStartupSync(store);
     toastStore.show.mockClear();
     applyStartupFreshnessDecision(store, decision, toastStore);
 
@@ -204,12 +178,7 @@ describe('startupSyncStateController', () => {
       branch: 'online_auth_expired',
       progress: null,
     });
-    expect(toastStore.show).toHaveBeenCalledWith(
-      'Your session has expired. Please sign in again to sync with OneDrive.',
-      'error',
-      5000,
-    );
-    expect(toastStore.remove).toHaveBeenCalledWith('toast-id');
+    expect(toastStore.show).not.toHaveBeenCalled();
   });
 
   it('resets to idle when the startup decision is skipped', () => {
@@ -238,16 +207,13 @@ describe('startupSyncStateController', () => {
     expect(toastStore.show).not.toHaveBeenCalled();
   });
 
-  it('applies unexpected startup errors and surfaces an error toast', () => {
+  it('applies unexpected startup errors without duplicating the persistent route error', () => {
     const store = createSyncStateStore();
-    const toastStore = createToastStore();
 
-    beginStartupSync(store, toastStore);
-    toastStore.show.mockClear();
+    beginStartupSync(store);
     applyUnexpectedStartupSyncError(
       store,
       'Start-Synchronisation unerwartet fehlgeschlagen. Bitte prüfe die Browser-Konsole und versuche es erneut.',
-      toastStore,
     );
 
     expect(get(store)).toEqual({
@@ -257,21 +223,13 @@ describe('startupSyncStateController', () => {
       branch: null,
       progress: null,
     });
-    expect(toastStore.show).toHaveBeenCalledWith(
-      'Start-Synchronisation unerwartet fehlgeschlagen. Bitte prüfe die Browser-Konsole und versuche es erneut.',
-      'error',
-      5000,
-    );
-    expect(toastStore.remove).toHaveBeenCalledWith('toast-id');
   });
 
   it('maps deterministic db runtime open errors into startup sync error state', () => {
     const store = createSyncStateStore();
-    const toastStore = createToastStore();
 
-    beginStartupSync(store, toastStore);
-    toastStore.show.mockClear();
-    applyStartupDbRuntimeError(store, new DbRuntimeError('db_open_failed'), toastStore);
+    beginStartupSync(store);
+    applyStartupDbRuntimeError(store, new DbRuntimeError('db_open_failed'));
 
     expect(get(store)).toEqual({
       state: 'error',
@@ -280,12 +238,6 @@ describe('startupSyncStateController', () => {
       branch: 'db_runtime_open_failed',
       progress: null,
     });
-    expect(toastStore.show).toHaveBeenCalledWith(
-      'Konnte zwischengespeicherte DB nicht öffnen. Synchronisiere erneut über die Einstellungen.',
-      'error',
-      5000,
-    );
-    expect(toastStore.remove).toHaveBeenCalledWith('toast-id');
   });
 
   it('falls back to a deterministic generic message for unknown db runtime failures', () => {
@@ -293,9 +245,7 @@ describe('startupSyncStateController', () => {
       state: 'syncing',
       message: 'Suche nach DB-Updates auf OneDrive...',
     });
-    const toastStore = createToastStore();
-
-    applyStartupDbRuntimeError(store, new Error('Unexpected runtime failure'), toastStore);
+    applyStartupDbRuntimeError(store, new Error('Unexpected runtime failure'));
 
     expect(get(store)).toEqual({
       state: 'error',
@@ -304,10 +254,5 @@ describe('startupSyncStateController', () => {
       branch: 'db_runtime_open_failed',
       progress: null,
     });
-    expect(toastStore.show).toHaveBeenCalledWith(
-      'Konnte das lokale SQLite-Snapshot nicht öffnen. Wiederhole die Synchronisation in den Einstellungen.',
-      'error',
-      5000,
-    );
   });
 });

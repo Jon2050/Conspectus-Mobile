@@ -19,6 +19,7 @@ const DRIVE_ITEM_BINDING: DriveItemBinding = {
   name: 'conspectus.db',
   parentPath: '/Finance',
 };
+const DOWNLOAD_URL = 'https://download.example.com/conspectus.db';
 
 const createSqliteBytes = (payloadBytes: readonly number[] = [1, 2, 3, 4]): Uint8Array =>
   Uint8Array.from([...SQLITE_DATABASE_HEADER, ...payloadBytes]);
@@ -27,7 +28,6 @@ const createMetadata = (dbBytes: Uint8Array): GraphFileMetadata => ({
   eTag: '"etag-2"',
   sizeBytes: dbBytes.length,
   lastModifiedDateTime: '2026-03-11T10:15:00.000Z',
-  downloadUrl: 'https://download.example.com/conspectus.db',
 });
 
 const createSnapshotValidator = (): CachedDatabaseSnapshotValidator => ({
@@ -46,8 +46,12 @@ const createDbRuntime = (calls: string[] = []): Pick<BrowserDbRuntime, 'close' |
 describe('database conflict recovery service', () => {
   it('downloads the latest OneDrive database, caches it, and reopens the runtime', async () => {
     const dbBytes = createSqliteBytes([9, 8, 7]);
-    const graphClient: Pick<GraphClient, 'getFileMetadata' | 'downloadFile'> = {
+    const graphClient: Pick<
+      GraphClient,
+      'getFileMetadata' | 'getFileDownloadUrl' | 'downloadFile'
+    > = {
       getFileMetadata: vi.fn(async () => createMetadata(dbBytes)),
+      getFileDownloadUrl: vi.fn(async () => DOWNLOAD_URL),
       downloadFile: vi.fn(async (_downloadUrl, onProgress) => {
         onProgress?.(5, dbBytes.length);
         onProgress?.(dbBytes.length, dbBytes.length);
@@ -108,6 +112,7 @@ describe('database conflict recovery service', () => {
     const service = createDatabaseConflictRecoveryService(
       {
         getFileMetadata: vi.fn(async () => createMetadata(createSqliteBytes())),
+        getFileDownloadUrl: vi.fn(async () => DOWNLOAD_URL),
         downloadFile: vi.fn(async () => createSqliteBytes()),
       },
       { writeSnapshot: vi.fn(async () => {}) },
@@ -128,6 +133,7 @@ describe('database conflict recovery service', () => {
     const service = createDatabaseConflictRecoveryService(
       {
         getFileMetadata: vi.fn(async () => createMetadata(createSqliteBytes())),
+        getFileDownloadUrl: vi.fn(async () => DOWNLOAD_URL),
         downloadFile: vi.fn(async () => createSqliteBytes()),
       },
       { writeSnapshot: vi.fn(async () => {}) },
@@ -151,8 +157,12 @@ describe('database conflict recovery service', () => {
 
   it('keeps the runtime closed when downloaded bytes cannot be opened', async () => {
     const dbBytes = createSqliteBytes([4, 5, 6]);
-    const graphClient: Pick<GraphClient, 'getFileMetadata' | 'downloadFile'> = {
+    const graphClient: Pick<
+      GraphClient,
+      'getFileMetadata' | 'getFileDownloadUrl' | 'downloadFile'
+    > = {
       getFileMetadata: vi.fn(async () => createMetadata(dbBytes)),
+      getFileDownloadUrl: vi.fn(async () => DOWNLOAD_URL),
       downloadFile: vi.fn(async () => dbBytes),
     };
     const cacheStore: Pick<CacheStore, 'writeSnapshot'> = {

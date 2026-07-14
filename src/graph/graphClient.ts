@@ -13,7 +13,8 @@ import type {
 
 const GRAPH_API_BASE_URL = 'https://graph.microsoft.com/v1.0';
 const CHILDREN_FIELDS = 'id,name,parentReference,file,folder';
-const METADATA_FIELDS = 'eTag,size,lastModifiedDateTime,@microsoft.graph.downloadUrl';
+const METADATA_FIELDS = 'eTag,size,lastModifiedDateTime';
+const DOWNLOAD_URL_FIELDS = 'id,@microsoft.graph.downloadUrl';
 
 type FetchFn = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -325,7 +326,7 @@ const normalizeDriveItem = (
 const normalizeGraphItemBase = (
   payload: unknown,
   invalidResponseMessage: string,
-): Omit<GraphFileMetadata, 'downloadUrl'> => {
+): GraphFileMetadata => {
   if (!isGraphItemPayload(payload)) {
     throw new GraphClientError('unknown', invalidResponseMessage, undefined, payload);
   }
@@ -347,12 +348,7 @@ const normalizeGraphItemBase = (
   };
 };
 
-const normalizeFileMetadata = (
-  payload: unknown,
-  invalidResponseMessage: string,
-): GraphFileMetadata => {
-  const baseMetadata = normalizeGraphItemBase(payload, invalidResponseMessage);
-
+const normalizeDownloadUrl = (payload: unknown, invalidResponseMessage: string): string => {
   if (!isGraphItemPayload(payload)) {
     throw new GraphClientError('unknown', invalidResponseMessage, undefined, payload);
   }
@@ -367,10 +363,7 @@ const normalizeFileMetadata = (
     throw new GraphClientError('unknown', invalidResponseMessage, undefined, payload);
   }
 
-  return {
-    ...baseMetadata,
-    downloadUrl,
-  };
+  return downloadUrl;
 };
 
 const normalizeUploadResult = (
@@ -474,10 +467,20 @@ export const createGraphClient = (options: CreateGraphClientOptions): GraphClien
         'Microsoft Graph metadata response did not include the required file fields.',
       );
 
-      return normalizeFileMetadata(
+      return normalizeGraphItemBase(
         payload,
         'Microsoft Graph metadata response did not include the required file fields.',
       );
+    },
+
+    async getFileDownloadUrl(binding): Promise<string> {
+      const downloadUrlRequest = `${buildDriveItemUrl(binding)}?select=${encodeURIComponent(DOWNLOAD_URL_FIELDS)}`;
+      const response = await executeRequest(downloadUrlRequest);
+      const invalidResponseMessage =
+        'Microsoft Graph response did not include a download URL for the selected file.';
+      const payload = await readJsonPayload(response, invalidResponseMessage);
+
+      return normalizeDownloadUrl(payload, invalidResponseMessage);
     },
 
     async downloadFile(

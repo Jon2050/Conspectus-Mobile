@@ -32,7 +32,6 @@ const createMetadata = (overrides: Partial<GraphFileMetadata> = {}): GraphFileMe
   eTag: '"etag-1"',
   sizeBytes: 2048,
   lastModifiedDateTime: '2026-03-11T10:15:00.000Z',
-  downloadUrl: 'https://download.example.com/conspectus.db',
   ...overrides,
 });
 

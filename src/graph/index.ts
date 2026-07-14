@@ -26,7 +26,6 @@ export interface GraphFileMetadata {
   readonly eTag: string;
   readonly sizeBytes: number;
   readonly lastModifiedDateTime: string;
-  readonly downloadUrl: string;
 }
 
 export interface GraphUploadResult {
@@ -53,6 +52,7 @@ export interface GraphError {
 export interface GraphClient {
   listChildren(folder?: DriveFolderReference): Promise<readonly GraphDriveItem[]>;
   getFileMetadata(binding: DriveItemBinding): Promise<GraphFileMetadata>;
+  getFileDownloadUrl(binding: DriveItemBinding): Promise<string>;
   downloadFile(
     downloadUrl: string,
     onProgress?: (loadedBytes: number, totalBytes: number | null) => void,
