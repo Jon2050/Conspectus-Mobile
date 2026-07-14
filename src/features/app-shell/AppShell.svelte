@@ -24,7 +24,13 @@
   import { createCachedDatabaseSnapshotService } from './cachedDatabaseSnapshotService';
   import { resolveAppGraphClient } from './graphClientResolver';
   import { resolveAppDbRuntime } from './dbRuntimeResolver';
-  import { APP_ROUTES, createHashRouteStore, DEFAULT_ROUTE, type AppRouteKey } from './hashRouting';
+  import {
+    APP_ROUTES,
+    createHashRouteStore,
+    DEFAULT_ROUTE,
+    toRouteHash,
+    type AppRouteKey,
+  } from './hashRouting';
   import {
     createStartupFreshnessService,
     type StartupFreshnessDecision,
@@ -78,6 +84,8 @@
   let footerVisibilityTrackingIsActive = false;
   let lastRenderedRoute: AppRouteKey | null = null;
   let forceRefreshIsRunning = false;
+  let authRecoveryIsPending = false;
+  let authRecoveryError: string | null = null;
   let stopFooterVisibilityTracking = (): void => {};
   const navIconBaseUrl = import.meta.env.BASE_URL;
   const unsubscribe = routeStore.subscribe((route) => {
@@ -99,6 +107,11 @@
     addTransferSaveState.phase === 'conflict' || addTransferSaveState.phase === 'conflict_syncing';
   $: pendingTransferIsOffline = !$networkStateStore;
   $: startupSyncIsActive = $syncStateStore.state === 'syncing' && $syncStateStore.branch === null;
+  $: staleTokenRecoveryIsRequired =
+    $syncStateStore.state === 'error' && $syncStateStore.branch === 'online_auth_expired';
+  $: if (!staleTokenRecoveryIsRequired && authRecoveryError !== null) {
+    authRecoveryError = null;
+  }
   $: startupSyncBlocksDataRoute =
     dataRoutesAwaitInitialSync &&
     startupSyncIsActive &&
@@ -107,6 +120,35 @@
   const openPendingTransfer = (): void => {
     if (typeof window !== 'undefined') {
       window.location.hash = '#/add';
+    }
+  };
+
+  const toRecoveryErrorMessage = (error: unknown): string => {
+    if (typeof error === 'object' && error !== null) {
+      const message = (error as { message?: unknown }).message;
+      if (typeof message === 'string' && message.trim().length > 0) {
+        return message;
+      }
+    }
+
+    return $_('appShell.reauthenticationFailed');
+  };
+
+  const requestStaleTokenRecovery = async (): Promise<void> => {
+    if (authRecoveryIsPending) {
+      return;
+    }
+
+    authRecoveryIsPending = true;
+    authRecoveryError = null;
+
+    try {
+      const redirectStartPage = new URL(toRouteHash(currentRoute), window.location.href).toString();
+      await resolveAppAuthClient().reauthenticate(redirectStartPage);
+    } catch (error) {
+      authRecoveryError = toRecoveryErrorMessage(error);
+    } finally {
+      authRecoveryIsPending = false;
     }
   };
 
@@ -442,6 +484,30 @@
     <h1>{$_('appShell.title')}</h1>
   </header>
 
+  {#if staleTokenRecoveryIsRequired}
+    <section class="auth-recovery" role="alert" data-testid="stale-token-recovery">
+      <div>
+        <h2>{$_('appShell.sessionExpiredTitle')}</h2>
+        <p>{$syncStateStore.message}</p>
+        {#if authRecoveryError !== null}
+          <p class="auth-recovery__error" data-testid="stale-token-recovery-error">
+            {authRecoveryError}
+          </p>
+        {/if}
+      </div>
+      <button
+        type="button"
+        class="app-button app-button--primary"
+        data-testid="stale-token-recovery-button"
+        aria-busy={authRecoveryIsPending}
+        disabled={authRecoveryIsPending}
+        on:click={() => void requestStaleTokenRecovery()}
+      >
+        {authRecoveryIsPending ? $_('appShell.reauthenticating') : $_('appShell.signInAgain')}
+      </button>
+    </section>
+  {/if}
+
   {#if pendingTransferNeedsAttention}
     <section
       class="pending-transfer-sync"
@@ -566,6 +632,7 @@
   </div>
 
   <style>
+    .auth-recovery,
     .pending-transfer-sync {
       display: flex;
       align-items: center;
@@ -576,9 +643,24 @@
       border-bottom: 1px solid var(--border);
     }
 
+    .auth-recovery {
+      background: color-mix(in srgb, var(--negative) 10%, var(--surface-strong));
+      border-bottom: 1px solid color-mix(in srgb, var(--negative) 24%, var(--border));
+    }
+
+    .auth-recovery h2,
+    .auth-recovery p,
     .pending-transfer-sync h2,
     .pending-transfer-sync p {
       margin: 0;
+    }
+
+    .auth-recovery h2 {
+      font-size: 1rem;
+    }
+
+    .auth-recovery__error {
+      color: color-mix(in srgb, var(--negative) 72%, var(--text-primary));
     }
 
     .pending-transfer-sync h2 {
@@ -598,9 +680,14 @@
     }
 
     @media (max-width: 36rem) {
+      .auth-recovery,
       .pending-transfer-sync {
         align-items: stretch;
         flex-direction: column;
+      }
+
+      .auth-recovery :global(.app-button) {
+        width: 100%;
       }
 
       .pending-transfer-sync__actions {

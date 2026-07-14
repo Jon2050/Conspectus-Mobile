@@ -45,6 +45,7 @@ const createMockAuthClientHarness = (): MockAuthClientHarness => {
   const signIn = vi.fn(async () => {
     session = SIGNED_IN_SESSION;
   });
+  const reauthenticate = vi.fn(async () => {});
   const signOut = vi.fn(async () => {
     session = SIGNED_OUT_SESSION;
   });
@@ -53,6 +54,7 @@ const createMockAuthClientHarness = (): MockAuthClientHarness => {
   const client: AuthClient = {
     initialize,
     signIn,
+    reauthenticate,
     signOut,
     getAccessToken,
     getSession: () => session,

@@ -23,6 +23,7 @@ const createStubAuthClient = (): AuthClient => ({
     account: null,
   })),
   signIn: vi.fn(async () => {}),
+  reauthenticate: vi.fn(async () => {}),
   signOut: vi.fn(async () => {}),
   getAccessToken: vi.fn(async () => 'token'),
 });

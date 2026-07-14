@@ -15,7 +15,7 @@ import {
 import { loadRuntimeEnv } from '@shared';
 
 import type { AuthAccount, AuthClient, AuthErrorCode, AuthSession } from './index';
-import { AUTH_REQUEST_SCOPES } from './scopes';
+import { AUTH_REQUEST_SCOPES, GRAPH_ONEDRIVE_FILE_SCOPES } from './scopes';
 
 const MSAL_CONSUMERS_AUTHORITY = 'https://login.microsoftonline.com/consumers';
 
@@ -26,6 +26,7 @@ type MsalInstance = {
   setActiveAccount(account: AccountInfo | null): void;
   getAllAccounts(): AccountInfo[];
   loginRedirect(request?: RedirectRequest): Promise<void>;
+  acquireTokenRedirect(request: RedirectRequest): Promise<void>;
   logoutRedirect(logoutRequest?: EndSessionRequest): Promise<void>;
   acquireTokenSilent(request: SilentRequest): Promise<AuthenticationResult>;
 };
@@ -294,6 +295,24 @@ export const createAuthClient = (options: CreateAuthClientOptions = {}): AuthCli
         await resolveMsalInstance().loginRedirect(signInRequest);
       } catch (error) {
         throw normalizeAuthError(error, 'Sign-in failed.');
+      }
+    },
+
+    async reauthenticate(redirectStartPage: string): Promise<void> {
+      assertInitialized();
+
+      const resolvedMsalInstance = resolveMsalInstance();
+      const activeAccount = ensureActiveAccount(resolvedMsalInstance);
+      const reauthenticationRequest: RedirectRequest = {
+        account: activeAccount,
+        scopes: [...GRAPH_ONEDRIVE_FILE_SCOPES],
+        redirectStartPage,
+      };
+
+      try {
+        await resolvedMsalInstance.acquireTokenRedirect(reauthenticationRequest);
+      } catch (error) {
+        throw normalizeAuthError(error, 'Re-authentication failed.');
       }
     },
 

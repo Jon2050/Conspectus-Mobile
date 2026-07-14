@@ -567,7 +567,7 @@ An issue is only considered done when:
 - Depends on: `M7-01`
 - GitHub: [#77](https://github.com/Jon2050/Conspectus-Mobile/issues/77)
 
-### :green_circle: M7-04 Implement stale token recovery flow
+### :white_check_mark: M7-04 Implement stale token recovery flow
 
 - Label: `feature`
 - Milestone: `M7 - Settings + Recovery`

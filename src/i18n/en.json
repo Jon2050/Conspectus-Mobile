@@ -8,6 +8,9 @@
   },
   "appShell": {
     "signInAgain": "Sign in again",
+    "sessionExpiredTitle": "Microsoft session expired",
+    "reauthenticating": "Opening Microsoft sign-in...",
+    "reauthenticationFailed": "Microsoft sign-in could not be opened. Try again.",
     "downloadedKb": "{kb} KB downloaded...",
     "downloadProgress": "{loaded} KB / {total} KB",
     "uploadedKb": "{kb} KB uploaded...",

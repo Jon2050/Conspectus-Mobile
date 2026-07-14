@@ -18,6 +18,7 @@ const createMinimalMsalInstance = (): MsalInstance => {
     }),
     getAllAccounts: vi.fn(() => []),
     loginRedirect: vi.fn(async () => {}),
+    acquireTokenRedirect: vi.fn(async () => {}),
     logoutRedirect: vi.fn(async () => {}),
     acquireTokenSilent: vi.fn(async () => ({
       authority: 'https://login.microsoftonline.com/consumers',
@@ -54,6 +55,7 @@ describe('auth barrel contract', () => {
         initialize: expect.any(Function),
         getSession: expect.any(Function),
         signIn: expect.any(Function),
+        reauthenticate: expect.any(Function),
         signOut: expect.any(Function),
         getAccessToken: expect.any(Function),
       }),

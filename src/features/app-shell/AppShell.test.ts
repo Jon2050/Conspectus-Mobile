@@ -119,4 +119,42 @@ describe('AppShell component', () => {
     expect(body).toContain('Checking OneDrive database freshness...');
     expect(body).not.toMatch(/<progress[^>]*\svalue=/u);
   });
+
+  it('renders the stale-token recovery action only for an expired auth session', () => {
+    const syncStateStore = createSyncStateStore({
+      state: 'error',
+      branch: 'online_auth_expired',
+      message: 'Your session has expired. Please sign in again to sync with OneDrive.',
+    });
+    const { body } = render(AppShell, {
+      props: {
+        routeStore: readable<AppRouteKey>('transfers'),
+        showLoadingPlaceholder: false,
+        syncStateStore,
+      },
+    });
+
+    expect(body).toContain('data-testid="stale-token-recovery"');
+    expect(body).toContain('data-testid="stale-token-recovery-button"');
+    expect(body).toContain('Microsoft-Sitzung abgelaufen');
+    expect(body).toContain('Erneut anmelden');
+  });
+
+  it('does not offer re-authentication for unrelated sync errors', () => {
+    const syncStateStore = createSyncStateStore({
+      state: 'error',
+      branch: 'online_metadata_failed',
+      message: 'OneDrive metadata is unavailable.',
+    });
+    const { body } = render(AppShell, {
+      props: {
+        routeStore: readable<AppRouteKey>('accounts'),
+        showLoadingPlaceholder: false,
+        syncStateStore,
+      },
+    });
+
+    expect(body).not.toContain('data-testid="stale-token-recovery"');
+    expect(body).not.toContain('data-testid="stale-token-recovery-button"');
+  });
 });

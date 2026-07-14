@@ -21,6 +21,7 @@ const createAuthClient = (accessTokenResult: string | Error = 'graph-token') => 
     },
   })),
   signIn: vi.fn(async () => {}),
+  reauthenticate: vi.fn(async () => {}),
   signOut: vi.fn(async () => {}),
   getAccessToken: vi.fn(async () => {
     if (accessTokenResult instanceof Error) {
