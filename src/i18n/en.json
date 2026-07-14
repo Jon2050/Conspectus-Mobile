@@ -108,6 +108,14 @@
   "settings": {
     "title": "Settings",
     "description": "Authentication controls for OneDrive account access.",
+    "safety": {
+      "heading": "Protect your data",
+      "warning": "Close the desktop app before using Conspectus Mobile. Never use both apps at the same time.",
+      "explanation": "Both apps use the same database file. Changes made at the same time can overwrite each other.",
+      "recoveryHeading": "Restore an earlier database version",
+      "recoveryDescription": "Personal OneDrive accounts keep file version history for 30 days. If a change was accidental or incorrect, open the database file on OneDrive.com, choose Version history, and restore the version you need.",
+      "recoveryLink": "Read Microsoft's OneDrive recovery instructions"
+    },
     "status": {
       "signedOut": "Signed out.",
       "signedIn": "Signed in.",

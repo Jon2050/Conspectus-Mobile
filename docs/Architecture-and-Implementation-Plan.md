@@ -736,6 +736,12 @@ M7-02 implementation clarification:
 - Settings force refresh is routed through the app shell's existing verified sync orchestration. It performs a fresh Graph metadata check and uses an explicit `force_download` mode to bypass unchanged-eTag cache reuse, then validates, caches, and reopens the downloaded SQLite snapshot through the established runtime path.
 - The shared sync state and progress surface report the manual operation while the Settings action is guarded against duplicate submissions. A successful forced download refreshes the cached `lastSyncAt` timestamp; failures preserve the previous timestamp and remain retryable from Settings.
 
+M7-03 implementation clarification:
+
+- The operational safety and recovery guidance is always visible in Settings, including before sign-in or file binding, so users can find it when setup or recovery is incomplete.
+- Concise English and German wording explains why desktop and mobile must not use the database concurrently and directs users to the personal OneDrive 30-day file version history recovery path.
+- The recovery card includes the restore steps and links to Microsoft's official instructions; no custom backup or version-history API is added to the app.
+
 M7-08 implementation clarification:
 
 - Startup database access now fails closed when offline or when authentication, OneDrive metadata, or snapshot download fails; cached bytes are reused only after a successful online eTag match.

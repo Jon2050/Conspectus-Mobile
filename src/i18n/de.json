@@ -108,6 +108,14 @@
   "settings": {
     "title": "Einstellungen",
     "description": "Authentifizierung für den OneDrive-Zugriff.",
+    "safety": {
+      "heading": "Schütze deine Daten",
+      "warning": "Schließe die Desktop-App, bevor du Conspectus Mobile verwendest. Verwende niemals beide Apps gleichzeitig.",
+      "explanation": "Beide Apps verwenden dieselbe Datenbankdatei. Gleichzeitige Änderungen können sich gegenseitig überschreiben.",
+      "recoveryHeading": "Frühere Datenbankversion wiederherstellen",
+      "recoveryDescription": "OneDrive speichert den Versionsverlauf bei persönlichen Konten 30 Tage lang. Öffne bei einer versehentlichen oder falschen Änderung die Datenbankdatei auf OneDrive.com, wähle Versionsverlauf und stelle die benötigte Version wieder her.",
+      "recoveryLink": "Microsoft-Anleitung zur Wiederherstellung in OneDrive lesen"
+    },
     "status": {
       "signedOut": "Abgemeldet.",
       "signedIn": "Angemeldet.",
