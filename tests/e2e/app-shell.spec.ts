@@ -2454,6 +2454,22 @@ test('supports sign-in and sign-out auth UX states in settings', async ({ page }
 
   const statusMessage = page.getByTestId('auth-status-message');
   await expect(page.getByRole('heading', { level: 2, name: 'Settings' })).toBeVisible();
+  const safetyNotice = page.getByTestId('settings-safety-recovery');
+  await expect(safetyNotice).toBeVisible();
+  await expect(safetyNotice).toContainText(
+    'Close the desktop app before using Conspectus Mobile. Never use both apps at the same time.',
+  );
+  await expect(safetyNotice).toContainText('file version history for 30 days');
+  const recoveryLink = safetyNotice.getByRole('link', {
+    name: "Read Microsoft's OneDrive recovery instructions",
+  });
+  await expect(recoveryLink).toHaveAttribute(
+    'href',
+    'https://support.microsoft.com/en-us/onedrive/restore-a-previous-version-of-a-file-stored-in-onedrive',
+  );
+  const recoveryLinkBox = await recoveryLink.boundingBox();
+  expect(recoveryLinkBox).not.toBeNull();
+  expect(recoveryLinkBox?.height).toBeGreaterThanOrEqual(44);
   await expect(page.getByRole('button', { name: 'Sign in with Microsoft' })).toBeVisible();
   await expect(statusMessage).toContainText('Signed out.');
 

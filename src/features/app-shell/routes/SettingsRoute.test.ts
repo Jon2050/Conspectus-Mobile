@@ -4,6 +4,14 @@ import settingsRouteSource from './SettingsRoute.svelte?raw';
 
 describe('SettingsRoute styling', () => {
   it('renders dedicated metadata and risk-grouped action sections', () => {
+    expect(settingsRouteSource).toContain('data-testid="settings-safety-recovery"');
+    expect(settingsRouteSource).toContain("$_('settings.safety.warning')");
+    expect(settingsRouteSource).toContain("$_('settings.safety.recoveryDescription')");
+    expect(settingsRouteSource).toContain(
+      'https://support.microsoft.com/en-us/onedrive/restore-a-previous-version-of-a-file-stored-in-onedrive',
+    );
+    expect(settingsRouteSource).toContain('target="_blank"');
+    expect(settingsRouteSource).toContain('rel="noopener noreferrer"');
     expect(settingsRouteSource).toContain('data-testid="settings-last-sync"');
     expect(settingsRouteSource).toContain('data-testid="standard-settings-actions"');
     expect(settingsRouteSource).toContain('data-testid="destructive-settings-actions"');
@@ -29,5 +37,15 @@ describe('SettingsRoute styling', () => {
     expect(settingsRouteSource).not.toContain('color: #991b1b;');
     expect(settingsRouteSource).not.toContain('background: #fef2f2;');
     expect(settingsRouteSource).not.toContain('color: #7d1111;');
+  });
+
+  it('uses theme tokens for the safety notice', () => {
+    expect(settingsRouteSource).toContain('border-left: 0.3rem solid var(--negative);');
+    expect(settingsRouteSource).toContain(
+      'background: color-mix(in srgb, var(--negative) 8%, var(--surface-strong));',
+    );
+    expect(settingsRouteSource).toContain('min-height: 2.75rem;');
+    expect(settingsRouteSource).toContain('color: var(--text-primary);');
+    expect(settingsRouteSource).toContain('text-decoration-color: var(--accent);');
   });
 });

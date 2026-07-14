@@ -559,7 +559,7 @@ An issue is only considered done when:
 - Depends on: `M4-04`
 - GitHub: [#76](https://github.com/Jon2050/Conspectus-Mobile/issues/76)
 
-### :green_circle: M7-03 Add operational safety notice and data recovery documentation
+### :white_check_mark: M7-03 Add operational safety notice and data recovery documentation
 
 - Label: `docs`
 - Milestone: `M7 - Settings + Recovery`

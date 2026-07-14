@@ -314,6 +314,27 @@
   <h2>{$_('settings.title')}</h2>
   <p>{$_('settings.description')}</p>
 
+  <section
+    class="settings-screen__safety-card"
+    data-testid="settings-safety-recovery"
+    aria-labelledby="settings-safety-heading"
+  >
+    <h3 id="settings-safety-heading">{$_('settings.safety.heading')}</h3>
+    <p class="settings-screen__safety-warning">{$_('settings.safety.warning')}</p>
+    <p>{$_('settings.safety.explanation')}</p>
+
+    <h4>{$_('settings.safety.recoveryHeading')}</h4>
+    <p>{$_('settings.safety.recoveryDescription')}</p>
+    <a
+      class="settings-screen__safety-link"
+      href="https://support.microsoft.com/en-us/onedrive/restore-a-previous-version-of-a-file-stored-in-onedrive"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      {$_('settings.safety.recoveryLink')}
+    </a>
+  </section>
+
   <p class="settings-screen__auth-status" data-testid="auth-status-message" aria-live="polite">
     {authStatusMessage}
   </p>
@@ -621,6 +642,56 @@
   .settings-screen__auth-status {
     margin: 0;
     color: var(--text-secondary);
+  }
+
+  .settings-screen__safety-card {
+    display: grid;
+    gap: 0.65rem;
+    padding: 1rem;
+    border: 1px solid color-mix(in srgb, var(--negative) 24%, var(--border));
+    border-left: 0.3rem solid var(--negative);
+    border-radius: var(--radius-md);
+    background: color-mix(in srgb, var(--negative) 8%, var(--surface-strong));
+    box-shadow: var(--shadow-sm);
+  }
+
+  .settings-screen__safety-card h3,
+  .settings-screen__safety-card h4,
+  .settings-screen__safety-card p {
+    margin: 0;
+  }
+
+  .settings-screen__safety-card h3 {
+    font-size: 1rem;
+  }
+
+  .settings-screen__safety-card h4 {
+    margin-top: 0.25rem;
+    font-size: 0.9rem;
+  }
+
+  .settings-screen__safety-warning {
+    color: var(--settings-error-color);
+    font-weight: 700;
+  }
+
+  .settings-screen__safety-link {
+    display: inline-flex;
+    align-items: center;
+    width: fit-content;
+    min-height: 2.75rem;
+    padding: 0.35rem 0.5rem;
+    color: var(--text-primary);
+    font-weight: 650;
+    text-decoration-color: var(--accent);
+    text-decoration-thickness: 0.125rem;
+    text-underline-offset: 0.18em;
+  }
+
+  .settings-screen__safety-link:focus-visible {
+    border-radius: var(--radius-sm);
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 
   .settings-screen__auth-error {
