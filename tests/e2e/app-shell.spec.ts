@@ -197,10 +197,12 @@ const inspectTransferMonthSwipeMove = async (
 type MockAuthClientOptions = {
   readonly initializeDelayMs?: number;
   readonly signInDelayMs?: number;
+  readonly reauthenticateDelayMs?: number;
   readonly signOutDelayMs?: number;
   readonly consumeRedirectHashOnInitialize?: boolean;
   readonly failInitialize?: boolean;
   readonly failSignIn?: boolean;
+  readonly failReauthenticate?: boolean;
   readonly failSignOut?: boolean;
   readonly failGetAccessToken?: boolean;
   readonly getAccessTokenErrorCode?: string;
@@ -300,6 +302,10 @@ const installMockAuthClient = async (
 
     let isInitialized = false;
     let isAuthenticated = mockOptions.startAuthenticated ?? false;
+    const trackedWindow = window as typeof window & {
+      __CONSPECTUS_REAUTHENTICATE_START_PAGES__?: string[];
+    };
+    trackedWindow.__CONSPECTUS_REAUTHENTICATE_START_PAGES__ = [];
 
     const toSession = () => ({
       isAuthenticated,
@@ -345,6 +351,16 @@ const installMockAuthClient = async (
           };
         }
         isAuthenticated = true;
+      },
+      async reauthenticate(redirectStartPage: string) {
+        trackedWindow.__CONSPECTUS_REAUTHENTICATE_START_PAGES__?.push(redirectStartPage);
+        await resolveDelay(mockOptions.reauthenticateDelayMs);
+        if (mockOptions.failReauthenticate) {
+          throw {
+            code: 'network_error',
+            message: 'Mock re-authentication failure.',
+          };
+        }
       },
       async signOut() {
         await resolveDelay(mockOptions.signOutDelayMs);
@@ -1940,11 +1956,64 @@ test('fails fast on non-retryable startup metadata errors and surfaces the clear
   expect(await getGraphDownloadCallCount(page)).toBe(0);
 });
 
-test('surfaces a sign-in-again recovery action when startup metadata refresh fails because the session expired', async ({
+test('starts one safe re-authentication and preserves the current screen after token expiry', async ({
   page,
 }) => {
   await installMockAuthClient(page, {
     startAuthenticated: true,
+    reauthenticateDelayMs: 250,
+  });
+  await installMockGraphClient(page, {
+    metadataErrorSequence: [
+      createMockGraphError(
+        'unauthorized',
+        'Your session has expired. Please sign in again to sync with OneDrive.',
+        401,
+      ),
+    ],
+  });
+  await installMockCacheStore(page);
+  await installPersistedBinding(page);
+  await installMockStartupNetworkState(page, true);
+
+  await page.goto(appPath('#/transfers'));
+
+  await expect(page.getByTestId('transfers-route-status')).toContainText(
+    'Your session has expired. Please sign in again to sync with OneDrive.',
+  );
+  expect(await getGraphMetadataCallCount(page)).toBe(1);
+  expect(await getGraphDownloadCallCount(page)).toBe(0);
+
+  const recoveryButton = page.getByTestId('stale-token-recovery-button');
+  const previousUrl = page.url();
+  await expect(recoveryButton).toBeVisible();
+  await recoveryButton.evaluate((button) => {
+    button.click();
+    button.click();
+  });
+  await expect(recoveryButton).toBeDisabled();
+  await expect(recoveryButton).toHaveAttribute('aria-busy', 'true');
+  await expect(recoveryButton).toBeEnabled();
+
+  const redirectStartPages = await page.evaluate(
+    () =>
+      (
+        window as typeof window & {
+          __CONSPECTUS_REAUTHENTICATE_START_PAGES__?: string[];
+        }
+      ).__CONSPECTUS_REAUTHENTICATE_START_PAGES__,
+  );
+  expect(redirectStartPages).toEqual([previousUrl]);
+  await expect(page).toHaveURL(previousUrl);
+  await expect(page.getByTestId('route-transfers')).toBeVisible();
+});
+
+test('keeps stale-token recovery retryable on the current screen when redirect startup fails', async ({
+  page,
+}) => {
+  await installMockAuthClient(page, {
+    startAuthenticated: true,
+    failReauthenticate: true,
   });
   await installMockGraphClient(page, {
     metadataErrorSequence: [
@@ -1960,15 +2029,17 @@ test('surfaces a sign-in-again recovery action when startup metadata refresh fai
   await installMockStartupNetworkState(page, true);
 
   await page.goto(appPath('#/accounts'));
+  const previousUrl = page.url();
+  const recoveryButton = page.getByTestId('stale-token-recovery-button');
+  await recoveryButton.click();
 
-  await expect(page.getByTestId('accounts-route-status')).toContainText(
-    'Your session has expired. Please sign in again to sync with OneDrive.',
+  await expect(page.getByTestId('stale-token-recovery-error')).toContainText(
+    'Mock re-authentication failure.',
   );
-  expect(await getGraphMetadataCallCount(page)).toBe(1);
-  expect(await getGraphDownloadCallCount(page)).toBe(0);
-
-  await page.getByRole('link', { name: 'Settings' }).click();
-  await expect(page.getByTestId('route-settings')).toBeVisible();
+  await expect(recoveryButton).toBeEnabled();
+  await expect(recoveryButton).toHaveAttribute('aria-busy', 'false');
+  await expect(page).toHaveURL(previousUrl);
+  await expect(page.getByTestId('route-accounts')).toBeVisible();
 });
 
 test('downloads a fresh DB on startup when the OneDrive eTag changed', async ({ page }) => {

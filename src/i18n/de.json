@@ -8,6 +8,9 @@
   },
   "appShell": {
     "signInAgain": "Erneut anmelden",
+    "sessionExpiredTitle": "Microsoft-Sitzung abgelaufen",
+    "reauthenticating": "Microsoft-Anmeldung wird geöffnet...",
+    "reauthenticationFailed": "Die Microsoft-Anmeldung konnte nicht geöffnet werden. Versuche es erneut.",
     "downloadedKb": "{kb} KB heruntergeladen...",
     "downloadProgress": "{loaded} KB / {total} KB",
     "uploadedKb": "{kb} KB hochgeladen...",

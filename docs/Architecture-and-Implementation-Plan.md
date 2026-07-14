@@ -742,6 +742,12 @@ M7-03 implementation clarification:
 - Concise English and German wording explains why desktop and mobile must not use the database concurrently and directs users to the personal OneDrive 30-day file version history recovery path.
 - The recovery card includes the restore steps and links to Microsoft's official instructions; no custom backup or version-history API is added to the app.
 
+M7-04 implementation clarification:
+
+- Existing Graph `unauthorized` normalization and the `online_auth_expired` sync branch drive one global stale-session recovery action without duplicating token-expiry detection in the UI.
+- Re-authentication uses MSAL `acquireTokenRedirect` with the existing OneDrive scope and active account, preserving the selected account/file ownership instead of opening the general account picker.
+- The current hash-route URL is passed as MSAL's `redirectStartPage`, so successful recovery returns to the screen that requested it. The recovery action exposes pending and failure feedback and blocks duplicate redirect attempts.
+
 M7-08 implementation clarification:
 
 - Startup database access now fails closed when offline or when authentication, OneDrive metadata, or snapshot download fails; cached bytes are reused only after a successful online eTag match.

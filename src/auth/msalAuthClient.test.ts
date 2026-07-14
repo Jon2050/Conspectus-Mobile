@@ -24,6 +24,7 @@ interface MockMsalOptions {
   readonly cachedAccounts?: AccountInfo[];
   readonly silentResult?: AuthenticationResult;
   readonly silentError?: unknown;
+  readonly redirectError?: unknown;
   readonly logoutError?: unknown;
 }
 
@@ -66,6 +67,11 @@ const createMockMsalInstance = (options: MockMsalOptions = {}) => {
   });
   const getAllAccounts = vi.fn(() => [...cachedAccounts]);
   const loginRedirect = vi.fn(async () => {});
+  const acquireTokenRedirect = vi.fn(async () => {
+    if (options.redirectError !== undefined) {
+      throw options.redirectError;
+    }
+  });
   const logoutRedirect = vi.fn(async () => {
     if (options.logoutError !== undefined) {
       throw options.logoutError;
@@ -92,6 +98,7 @@ const createMockMsalInstance = (options: MockMsalOptions = {}) => {
     setActiveAccount,
     getAllAccounts,
     loginRedirect,
+    acquireTokenRedirect,
     logoutRedirect,
     acquireTokenSilent,
   };
@@ -101,6 +108,7 @@ const createMockMsalInstance = (options: MockMsalOptions = {}) => {
     handleRedirectPromise,
     setActiveAccount,
     loginRedirect,
+    acquireTokenRedirect,
     logoutRedirect,
     acquireTokenSilent,
     getActiveAccountValue: (): AccountInfo | null => activeAccount,
@@ -310,6 +318,59 @@ describe('createAuthClient', () => {
     expect(mockMsal.loginRedirect).toHaveBeenCalledWith({
       scopes: [...AUTH_REQUEST_SCOPES],
       prompt: 'select_account',
+    });
+  });
+
+  it('re-authenticates the active account and returns to the requesting app screen', async () => {
+    const activeAccount = createAccount('active@example.com', 'active-home');
+    const mockMsal = createMockMsalInstance({
+      initialActiveAccount: activeAccount,
+    });
+    const client = createAuthClient({ msalInstance: mockMsal.instance });
+
+    await client.initialize();
+    await client.reauthenticate('https://jon2050.de/conspectus/webapp/#/transfers');
+
+    expect(mockMsal.acquireTokenRedirect).toHaveBeenCalledWith({
+      account: activeAccount,
+      scopes: ['Files.ReadWrite'],
+      redirectStartPage: 'https://jon2050.de/conspectus/webapp/#/transfers',
+    });
+    expect(mockMsal.loginRedirect).not.toHaveBeenCalled();
+  });
+
+  it('requires the existing active account for safe re-authentication', async () => {
+    const mockMsal = createMockMsalInstance();
+    const client = createAuthClient({ msalInstance: mockMsal.instance });
+
+    await client.initialize();
+
+    await expect(
+      client.reauthenticate('https://conspectus.local/#/accounts'),
+    ).rejects.toMatchObject({
+      code: 'no_active_account',
+    });
+    expect(mockMsal.acquireTokenRedirect).not.toHaveBeenCalled();
+  });
+
+  it('normalizes failures that prevent the re-authentication redirect', async () => {
+    const activeAccount = createAccount('active@example.com', 'active-home');
+    const mockMsal = createMockMsalInstance({
+      initialActiveAccount: activeAccount,
+      redirectError: {
+        errorCode: BrowserAuthErrorCodes.noNetworkConnectivity,
+        errorMessage: 'Network unavailable',
+      },
+    });
+    const client = createAuthClient({ msalInstance: mockMsal.instance });
+
+    await client.initialize();
+
+    await expect(
+      client.reauthenticate('https://conspectus.local/#/accounts'),
+    ).rejects.toMatchObject({
+      code: 'network_error',
+      message: 'Authentication network request failed. Check your connection and try again.',
     });
   });
 

@@ -20,6 +20,7 @@ export interface AuthClient {
   initialize(): Promise<void>;
   getSession(): AuthSession;
   signIn(): Promise<void>;
+  reauthenticate(redirectStartPage: string): Promise<void>;
   signOut(): Promise<void>;
   getAccessToken(scopes: readonly string[]): Promise<string>;
 }
