@@ -731,6 +731,11 @@ M7-01 implementation clarification:
 - Bound-file details come from the persisted binding, and the last-sync timestamp comes from the cached snapshot metadata. Settings refreshes that metadata when the shared sync state reaches `synced` so a completed download is reflected without polling.
 - The dedicated Settings build section reuses the build-time version and deployment timestamp resolution in `src/shared/config/buildInfo.ts`; its injected bundle metadata remains available offline.
 
+M7-02 implementation clarification:
+
+- Settings force refresh is routed through the app shell's existing verified sync orchestration. It performs a fresh Graph metadata check and uses an explicit `force_download` mode to bypass unchanged-eTag cache reuse, then validates, caches, and reopens the downloaded SQLite snapshot through the established runtime path.
+- The shared sync state and progress surface report the manual operation while the Settings action is guarded against duplicate submissions. A successful forced download refreshes the cached `lastSyncAt` timestamp; failures preserve the previous timestamp and remain retryable from Settings.
+
 M7-08 implementation clarification:
 
 - Startup database access now fails closed when offline or when authentication, OneDrive metadata, or snapshot download fails; cached bytes are reused only after a successful online eTag match.
