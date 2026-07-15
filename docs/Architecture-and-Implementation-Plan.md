@@ -819,6 +819,12 @@ M8-05 implementation clarification:
 - Three reports are generated per deployment. Median category scores must reach 80 for performance and 90 for accessibility and best practices; HTTPS and mobile viewport audits must pass on every run. Failed thresholds fail the deployment workflow, while HTML/JSON reports and a score summary remain available as 90-day GitHub artifacts.
 - Lighthouse 12 no longer exposes the deprecated PWA category. PWA release coverage therefore uses supported HTTPS/viewport audits plus live checks for an installable same-origin manifest, route-correct `start_url`/scope, browser-confirmed service-worker registration/scope, and required 192px/512px icons; no synthetic PWA score is reported.
 
+M8-06 implementation clarification:
+
+- Playwright release coverage combines cohesive login, OneDrive binding, database read, transfer write/retry, and offline-startup failure journeys with the existing focused browser regressions.
+- External Microsoft and Graph boundaries use localhost-only deterministic adapters, while committed SQLite fixture bytes exercise the production sql.js read path.
+- Release-gate stability uses fixed scenario data and clocks, web-first assertions, serial CI execution, zero local retries, and one CI retry for transient runner noise. Failure diagnostics retain traces, screenshots, videos, and the Playwright report; recurring flakiness requires a root-cause fix rather than a larger retry allowance.
+
 Substeps:
 
 1. Security hardening:
