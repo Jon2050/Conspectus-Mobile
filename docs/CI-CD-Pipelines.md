@@ -101,7 +101,7 @@ flowchart TD
   - rebuilds the app for production because the production base URL (`/conspectus/webapp/`) differs from the preview URLs
   - the website repo target defaults to `Jon2050/Jon2050_Webpage` and can be overridden with `WEBSITE_REPO_FULL_NAME`
   - production smoke target defaults to `https://jon2050.de/conspectus/webapp/` and can be overridden with `PRODUCTION_APP_BASE_URL`
-  - the production artifact includes the PWA-owned `/.htaccess` for `/conspectus/webapp/`; the website consumer validates and preserves it unchanged before upload
+  - the production artifact includes the PWA-owned `/.htaccess` and PHP app-shell entrypoint for `/conspectus/webapp/`; the website consumer validates both before upload and proves the staged PHP response before promotion
   - production smoke fails unless the live app route returns the canonical `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy: strict-origin-when-cross-origin` headers
   - the CSP keeps general JavaScript evaluation disabled while allowing the narrower WebAssembly permission required by sql.js plus the Microsoft login, Graph, and OneDrive download endpoints used by the app
 
@@ -132,6 +132,7 @@ flowchart TD
 - Consumer: the website repository deploy workflow
 - Required metadata file: `deploy-metadata.json`
 - Required Apache security configuration: `.htaccess`
+- Required PHP security entrypoint: `index.php`
 - Required metadata fields:
   - `channel`
   - `basePath`

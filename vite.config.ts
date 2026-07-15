@@ -58,6 +58,11 @@ export const resolveViteBasePath = (
   mode: string,
 ): string => (command === 'serve' && mode === 'development' ? '/' : resolveBasePath(environment));
 
+export const resolvePwaNavigationFallback = (
+  environment: Record<string, string | undefined>,
+): 'index.html' | 'index.php' =>
+  environment.DEPLOY_CHANNEL?.trim().toLowerCase() === 'preview' ? 'index.html' : 'index.php';
+
 export const loadBuildEnvironment = (
   mode: string,
   envDirectory: string = process.cwd(),
@@ -66,6 +71,7 @@ export const loadBuildEnvironment = (
 export default defineConfig(({ command, mode }) => {
   const environment = loadBuildEnvironment(mode);
   const basePath = resolveViteBasePath(environment, command, mode);
+  const navigationFallback = resolvePwaNavigationFallback(environment);
 
   return {
     base: basePath,
@@ -78,6 +84,13 @@ export default defineConfig(({ command, mode }) => {
       VitePWA({
         registerType: 'autoUpdate',
         scope: basePath,
+        workbox: {
+          additionalManifestEntries:
+            navigationFallback === 'index.php'
+              ? [{ url: navigationFallback, revision: appBuildTimeUtc }]
+              : [],
+          navigateFallback: navigationFallback,
+        },
         includeAssets: [
           'icons/moneysack.ico',
           'icons/moneysack180x180.png',

@@ -6,6 +6,7 @@ import {
   DOCUMENT_CSP,
   extractApacheHeaderValue,
   extractCspMetaContent,
+  extractPhpHeaderValue,
 } from './security-policy.mjs';
 
 describe('security policy helpers', () => {
@@ -49,5 +50,11 @@ describe('security policy helpers', () => {
     const htaccess = 'Header always set X-Content-Type-Options "nosniff"';
 
     expect(extractApacheHeaderValue(htaccess, 'X-Content-Type-Options')).toBe('nosniff');
+  });
+
+  it('extracts a PHP response header value containing CSP source quotes', () => {
+    const php = `header("Content-Security-Policy: ${DOCUMENT_CSP}");`;
+
+    expect(extractPhpHeaderValue(php, 'Content-Security-Policy')).toBe(DOCUMENT_CSP);
   });
 });

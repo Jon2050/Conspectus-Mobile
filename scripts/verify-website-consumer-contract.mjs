@@ -11,7 +11,9 @@ const REQUIRED_CONTRACT_MARKERS = [
   'actions/runs/${DEPLOY_RUN_ID}',
   'validate-conspectus-deploy-metadata.mjs',
   'validate-conspectus-security-headers.mjs',
+  'verify-conspectus-staging-response.mjs',
   '${incoming_dir}/.htaccess',
+  '${incoming_dir}/index.php',
   'conspectus/webapp',
 ];
 
