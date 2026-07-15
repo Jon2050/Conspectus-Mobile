@@ -24,7 +24,7 @@ flowchart TD
 
 - Main preview: `https://jon2050.github.io/Conspectus-Mobile/previews/main/`
 - Shared non-main preview: `https://jon2050.github.io/Conspectus-Mobile/previews/test/`
-- Production: `https://jon2050.de/conspectus/webapp/`
+- Production: `https://conspectus.jon2050.de/`
 
 ## Workflows
 
@@ -81,7 +81,7 @@ flowchart TD
 - Trigger: manual `workflow_dispatch`
 - Purpose:
   - confirm that the current `main` commit already has a successful `Quality` run
-  - build the production app for `/conspectus/webapp/`
+  - build the production app for `/`
   - verify the production build output and append `deploy-metadata.json`
   - publish exactly one immutable artifact named `conspectus-mobile-production-<commitSha>` from the deploy run itself
   - verify website consumer contract compatibility
@@ -98,11 +98,11 @@ flowchart TD
   - fails if the website repo workflow contract is incompatible
   - fails if dispatch is rejected or if production smoke verification does not observe the expected `deploy-metadata.json`
 - Notes:
-  - rebuilds the app for production because the production base URL (`/conspectus/webapp/`) differs from the preview URLs
+  - rebuilds the app for production because the production base URL (`/`) differs from the preview URLs
   - the website repo target defaults to `Jon2050/Jon2050_Webpage` and can be overridden with `WEBSITE_REPO_FULL_NAME`
-  - production smoke target defaults to `https://jon2050.de/conspectus/webapp/` and can be overridden with `PRODUCTION_APP_BASE_URL`
-  - the production artifact includes the PWA-owned `/.htaccess` and PHP app-shell entrypoint for `/conspectus/webapp/`; the website consumer validates both before upload and proves the staged PHP response before promotion
-  - production smoke fails unless the live app route returns the canonical `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy: strict-origin-when-cross-origin` headers
+  - production smoke target defaults to `https://conspectus.jon2050.de/` and can be overridden with `PRODUCTION_APP_BASE_URL`
+  - the production artifact is a static root PWA for `conspectus.jon2050.de`; the website consumer validates `index.html`, the document CSP, and the optional `.htaccess` defense-in-depth headers before upload
+  - production smoke validates the live document CSP and referrer-policy meta tag without requiring PHP or hosting-package response-header support
   - the CSP keeps general JavaScript evaluation disabled while allowing the narrower WebAssembly permission required by sql.js plus the Microsoft login, Graph, and OneDrive download endpoints used by the app
 
 ## GitHub-Managed Pages Workflow
@@ -132,7 +132,7 @@ flowchart TD
 - Consumer: the website repository deploy workflow
 - Required metadata file: `deploy-metadata.json`
 - Required Apache security configuration: `.htaccess`
-- Required PHP security entrypoint: `index.php`
+- Required static app-shell entrypoint: `index.html`
 - Required metadata fields:
   - `channel`
   - `basePath`

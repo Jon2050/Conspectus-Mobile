@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 const resolveAppBasePath = (): string => {
   const configuredBasePath = process.env.PLAYWRIGHT_APP_BASE_PATH?.trim();
   if (!configuredBasePath) {
-    return '/conspectus/webapp/';
+    return '/';
   }
 
   const withLeadingSlash = configuredBasePath.startsWith('/')

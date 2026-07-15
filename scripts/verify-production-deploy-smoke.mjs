@@ -3,11 +3,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 
-import {
-  assertCspEquivalent,
-  PRODUCTION_CSP,
-  SECURITY_RESPONSE_HEADERS,
-} from './security-policy.mjs';
+import { assertCspEquivalent, DOCUMENT_CSP, extractCspMetaContent } from './security-policy.mjs';
 
 const REQUIRED_ARGS = new Set(['baseUrl', 'commitSha', 'deployRunId']);
 const REQUIRED_MONEYBAG_ICON_SPECS = [
@@ -92,34 +88,18 @@ const buildContextLabel = ({ commitSha, deployRunId }) =>
 
 const toPathname = (urlOrPath, baseUrl) => new URL(urlOrPath, baseUrl).pathname;
 
-const ensureSecurityHeaders = (headers, checkName) => {
-  const contentSecurityPolicy = headers.get('content-security-policy');
-  assert(
-    typeof contentSecurityPolicy === 'string' && contentSecurityPolicy.trim().length > 0,
-    `${checkName} response missing required Content-Security-Policy header.`,
-  );
-  assertCspEquivalent(
-    contentSecurityPolicy,
-    PRODUCTION_CSP,
-    `${checkName} Content-Security-Policy header`,
-  );
-
-  const xContentTypeOptions = headers.get('x-content-type-options');
-  assert(
-    typeof xContentTypeOptions === 'string' &&
-      xContentTypeOptions.trim().toLowerCase() === 'nosniff',
-    `${checkName} response must set X-Content-Type-Options to "nosniff".`,
-  );
-
-  const referrerPolicy = headers.get('referrer-policy');
-  assert(
-    referrerPolicy?.trim().toLowerCase() ===
-      SECURITY_RESPONSE_HEADERS['Referrer-Policy'].toLowerCase(),
-    `${checkName} response must set Referrer-Policy to "${SECURITY_RESPONSE_HEADERS['Referrer-Policy']}".`,
-  );
-};
-
 const ensureBootstrapMarkers = (html, options) => {
+  assertCspEquivalent(
+    extractCspMetaContent(html),
+    DOCUMENT_CSP,
+    'app-route Content-Security-Policy meta tag',
+  );
+  assert(
+    /<meta\s+[^>]*name=["']referrer["'][^>]*content=["']strict-origin-when-cross-origin["'][^>]*>/iu.test(
+      html,
+    ),
+    'HTML bootstrap sanity check failed: missing strict referrer policy meta tag.',
+  );
   assert(
     /id=["']app["']/.test(html),
     'HTML bootstrap sanity check failed: missing app root element id="app".',
@@ -247,7 +227,6 @@ const createChecks = (options, setManifestIconUrls, setAppleTouchIconUrl) => [
   {
     name: 'app-route',
     url: options.baseUrl,
-    validateResponse: (response) => ensureSecurityHeaders(response.headers, 'app-route'),
     validateBody: (bodyText) => {
       const appleTouchIconUrl = ensureBootstrapMarkers(bodyText, options);
       setAppleTouchIconUrl(appleTouchIconUrl);

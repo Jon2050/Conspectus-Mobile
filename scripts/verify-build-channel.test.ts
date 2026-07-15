@@ -22,11 +22,10 @@ const writeText = (filePath: string, value: string) => {
 type DistFixtureOptions = {
   includeCspMeta?: boolean;
   includeHtaccess?: boolean;
-  includePhpEntrypoint?: boolean;
   cspMetaContent?: string;
 };
 
-const VALID_HTACCESS = `DirectoryIndex index.php index.html
+const VALID_HTACCESS = `DirectoryIndex index.html
 
 <IfModule mod_headers.c>
   Header always set Content-Security-Policy "${PRODUCTION_CSP}"
@@ -34,14 +33,7 @@ const VALID_HTACCESS = `DirectoryIndex index.php index.html
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
 </IfModule>`;
 
-const VALID_PHP_ENTRYPOINT = `<?php
-header("Content-Security-Policy: ${PRODUCTION_CSP}");
-header("X-Content-Type-Options: nosniff");
-header("Referrer-Policy: strict-origin-when-cross-origin");
-readfile(__DIR__ . '/index.html');`;
-
-const VALID_SERVICE_WORKER =
-  'url:"index.php",revision:"2026-07-15T00:00:00Z";createHandlerBoundToURL("index.php")';
+const VALID_SERVICE_WORKER = 'createHandlerBoundToURL("index.html")';
 const VALID_PREVIEW_SERVICE_WORKER = 'createHandlerBoundToURL("index.html")';
 
 const createDistFixture = (
@@ -50,7 +42,7 @@ const createDistFixture = (
   options: DistFixtureOptions = {},
 ) => {
   const distPath = path.join(fixtureRootPath, 'dist');
-  const basePath = '/conspectus/webapp/';
+  const basePath = '/test-app/';
   const includeCspMeta = options.includeCspMeta ?? true;
   const cspMetaContent = options.cspMetaContent ?? DOCUMENT_CSP;
   const cspMetaTag = includeCspMeta
@@ -92,10 +84,6 @@ const createDistFixture = (
   if (options.includeHtaccess ?? true) {
     writeText(path.join(distPath, '.htaccess'), VALID_HTACCESS);
   }
-  if (options.includePhpEntrypoint ?? true) {
-    writeText(path.join(distPath, 'index.php'), VALID_PHP_ENTRYPOINT);
-  }
-
   return distPath;
 };
 
@@ -112,7 +100,7 @@ describe('verify-build-channel script', () => {
     try {
       const distPath = createDistFixture(
         fixturePath,
-        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/conspectus/webapp/sw.js', { scope: '/conspectus/webapp/' }); }`,
+        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/test-app/sw.js', { scope: '/test-app/' }); }`,
       );
 
       const result = runVerifier([
@@ -121,13 +109,13 @@ describe('verify-build-channel script', () => {
         '--channel',
         'production',
         '--base',
-        '/conspectus/webapp/',
+        '/test-app/',
       ]);
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(0);
       expect(result.stdout).toContain(
-        '[verify-build-channel] production build output is valid for base path /conspectus/webapp/',
+        '[verify-build-channel] production build output is valid for base path /test-app/',
       );
     } finally {
       rmSync(fixturePath, { force: true, recursive: true });
@@ -140,7 +128,7 @@ describe('verify-build-channel script', () => {
     try {
       const distPath = createDistFixture(
         fixturePath,
-        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/conspectus/webapp/sw.js', { scope: '/conspectus/webapp/' }); }`,
+        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/test-app/sw.js', { scope: '/test-app/' }); }`,
         { includeCspMeta: false },
       );
 
@@ -150,7 +138,7 @@ describe('verify-build-channel script', () => {
         '--channel',
         'production',
         '--base',
-        '/conspectus/webapp/',
+        '/test-app/',
       ]);
 
       expect(result.error).toBeUndefined();
@@ -167,7 +155,7 @@ describe('verify-build-channel script', () => {
     try {
       const distPath = createDistFixture(
         fixturePath,
-        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/conspectus/webapp/sw.js', { scope: '/conspectus/webapp/' }); }`,
+        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/test-app/sw.js', { scope: '/test-app/' }); }`,
         { includeHtaccess: false },
       );
 
@@ -177,7 +165,7 @@ describe('verify-build-channel script', () => {
         '--channel',
         'production',
         '--base',
-        '/conspectus/webapp/',
+        '/test-app/',
       ]);
 
       expect(result.status).toBe(1);
@@ -188,72 +176,15 @@ describe('verify-build-channel script', () => {
     }
   });
 
-  it('fails when the build output is missing the PHP security entrypoint', () => {
+  it('fails when a service worker uses the removed PHP app shell', () => {
     const fixturePath = createFixtureDirectory();
 
     try {
       const distPath = createDistFixture(
         fixturePath,
-        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/conspectus/webapp/sw.js', { scope: '/conspectus/webapp/' }); }`,
-        { includePhpEntrypoint: false },
+        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/test-app/sw.js', { scope: '/test-app/' }); }`,
       );
-
-      const result = runVerifier([
-        '--dist',
-        distPath,
-        '--channel',
-        'production',
-        '--base',
-        '/conspectus/webapp/',
-      ]);
-
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain('Missing expected file:');
-      expect(result.stderr).toContain('index.php');
-    } finally {
-      rmSync(fixturePath, { force: true, recursive: true });
-    }
-  });
-
-  it('fails when the PHP app shell revision is not unique to the build', () => {
-    const fixturePath = createFixtureDirectory();
-
-    try {
-      const distPath = createDistFixture(
-        fixturePath,
-        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/conspectus/webapp/sw.js', { scope: '/conspectus/webapp/' }); }`,
-      );
-      writeText(
-        path.join(distPath, 'sw.js'),
-        'url:"index.php",revision:"0.8.01";createHandlerBoundToURL("index.php")',
-      );
-
-      const result = runVerifier([
-        '--dist',
-        distPath,
-        '--channel',
-        'production',
-        '--base',
-        '/conspectus/webapp/',
-      ]);
-
-      expect(result.status).toBe(1);
-      expect(result.stderr).toContain(
-        'Service worker must revision index.php with the unique build timestamp.',
-      );
-    } finally {
-      rmSync(fixturePath, { force: true, recursive: true });
-    }
-  });
-
-  it('fails when a preview service worker uses the PHP production app shell', () => {
-    const fixturePath = createFixtureDirectory();
-
-    try {
-      const distPath = createDistFixture(
-        fixturePath,
-        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/conspectus/webapp/sw.js', { scope: '/conspectus/webapp/' }); }`,
-      );
+      writeText(path.join(distPath, 'sw.js'), 'createHandlerBoundToURL("index.php")');
 
       const result = runVerifier([
         '--dist',
@@ -261,13 +192,11 @@ describe('verify-build-channel script', () => {
         '--channel',
         'preview',
         '--base',
-        '/conspectus/webapp/',
+        '/test-app/',
       ]);
 
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain(
-        'Preview service worker navigation fallback must use the static index.html app shell.',
-      );
+      expect(result.stderr).toContain('static index.html app shell');
     } finally {
       rmSync(fixturePath, { force: true, recursive: true });
     }
@@ -279,7 +208,7 @@ describe('verify-build-channel script', () => {
     try {
       const distPath = createDistFixture(
         fixturePath,
-        `const leaked = '/assets/should-not-be-rooted.js';\nconsole.log(leaked);\nif ('serviceWorker' in navigator) { navigator.serviceWorker.register('/conspectus/webapp/sw.js', { scope: '/conspectus/webapp/' }); }`,
+        `const leaked = '/assets/should-not-be-rooted.js';\nconsole.log(leaked);\nif ('serviceWorker' in navigator) { navigator.serviceWorker.register('/test-app/sw.js', { scope: '/test-app/' }); }`,
       );
 
       const result = runVerifier([
@@ -288,7 +217,7 @@ describe('verify-build-channel script', () => {
         '--channel',
         'production',
         '--base',
-        '/conspectus/webapp/',
+        '/test-app/',
       ]);
 
       expect(result.error).toBeUndefined();
@@ -305,7 +234,7 @@ describe('verify-build-channel script', () => {
     try {
       const distPath = createDistFixture(
         fixturePath,
-        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/conspectus/webapp/sw.js', { scope: '/conspectus/webapp/' }); }`,
+        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/test-app/sw.js', { scope: '/test-app/' }); }`,
         {
           cspMetaContent:
             "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://login.microsoftonline.com https://graph.microsoft.com https://*.1drv.com https://*.microsoftpersonalcontent.com; object-src 'none'; base-uri 'self'",
@@ -318,7 +247,7 @@ describe('verify-build-channel script', () => {
         '--channel',
         'production',
         '--base',
-        '/conspectus/webapp/',
+        '/test-app/',
       ]);
 
       expect(result.error).toBeUndefined();
@@ -335,7 +264,7 @@ describe('verify-build-channel script', () => {
     try {
       const distPath = createDistFixture(
         fixturePath,
-        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/conspectus/webapp/sw.js', { scope: '/conspectus/webapp/' }); }`,
+        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/test-app/sw.js', { scope: '/test-app/' }); }`,
         {
           cspMetaContent:
             "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://login.microsoftonline.com https://graph.microsoft.com; object-src 'none'; base-uri 'self'",
@@ -348,7 +277,7 @@ describe('verify-build-channel script', () => {
         '--channel',
         'production',
         '--base',
-        '/conspectus/webapp/',
+        '/test-app/',
       ]);
 
       expect(result.error).toBeUndefined();
@@ -365,7 +294,7 @@ describe('verify-build-channel script', () => {
     try {
       const distPath = createDistFixture(
         fixturePath,
-        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/conspectus/webapp/sw.js', { scope: '/' }); }`,
+        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/test-app/sw.js', { scope: '/' }); }`,
       );
 
       const result = runVerifier([
@@ -374,14 +303,12 @@ describe('verify-build-channel script', () => {
         '--channel',
         'production',
         '--base',
-        '/conspectus/webapp/',
+        '/test-app/',
       ]);
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain(
-        'Service worker scope is not restricted to /conspectus/webapp/.',
-      );
+      expect(result.stderr).toContain('Service worker scope is not restricted to /test-app/.');
     } finally {
       rmSync(fixturePath, { force: true, recursive: true });
     }
@@ -418,7 +345,6 @@ describe('verify-build-channel script', () => {
       writeText(path.join(distPath, 'assets', 'index.css'), '.app { color: #111; }');
       writeText(path.join(distPath, 'sw.js'), VALID_PREVIEW_SERVICE_WORKER);
       writeText(path.join(distPath, '.htaccess'), VALID_HTACCESS);
-      writeText(path.join(distPath, 'index.php'), VALID_PHP_ENTRYPOINT);
       writeText(
         path.join(distPath, 'assets', 'index.js'),
         `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('${previewBase}sw.js', { scope: '${previewBase}' }); }`,
@@ -448,7 +374,7 @@ describe('verify-build-channel script', () => {
 
     try {
       const distPath = path.join(fixturePath, 'dist');
-      const basePath = '/conspectus/webapp/';
+      const basePath = '/test-app/';
 
       writeText(
         path.join(distPath, 'index.html'),
@@ -478,7 +404,6 @@ describe('verify-build-channel script', () => {
       writeText(path.join(distPath, 'assets', 'index.css'), '.app { color: #111; }');
       writeText(path.join(distPath, 'sw.js'), VALID_SERVICE_WORKER);
       writeText(path.join(distPath, '.htaccess'), VALID_HTACCESS);
-      writeText(path.join(distPath, 'index.php'), VALID_PHP_ENTRYPOINT);
       writeText(
         path.join(distPath, 'assets', 'index.js'),
         `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('${basePath}sw.js', { scope: '${basePath}' }); }`,

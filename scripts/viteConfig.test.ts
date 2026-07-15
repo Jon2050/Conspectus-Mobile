@@ -4,12 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import {
-  loadBuildEnvironment,
-  resolveBasePath,
-  resolvePwaNavigationFallback,
-  resolveViteBasePath,
-} from '../vite.config';
+import { loadBuildEnvironment, resolveBasePath, resolveViteBasePath } from '../vite.config';
 
 describe('resolveBasePath', () => {
   it('uses a VITE_DEPLOY_BASE_PATH value supplied by a local .env file', () => {
@@ -45,6 +40,10 @@ describe('resolveBasePath', () => {
     ).toBe('/previews/test/');
   });
 
+  it('uses the Conspectus subdomain root for production', () => {
+    expect(resolveBasePath({ DEPLOY_CHANNEL: 'production' })).toBe('/');
+  });
+
   it('serves local development at the registered localhost redirect root', () => {
     expect(
       resolveViteBasePath(
@@ -64,12 +63,5 @@ describe('resolveBasePath', () => {
 
     expect(resolveViteBasePath(environment, 'build', 'production')).toBe('/conspectus/webapp/');
     expect(resolveViteBasePath(environment, 'serve', 'production')).toBe('/conspectus/webapp/');
-  });
-});
-
-describe('resolvePwaNavigationFallback', () => {
-  it('uses a static app shell for previews and the security entrypoint for production', () => {
-    expect(resolvePwaNavigationFallback({ DEPLOY_CHANNEL: 'preview' })).toBe('index.html');
-    expect(resolvePwaNavigationFallback({ DEPLOY_CHANNEL: 'production' })).toBe('index.php');
   });
 });

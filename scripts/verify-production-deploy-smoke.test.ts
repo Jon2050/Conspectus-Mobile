@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseArgs, runSmokeChecks } from './verify-production-deploy-smoke.mjs';
-import { PRODUCTION_CSP } from './security-policy.mjs';
+import { DOCUMENT_CSP, PRODUCTION_CSP } from './security-policy.mjs';
 
 const baseOptions = {
-  baseUrl: 'https://jon2050.de/conspectus/webapp/',
+  baseUrl: 'https://conspectus.jon2050.de/',
   commitSha: 'abc123',
   deployRunId: '2002',
   maxAttempts: 1,
@@ -14,17 +14,19 @@ const baseOptions = {
 const appHtml = `<!doctype html>
 <html lang="en">
   <head>
-    <link rel="apple-touch-icon" sizes="180x180" href="/conspectus/webapp/icons/moneysack180x180.png" />
+    <meta http-equiv="Content-Security-Policy" content="${DOCUMENT_CSP}" />
+    <meta name="referrer" content="strict-origin-when-cross-origin" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/moneysack180x180.png" />
   </head>
   <body>
     <div id="app"></div>
-    <script type="module" src="/conspectus/webapp/assets/index.js"></script>
+    <script type="module" src="/assets/index.js"></script>
   </body>
 </html>`;
 
 const validDeployMetadata = JSON.stringify({
   channel: 'production',
-  basePath: '/conspectus/webapp/',
+  basePath: '/',
   commitSha: 'abc123',
   deployRunId: '2002',
 });
@@ -69,7 +71,7 @@ const createFetchByUrl = (responses: Record<string, MockHttpResponse>): FetchMoc
   }) as FetchMock;
 
 const createHealthyResponses = (): Record<string, MockHttpResponse> => ({
-  'https://jon2050.de/conspectus/webapp/': {
+  'https://conspectus.jon2050.de/': {
     status: 200,
     body: appHtml,
     headers: {
@@ -78,11 +80,11 @@ const createHealthyResponses = (): Record<string, MockHttpResponse> => ({
       'referrer-policy': 'strict-origin-when-cross-origin',
     },
   },
-  'https://jon2050.de/conspectus/webapp/manifest.webmanifest': {
+  'https://conspectus.jon2050.de/manifest.webmanifest': {
     status: 200,
     body: JSON.stringify({
-      start_url: '/conspectus/webapp/',
-      scope: '/conspectus/webapp/',
+      start_url: '/',
+      scope: '/',
       icons: [
         {
           src: 'icons/moneysack64x64.png',
@@ -107,31 +109,31 @@ const createHealthyResponses = (): Record<string, MockHttpResponse> => ({
       ],
     }),
   },
-  'https://jon2050.de/conspectus/webapp/sw.js': {
+  'https://conspectus.jon2050.de/sw.js': {
     status: 200,
     body: 'self.addEventListener("install", () => {});',
   },
-  'https://jon2050.de/conspectus/webapp/deploy-metadata.json': {
+  'https://conspectus.jon2050.de/deploy-metadata.json': {
     status: 200,
     body: validDeployMetadata,
   },
-  'https://jon2050.de/conspectus/webapp/icons/moneysack180x180.png': {
+  'https://conspectus.jon2050.de/icons/moneysack180x180.png': {
     status: 200,
     body: 'icon-bytes',
   },
-  'https://jon2050.de/conspectus/webapp/icons/moneysack64x64.png': {
+  'https://conspectus.jon2050.de/icons/moneysack64x64.png': {
     status: 200,
     body: 'icon-bytes',
   },
-  'https://jon2050.de/conspectus/webapp/icons/moneysack192x192.png': {
+  'https://conspectus.jon2050.de/icons/moneysack192x192.png': {
     status: 200,
     body: 'icon-bytes',
   },
-  'https://jon2050.de/conspectus/webapp/icons/moneysack256x256.png': {
+  'https://conspectus.jon2050.de/icons/moneysack256x256.png': {
     status: 200,
     body: 'icon-bytes',
   },
-  'https://jon2050.de/conspectus/webapp/icons/moneysack512x512.png': {
+  'https://conspectus.jon2050.de/icons/moneysack512x512.png': {
     status: 200,
     body: 'icon-bytes',
   },
@@ -158,7 +160,7 @@ describe('verify-production-deploy-smoke script', () => {
 
   it('fails when manifest URL check is not HTTP 200', async () => {
     const responses = createHealthyResponses();
-    responses['https://jon2050.de/conspectus/webapp/manifest.webmanifest'] = {
+    responses['https://conspectus.jon2050.de/manifest.webmanifest'] = {
       status: 404,
       body: 'missing',
     };
@@ -174,7 +176,7 @@ describe('verify-production-deploy-smoke script', () => {
 
   it('fails when service worker URL check is not HTTP 200', async () => {
     const responses = createHealthyResponses();
-    responses['https://jon2050.de/conspectus/webapp/sw.js'] = {
+    responses['https://conspectus.jon2050.de/sw.js'] = {
       status: 404,
       body: 'missing',
     };
@@ -190,7 +192,7 @@ describe('verify-production-deploy-smoke script', () => {
 
   it('fails HTML sanity check when bootstrap markers are missing', async () => {
     const responses = createHealthyResponses();
-    responses['https://jon2050.de/conspectus/webapp/'] = {
+    responses['https://conspectus.jon2050.de/'] = {
       status: 200,
       body: '<!doctype html><html><body><main>Missing app root</main></body></html>',
     };
@@ -206,15 +208,9 @@ describe('verify-production-deploy-smoke script', () => {
 
   it('fails when app route is missing moneybag apple-touch-icon link', async () => {
     const responses = createHealthyResponses();
-    responses['https://jon2050.de/conspectus/webapp/'] = {
+    responses['https://conspectus.jon2050.de/'] = {
       status: 200,
-      body: `<!doctype html>
-<html lang="en">
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/conspectus/webapp/assets/index.js"></script>
-  </body>
-</html>`,
+      body: appHtml.replace(/<link rel="apple-touch-icon"[^>]+\/>/u, ''),
     };
     const fetchMock = createFetchByUrl(responses);
     const sleepMock = vi.fn(async () => undefined);
@@ -226,12 +222,12 @@ describe('verify-production-deploy-smoke script', () => {
     );
   });
 
-  it('fails when app-route response is missing Content-Security-Policy header', async () => {
+  it('fails when app-route HTML is missing the Content-Security-Policy meta tag', async () => {
     const responses = createHealthyResponses();
-    responses['https://jon2050.de/conspectus/webapp/'].headers = {
-      'x-content-type-options': 'nosniff',
-      'referrer-policy': 'strict-origin-when-cross-origin',
-    };
+    responses['https://conspectus.jon2050.de/'].body = appHtml.replace(
+      /<meta http-equiv="Content-Security-Policy"[^>]+\/>/u,
+      '',
+    );
     const fetchMock = createFetchByUrl(responses);
     const sleepMock = vi.fn(async () => undefined);
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
@@ -244,12 +240,10 @@ describe('verify-production-deploy-smoke script', () => {
 
   it('fails when the CSP omits WebAssembly and OneDrive download permissions', async () => {
     const responses = createHealthyResponses();
-    responses['https://jon2050.de/conspectus/webapp/'].headers = {
-      'content-security-policy':
-        "default-src 'self'; script-src 'self'; connect-src 'self' https://login.microsoftonline.com https://graph.microsoft.com; frame-ancestors 'none'",
-      'x-content-type-options': 'nosniff',
-      'referrer-policy': 'strict-origin-when-cross-origin',
-    };
+    responses['https://conspectus.jon2050.de/'].body = appHtml.replace(
+      DOCUMENT_CSP,
+      "default-src 'self'; script-src 'self'; connect-src 'self' https://login.microsoftonline.com https://graph.microsoft.com",
+    );
     const fetchMock = createFetchByUrl(responses);
     const sleepMock = vi.fn(async () => undefined);
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
@@ -260,43 +254,25 @@ describe('verify-production-deploy-smoke script', () => {
     );
   });
 
-  it('fails when app-route response has invalid X-Content-Type-Options header', async () => {
+  it('fails when app-route HTML has an invalid referrer policy', async () => {
     const responses = createHealthyResponses();
-    responses['https://jon2050.de/conspectus/webapp/'].headers = {
-      'content-security-policy': PRODUCTION_CSP,
-      'x-content-type-options': 'invalid',
-      'referrer-policy': 'strict-origin-when-cross-origin',
-    };
-    const fetchMock = createFetchByUrl(responses);
-    const sleepMock = vi.fn(async () => undefined);
-    vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    vi.spyOn(console, 'error').mockImplementation(() => undefined);
-
-    await expect(runSmokeChecks(baseOptions, fetchMock, sleepMock)).rejects.toThrow(
-      'X-Content-Type-Options',
+    responses['https://conspectus.jon2050.de/'].body = appHtml.replace(
+      'strict-origin-when-cross-origin',
+      'unsafe-url',
     );
-  });
-
-  it('fails when app-route response has an invalid Referrer-Policy header', async () => {
-    const responses = createHealthyResponses();
-    responses['https://jon2050.de/conspectus/webapp/'].headers = {
-      'content-security-policy': PRODUCTION_CSP,
-      'x-content-type-options': 'nosniff',
-      'referrer-policy': 'unsafe-url',
-    };
     const fetchMock = createFetchByUrl(responses);
     const sleepMock = vi.fn(async () => undefined);
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     await expect(runSmokeChecks(baseOptions, fetchMock, sleepMock)).rejects.toThrow(
-      'Referrer-Policy',
+      'referrer policy',
     );
   });
 
   it('fails when apple touch icon URL is not reachable', async () => {
     const responses = createHealthyResponses();
-    responses['https://jon2050.de/conspectus/webapp/icons/moneysack180x180.png'] = {
+    responses['https://conspectus.jon2050.de/icons/moneysack180x180.png'] = {
       status: 404,
       body: 'missing',
     };
@@ -312,10 +288,10 @@ describe('verify-production-deploy-smoke script', () => {
 
   it('fails when deploy metadata identity does not match expected deploy context', async () => {
     const responses = createHealthyResponses();
-    responses['https://jon2050.de/conspectus/webapp/deploy-metadata.json'] = {
+    responses['https://conspectus.jon2050.de/deploy-metadata.json'] = {
       status: 200,
       body: JSON.stringify({
-        basePath: '/conspectus/webapp/',
+        basePath: '/',
         commitSha: 'different-sha',
         deployRunId: '2002',
       }),
@@ -335,7 +311,7 @@ describe('verify-production-deploy-smoke script', () => {
     let manifestAttempts = 0;
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
       const resolvedUrl = resolveUrl(input);
-      if (resolvedUrl === 'https://jon2050.de/conspectus/webapp/manifest.webmanifest') {
+      if (resolvedUrl === 'https://conspectus.jon2050.de/manifest.webmanifest') {
         manifestAttempts += 1;
         if (manifestAttempts === 1) {
           return asResponse(503, 'temporarily unavailable');
@@ -370,11 +346,11 @@ describe('verify-production-deploy-smoke script', () => {
 
   it('fails when required moneybag manifest icons are missing', async () => {
     const responses = createHealthyResponses();
-    responses['https://jon2050.de/conspectus/webapp/manifest.webmanifest'] = {
+    responses['https://conspectus.jon2050.de/manifest.webmanifest'] = {
       status: 200,
       body: JSON.stringify({
-        start_url: '/conspectus/webapp/',
-        scope: '/conspectus/webapp/',
+        start_url: '/',
+        scope: '/',
         icons: [
           {
             src: 'icons/moneysack64x64.png',
@@ -396,7 +372,7 @@ describe('verify-production-deploy-smoke script', () => {
 
   it('fails when one manifest icon URL is not reachable', async () => {
     const responses = createHealthyResponses();
-    responses['https://jon2050.de/conspectus/webapp/icons/moneysack512x512.png'] = {
+    responses['https://conspectus.jon2050.de/icons/moneysack512x512.png'] = {
       status: 404,
       body: 'missing',
     };
@@ -413,7 +389,7 @@ describe('verify-production-deploy-smoke script', () => {
   it('normalizes cli args and applies numeric defaults', () => {
     const args = parseArgs([
       '--base-url',
-      'https://jon2050.de/conspectus/webapp',
+      'https://conspectus.jon2050.de',
       '--commit-sha',
       'abc123',
       '--deploy-run-id',
@@ -421,7 +397,7 @@ describe('verify-production-deploy-smoke script', () => {
     ]);
 
     expect(args).toEqual({
-      baseUrl: 'https://jon2050.de/conspectus/webapp/',
+      baseUrl: 'https://conspectus.jon2050.de/',
       commitSha: 'abc123',
       deployRunId: '2002',
       maxAttempts: 24,

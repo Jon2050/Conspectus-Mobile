@@ -52,11 +52,13 @@ const createValidWorkflow = () =>
     '          run_url="https://api.github.com/repos/${PRODUCER_REPO}/actions/runs/${DEPLOY_RUN_ID}"',
     '      - name: Validate deploy metadata and identity',
     '        run: node ./scripts/validate-conspectus-deploy-metadata.mjs ./pwa-artifact/deploy-metadata.json',
-    '      - name: Stage atomic replace for conspectus/webapp',
+    '      - name: Stage Conspectus subdomain root',
     '        run: |',
     '          node ./scripts/validate-conspectus-security-headers.mjs "${incoming_dir}/.htaccess"',
-    '          test -f "${incoming_dir}/index.php"',
-    '      - name: Verify staged PWA response headers',
+    '          test -f "${incoming_dir}/index.html"',
+    '          server-dir: ./www/conspectus.__incoming/',
+    '          mv ./www/conspectus.__incoming ./www/conspectus',
+    '      - name: Verify staged static PWA response',
     '        run: node ./scripts/verify-conspectus-staging-response.mjs',
   ].join('\n');
 
@@ -165,7 +167,7 @@ describe('verify-website-consumer-contract script', () => {
     }
   });
 
-  it('fails when the consumer does not validate the PWA-owned security headers', () => {
+  it('fails when the consumer does not validate the PWA-owned security policy', () => {
     const fixturePath = createFixtureDirectory();
     const workflowJsonPath = path.join(fixturePath, 'workflow.json');
 
@@ -190,7 +192,7 @@ describe('verify-website-consumer-contract script', () => {
     }
   });
 
-  it('fails when the consumer does not verify staged live response headers', () => {
+  it('fails when the consumer does not verify the staged static app shell', () => {
     const fixturePath = createFixtureDirectory();
     const workflowJsonPath = path.join(fixturePath, 'workflow.json');
 

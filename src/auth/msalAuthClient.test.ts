@@ -118,8 +118,8 @@ const createMockMsalInstance = (options: MockMsalOptions = {}) => {
 describe('createAuthClient', () => {
   it('pins redirect handling to the resolved app root', () => {
     expect(resolveAuthRedirectUri('http://localhost:5173', '/')).toBe('http://localhost:5173/');
-    expect(resolveAuthRedirectUri('https://jon2050.de', '/conspectus/webapp/')).toBe(
-      'https://jon2050.de/conspectus/webapp/',
+    expect(resolveAuthRedirectUri('https://conspectus.jon2050.de', '/')).toBe(
+      'https://conspectus.jon2050.de/',
     );
     expect(
       resolveAuthRedirectUri('https://jon2050.github.io', '/Conspectus-Mobile/previews/test/'),
@@ -127,7 +127,7 @@ describe('createAuthClient', () => {
   });
 
   it('uses the same explicit URI for sign-in callbacks and post-logout navigation', () => {
-    const redirectUri = 'https://jon2050.de/conspectus/webapp/';
+    const redirectUri = 'https://conspectus.jon2050.de/';
 
     expect(createMsalConfiguration('client-id', redirectUri).auth).toMatchObject({
       clientId: 'client-id',
@@ -329,12 +329,12 @@ describe('createAuthClient', () => {
     const client = createAuthClient({ msalInstance: mockMsal.instance });
 
     await client.initialize();
-    await client.reauthenticate('https://jon2050.de/conspectus/webapp/#/transfers');
+    await client.reauthenticate('https://conspectus.jon2050.de/#/transfers');
 
     expect(mockMsal.acquireTokenRedirect).toHaveBeenCalledWith({
       account: activeAccount,
       scopes: ['Files.ReadWrite'],
-      redirectStartPage: 'https://jon2050.de/conspectus/webapp/#/transfers',
+      redirectStartPage: 'https://conspectus.jon2050.de/#/transfers',
     });
     expect(mockMsal.loginRedirect).not.toHaveBeenCalled();
   });

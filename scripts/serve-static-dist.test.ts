@@ -11,12 +11,6 @@ describe('resolveRequestPath', () => {
     ).toBe('index.html');
   });
 
-  it('simulates the hosted PHP app-shell response for service worker precaching', () => {
-    expect(resolveRequestPath('/conspectus/webapp/index.php', '/conspectus/webapp/')).toBe(
-      'index.html',
-    );
-  });
-
   it('serves index.html for the configured base path without trailing slash', () => {
     expect(
       resolveRequestPath('/Conspectus-Mobile/previews/test', '/Conspectus-Mobile/previews/test/'),
