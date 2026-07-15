@@ -1,6 +1,7 @@
 import { mount } from 'svelte';
 import { registerSW } from 'virtual:pwa-register';
 import { RuntimeEnvError, loadRuntimeEnv } from '@shared';
+import { registerServiceWorkerUpdates } from './features/app-shell/serviceWorkerUpdateRegistration';
 import { syncRootDocumentLanguage } from './i18n';
 import './app.css';
 import App from './App.svelte';
@@ -40,7 +41,7 @@ let app: ReturnType<typeof mount> | undefined;
 try {
   syncRootDocumentLanguage();
   loadRuntimeEnv();
-  registerSW({ immediate: true });
+  registerServiceWorkerUpdates(registerSW);
 
   app = mount(App, {
     target: appRoot,

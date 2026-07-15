@@ -3196,6 +3196,62 @@ test('exposes manifest and registers service worker', async ({ context, page }) 
   }
 });
 
+test('prompts for an available service worker update and reloads into it', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'One real-worker update smoke is sufficient.');
+
+  const serviceWorkerPath = path.join(process.cwd(), 'dist', 'sw.js');
+  const originalServiceWorker = fs.readFileSync(serviceWorkerPath, 'utf8');
+
+  try {
+    await page.goto(appPath());
+    await expect
+      .poll(
+        () =>
+          page.evaluate(async (appBasePath) => {
+            const registration = await navigator.serviceWorker.getRegistration(appBasePath);
+            return Boolean(registration?.active);
+          }, APP_BASE_PATH),
+        { timeout: 15_000 },
+      )
+      .toBeTruthy();
+
+    await page.reload();
+    await expect
+      .poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller)))
+      .toBeTruthy();
+
+    fs.writeFileSync(
+      serviceWorkerPath,
+      `${originalServiceWorker}\n// playwright-update-${Date.now()}\n`,
+    );
+
+    await page.evaluate(async (appBasePath) => {
+      const registration = await navigator.serviceWorker.getRegistration(appBasePath);
+      if (!registration) {
+        throw new Error('Expected an active service worker registration.');
+      }
+      await registration.update();
+    }, APP_BASE_PATH);
+
+    await expect(page.getByTestId('service-worker-update-banner')).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId('service-worker-update-button')).toHaveText('Update now');
+
+    await Promise.all([
+      page.waitForEvent('framenavigated'),
+      page.getByTestId('service-worker-update-button').click(),
+    ]);
+
+    await expect(page.getByTestId('app-shell')).toBeVisible();
+    await expect(page.getByTestId('service-worker-update-banner')).toHaveCount(0);
+  } finally {
+    fs.writeFileSync(serviceWorkerPath, originalServiceWorker);
+  }
+});
+
 const seedAndBindTestDb = async (
   page: import('@playwright/test').Page,
   graphOptions: MockGraphClientOptions = {},

@@ -5,6 +5,7 @@ import { render } from 'svelte/server';
 import { createSyncStateStore, formatBuildInfoLabel, getFallbackBuildInfo } from '@shared';
 
 import AppShell from './AppShell.svelte';
+import { createServiceWorkerUpdateController } from './serviceWorkerUpdateController';
 import { APP_ROUTES, type AppRouteKey } from './hashRouting';
 import type {
   AddTransferSaveController,
@@ -40,6 +41,22 @@ const createMockSaveController = (state: AddTransferSaveState): AddTransferSaveC
 });
 
 describe('AppShell component', () => {
+  it('shows an available app update globally before route content', () => {
+    const serviceWorkerUpdateController = createServiceWorkerUpdateController();
+    serviceWorkerUpdateController.notifyUpdateAvailable();
+
+    const { body } = render(AppShell, {
+      props: {
+        routeStore: readable<AppRouteKey>('accounts'),
+        serviceWorkerUpdateController,
+        showLoadingPlaceholder: false,
+      },
+    });
+
+    expect(body).toContain('data-testid="service-worker-update-banner"');
+    expect(body).toContain('data-testid="route-accounts"');
+  });
+
   it('renders loading placeholder before route placeholder content', () => {
     const { body } = render(AppShell);
 
