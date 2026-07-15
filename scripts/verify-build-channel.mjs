@@ -9,6 +9,7 @@ import {
   DOCUMENT_CSP,
   extractApacheHeaderValue,
   extractCspMetaContent,
+  extractPhpHeaderValue,
   PRODUCTION_CSP,
   SECURITY_RESPONSE_HEADERS,
 } from './security-policy.mjs';
@@ -233,12 +234,43 @@ const verifyServiceWorkerRegistration = (distDir, expectedBasePath) => {
   assert(hasScopedRegistration, `Service worker scope is not restricted to ${expectedBasePath}.`);
 };
 
+const verifyServiceWorkerNavigationFallback = (distDir, channel) => {
+  const serviceWorkerText = readTextFile(path.join(distDir, 'sw.js'));
+  if (channel === 'preview') {
+    assert(
+      /createHandlerBoundToURL\(["']index\.html["']\)/u.test(serviceWorkerText),
+      'Preview service worker navigation fallback must use the static index.html app shell.',
+    );
+    assert(
+      !/url:["']index\.php["']/u.test(serviceWorkerText),
+      'Preview service worker must not precache the unexecuted PHP entrypoint.',
+    );
+    return;
+  }
+
+  assert(
+    /url:["']index\.php["'],revision:["']\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z["']/u.test(
+      serviceWorkerText,
+    ),
+    'Service worker must revision index.php with the unique build timestamp.',
+  );
+  assert(
+    /createHandlerBoundToURL\(["']index\.php["']\)/u.test(serviceWorkerText),
+    'Service worker navigation fallback must use the header-emitting index.php app shell.',
+  );
+};
+
 const verifyCspMetaTag = (indexHtml) => {
   const cspContent = extractCspMetaContent(indexHtml);
   assertCspEquivalent(cspContent, DOCUMENT_CSP, 'Content-Security-Policy meta tag');
 };
 
 const verifyApacheSecurityHeaders = (htaccessText) => {
+  assert(
+    /^\s*DirectoryIndex\s+index\.php\s+index\.html\s*$/imu.test(htaccessText),
+    'Apache security configuration must prefer index.php before index.html.',
+  );
+
   const apacheCsp = extractApacheHeaderValue(htaccessText, 'Content-Security-Policy');
   assertCspEquivalent(apacheCsp, PRODUCTION_CSP, 'Apache Content-Security-Policy header');
 
@@ -255,23 +287,48 @@ const verifyApacheSecurityHeaders = (htaccessText) => {
   }
 };
 
+const verifyPhpSecurityEntrypoint = (phpText) => {
+  const phpCsp = extractPhpHeaderValue(phpText, 'Content-Security-Policy');
+  assertCspEquivalent(phpCsp, PRODUCTION_CSP, 'PHP Content-Security-Policy header');
+
+  for (const [headerName, expectedValue] of Object.entries(SECURITY_RESPONSE_HEADERS)) {
+    if (headerName === 'Content-Security-Policy') {
+      continue;
+    }
+
+    assert(
+      extractPhpHeaderValue(phpText, headerName) === expectedValue,
+      `PHP header "${headerName}" must be "${expectedValue}".`,
+    );
+  }
+
+  assert(
+    /readfile\(__DIR__\s*\.\s*['"]\/index\.html['"]\)/u.test(phpText),
+    'PHP security entrypoint must serve the generated index.html app shell.',
+  );
+};
+
 const main = () => {
   const args = parseArgs(process.argv.slice(2));
   const distDir = path.resolve(process.cwd(), args.dist);
   const indexPath = path.join(distDir, 'index.html');
   const manifestPath = path.join(distDir, 'manifest.webmanifest');
   const htaccessPath = path.join(distDir, '.htaccess');
+  const phpEntrypointPath = path.join(distDir, 'index.php');
 
   const indexHtml = readTextFile(indexPath);
   const manifestText = readTextFile(manifestPath);
   const htaccessText = readTextFile(htaccessPath);
+  const phpEntrypointText = readTextFile(phpEntrypointPath);
 
   verifyCspMetaTag(indexHtml);
   verifyApacheSecurityHeaders(htaccessText);
+  verifyPhpSecurityEntrypoint(phpEntrypointText);
   verifyAbsolutePathReferences(indexHtml, args.base);
   verifyNoRootPathLeakage(distDir, args.base);
   verifyManifest(manifestText, args.base);
   verifyServiceWorkerRegistration(distDir, args.base);
+  verifyServiceWorkerNavigationFallback(distDir, args.channel);
 
   console.log(
     `[verify-build-channel] ${args.channel} build output is valid for base path ${args.base}`,

@@ -55,6 +55,9 @@ const createValidWorkflow = () =>
     '      - name: Stage atomic replace for conspectus/webapp',
     '        run: |',
     '          node ./scripts/validate-conspectus-security-headers.mjs "${incoming_dir}/.htaccess"',
+    '          test -f "${incoming_dir}/index.php"',
+    '      - name: Verify staged PWA response headers',
+    '        run: node ./scripts/verify-conspectus-staging-response.mjs',
   ].join('\n');
 
 describe('verify-website-consumer-contract script', () => {
@@ -182,6 +185,31 @@ describe('verify-website-consumer-contract script', () => {
 
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('validate-conspectus-security-headers.mjs');
+    } finally {
+      rmSync(fixturePath, { force: true, recursive: true });
+    }
+  });
+
+  it('fails when the consumer does not verify staged live response headers', () => {
+    const fixturePath = createFixtureDirectory();
+    const workflowJsonPath = path.join(fixturePath, 'workflow.json');
+
+    try {
+      const invalidWorkflow = createValidWorkflow().replace(
+        'verify-conspectus-staging-response.mjs',
+        'skip-staging-response-validation.mjs',
+      );
+      writeFileSync(workflowJsonPath, encodeWorkflowPayload(invalidWorkflow));
+
+      const result = runVerifier([
+        '--workflow-json',
+        workflowJsonPath,
+        '--producer-repo',
+        'Jon2050/Conspectus-Mobile',
+      ]);
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('verify-conspectus-staging-response.mjs');
     } finally {
       rmSync(fixturePath, { force: true, recursive: true });
     }

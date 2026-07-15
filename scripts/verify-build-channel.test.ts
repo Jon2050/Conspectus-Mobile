@@ -22,14 +22,27 @@ const writeText = (filePath: string, value: string) => {
 type DistFixtureOptions = {
   includeCspMeta?: boolean;
   includeHtaccess?: boolean;
+  includePhpEntrypoint?: boolean;
   cspMetaContent?: string;
 };
 
-const VALID_HTACCESS = `<IfModule mod_headers.c>
+const VALID_HTACCESS = `DirectoryIndex index.php index.html
+
+<IfModule mod_headers.c>
   Header always set Content-Security-Policy "${PRODUCTION_CSP}"
   Header always set X-Content-Type-Options "nosniff"
   Header always set Referrer-Policy "strict-origin-when-cross-origin"
 </IfModule>`;
+
+const VALID_PHP_ENTRYPOINT = `<?php
+header("Content-Security-Policy: ${PRODUCTION_CSP}");
+header("X-Content-Type-Options: nosniff");
+header("Referrer-Policy: strict-origin-when-cross-origin");
+readfile(__DIR__ . '/index.html');`;
+
+const VALID_SERVICE_WORKER =
+  'url:"index.php",revision:"2026-07-15T00:00:00Z";createHandlerBoundToURL("index.php")';
+const VALID_PREVIEW_SERVICE_WORKER = 'createHandlerBoundToURL("index.html")';
 
 const createDistFixture = (
   fixtureRootPath: string,
@@ -75,8 +88,12 @@ const createDistFixture = (
 
   writeText(path.join(distPath, 'assets', 'index.css'), '.app { color: #111; }');
   writeText(path.join(distPath, 'assets', 'index.js'), jsAssetContent);
+  writeText(path.join(distPath, 'sw.js'), VALID_SERVICE_WORKER);
   if (options.includeHtaccess ?? true) {
     writeText(path.join(distPath, '.htaccess'), VALID_HTACCESS);
+  }
+  if (options.includePhpEntrypoint ?? true) {
+    writeText(path.join(distPath, 'index.php'), VALID_PHP_ENTRYPOINT);
   }
 
   return distPath;
@@ -166,6 +183,91 @@ describe('verify-build-channel script', () => {
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('Missing expected file:');
       expect(result.stderr).toContain('.htaccess');
+    } finally {
+      rmSync(fixturePath, { force: true, recursive: true });
+    }
+  });
+
+  it('fails when the build output is missing the PHP security entrypoint', () => {
+    const fixturePath = createFixtureDirectory();
+
+    try {
+      const distPath = createDistFixture(
+        fixturePath,
+        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/conspectus/webapp/sw.js', { scope: '/conspectus/webapp/' }); }`,
+        { includePhpEntrypoint: false },
+      );
+
+      const result = runVerifier([
+        '--dist',
+        distPath,
+        '--channel',
+        'production',
+        '--base',
+        '/conspectus/webapp/',
+      ]);
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('Missing expected file:');
+      expect(result.stderr).toContain('index.php');
+    } finally {
+      rmSync(fixturePath, { force: true, recursive: true });
+    }
+  });
+
+  it('fails when the PHP app shell revision is not unique to the build', () => {
+    const fixturePath = createFixtureDirectory();
+
+    try {
+      const distPath = createDistFixture(
+        fixturePath,
+        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/conspectus/webapp/sw.js', { scope: '/conspectus/webapp/' }); }`,
+      );
+      writeText(
+        path.join(distPath, 'sw.js'),
+        'url:"index.php",revision:"0.8.01";createHandlerBoundToURL("index.php")',
+      );
+
+      const result = runVerifier([
+        '--dist',
+        distPath,
+        '--channel',
+        'production',
+        '--base',
+        '/conspectus/webapp/',
+      ]);
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(
+        'Service worker must revision index.php with the unique build timestamp.',
+      );
+    } finally {
+      rmSync(fixturePath, { force: true, recursive: true });
+    }
+  });
+
+  it('fails when a preview service worker uses the PHP production app shell', () => {
+    const fixturePath = createFixtureDirectory();
+
+    try {
+      const distPath = createDistFixture(
+        fixturePath,
+        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/conspectus/webapp/sw.js', { scope: '/conspectus/webapp/' }); }`,
+      );
+
+      const result = runVerifier([
+        '--dist',
+        distPath,
+        '--channel',
+        'preview',
+        '--base',
+        '/conspectus/webapp/',
+      ]);
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(
+        'Preview service worker navigation fallback must use the static index.html app shell.',
+      );
     } finally {
       rmSync(fixturePath, { force: true, recursive: true });
     }
@@ -314,7 +416,9 @@ describe('verify-build-channel script', () => {
       );
 
       writeText(path.join(distPath, 'assets', 'index.css'), '.app { color: #111; }');
+      writeText(path.join(distPath, 'sw.js'), VALID_PREVIEW_SERVICE_WORKER);
       writeText(path.join(distPath, '.htaccess'), VALID_HTACCESS);
+      writeText(path.join(distPath, 'index.php'), VALID_PHP_ENTRYPOINT);
       writeText(
         path.join(distPath, 'assets', 'index.js'),
         `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('${previewBase}sw.js', { scope: '${previewBase}' }); }`,
@@ -372,7 +476,9 @@ describe('verify-build-channel script', () => {
       );
 
       writeText(path.join(distPath, 'assets', 'index.css'), '.app { color: #111; }');
+      writeText(path.join(distPath, 'sw.js'), VALID_SERVICE_WORKER);
       writeText(path.join(distPath, '.htaccess'), VALID_HTACCESS);
+      writeText(path.join(distPath, 'index.php'), VALID_PHP_ENTRYPOINT);
       writeText(
         path.join(distPath, 'assets', 'index.js'),
         `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('${basePath}sw.js', { scope: '${basePath}' }); }`,

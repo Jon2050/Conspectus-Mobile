@@ -72,6 +72,10 @@ export const resolveRequestPath = (requestPathname, basePath) => {
   }
 
   const resolvedPath = pathSegments.join('/');
+  if (resolvedPath === 'index.php') {
+    return 'index.html';
+  }
+
   if (path.posix.extname(resolvedPath)) {
     return resolvedPath;
   }

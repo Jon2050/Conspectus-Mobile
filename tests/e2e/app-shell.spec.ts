@@ -3065,7 +3065,7 @@ test('falls back safely on invalid hash routes', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 2, name: 'Accounts' })).toBeVisible();
 });
 
-test('exposes manifest and registers service worker', async ({ page }) => {
+test('exposes manifest and registers service worker', async ({ context, page }) => {
   await page.addInitScript(() => {
     const violations: string[] = [];
     Object.defineProperty(globalThis, '__conspectusCspViolations', { value: violations });
@@ -3176,6 +3176,25 @@ test('exposes manifest and registers service worker', async ({ page }) => {
       { timeout: 15_000 },
     )
     .toBe(expectedServiceWorkerScope);
+
+  await page.reload();
+  await expect
+    .poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller)))
+    .toBeTruthy();
+
+  await context.setOffline(true);
+  try {
+    const offlineNavigationResponse = await page.reload();
+    expect(offlineNavigationResponse?.status()).toBe(200);
+    expect(offlineNavigationResponse?.headers()).toMatchObject({
+      'content-security-policy': `${documentCsp}; frame-ancestors 'none'`,
+      'x-content-type-options': 'nosniff',
+      'referrer-policy': 'strict-origin-when-cross-origin',
+    });
+    await expect(page.getByTestId('app-shell')).toBeVisible();
+  } finally {
+    await context.setOffline(false);
+  }
 });
 
 test('does not register service worker for parent-site routes outside the app base path', async ({
