@@ -3066,7 +3066,35 @@ test('falls back safely on invalid hash routes', async ({ page }) => {
 });
 
 test('exposes manifest and registers service worker', async ({ page }) => {
-  await page.goto(appPath());
+  await page.addInitScript(() => {
+    const violations: string[] = [];
+    Object.defineProperty(globalThis, '__conspectusCspViolations', { value: violations });
+    document.addEventListener('securitypolicyviolation', (event) => {
+      violations.push(`${event.effectiveDirective}: ${event.blockedURI}`);
+    });
+  });
+
+  const appResponse = await page.goto(appPath());
+  expect(appResponse?.status()).toBe(200);
+
+  const responseHeaders = appResponse?.headers() ?? {};
+  const documentCsp = await page
+    .locator('meta[http-equiv="Content-Security-Policy"]')
+    .getAttribute('content');
+  expect(documentCsp).toBeTruthy();
+  expect(responseHeaders['content-security-policy']).toBe(`${documentCsp}; frame-ancestors 'none'`);
+  expect(responseHeaders['x-content-type-options']).toBe('nosniff');
+  expect(responseHeaders['referrer-policy']).toBe('strict-origin-when-cross-origin');
+  await page.evaluate(async () => document.fonts.ready);
+  const cspViolations = await page.evaluate(
+    () =>
+      (
+        globalThis as typeof globalThis & {
+          __conspectusCspViolations?: string[];
+        }
+      ).__conspectusCspViolations ?? [],
+  );
+  expect(cspViolations).toEqual([]);
 
   const manifestResponse = await page.request.get(appPath('manifest.webmanifest'));
   expect(manifestResponse.ok()).toBeTruthy();

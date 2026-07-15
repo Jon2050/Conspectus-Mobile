@@ -53,6 +53,8 @@ const createValidWorkflow = () =>
     '      - name: Validate deploy metadata and identity',
     '        run: node ./scripts/validate-conspectus-deploy-metadata.mjs ./pwa-artifact/deploy-metadata.json',
     '      - name: Stage atomic replace for conspectus/webapp',
+    '        run: |',
+    '          node ./scripts/validate-conspectus-security-headers.mjs "${incoming_dir}/.htaccess"',
   ].join('\n');
 
 describe('verify-website-consumer-contract script', () => {
@@ -155,6 +157,31 @@ describe('verify-website-consumer-contract script', () => {
 
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('PRODUCER_REPO must be "Jon2050/Another-Repo"');
+    } finally {
+      rmSync(fixturePath, { force: true, recursive: true });
+    }
+  });
+
+  it('fails when the consumer does not validate the PWA-owned security headers', () => {
+    const fixturePath = createFixtureDirectory();
+    const workflowJsonPath = path.join(fixturePath, 'workflow.json');
+
+    try {
+      const invalidWorkflow = createValidWorkflow().replace(
+        'validate-conspectus-security-headers.mjs',
+        'skip-security-header-validation.mjs',
+      );
+      writeFileSync(workflowJsonPath, encodeWorkflowPayload(invalidWorkflow));
+
+      const result = runVerifier([
+        '--workflow-json',
+        workflowJsonPath,
+        '--producer-repo',
+        'Jon2050/Conspectus-Mobile',
+      ]);
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('validate-conspectus-security-headers.mjs');
     } finally {
       rmSync(fixturePath, { force: true, recursive: true });
     }

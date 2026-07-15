@@ -607,7 +607,7 @@ An issue is only considered done when:
 - Depends on: `M4-04, M4-05, M4-07, M4-08, M7-01`
 - GitHub: [#211](https://github.com/Jon2050/Conspectus-Mobile/issues/211)
 
-### :green_circle: M8-01 Implement CSP and security headers for PWA path
+### :white_check_mark: M8-01 Implement CSP and security headers for PWA path
 
 - Label: `security`
 - Milestone: `M8 - Hardening + QA + Release`

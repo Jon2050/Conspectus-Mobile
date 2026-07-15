@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { normalizeBasePath } from './deploy-utils.mjs';
+import { SECURITY_RESPONSE_HEADERS } from './security-policy.mjs';
 
 const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_PORT = 4173;
@@ -83,6 +84,12 @@ const readFileBuffer = (filePath) => fs.readFileSync(filePath);
 const resolveContentType = (filePath) =>
   MIME_TYPES.get(path.extname(filePath).toLowerCase()) ?? 'application/octet-stream';
 
+export const createResponseHeaders = (contentType) => ({
+  'Cache-Control': 'no-cache',
+  'Content-Type': contentType,
+  ...SECURITY_RESPONSE_HEADERS,
+});
+
 const createServer = ({ basePath, distDirectoryPath }) =>
   http.createServer((request, response) => {
     if (!request.url) {
@@ -112,10 +119,7 @@ const createServer = ({ basePath, distDirectoryPath }) =>
       return;
     }
 
-    response.writeHead(200, {
-      'Cache-Control': 'no-cache',
-      'Content-Type': resolveContentType(absoluteFilePath),
-    });
+    response.writeHead(200, createResponseHeaders(resolveContentType(absoluteFilePath)));
 
     if (request.method === 'HEAD') {
       response.end();

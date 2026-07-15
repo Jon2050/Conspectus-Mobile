@@ -4,6 +4,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { normalizeBasePath } from './deploy-utils.mjs';
+import {
+  assertCspEquivalent,
+  DOCUMENT_CSP,
+  extractApacheHeaderValue,
+  extractCspMetaContent,
+  PRODUCTION_CSP,
+  SECURITY_RESPONSE_HEADERS,
+} from './security-policy.mjs';
 
 const parseArgs = (argv) => {
   const args = {
@@ -225,81 +233,26 @@ const verifyServiceWorkerRegistration = (distDir, expectedBasePath) => {
   assert(hasScopedRegistration, `Service worker scope is not restricted to ${expectedBasePath}.`);
 };
 
-const extractCspMetaContent = (indexHtml) => {
-  const cspMetaTagMatch = indexHtml.match(
-    /<meta\s+[^>]*http-equiv=["']Content-Security-Policy["'][^>]*>/i,
-  );
-  assert(cspMetaTagMatch, 'Missing Content-Security-Policy meta tag in index.html.');
-
-  const cspMetaTag = cspMetaTagMatch[0];
-  const doubleQuotedContentMatch = cspMetaTag.match(/content="([^"]+)"/i);
-  const singleQuotedContentMatch = cspMetaTag.match(/content='([^']+)'/i);
-  const cspContent = doubleQuotedContentMatch?.[1] ?? singleQuotedContentMatch?.[1] ?? '';
-
-  assert(
-    Boolean(cspContent.trim()),
-    'Content-Security-Policy meta tag must define a non-empty content value.',
-  );
-
-  return cspContent;
-};
-
-const hasDirective = (policyText, directiveName) =>
-  new RegExp(`(?:^|;)\\s*${directiveName}\\s+[^;]+`).test(policyText);
-
-const extractDirectiveValue = (policyText, directiveName) => {
-  const directiveMatch = policyText.match(new RegExp(`(?:^|;)\\s*${directiveName}\\s+([^;]+)`));
-  return directiveMatch?.[1]?.trim() ?? null;
-};
-
 const verifyCspMetaTag = (indexHtml) => {
   const cspContent = extractCspMetaContent(indexHtml);
-  const requiredDirectives = [
-    'default-src',
-    'script-src',
-    'style-src',
-    'img-src',
-    'object-src',
-    'base-uri',
-  ];
-  const missingDirectives = requiredDirectives.filter(
-    (directiveName) => !hasDirective(cspContent, directiveName),
-  );
+  assertCspEquivalent(cspContent, DOCUMENT_CSP, 'Content-Security-Policy meta tag');
+};
 
-  assert(
-    missingDirectives.length === 0,
-    `Content-Security-Policy meta tag is missing required directive(s): ${missingDirectives.join(', ')}.`,
-  );
+const verifyApacheSecurityHeaders = (htaccessText) => {
+  const apacheCsp = extractApacheHeaderValue(htaccessText, 'Content-Security-Policy');
+  assertCspEquivalent(apacheCsp, PRODUCTION_CSP, 'Apache Content-Security-Policy header');
 
-  const scriptSourceDirectiveValue = extractDirectiveValue(cspContent, 'script-src');
-  assert(
-    scriptSourceDirectiveValue !== null &&
-      scriptSourceDirectiveValue.includes("'wasm-unsafe-eval'"),
-    "Content-Security-Policy script-src directive must include 'wasm-unsafe-eval' for sql.js WASM runtime support.",
-  );
+  for (const [headerName, expectedValue] of Object.entries(SECURITY_RESPONSE_HEADERS)) {
+    if (headerName === 'Content-Security-Policy') {
+      continue;
+    }
 
-  const connectSourceDirectiveValue = extractDirectiveValue(cspContent, 'connect-src');
-  const requiredConnectSources = [
-    "'self'",
-    'https://login.microsoftonline.com',
-    'https://graph.microsoft.com',
-    'https://*.1drv.com',
-    'https://*.microsoftpersonalcontent.com',
-  ];
-
-  assert(
-    connectSourceDirectiveValue !== null,
-    'Content-Security-Policy connect-src directive is required for auth and OneDrive download requests.',
-  );
-
-  const missingConnectSources = requiredConnectSources.filter(
-    (source) => !connectSourceDirectiveValue.includes(source),
-  );
-
-  assert(
-    missingConnectSources.length === 0,
-    `Content-Security-Policy connect-src directive is missing required source(s): ${missingConnectSources.join(', ')}.`,
-  );
+    const actualValue = extractApacheHeaderValue(htaccessText, headerName);
+    assert(
+      actualValue === expectedValue,
+      `Apache header "${headerName}" must be "${expectedValue}".`,
+    );
+  }
 };
 
 const main = () => {
@@ -307,11 +260,14 @@ const main = () => {
   const distDir = path.resolve(process.cwd(), args.dist);
   const indexPath = path.join(distDir, 'index.html');
   const manifestPath = path.join(distDir, 'manifest.webmanifest');
+  const htaccessPath = path.join(distDir, '.htaccess');
 
   const indexHtml = readTextFile(indexPath);
   const manifestText = readTextFile(manifestPath);
+  const htaccessText = readTextFile(htaccessPath);
 
   verifyCspMetaTag(indexHtml);
+  verifyApacheSecurityHeaders(htaccessText);
   verifyAbsolutePathReferences(indexHtml, args.base);
   verifyNoRootPathLeakage(distDir, args.base);
   verifyManifest(manifestText, args.base);

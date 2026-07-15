@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseArgs, runSmokeChecks } from './verify-production-deploy-smoke.mjs';
+import { PRODUCTION_CSP } from './security-policy.mjs';
 
 const baseOptions = {
   baseUrl: 'https://jon2050.de/conspectus/webapp/',
@@ -8,7 +9,6 @@ const baseOptions = {
   maxAttempts: 1,
   retryDelaySeconds: 0,
   requestTimeoutMs: 1000,
-  skipSecurityHeaderChecks: false,
 };
 
 const appHtml = `<!doctype html>
@@ -73,7 +73,7 @@ const createHealthyResponses = (): Record<string, MockHttpResponse> => ({
     status: 200,
     body: appHtml,
     headers: {
-      'content-security-policy': "default-src 'self'; frame-ancestors 'none'",
+      'content-security-policy': PRODUCTION_CSP,
       'x-content-type-options': 'nosniff',
       'referrer-policy': 'strict-origin-when-cross-origin',
     },
@@ -242,29 +242,28 @@ describe('verify-production-deploy-smoke script', () => {
     );
   });
 
-  it('skips security header validation when explicitly disabled', async () => {
+  it('fails when the CSP omits WebAssembly and OneDrive download permissions', async () => {
     const responses = createHealthyResponses();
-    responses['https://jon2050.de/conspectus/webapp/'].headers = {};
+    responses['https://jon2050.de/conspectus/webapp/'].headers = {
+      'content-security-policy':
+        "default-src 'self'; script-src 'self'; connect-src 'self' https://login.microsoftonline.com https://graph.microsoft.com; frame-ancestors 'none'",
+      'x-content-type-options': 'nosniff',
+      'referrer-policy': 'strict-origin-when-cross-origin',
+    };
     const fetchMock = createFetchByUrl(responses);
     const sleepMock = vi.fn(async () => undefined);
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
-    await expect(
-      runSmokeChecks(
-        {
-          ...baseOptions,
-          skipSecurityHeaderChecks: true,
-        },
-        fetchMock,
-        sleepMock,
-      ),
-    ).resolves.toBeUndefined();
+    await expect(runSmokeChecks(baseOptions, fetchMock, sleepMock)).rejects.toThrow(
+      'does not match the canonical security policy',
+    );
   });
 
   it('fails when app-route response has invalid X-Content-Type-Options header', async () => {
     const responses = createHealthyResponses();
     responses['https://jon2050.de/conspectus/webapp/'].headers = {
-      'content-security-policy': "default-src 'self'; frame-ancestors 'none'",
+      'content-security-policy': PRODUCTION_CSP,
       'x-content-type-options': 'invalid',
       'referrer-policy': 'strict-origin-when-cross-origin',
     };
@@ -275,6 +274,23 @@ describe('verify-production-deploy-smoke script', () => {
 
     await expect(runSmokeChecks(baseOptions, fetchMock, sleepMock)).rejects.toThrow(
       'X-Content-Type-Options',
+    );
+  });
+
+  it('fails when app-route response has an invalid Referrer-Policy header', async () => {
+    const responses = createHealthyResponses();
+    responses['https://jon2050.de/conspectus/webapp/'].headers = {
+      'content-security-policy': PRODUCTION_CSP,
+      'x-content-type-options': 'nosniff',
+      'referrer-policy': 'unsafe-url',
+    };
+    const fetchMock = createFetchByUrl(responses);
+    const sleepMock = vi.fn(async () => undefined);
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await expect(runSmokeChecks(baseOptions, fetchMock, sleepMock)).rejects.toThrow(
+      'Referrer-Policy',
     );
   });
 
@@ -411,23 +427,7 @@ describe('verify-production-deploy-smoke script', () => {
       maxAttempts: 24,
       retryDelaySeconds: 10,
       requestTimeoutMs: 10000,
-      skipSecurityHeaderChecks: false,
     });
-  });
-
-  it('accepts explicit security-header check skip flag', () => {
-    const args = parseArgs([
-      '--base-url',
-      'https://jon2050.de/conspectus/webapp',
-      '--commit-sha',
-      'abc123',
-      '--deploy-run-id',
-      '2002',
-      '--skip-security-header-checks',
-      'true',
-    ]);
-
-    expect(args.skipSecurityHeaderChecks).toBe(true);
   });
 
   it('rejects non-https base URLs', () => {

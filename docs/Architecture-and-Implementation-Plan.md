@@ -789,6 +789,13 @@ Exit criteria:
 
 Goal: release with confidence on iOS and Android.
 
+M8-01 implementation clarification:
+
+- The PWA owns its production Apache response-header contract in `public/.htaccess`; Vite copies that file into every build artifact, and build verification rejects missing or incompatible header configuration.
+- The document CSP permits only the Svelte/Vite and runtime capabilities the app currently needs, including the narrower `script-src 'wasm-unsafe-eval'` permission for sql.js and explicit Microsoft login, Graph, and short-lived OneDrive download endpoints.
+- The production header CSP matches the document policy and adds `frame-ancestors 'none'`; Apache also emits `X-Content-Type-Options: nosniff` and `Referrer-Policy: strict-origin-when-cross-origin` for the PWA directory.
+- The website consumer validates and preserves the artifact-owned `.htaccess` before upload. Local Playwright serving and post-deploy smoke checks use the same response-header contract, so sql.js, the manifest, and the service worker are exercised under production-equivalent CSP constraints.
+
 Substeps:
 
 1. Security hardening:

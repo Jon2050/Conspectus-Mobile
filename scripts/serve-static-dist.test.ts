@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 // @ts-expect-error -- .mjs import has no type declarations
-import { resolveRequestPath } from './serve-static-dist.mjs';
+import { createResponseHeaders, resolveRequestPath } from './serve-static-dist.mjs';
+import { PRODUCTION_CSP } from './security-policy.mjs';
 
 describe('resolveRequestPath', () => {
   it('serves index.html for the configured base path root', () => {
@@ -47,5 +48,16 @@ describe('resolveRequestPath', () => {
         '/Conspectus-Mobile/previews/test/',
       ),
     ).toBeNull();
+  });
+});
+
+describe('createResponseHeaders', () => {
+  it('serves the canonical production security headers', () => {
+    expect(createResponseHeaders('text/html; charset=utf-8')).toMatchObject({
+      'Content-Security-Policy': PRODUCTION_CSP,
+      'X-Content-Type-Options': 'nosniff',
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+      'Content-Type': 'text/html; charset=utf-8',
+    });
   });
 });

@@ -3,6 +3,12 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 
+import {
+  assertCspEquivalent,
+  PRODUCTION_CSP,
+  SECURITY_RESPONSE_HEADERS,
+} from './security-policy.mjs';
+
 const REQUIRED_ARGS = new Set(['baseUrl', 'commitSha', 'deployRunId']);
 const REQUIRED_MONEYBAG_ICON_SPECS = [
   { src: 'icons/moneysack192x192.png', sizes: '192x192' },
@@ -34,7 +40,6 @@ export const parseArgs = (argv) => {
     maxAttempts: '24',
     retryDelaySeconds: '10',
     requestTimeoutMs: '10000',
-    skipSecurityHeaderChecks: 'false',
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -59,7 +64,6 @@ export const parseArgs = (argv) => {
   const maxAttempts = Number(args.maxAttempts);
   const retryDelaySeconds = Number(args.retryDelaySeconds);
   const requestTimeoutMs = Number(args.requestTimeoutMs);
-  const normalizedSkipSecurityHeaderChecks = args.skipSecurityHeaderChecks.trim().toLowerCase();
 
   assert(
     Number.isInteger(maxAttempts) && maxAttempts > 0,
@@ -73,11 +77,6 @@ export const parseArgs = (argv) => {
     Number.isInteger(requestTimeoutMs) && requestTimeoutMs > 0,
     '--request-timeout-ms must be a positive integer.',
   );
-  assert(
-    normalizedSkipSecurityHeaderChecks === 'true' || normalizedSkipSecurityHeaderChecks === 'false',
-    '--skip-security-header-checks must be "true" or "false".',
-  );
-
   return {
     baseUrl: normalizeBaseUrl(args.baseUrl),
     commitSha: args.commitSha,
@@ -85,7 +84,6 @@ export const parseArgs = (argv) => {
     maxAttempts,
     retryDelaySeconds,
     requestTimeoutMs,
-    skipSecurityHeaderChecks: normalizedSkipSecurityHeaderChecks === 'true',
   };
 };
 
@@ -100,6 +98,11 @@ const ensureSecurityHeaders = (headers, checkName) => {
     typeof contentSecurityPolicy === 'string' && contentSecurityPolicy.trim().length > 0,
     `${checkName} response missing required Content-Security-Policy header.`,
   );
+  assertCspEquivalent(
+    contentSecurityPolicy,
+    PRODUCTION_CSP,
+    `${checkName} Content-Security-Policy header`,
+  );
 
   const xContentTypeOptions = headers.get('x-content-type-options');
   assert(
@@ -110,8 +113,9 @@ const ensureSecurityHeaders = (headers, checkName) => {
 
   const referrerPolicy = headers.get('referrer-policy');
   assert(
-    typeof referrerPolicy === 'string' && referrerPolicy.trim().length > 0,
-    `${checkName} response missing required Referrer-Policy header.`,
+    referrerPolicy?.trim().toLowerCase() ===
+      SECURITY_RESPONSE_HEADERS['Referrer-Policy'].toLowerCase(),
+    `${checkName} response must set Referrer-Policy to "${SECURITY_RESPONSE_HEADERS['Referrer-Policy']}".`,
   );
 };
 
@@ -243,11 +247,7 @@ const createChecks = (options, setManifestIconUrls, setAppleTouchIconUrl) => [
   {
     name: 'app-route',
     url: options.baseUrl,
-    validateResponse: (response) => {
-      if (!options.skipSecurityHeaderChecks) {
-        ensureSecurityHeaders(response.headers, 'app-route');
-      }
-    },
+    validateResponse: (response) => ensureSecurityHeaders(response.headers, 'app-route'),
     validateBody: (bodyText) => {
       const appleTouchIconUrl = ensureBootstrapMarkers(bodyText, options);
       setAppleTouchIconUrl(appleTouchIconUrl);
