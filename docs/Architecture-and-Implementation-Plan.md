@@ -802,6 +802,11 @@ M8-02 implementation clarification:
 - Active clients check for a new service worker once per hour, bypassing HTTP caches and skipping checks while offline or while another worker is installing.
 - A persistent, non-dismissible app-shell banner lets the user activate the waiting worker. Activation is single-flight, reloads after the new worker takes control, and remains retryable if activation fails.
 
+M8-03 implementation clarification:
+
+- Native npm audit data is evaluated at the `high` threshold across runtime and development dependencies. High and critical advisories fail pull-request scans, the push-based Quality gate, and a fresh production preflight scan.
+- The same dependency-audit workflow runs weekly from the default branch and supports manual dispatch. Any unavoidable temporary exception must be narrowly scoped, reviewed, time-bounded, and recorded in `docs/security/Dependency-Vulnerability-Exceptions.md`; there are no active exceptions.
+
 Substeps:
 
 1. Security hardening:

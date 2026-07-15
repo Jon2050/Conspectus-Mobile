@@ -623,7 +623,7 @@ An issue is only considered done when:
 - Depends on: `M1-05`
 - GitHub: [#83](https://github.com/Jon2050/Conspectus-Mobile/issues/83)
 
-### :green_circle: M8-03 Add dependency vulnerability scanning
+### :white_check_mark: M8-03 Add dependency vulnerability scanning
 
 - Label: `security`
 - Milestone: `M8 - Hardening + QA + Release`

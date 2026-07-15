@@ -114,6 +114,9 @@ jobs:
       - name: Install dependencies
         run: npm ci --prefer-offline --no-audit
 
+      - name: Fail on current high or critical dependency vulnerabilities
+        run: npm run audit:dependencies
+
       - name: Build production artifact
         env:
           DEPLOY_CHANNEL: production

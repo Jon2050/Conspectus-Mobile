@@ -141,6 +141,7 @@ Import convention:
 
 Local quality scripts:
 
+- `npm run audit:dependencies` - reports all dependency advisories and fails on high/critical findings.
 - `npm run format` - verifies deterministic formatting with Prettier.
 - `npm run lint` - runs ESLint and fails on warnings/errors.
 - `npm run typecheck` - runs Svelte + TypeScript checks in strict mode.

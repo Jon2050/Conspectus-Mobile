@@ -14,8 +14,12 @@ It also explains the GitHub-managed Pages workflow that appears in the Actions U
 ```mermaid
 flowchart TD
   Push[Push to any non-gh-pages branch] --> Quality[Quality]
+  PR[Pull request] --> Audit[Dependency Audit]
+  Schedule[Weekly schedule] --> Audit
+  Quality --> Audit
   Quality -->|success + reusable preview artifact| Preview[Deploy Preview]
   Main[Current main commit] -->|manual start + successful Quality required| Production[Deploy Production]
+  Production -->|fresh audit required| Audit
   Production --> Website[Jon2050/Jon2050_Webpage deploy workflow]
   Production --> Smoke[Production smoke verification]
 ```
@@ -28,14 +32,30 @@ flowchart TD
 
 ## Workflows
 
+### `Dependency Audit`
+
+- File: [`.github/workflows/dependency-audit.yml`](../.github/workflows/dependency-audit.yml)
+- Trigger: pull requests, weekly schedule, manual dispatch, and reusable calls from `Quality`
+- Purpose:
+  - scan the complete npm dependency tree, including development tooling
+  - fail when npm reports a high or critical vulnerability
+- Depends on: the committed `package-lock.json`
+- Failure behavior:
+  - a failed reusable call fails `Quality` and blocks preview and production eligibility
+  - `Deploy Production` repeats the audit immediately before its build so newly published advisories fail closed
+- Notes:
+  - moderate and low findings remain visible but do not fail the M8-03 threshold
+  - temporary exceptions require a narrowly scoped, reviewed, time-bounded entry in [`docs/security/Dependency-Vulnerability-Exceptions.md`](security/Dependency-Vulnerability-Exceptions.md); there are no active exceptions
+
 ### `Quality`
 
 - File: [`.github/workflows/quality.yml`](../.github/workflows/quality.yml)
 - Trigger: every push to every branch except `gh-pages`
 - Purpose:
-  - validate formatting, linting, type safety, unit tests, preview build correctness, and Playwright smoke
+  - validate dependency security, formatting, linting, type safety, unit tests, preview build correctness, and Playwright smoke
   - produce the reusable `quality-preview-dist` artifact after `Build App (Preview)`
 - Stage order:
+  - `Dependency Audit`
   - `Detect Relevant Changes`
   - `Format, Lint, and Typecheck`
   - `Unit Tests`
@@ -48,7 +68,7 @@ flowchart TD
   - `Deploy Preview`
   - `Deploy Production` (manual, current `main` commit only)
 - Failure behavior:
-  - if any quality job fails, no downstream preview deployment or manual production deployment can proceed for that commit
+  - if any quality job, including the dependency audit, fails, no downstream preview deployment or manual production deployment can proceed for that commit
   - branches whose effective diff is docs-only skip the heavy jobs and therefore do not emit deployable artifacts
 - Notes:
   - uses `actions/setup-node` npm cache and Playwright browser cache
@@ -81,6 +101,7 @@ flowchart TD
 - Trigger: manual `workflow_dispatch`
 - Purpose:
   - confirm that the current `main` commit already has a successful `Quality` run
+  - re-scan dependencies immediately before building to catch advisories published after `Quality`
   - build the production app for `/`
   - verify the production build output and append `deploy-metadata.json`
   - publish exactly one immutable artifact named `conspectus-mobile-production-<commitSha>` from the deploy run itself
@@ -94,6 +115,7 @@ flowchart TD
 - Failure behavior:
   - fails if started from a branch other than `main`
   - fails if the current `main` commit has no successful `Quality` run
+  - fails if the fresh dependency audit reports a high or critical vulnerability
   - fails if the production build, metadata generation, or artifact verification steps fail
   - fails if the website repo workflow contract is incompatible
   - fails if dispatch is rejected or if production smoke verification does not observe the expected `deploy-metadata.json`
