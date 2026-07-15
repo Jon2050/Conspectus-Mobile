@@ -13,8 +13,9 @@ const REQUIRED_CONTRACT_MARKERS = [
   'validate-conspectus-security-headers.mjs',
   'verify-conspectus-staging-response.mjs',
   '${incoming_dir}/.htaccess',
-  '${incoming_dir}/index.php',
-  'conspectus/webapp',
+  '${incoming_dir}/index.html',
+  './www/conspectus.__incoming/',
+  'mv ./www/conspectus.__incoming ./www/conspectus',
 ];
 
 const assert = (condition, message) => {

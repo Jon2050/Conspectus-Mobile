@@ -16,4 +16,3 @@ export function assertCspEquivalent(
 export function extractCspMetaContent(indexHtml: string): string;
 
 export function extractApacheHeaderValue(htaccessText: string, headerName: string): string;
-export function extractPhpHeaderValue(phpText: string, headerName: string): string;

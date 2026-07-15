@@ -8,7 +8,7 @@ test.use({ viewport: { width: 390, height: 844 } });
 const resolveAppBasePath = (): string => {
   const configuredBasePath = process.env.PLAYWRIGHT_APP_BASE_PATH?.trim();
   if (!configuredBasePath) {
-    return '/conspectus/webapp/';
+    return '/';
   }
 
   const withLeadingSlash = configuredBasePath.startsWith('/')
@@ -18,7 +18,6 @@ const resolveAppBasePath = (): string => {
 };
 
 const APP_BASE_PATH = resolveAppBasePath();
-const APP_BASE_PATH_WITHOUT_TRAILING_SLASH = APP_BASE_PATH.slice(0, -1);
 const RUNTIME_CLIENT_ID_PATTERN = /VITE_AZURE_CLIENT_ID:"[^"]*"/g;
 const appPath = (suffix = ''): string => `${APP_BASE_PATH}${suffix}`;
 const SQLITE_DATABASE_HEADER_BYTES = [
@@ -3195,42 +3194,6 @@ test('exposes manifest and registers service worker', async ({ context, page }) 
   } finally {
     await context.setOffline(false);
   }
-});
-
-test('does not register service worker for parent-site routes outside the app base path', async ({
-  page,
-}) => {
-  await page.goto(appPath('#/accounts'));
-  await expect(page.getByTestId('app-shell')).toBeVisible();
-
-  await expect
-    .poll(
-      async () =>
-        page.evaluate(async (appBasePath) => {
-          if (!('serviceWorker' in navigator)) {
-            return false;
-          }
-
-          const registration = await navigator.serviceWorker.getRegistration(appBasePath);
-          return Boolean(registration?.active);
-        }, APP_BASE_PATH),
-      { timeout: 15_000 },
-    )
-    .toBeTruthy();
-
-  const parentRouteRegistrationScope = await page.evaluate(async () => {
-    const registration = await navigator.serviceWorker.getRegistration('/');
-    return registration?.scope ?? null;
-  });
-
-  expect(parentRouteRegistrationScope).toBeNull();
-
-  const appRegistrationScope = await page.evaluate(async (appBasePath) => {
-    const registration = await navigator.serviceWorker.getRegistration(appBasePath);
-    return registration?.scope ?? '';
-  }, APP_BASE_PATH);
-
-  expect(appRegistrationScope).toContain(`${APP_BASE_PATH_WITHOUT_TRAILING_SLASH}/`);
 });
 
 const seedAndBindTestDb = async (

@@ -87,16 +87,3 @@ export const extractApacheHeaderValue = (htaccessText, headerName) => {
 
   return match[1];
 };
-
-export const extractPhpHeaderValue = (phpText, headerName) => {
-  const escapedHeaderName = headerName.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
-  const match = phpText.match(
-    new RegExp(`header\\(\\s*(["'])${escapedHeaderName}:\\s*(.*?)\\1\\s*\\)`, 'iu'),
-  );
-
-  if (!match?.[2]) {
-    throw new Error(`PHP security entrypoint is missing header "${headerName}".`);
-  }
-
-  return match[2];
-};

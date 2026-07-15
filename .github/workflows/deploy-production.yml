@@ -5,7 +5,7 @@ on:
 
 env:
   VITE_AZURE_CLIENT_ID: ${{ vars.VITE_AZURE_CLIENT_ID }}
-  PRODUCTION_APP_BASE_URL: ${{ vars.PRODUCTION_APP_BASE_URL || 'https://jon2050.de/conspectus/webapp/' }}
+  PRODUCTION_APP_BASE_URL: ${{ vars.PRODUCTION_APP_BASE_URL || 'https://conspectus.jon2050.de/' }}
   WEBSITE_REPO_FULL_NAME: ${{ vars.WEBSITE_REPO_FULL_NAME || 'Jon2050/Jon2050_Webpage' }}
   PRODUCTION_SMOKE_MAX_ATTEMPTS: '24'
   PRODUCTION_SMOKE_RETRY_DELAY_SECONDS: '10'
@@ -124,7 +124,7 @@ jobs:
           node scripts/verify-build-channel.mjs
           --dist dist
           --channel production
-          --base /conspectus/webapp/
+          --base /
 
       - name: Resolve production handoff identity
         id: handoff
@@ -141,7 +141,7 @@ jobs:
           cat > dist/deploy-metadata.json <<EOF
           {
             "channel": "production",
-            "basePath": "/conspectus/webapp/",
+            "basePath": "/",
             "sourceBranch": "main",
             "commitSha": "${{ steps.target.outputs.commit_sha }}",
             "buildTimeUtc": "${{ steps.handoff.outputs.build_time_utc }}",

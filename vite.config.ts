@@ -9,7 +9,7 @@ import { loadEnv } from 'vite';
 // @ts-expect-error -- .mjs import has no type declarations
 import { normalizeBasePath, toPreviewSlug } from './scripts/deploy-utils.mjs';
 
-const DEFAULT_PRODUCTION_BASE_PATH = '/conspectus/webapp/';
+const DEFAULT_PRODUCTION_BASE_PATH = '/';
 const LIGHT_APP_THEME_COLOR = '#f3f4f6';
 const PACKAGE_JSON_URL = new URL('./package.json', import.meta.url);
 const packageJson = JSON.parse(readFileSync(PACKAGE_JSON_URL, 'utf-8')) as {
@@ -58,11 +58,6 @@ export const resolveViteBasePath = (
   mode: string,
 ): string => (command === 'serve' && mode === 'development' ? '/' : resolveBasePath(environment));
 
-export const resolvePwaNavigationFallback = (
-  environment: Record<string, string | undefined>,
-): 'index.html' | 'index.php' =>
-  environment.DEPLOY_CHANNEL?.trim().toLowerCase() === 'preview' ? 'index.html' : 'index.php';
-
 export const loadBuildEnvironment = (
   mode: string,
   envDirectory: string = process.cwd(),
@@ -71,8 +66,6 @@ export const loadBuildEnvironment = (
 export default defineConfig(({ command, mode }) => {
   const environment = loadBuildEnvironment(mode);
   const basePath = resolveViteBasePath(environment, command, mode);
-  const navigationFallback = resolvePwaNavigationFallback(environment);
-
   return {
     base: basePath,
     define: {
@@ -85,11 +78,7 @@ export default defineConfig(({ command, mode }) => {
         registerType: 'autoUpdate',
         scope: basePath,
         workbox: {
-          additionalManifestEntries:
-            navigationFallback === 'index.php'
-              ? [{ url: navigationFallback, revision: appBuildTimeUtc }]
-              : [],
-          navigateFallback: navigationFallback,
+          navigateFallback: 'index.html',
         },
         includeAssets: [
           'icons/moneysack.ico',

@@ -60,7 +60,7 @@ describe('verify-production-handoff script', () => {
       });
       writeJson(metadataPath, {
         channel: 'production',
-        basePath: '/conspectus/webapp/',
+        basePath: '/',
         sourceBranch: 'main',
         commitSha: 'abc123',
         buildTimeUtc: '2026-03-01T10:20:30Z',
@@ -103,7 +103,7 @@ describe('verify-production-handoff script', () => {
       });
       writeJson(metadataPath, {
         channel: 'production',
-        basePath: '/conspectus/webapp/',
+        basePath: '/',
         sourceBranch: 'main',
         commitSha: 'abc123',
         buildTimeUtc: '2026-03-01T10:20:30Z',
@@ -146,7 +146,7 @@ describe('verify-production-handoff script', () => {
       });
       writeJson(metadataPath, {
         channel: 'production',
-        basePath: '/conspectus/webapp/',
+        basePath: '/',
         sourceBranch: 'main',
         commitSha: 'abc123',
         buildTimeUtc: '2026-03-01T10:20:30Z',
@@ -189,7 +189,7 @@ describe('verify-production-handoff script', () => {
       });
       writeJson(metadataPath, {
         channel: 'production',
-        basePath: '/conspectus/webapp/',
+        basePath: '/',
         sourceBranch: 'main',
         commitSha: 'wrong-sha',
         buildTimeUtc: '2026-03-01T10:20:30Z',
@@ -232,7 +232,7 @@ describe('verify-production-handoff script', () => {
       });
       writeJson(metadataPath, {
         channel: 'production',
-        basePath: '/conspectus/webapp/',
+        basePath: '/',
         sourceBranch: 'feature/test',
         commitSha: 'abc123',
         buildTimeUtc: '2026-03-01T10:20:30Z',
