@@ -1,12 +1,13 @@
 {
   "name": "conspectus-mobile",
   "private": true,
-  "version": "0.8.04",
+  "version": "0.8.05",
   "type": "module",
   "scripts": {
     "dev": "vite --host localhost --port 5173 --strictPort",
     "build": "vite build",
     "check:bundle-size": "node scripts/check-bundle-size.mjs --dist dist --budget-config bundle-size-budgets.json",
+    "check:lighthouse": "node scripts/run-lighthouse-ci.mjs --budget-config lighthouse-budgets.json",
     "preview": "vite preview",
     "prepare": "husky",
     "audit:dependencies": "npm audit --audit-level=high",
@@ -39,6 +40,7 @@
     "fake-indexeddb": "^6.2.5",
     "globals": "^17.3.0",
     "husky": "^9.1.7",
+    "lighthouse": "12.6.1",
     "lint-staged": "^16.2.7",
     "prettier": "^3.8.1",
     "prettier-plugin-svelte": "^3.5.0",

@@ -149,6 +149,10 @@ Local quality scripts:
 - `npm run build` - creates a production build in `dist/`.
 - `npm run check:bundle-size` - checks an existing `dist/` against the committed JS/CSS raw and
   gzip budgets; run `npm run build` first.
+- `npm run check:lighthouse -- <deployed-https-url>` - runs the mobile Lighthouse release
+  gate three times against a deployed route, writes HTML/JSON reports under `reports/lighthouse`,
+  and enforces the committed score and PWA deployment budgets. A local Chrome/Chromium install is
+  required.
 - `npm run test:e2e` - runs Playwright browser tests.
 
 The `Quality` workflow runs on every push to non-`gh-pages` branches. Branches whose effective diff is docs-only skip the heavy jobs.

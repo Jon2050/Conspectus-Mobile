@@ -639,7 +639,7 @@ An issue is only considered done when:
 - Depends on: `M1-08`
 - GitHub: [#85](https://github.com/Jon2050/Conspectus-Mobile/issues/85)
 
-### :green_circle: M8-05 Add Lighthouse CI checks for mobile performance
+### :white_check_mark: M8-05 Add Lighthouse CI checks for mobile performance
 
 - Label: `test`
 - Milestone: `M8 - Hardening + QA + Release`
