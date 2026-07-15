@@ -807,6 +807,12 @@ M8-03 implementation clarification:
 - Native npm audit data is evaluated at the `high` threshold across runtime and development dependencies. High and critical advisories fail pull-request scans, the push-based Quality gate, and a fresh production preflight scan.
 - The same dependency-audit workflow runs weekly from the default branch and supports manual dispatch. Any unavoidable temporary exception must be narrowly scoped, reviewed, time-bounded, and recorded in `docs/security/Dependency-Vulnerability-Exceptions.md`; there are no active exceptions.
 
+M8-04 implementation clarification:
+
+- Bundle budgets cover every emitted JavaScript and CSS file recursively under `dist`, including generated service-worker and Workbox runtime files while excluding non-JS/CSS artifacts such as sql.js WASM and images.
+- The gate enforces aggregate raw bytes and the sum of deterministic per-file gzip bytes for each asset class. The committed limits are based on the current preview build with enough headroom for ordinary build variation while still rejecting significant growth.
+- Quality measures the exact preview artifact produced by the build before E2E and deployment eligibility, so an over-budget artifact fails the branch Quality Gate.
+
 Substeps:
 
 1. Security hardening:
