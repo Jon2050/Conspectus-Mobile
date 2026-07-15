@@ -248,6 +248,7 @@ jobs:
         with:
           name: quality-preview-dist
           if-no-files-found: error
+          include-hidden-files: true
           path: dist
           retention-days: 7
 
