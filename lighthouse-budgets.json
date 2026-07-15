@@ -1,0 +1,27 @@
+{
+  "numberOfRuns": 3,
+  "categories": {
+    "performance": {
+      "label": "Performance",
+      "minimumScore": 0.8
+    },
+    "accessibility": {
+      "label": "Accessibility",
+      "minimumScore": 0.9
+    },
+    "best-practices": {
+      "label": "Best Practices",
+      "minimumScore": 0.9
+    }
+  },
+  "audits": {
+    "is-on-https": {
+      "label": "HTTPS",
+      "minimumScore": 1
+    },
+    "viewport": {
+      "label": "Mobile viewport",
+      "minimumScore": 1
+    }
+  }
+}

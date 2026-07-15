@@ -317,6 +317,43 @@ jobs:
           cat preview-index.html >&2 || true
           exit 1
 
+      - name: Setup Node.js for Lighthouse
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install Lighthouse dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Run mobile Lighthouse release gate
+        id: lighthouse
+        continue-on-error: true
+        run: >-
+          npm run check:lighthouse --
+          "${PREVIEW_URL}"
+          reports/lighthouse/preview
+
+      - name: Upload preview Lighthouse reports
+        if: always() && steps.lighthouse.outcome != 'skipped'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: lighthouse-preview-${{ needs.prepare-context.outputs.preview_slot }}-${{ needs.prepare-context.outputs.head_sha }}
+          if-no-files-found: error
+          path: reports/lighthouse/preview
+          retention-days: 90
+
+      - name: Enforce preview Lighthouse result
+        if: always() && steps.lighthouse.outcome != 'skipped'
+        env:
+          LIGHTHOUSE_OUTCOME: ${{ steps.lighthouse.outcome }}
+        run: |
+          if [ "${LIGHTHOUSE_OUTCOME}" != 'success' ]; then
+            echo "Mobile Lighthouse release gate failed (outcome=${LIGHTHOUSE_OUTCOME})." >&2
+            exit 1
+          fi
+
       - name: Mark deployment success
         if: success() && steps.deployment.outputs.deployment_id != ''
         env:

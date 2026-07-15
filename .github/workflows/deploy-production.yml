@@ -271,3 +271,30 @@ jobs:
           --max-attempts ${{ env.PRODUCTION_SMOKE_MAX_ATTEMPTS }}
           --retry-delay-seconds ${{ env.PRODUCTION_SMOKE_RETRY_DELAY_SECONDS }}
           --request-timeout-ms 10000
+
+      - name: Run mobile Lighthouse release gate
+        id: lighthouse
+        continue-on-error: true
+        run: >-
+          npm run check:lighthouse --
+          "${PRODUCTION_APP_BASE_URL}"
+          reports/lighthouse/production
+
+      - name: Upload production Lighthouse reports
+        if: always() && steps.lighthouse.outcome != 'skipped'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: lighthouse-production-${{ steps.target.outputs.commit_sha }}
+          if-no-files-found: error
+          path: reports/lighthouse/production
+          retention-days: 90
+
+      - name: Enforce production Lighthouse result
+        if: always() && steps.lighthouse.outcome != 'skipped'
+        env:
+          LIGHTHOUSE_OUTCOME: ${{ steps.lighthouse.outcome }}
+        run: |
+          if [ "${LIGHTHOUSE_OUTCOME}" != 'success' ]; then
+            echo "Mobile Lighthouse release gate failed (outcome=${LIGHTHOUSE_OUTCOME})." >&2
+            exit 1
+          fi

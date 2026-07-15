@@ -813,6 +813,12 @@ M8-04 implementation clarification:
 - The gate enforces aggregate raw bytes and the sum of deterministic per-file gzip bytes for each asset class. The committed limits are based on the current preview build with enough headroom for ordinary build variation while still rejecting significant growth.
 - Quality measures the exact preview artifact produced by the build before E2E and deployment eligibility, so an over-budget artifact fails the branch Quality Gate.
 
+M8-05 implementation clarification:
+
+- Mobile Lighthouse checks run against the real HTTPS route after preview availability and production identity smoke checks succeed, so hosting behavior, response policy, and deployed asset paths are included in the measurement.
+- Three reports are generated per deployment. Median category scores must reach 80 for performance and 90 for accessibility and best practices; HTTPS and mobile viewport audits must pass on every run. Failed thresholds fail the deployment workflow, while HTML/JSON reports and a score summary remain available as 90-day GitHub artifacts.
+- Lighthouse 12 no longer exposes the deprecated PWA category. PWA release coverage therefore uses supported HTTPS/viewport audits plus live checks for an installable same-origin manifest, route-correct `start_url`/scope, browser-confirmed service-worker registration/scope, and required 192px/512px icons; no synthetic PWA score is reported.
+
 Substeps:
 
 1. Security hardening:

@@ -18,10 +18,12 @@ flowchart TD
   Schedule[Weekly schedule] --> Audit
   Quality --> Audit
   Quality -->|success + reusable preview artifact| Preview[Deploy Preview]
+  Preview --> PreviewLighthouse[Mobile Lighthouse preview gate]
   Main[Current main commit] -->|manual start + successful Quality required| Production[Deploy Production]
   Production -->|fresh audit required| Audit
   Production --> Website[Jon2050/Jon2050_Webpage deploy workflow]
   Production --> Smoke[Production smoke verification]
+  Smoke --> ProductionLighthouse[Mobile Lighthouse production gate]
 ```
 
 ## Fixed URLs
@@ -115,16 +117,19 @@ When a budget is exceeded:
   - publish the verified preview artifact from `Quality` to GitHub Pages
   - deploy `main` to `/previews/main/`
   - deploy every non-`main` branch to the shared `/previews/test/` slot
+  - run the mobile Lighthouse release gate against the reachable deployed route
 - Depends on:
   - a successful `Quality` run
   - the presence of the `quality-preview-dist` artifact on that `Quality` run
 - Failure behavior:
   - if GitHub Pages is unavailable or the preview URL does not become reachable in time, the workflow fails
+  - if Lighthouse collection, live PWA checks, or a release threshold fails, the workflow and GitHub deployment record fail
   - if the triggering `Quality` run is no longer the current tip of its branch, the workflow exits cleanly without deploying
   - if the triggering `Quality` run did not produce a preview artifact, the workflow exits cleanly without deploying
 - Notes:
   - reuses the built artifact from `Quality`; it does not rebuild
   - serializes preview deployments by fixed slot (`main` or `test`) to avoid races
+  - always uploads the completed Lighthouse HTML/JSON reports, machine-readable result, and Markdown summary before enforcing the score result
 
 ### `Deploy Production`
 
@@ -139,6 +144,7 @@ When a budget is exceeded:
   - verify website consumer contract compatibility
   - dispatch the deterministic handoff event to `Jon2050/Jon2050_Webpage`
   - wait for the live production site to expose the expected deploy identity
+  - run the mobile Lighthouse release gate against the verified live production route
 - Depends on:
   - manual operator start from `main`
   - a successful `Quality` run for the current `main` commit
@@ -150,6 +156,7 @@ When a budget is exceeded:
   - fails if the production build, metadata generation, or artifact verification steps fail
   - fails if the website repo workflow contract is incompatible
   - fails if dispatch is rejected or if production smoke verification does not observe the expected `deploy-metadata.json`
+  - fails if Lighthouse collection, live PWA checks, or a release threshold fails
 - Notes:
   - rebuilds the app for production because the production base URL (`/`) differs from the preview URLs
   - the website repo target defaults to `Jon2050/Jon2050_Webpage` and can be overridden with `WEBSITE_REPO_FULL_NAME`
@@ -157,6 +164,38 @@ When a budget is exceeded:
   - the production artifact is a static root PWA for `conspectus.jon2050.de`; the website consumer validates `index.html`, the document CSP, and the optional `.htaccess` defense-in-depth headers before upload
   - production smoke validates the live document CSP and referrer-policy meta tag without requiring PHP or hosting-package response-header support
   - the CSP keeps general JavaScript evaluation disabled while allowing the narrower WebAssembly permission required by sql.js plus the Microsoft login, Graph, and OneDrive download endpoints used by the app
+  - Lighthouse runs only after production smoke observes the expected commit and deploy-run identity; a failure blocks release acceptance but does not attempt an automatic rollback
+
+### Lighthouse mobile release budgets
+
+Both deployment workflows run the pinned Lighthouse CLI three times with its mobile profile against
+the real deployed HTTPS route. Category thresholds use the median of the three runs to reduce normal
+measurement variance. Deterministic audits must pass in every run.
+
+| Check           | Minimum | Aggregation |
+| --------------- | ------: | ----------- |
+| Performance     |     80% | Median      |
+| Accessibility   |     90% | Median      |
+| Best Practices  |     90% | Median      |
+| HTTPS           |    100% | Every run   |
+| Mobile viewport |    100% | Every run   |
+
+The release runner also checks the deployed same-origin PWA manifest, route-correct `start_url` and
+scope, browser-confirmed service-worker registration/scope, and required 192px/512px install icons.
+These checks replace the deprecated Lighthouse PWA category; the project does not invent a
+synthetic replacement score.
+
+Each run appends a score table to the GitHub Actions summary and uploads its HTML/JSON reports plus
+machine-readable summary for 90 days. Preview artifacts are named
+`lighthouse-preview-<slot>-<commitSha>` and production artifacts are named
+`lighthouse-production-<commitSha>`. The report upload executes before final threshold enforcement,
+so evidence remains available when a measured score fails.
+
+To reproduce a deployed-route check locally with Chrome/Chromium installed:
+
+```sh
+npm run check:lighthouse -- https://jon2050.github.io/Conspectus-Mobile/previews/test/
+```
 
 ## GitHub-Managed Pages Workflow
 
@@ -194,6 +233,13 @@ When a budget is exceeded:
   - `buildTimeUtc`
   - `qualityRunId`
   - `deployRunId`
+
+### `lighthouse-preview-<slot>-<commitSha>` / `lighthouse-production-<commitSha>`
+
+- Producers: `Deploy Preview` and `Deploy Production`
+- Contents: three mobile Lighthouse HTML/JSON reports, `summary.json`, and `summary.md`
+- Retention: 90 days
+- Failure behavior: reports remain available when collection completed but a release threshold failed
 
 ## Repository Links
 
