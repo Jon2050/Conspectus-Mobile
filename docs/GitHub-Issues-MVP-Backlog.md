@@ -655,7 +655,7 @@ An issue is only considered done when:
 - Depends on: `M6-10, M7-07`
 - GitHub: [#87](https://github.com/Jon2050/Conspectus-Mobile/issues/87)
 
-### :green_circle: M8-07 Create manual device QA checklist issue
+### :white_check_mark: M8-07 Create manual device QA checklist issue
 
 - Label: `test`
 - Milestone: `M8 - Hardening + QA + Release`

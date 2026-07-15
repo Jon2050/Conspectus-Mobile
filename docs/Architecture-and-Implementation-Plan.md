@@ -900,6 +900,10 @@ Recommended additional:
 - iPad Safari
 - Samsung Internet (recent)
 
+The canonical execution, pass/fail, and release-evidence contract is
+[`docs/Manual-Device-QA.md`](Manual-Device-QA.md). Both required physical-device rows must pass
+every required scenario before release. Emulators may supplement this gate but cannot satisfy it.
+
 Manual scenarios:
 
 - Install to home screen.

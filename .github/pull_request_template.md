@@ -26,6 +26,15 @@
 - [ ] UI change: screenshots attached
 - [ ] No UI change
 
+## Manual Device QA (Release PRs Only)
+
+- [ ] Not a release PR; physical-device QA is not required here.
+- [ ] Release PR: all required rows in
+      [`docs/Manual-Device-QA.md`](https://github.com/Jon2050/Conspectus-Mobile/blob/main/docs/Manual-Device-QA.md)
+      pass.
+- Tested candidate URL / commit:
+- Completed results and evidence location in this PR:
+
 ## Risk Notes
 
 - User impact:
