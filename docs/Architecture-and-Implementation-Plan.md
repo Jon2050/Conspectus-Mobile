@@ -796,6 +796,12 @@ M8-01 implementation clarification:
 - The optional Apache header CSP matches the document policy and adds `frame-ancestors 'none'`, plus `X-Content-Type-Options: nosniff` and `Referrer-Policy: strict-origin-when-cross-origin`. No PHP runtime is required by the production artifact.
 - The website consumer validates and preserves the artifact-owned files, then requests the public staging path before promotion to prove that the static app shell and its document policy are live. Local Playwright serving exercises the stricter optional header contract; post-deploy smoke checks use the policy that the free hosting package can enforce.
 
+M8-02 implementation clarification:
+
+- The generated service worker uses vite-plugin-pwa prompt mode so a waiting deployment never reloads an in-progress transfer form without user confirmation.
+- Active clients check for a new service worker once per hour, bypassing HTTP caches and skipping checks while offline or while another worker is installing.
+- A persistent, non-dismissible app-shell banner lets the user activate the waiting worker. Activation is single-flight, reloads after the new worker takes control, and remains retryable if activation fails.
+
 Substeps:
 
 1. Security hardening:
