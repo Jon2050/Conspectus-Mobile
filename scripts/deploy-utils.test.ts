@@ -147,6 +147,7 @@ describe('quality workflow contract', () => {
     expect(workflowSource).toContain('name: Quality Gate');
     expect(workflowSource).toContain('name: quality-preview-dist');
     expect(workflowSource).not.toContain('name: quality-production-dist');
+    expect(workflowSource).toContain('include-hidden-files: true');
     expect(workflowSource).toContain(
       "DEPLOY_PREVIEW_SLUG: ${{ github.ref_name == 'main' && 'main' || 'test' }}",
     );
@@ -195,6 +196,7 @@ describe('production workflow contracts', () => {
     expect(workflowSource).toContain(
       'artifact_name="conspectus-mobile-production-${{ steps.target.outputs.commit_sha }}"',
     );
+    expect(workflowSource).toContain('include-hidden-files: true');
     expect(workflowSource).toContain(
       '"qualityRunId": "${{ steps.quality_run.outputs.quality_run_id }}"',
     );
