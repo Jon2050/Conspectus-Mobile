@@ -14,6 +14,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  dependency-audit:
+    name: Dependency Audit
+    uses: ./.github/workflows/dependency-audit.yml
+    permissions:
+      contents: read
+
   detect-code-changes:
     name: Detect Relevant Changes
     runs-on: ubuntu-latest
@@ -360,6 +366,7 @@ jobs:
   quality-gate:
     name: Quality Gate
     needs:
+      - dependency-audit
       - detect-code-changes
       - lint-typecheck
       - unit-tests
@@ -375,6 +382,7 @@ jobs:
         env:
           BUILD_RESULT: ${{ needs.build.result }}
           CODE_CHANGED: ${{ needs.detect-code-changes.outputs.code_changed }}
+          DEPENDENCY_AUDIT_RESULT: ${{ needs.dependency-audit.result }}
           DETECT_RESULT: ${{ needs.detect-code-changes.result }}
           E2E_RESULT: ${{ needs.e2e-tests.result }}
           LINT_RESULT: ${{ needs.lint-typecheck.result }}
@@ -385,6 +393,11 @@ jobs:
 
           if [ "${DETECT_RESULT}" != 'success' ]; then
             echo "Detect Relevant Changes did not succeed (result=${DETECT_RESULT})." >&2
+            exit 1
+          fi
+
+          if [ "${DEPENDENCY_AUDIT_RESULT}" != 'success' ]; then
+            echo "Dependency Audit did not succeed (result=${DEPENDENCY_AUDIT_RESULT})." >&2
             exit 1
           fi
 

@@ -1,13 +1,14 @@
 {
   "name": "conspectus-mobile",
   "private": true,
-  "version": "0.8.02",
+  "version": "0.8.03",
   "type": "module",
   "scripts": {
     "dev": "vite --host localhost --port 5173 --strictPort",
     "build": "vite build",
     "preview": "vite preview",
     "prepare": "husky",
+    "audit:dependencies": "npm audit --audit-level=high",
     "precommit:quick": "lint-staged",
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --max-warnings=0 --fix",

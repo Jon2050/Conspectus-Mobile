@@ -18,6 +18,11 @@ const deployProductionWorkflowPath = path.resolve(
   '.github/workflows/deploy-production.yml',
 );
 const qualityWorkflowPath = path.resolve(repositoryRootPath, '.github/workflows/quality.yml');
+const dependencyAuditWorkflowPath = path.resolve(
+  repositoryRootPath,
+  '.github/workflows/dependency-audit.yml',
+);
+const packageManifestPath = path.resolve(repositoryRootPath, 'package.json');
 
 describe('normalizeBasePath', () => {
   it('adds leading slash when missing', () => {
@@ -142,7 +147,7 @@ describe('quality workflow contract', () => {
     );
     expect(workflowSource).toContain('quality-gate:');
     expect(workflowSource).toMatch(
-      /quality-gate:\n(?:.*\n)*?\s+needs:\n\s+- detect-code-changes\n\s+- lint-typecheck\n\s+- unit-tests\n\s+- build\n\s+- build-verification\n\s+- e2e-tests/,
+      /quality-gate:\n(?:.*\n)*?\s+needs:\n\s+- dependency-audit\n\s+- detect-code-changes\n\s+- lint-typecheck\n\s+- unit-tests\n\s+- build\n\s+- build-verification\n\s+- e2e-tests/,
     );
     expect(workflowSource).toContain('name: Quality Gate');
     expect(workflowSource).toContain('name: quality-preview-dist');
@@ -153,12 +158,42 @@ describe('quality workflow contract', () => {
     );
     expect(workflowSource).toContain('PLAYWRIGHT_APP_BASE_PATH:');
   });
+
+  it('requires dependency auditing before both code-bearing and docs-only pushes pass', () => {
+    const workflowSource = fs.readFileSync(qualityWorkflowPath, 'utf8');
+    const auditResultCheckIndex = workflowSource.indexOf(
+      'if [ "${DEPENDENCY_AUDIT_RESULT}" != \'success\' ]; then',
+    );
+    const docsOnlyExitIndex = workflowSource.indexOf('if [ "${CODE_CHANGED}" = \'false\' ]; then');
+
+    expect(workflowSource).toContain('uses: ./.github/workflows/dependency-audit.yml');
+    expect(auditResultCheckIndex).toBeGreaterThan(-1);
+    expect(docsOnlyExitIndex).toBeGreaterThan(auditResultCheckIndex);
+  });
+});
+
+describe('dependency audit workflow contract', () => {
+  it('runs for pull requests and weekly schedules and fails at the high threshold', () => {
+    const workflowSource = fs.readFileSync(dependencyAuditWorkflowPath, 'utf8');
+    const packageManifest = JSON.parse(fs.readFileSync(packageManifestPath, 'utf8')) as {
+      scripts: Record<string, string>;
+    };
+
+    expect(workflowSource).toContain('workflow_call:');
+    expect(workflowSource).toContain('pull_request:');
+    expect(workflowSource).toContain('schedule:');
+    expect(workflowSource).toMatch(/cron: '[^']+'/);
+    expect(workflowSource).toContain('workflow_dispatch:');
+    expect(workflowSource).toContain('run: npm run audit:dependencies');
+    expect(packageManifest.scripts['audit:dependencies']).toBe('npm audit --audit-level=high');
+  });
 });
 
 describe('workflow action pinning', () => {
   it('uses full commit SHAs for every referenced action', () => {
     const workflowPaths = [
       qualityWorkflowPath,
+      dependencyAuditWorkflowPath,
       deployPreviewWorkflowPath,
       deployProductionWorkflowPath,
     ];
@@ -212,6 +247,10 @@ describe('production workflow contracts', () => {
     expect(qualityWorkflowSource).toContain(viteClientIdMapping);
     expect(productionWorkflowSource).toContain(viteClientIdMapping);
     expect(productionWorkflowSource).toContain('name: Validate required runtime env');
+    expect(productionWorkflowSource).toContain(
+      'name: Fail on current high or critical dependency vulnerabilities',
+    );
+    expect(productionWorkflowSource).toContain('run: npm run audit:dependencies');
     expect(productionWorkflowSource).toContain(
       'echo "Missing repository variable VITE_AZURE_CLIENT_ID." >&2',
     );
