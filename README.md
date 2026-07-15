@@ -155,6 +155,16 @@ Local quality scripts:
   required.
 - `npm run test:e2e` - runs Playwright browser tests.
 
+Playwright release-gate policy:
+
+- Local runs use zero retries so deterministic failures surface immediately.
+- CI uses one retry for transient browser or runner noise and one worker because the suite shares
+  the served build and service-worker files.
+- CI rejects focused tests, retains traces/screenshots/videos on failure, and uploads the HTML
+  report plus raw test results when the E2E job fails.
+- A test that still fails after the CI retry blocks `Quality`; repeated flaky behavior must be
+  fixed at its root cause instead of increasing retries.
+
 The `Quality` workflow runs on every push to non-`gh-pages` branches. Branches whose effective diff is docs-only skip the heavy jobs.
 
 CI test report view in GitHub:

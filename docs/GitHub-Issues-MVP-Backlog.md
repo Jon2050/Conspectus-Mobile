@@ -647,7 +647,7 @@ An issue is only considered done when:
 - Depends on: `M2-05`
 - GitHub: [#86](https://github.com/Jon2050/Conspectus-Mobile/issues/86)
 
-### :green_circle: M8-06 Expand Playwright suite to critical user journeys
+### :white_check_mark: M8-06 Expand Playwright suite to critical user journeys
 
 - Label: `test`
 - Milestone: `M8 - Hardening + QA + Release`

@@ -294,7 +294,7 @@ jobs:
           --base "/${{ github.event.repository.name }}/previews/${{ github.ref_name == 'main' && 'main' || 'test' }}/"
 
   e2e-tests:
-    name: E2E Smoke Tests
+    name: E2E Critical Journeys
     needs:
       - detect-code-changes
       - build-verification
@@ -337,7 +337,7 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
 
-      - name: Download preview build artifact for e2e smoke
+      - name: Download preview build artifact for E2E critical journeys
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           name: quality-preview-dist
@@ -353,11 +353,23 @@ jobs:
       - name: Prepare e2e report directories
         run: mkdir -p reports/playwright
 
-      - name: Run E2E smoke tests
+      - name: Run E2E critical journeys
         env:
           PLAYWRIGHT_APP_BASE_PATH: /${{ github.event.repository.name }}/previews/${{ github.ref_name == 'main' && 'main' || 'test' }}/
           PLAYWRIGHT_WEB_SERVER_BUILD: '0'
         run: npm run test:e2e
+
+      - name: Upload Playwright failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: playwright-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: warn
+          path: |
+            playwright-report
+            test-results
+            reports/playwright/junit.xml
+          retention-days: 7
 
       - name: Publish e2e test report summary
         if: always()
@@ -419,7 +431,7 @@ jobs:
           Unit Tests:${UNIT_RESULT}
           Build App (Preview):${BUILD_RESULT}
           Build Verification:${VERIFY_RESULT}
-          E2E Smoke Tests:${E2E_RESULT}
+          E2E Critical Journeys:${E2E_RESULT}
           EOF
 
           echo "Quality pipeline completed successfully."
