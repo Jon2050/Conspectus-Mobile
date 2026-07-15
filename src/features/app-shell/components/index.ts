@@ -4,3 +4,4 @@ export { default as ErrorBoundaryPlaceholder } from './ErrorBoundaryPlaceholder.
 export { default as LoadingPlaceholder } from './LoadingPlaceholder.svelte';
 export { default as SkeletonCard } from './SkeletonCard.svelte';
 export { default as ToastContainer } from './ToastContainer.svelte';
+export { default as ServiceWorkerUpdateBanner } from './ServiceWorkerUpdateBanner.svelte';

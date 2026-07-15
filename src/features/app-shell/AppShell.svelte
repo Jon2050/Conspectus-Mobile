@@ -19,6 +19,11 @@
   import AddRoute from './routes/AddRoute.svelte';
   import SettingsRoute from './routes/SettingsRoute.svelte';
   import ToastContainer from './components/ToastContainer.svelte';
+  import ServiceWorkerUpdateBanner from './components/ServiceWorkerUpdateBanner.svelte';
+  import {
+    appServiceWorkerUpdateController,
+    type ServiceWorkerUpdateController,
+  } from './serviceWorkerUpdateController';
   import { initializeAppAuthClient, resolveAppAuthClient } from './authClientResolver';
   import { resolveAppCacheStore } from './cacheStoreResolver';
   import { createCachedDatabaseSnapshotService } from './cachedDatabaseSnapshotService';
@@ -60,6 +65,8 @@
   export let routeStore: Readable<AppRouteKey> = createHashRouteStore();
   export let syncStateStore: SyncStateStore = appSyncStateStore;
   export let networkStateStore: NetworkStateStore = appNetworkStateStore;
+  export let serviceWorkerUpdateController: ServiceWorkerUpdateController =
+    appServiceWorkerUpdateController;
   export let addTransferSaveController: AddTransferSaveController =
     createAddTransferSaveController();
   export let loadingDelayMs = 160;
@@ -509,6 +516,8 @@
   <header class="app-header">
     <h1>{$_('appShell.title')}</h1>
   </header>
+
+  <ServiceWorkerUpdateBanner updateController={serviceWorkerUpdateController} />
 
   {#if staleTokenRecoveryIsRequired}
     <section class="auth-recovery" role="alert" data-testid="stale-token-recovery">

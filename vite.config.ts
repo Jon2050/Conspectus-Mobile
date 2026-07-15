@@ -11,6 +11,7 @@ import { normalizeBasePath, toPreviewSlug } from './scripts/deploy-utils.mjs';
 
 const DEFAULT_PRODUCTION_BASE_PATH = '/';
 const LIGHT_APP_THEME_COLOR = '#f3f4f6';
+export const PWA_REGISTER_TYPE = 'prompt' as const;
 const PACKAGE_JSON_URL = new URL('./package.json', import.meta.url);
 const packageJson = JSON.parse(readFileSync(PACKAGE_JSON_URL, 'utf-8')) as {
   version: string;
@@ -75,7 +76,7 @@ export default defineConfig(({ command, mode }) => {
     plugins: [
       svelte(),
       VitePWA({
-        registerType: 'autoUpdate',
+        registerType: PWA_REGISTER_TYPE,
         scope: basePath,
         workbox: {
           navigateFallback: 'index.html',

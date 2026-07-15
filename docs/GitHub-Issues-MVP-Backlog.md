@@ -615,7 +615,7 @@ An issue is only considered done when:
 - Depends on: `M2-04`
 - GitHub: [#82](https://github.com/Jon2050/Conspectus-Mobile/issues/82)
 
-### :green_circle: M8-02 Implement PWA Service Worker Update Flow
+### :white_check_mark: M8-02 Implement PWA Service Worker Update Flow
 
 - Label: `feature`
 - Milestone: `M8 - Hardening + QA + Release`

@@ -20,6 +20,14 @@
     "uploadProgress": "{loaded} KB / {total} KB uploaded",
     "title": "Conspectus Mobile"
   },
+  "appUpdate": {
+    "title": "Update available",
+    "description": "A new version is ready. Finish any unsaved transfer, then update to load it.",
+    "action": "Update now",
+    "applying": "Updating...",
+    "retry": "Retry update",
+    "error": "The update could not be activated. Your current version is still running; try again."
+  },
   "accounts": {
     "title": "Accounts",
     "loading": "Loading accounts from the local database...",

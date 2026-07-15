@@ -20,6 +20,14 @@
     "uploadProgress": "{loaded} KB / {total} KB hochgeladen",
     "title": "Conspectus Mobile"
   },
+  "appUpdate": {
+    "title": "Update verfügbar",
+    "description": "Eine neue Version ist bereit. Schließe einen ungespeicherten Transfer ab und aktualisiere dann die App.",
+    "action": "Jetzt aktualisieren",
+    "applying": "Wird aktualisiert...",
+    "retry": "Update erneut versuchen",
+    "error": "Das Update konnte nicht aktiviert werden. Die aktuelle Version läuft weiter; versuche es erneut."
+  },
   "accounts": {
     "title": "Konten",
     "loading": "Konten werden geladen...",

@@ -4,7 +4,18 @@ import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { loadBuildEnvironment, resolveBasePath, resolveViteBasePath } from '../vite.config';
+import {
+  PWA_REGISTER_TYPE,
+  loadBuildEnvironment,
+  resolveBasePath,
+  resolveViteBasePath,
+} from '../vite.config';
+
+describe('PWA update strategy', () => {
+  it('requires user confirmation before activating a waiting service worker', () => {
+    expect(PWA_REGISTER_TYPE).toBe('prompt');
+  });
+});
 
 describe('resolveBasePath', () => {
   it('uses a VITE_DEPLOY_BASE_PATH value supplied by a local .env file', () => {
