@@ -53,7 +53,7 @@ flowchart TD
 - Notes:
   - uses `actions/setup-node` npm cache and Playwright browser cache
   - cancels in-progress runs for the same ref via workflow concurrency
-  - `Build Verification` checks preview build output base-path correctness, manifest `start_url` and `scope`, service worker scope, CSP presence, and root-path leakage
+  - `Build Verification` checks preview build output base-path correctness, manifest `start_url` and `scope`, service worker scope, the document CSP and artifact-owned Apache security headers, and root-path leakage
   - `Quality Gate` is the single branch-protection check that should be required on `main`
 
 ### `Deploy Preview`
@@ -101,8 +101,9 @@ flowchart TD
   - rebuilds the app for production because the production base URL (`/conspectus/webapp/`) differs from the preview URLs
   - the website repo target defaults to `Jon2050/Jon2050_Webpage` and can be overridden with `WEBSITE_REPO_FULL_NAME`
   - production smoke target defaults to `https://jon2050.de/conspectus/webapp/` and can be overridden with `PRODUCTION_APP_BASE_URL`
-  - production smoke currently keeps live response-header verification explicitly disabled through `PRODUCTION_SMOKE_SKIP_SECURITY_HEADER_CHECKS: 'true'` because the website hosting layer does not yet emit the required `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy` headers for the PWA route
-  - `M8-01` owns enabling those live security headers in the hosting layer; once that is implemented, flip `PRODUCTION_SMOKE_SKIP_SECURITY_HEADER_CHECKS` to `false` or remove the flag so `verify-production-deploy-smoke.mjs` uses its strict default
+  - the production artifact includes the PWA-owned `/.htaccess` for `/conspectus/webapp/`; the website consumer validates and preserves it unchanged before upload
+  - production smoke fails unless the live app route returns the canonical `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, and `Referrer-Policy: strict-origin-when-cross-origin` headers
+  - the CSP keeps general JavaScript evaluation disabled while allowing the narrower WebAssembly permission required by sql.js plus the Microsoft login, Graph, and OneDrive download endpoints used by the app
 
 ## GitHub-Managed Pages Workflow
 
@@ -130,6 +131,7 @@ flowchart TD
 - Producer: `Deploy Production`
 - Consumer: the website repository deploy workflow
 - Required metadata file: `deploy-metadata.json`
+- Required Apache security configuration: `.htaccess`
 - Required metadata fields:
   - `channel`
   - `basePath`

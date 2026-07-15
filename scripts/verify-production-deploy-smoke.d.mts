@@ -5,7 +5,6 @@ export interface SmokeCheckOptions {
   maxAttempts: number;
   retryDelaySeconds: number;
   requestTimeoutMs: number;
-  skipSecurityHeaderChecks: boolean;
 }
 
 export type SleepFunction = (milliseconds: number) => Promise<void>;

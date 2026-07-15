@@ -5,6 +5,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
+import { DOCUMENT_CSP, PRODUCTION_CSP } from './security-policy.mjs';
+
 const thisFilePath = fileURLToPath(import.meta.url);
 const scriptsDirectoryPath = path.dirname(thisFilePath);
 const repositoryRootPath = path.resolve(scriptsDirectoryPath, '..');
@@ -19,11 +21,15 @@ const writeText = (filePath: string, value: string) => {
 
 type DistFixtureOptions = {
   includeCspMeta?: boolean;
+  includeHtaccess?: boolean;
   cspMetaContent?: string;
 };
 
-const BASE_CSP_META_CONTENT =
-  "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://login.microsoftonline.com https://graph.microsoft.com https://*.1drv.com https://*.microsoftpersonalcontent.com; object-src 'none'; base-uri 'self'";
+const VALID_HTACCESS = `<IfModule mod_headers.c>
+  Header always set Content-Security-Policy "${PRODUCTION_CSP}"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>`;
 
 const createDistFixture = (
   fixtureRootPath: string,
@@ -33,7 +39,7 @@ const createDistFixture = (
   const distPath = path.join(fixtureRootPath, 'dist');
   const basePath = '/conspectus/webapp/';
   const includeCspMeta = options.includeCspMeta ?? true;
-  const cspMetaContent = options.cspMetaContent ?? BASE_CSP_META_CONTENT;
+  const cspMetaContent = options.cspMetaContent ?? DOCUMENT_CSP;
   const cspMetaTag = includeCspMeta
     ? `<meta http-equiv="Content-Security-Policy" content="${cspMetaContent}" />`
     : '';
@@ -69,6 +75,9 @@ const createDistFixture = (
 
   writeText(path.join(distPath, 'assets', 'index.css'), '.app { color: #111; }');
   writeText(path.join(distPath, 'assets', 'index.js'), jsAssetContent);
+  if (options.includeHtaccess ?? true) {
+    writeText(path.join(distPath, '.htaccess'), VALID_HTACCESS);
+  }
 
   return distPath;
 };
@@ -135,6 +144,33 @@ describe('verify-build-channel script', () => {
     }
   });
 
+  it('fails when the build output is missing the Apache security configuration', () => {
+    const fixturePath = createFixtureDirectory();
+
+    try {
+      const distPath = createDistFixture(
+        fixturePath,
+        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/conspectus/webapp/sw.js', { scope: '/conspectus/webapp/' }); }`,
+        { includeHtaccess: false },
+      );
+
+      const result = runVerifier([
+        '--dist',
+        distPath,
+        '--channel',
+        'production',
+        '--base',
+        '/conspectus/webapp/',
+      ]);
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('Missing expected file:');
+      expect(result.stderr).toContain('.htaccess');
+    } finally {
+      rmSync(fixturePath, { force: true, recursive: true });
+    }
+  });
+
   it('fails when root-absolute asset paths leak outside expected base', () => {
     const fixturePath = createFixtureDirectory();
 
@@ -185,9 +221,7 @@ describe('verify-build-channel script', () => {
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain(
-        "Content-Security-Policy script-src directive must include 'wasm-unsafe-eval' for sql.js WASM runtime support.",
-      );
+      expect(result.stderr).toContain('does not match the canonical security policy');
     } finally {
       rmSync(fixturePath, { force: true, recursive: true });
     }
@@ -217,9 +251,7 @@ describe('verify-build-channel script', () => {
 
       expect(result.error).toBeUndefined();
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain(
-        'Content-Security-Policy connect-src directive is missing required source(s): https://*.1drv.com, https://*.microsoftpersonalcontent.com.',
-      );
+      expect(result.stderr).toContain('does not match the canonical security policy');
     } finally {
       rmSync(fixturePath, { force: true, recursive: true });
     }
@@ -265,7 +297,7 @@ describe('verify-build-channel script', () => {
         `<!doctype html>
 <html lang="en">
   <head>
-    <meta http-equiv="Content-Security-Policy" content="${BASE_CSP_META_CONTENT}" />
+    <meta http-equiv="Content-Security-Policy" content="${DOCUMENT_CSP}" />
     <link rel="manifest" href="${previewBase}manifest.webmanifest" />
     <link rel="stylesheet" href="${previewBase}assets/index.css" />
   </head>
@@ -282,6 +314,7 @@ describe('verify-build-channel script', () => {
       );
 
       writeText(path.join(distPath, 'assets', 'index.css'), '.app { color: #111; }');
+      writeText(path.join(distPath, '.htaccess'), VALID_HTACCESS);
       writeText(
         path.join(distPath, 'assets', 'index.js'),
         `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('${previewBase}sw.js', { scope: '${previewBase}' }); }`,
@@ -318,7 +351,7 @@ describe('verify-build-channel script', () => {
         `<!doctype html>
 <html lang="en">
   <head>
-    <meta http-equiv="Content-Security-Policy" content="${BASE_CSP_META_CONTENT}" />
+    <meta http-equiv="Content-Security-Policy" content="${DOCUMENT_CSP}" />
     <link rel="manifest" href="${basePath}manifest.webmanifest" />
     <link rel="stylesheet" href="${basePath}assets/index.css" />
   </head>
@@ -339,6 +372,7 @@ describe('verify-build-channel script', () => {
       );
 
       writeText(path.join(distPath, 'assets', 'index.css'), '.app { color: #111; }');
+      writeText(path.join(distPath, '.htaccess'), VALID_HTACCESS);
       writeText(
         path.join(distPath, 'assets', 'index.js'),
         `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('${basePath}sw.js', { scope: '${basePath}' }); }`,

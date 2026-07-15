@@ -10,6 +10,8 @@ const REQUIRED_CONTRACT_MARKERS = [
   'conspectus-mobile-production-ready',
   'actions/runs/${DEPLOY_RUN_ID}',
   'validate-conspectus-deploy-metadata.mjs',
+  'validate-conspectus-security-headers.mjs',
+  '${incoming_dir}/.htaccess',
   'conspectus/webapp',
 ];
 
