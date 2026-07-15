@@ -52,7 +52,7 @@ flowchart TD
 - File: [`.github/workflows/quality.yml`](../.github/workflows/quality.yml)
 - Trigger: every push to every branch except `gh-pages`
 - Purpose:
-  - validate dependency security, formatting, linting, type safety, unit tests, preview build correctness, and Playwright smoke
+  - validate dependency security, formatting, linting, type safety, unit tests, preview build correctness, bundle size, and Playwright smoke
   - produce the reusable `quality-preview-dist` artifact after `Build App (Preview)`
 - Stage order:
   - `Dependency Audit`
@@ -73,8 +73,39 @@ flowchart TD
 - Notes:
   - uses `actions/setup-node` npm cache and Playwright browser cache
   - cancels in-progress runs for the same ref via workflow concurrency
-  - `Build Verification` checks preview build output base-path correctness, manifest `start_url` and `scope`, service worker scope, the document CSP and artifact-owned Apache security headers, and root-path leakage
+  - `Build Verification` checks the downloaded preview artifact against the JS/CSS bundle budgets before validating base-path correctness, manifest `start_url` and `scope`, service worker scope, the document CSP and artifact-owned Apache security headers, and root-path leakage
   - `Quality Gate` is the single branch-protection check that should be required on `main`
+
+#### Bundle size budgets
+
+`Build Verification` runs `npm run check:bundle-size` against the exact preview artifact produced
+by `Build App (Preview)`. The checker recursively includes every `.js` and `.css` file under
+`dist`, including generated service-worker and Workbox runtime files. WASM, source maps, images,
+HTML, manifests, and other asset types are outside the M8-04 JS/CSS budget scope.
+
+The committed limits in [`bundle-size-budgets.json`](../bundle-size-budgets.json) are aggregate
+limits per asset class:
+
+| Asset class |               Raw limit |              Gzip limit |
+| ----------- | ----------------------: | ----------------------: |
+| JavaScript  | 680 KiB (696,320 bytes) | 210 KiB (215,040 bytes) |
+| CSS         |   30 KiB (30,720 bytes) |  5.75 KiB (5,888 bytes) |
+
+Raw totals guard parse, storage, and uncompressed delivery cost. Gzip totals are calculated by
+compressing each emitted file independently and summing the results, matching separate network
+resources. A missing JS/CSS class or any exceeded limit fails `Build Verification`, which blocks
+E2E, preview deployment, production eligibility, and the branch `Quality Gate`.
+
+When a budget is exceeded:
+
+1. Run `npm run build` and `npm run check:bundle-size` locally, then use the file-level report to
+   identify the largest changed artifact.
+2. Inspect the change or dependency that caused the growth and remove unused code or dependencies.
+3. If the code is not needed during startup, use justified lazy loading or chunking and confirm the
+   aggregate total actually improves.
+4. Re-run the complete local quality gate.
+5. Raise a limit only for intentional, reviewed product growth, and document the rationale in the
+   pull request. Never raise a budget only to make CI green.
 
 ### `Deploy Preview`
 

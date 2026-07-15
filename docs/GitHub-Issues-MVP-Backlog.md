@@ -631,7 +631,7 @@ An issue is only considered done when:
 - Depends on: `M1-08`
 - GitHub: [#84](https://github.com/Jon2050/Conspectus-Mobile/issues/84)
 
-### :green_circle: M8-04 Add bundle size budget checks
+### :white_check_mark: M8-04 Add bundle size budget checks
 
 - Label: `infra`
 - Milestone: `M8 - Hardening + QA + Release`

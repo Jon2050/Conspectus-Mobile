@@ -147,6 +147,8 @@ Local quality scripts:
 - `npm run typecheck` - runs Svelte + TypeScript checks in strict mode.
 - `npm run test` - runs app Vitest tests plus script Vitest tests.
 - `npm run build` - creates a production build in `dist/`.
+- `npm run check:bundle-size` - checks an existing `dist/` against the committed JS/CSS raw and
+  gzip budgets; run `npm run build` first.
 - `npm run test:e2e` - runs Playwright browser tests.
 
 The `Quality` workflow runs on every push to non-`gh-pages` branches. Branches whose effective diff is docs-only skip the heavy jobs.

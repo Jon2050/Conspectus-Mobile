@@ -283,6 +283,9 @@ jobs:
           name: quality-preview-dist
           path: dist
 
+      - name: Enforce JS/CSS bundle size budgets
+        run: npm run check:bundle-size
+
       - name: Verify preview build output paths and scope
         run: >-
           node scripts/verify-build-channel.mjs
