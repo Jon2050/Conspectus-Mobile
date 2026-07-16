@@ -9,6 +9,12 @@ After these pinned workflows reach the default branch, repository administrators
 This document is the operational reference for the project-owned GitHub Actions in this repository.
 It also explains the GitHub-managed Pages workflow that appears in the Actions UI.
 
+Production workflow success is necessary but is not the complete release gate. Every production
+release must follow the single checklist in [`Release-Process.md`](Release-Process.md), including
+human release-owner acceptance and the physical-device evidence from
+[`Manual-Device-QA.md`](Manual-Device-QA.md). The active default-branch ruleset strictly requires
+the `Quality Gate`; the additional human and device gates are recorded in the release pull request.
+
 ## Workflow Graph
 
 ```mermaid

@@ -663,7 +663,7 @@ An issue is only considered done when:
 - Depends on: `M2-07, M6-10, M7-07`
 - GitHub: [#88](https://github.com/Jon2050/Conspectus-Mobile/issues/88)
 
-### :green_circle: M8-08 Create release checklist and cut process
+### :white_check_mark: M8-08 Create release checklist and cut process
 
 - Label: `docs`
 - Milestone: `M8 - Hardening + QA + Release`

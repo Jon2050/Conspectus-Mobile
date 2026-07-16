@@ -825,6 +825,12 @@ M8-06 implementation clarification:
 - External Microsoft and Graph boundaries use localhost-only deterministic adapters, while committed SQLite fixture bytes exercise the production sql.js read path.
 - Release-gate stability uses fixed scenario data and clocks, web-first assertions, serial CI execution, zero local retries, and one CI retry for transient runner noise. Failure diagnostics retain traces, screenshots, videos, and the Playwright report; recurring flakiness requires a root-cause fix rather than a larger retry allowance.
 
+M8-08 implementation clarification:
+
+- Every production release uses the single ordered checklist in `docs/Release-Process.md`, with a `release/v<version>` candidate branch, synchronized package and lockfile versions, and retained release pull request evidence.
+- GitHub enforces pull-request delivery, rebase-only linear history, and the strict `Quality Gate`; the release process additionally requires reviewer-agent approval, explicit human release-owner acceptance, and complete physical iOS/Android evidence.
+- Production remains a manual deployment of the qualified current `main` commit. The immutable `v<version>` tag and GitHub Release are published only for the exact commit whose production identity, Lighthouse gate, and post-deploy smoke checks passed.
+
 Substeps:
 
 1. Security hardening:
