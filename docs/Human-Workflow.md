@@ -52,3 +52,21 @@ Sobald ein Meilenstein komplett abgeschlossen ist, steuerst du das Review und di
 
 - Nutze die Vorlage unter _Fix Findings Review Prompt Template_ (am Ende von [Post-Milestone-Review-Prompt-Template.md](./prompts/Post-Milestone-Review-Prompt-Template.md)), um einen Review-Agenten zu starten, der die Korrekturen auf dem fixing-Branch abschließend prüft.
 - Wenn der Reviewer grünes Licht gibt, merge die Korrekturen in `main`.
+
+---
+
+## 🚀 3. Release-Verantwortung
+
+Für jeden Production Release gilt ausschließlich die Checkliste in
+[Release-Process.md](./Release-Process.md). Kopiere sie vollständig in den Release-PR oder einen
+eigenen Kommentar; erstelle keine zweite, abweichende Release-Checkliste.
+
+Als menschlicher Release Owner musst du insbesondere:
+
+- das Zeitfenster für den gemeinsam genutzten Test-Preview koordinieren;
+- die vollständigen iOS-/Android-Nachweise aus
+  [Manual-Device-QA.md](./Manual-Device-QA.md) prüfen;
+- im Release-PR ausdrücklich `APPROVED FOR RELEASE` dokumentieren;
+- `Deploy Production` vom freigegebenen `main`-Commit manuell starten;
+- die Production-Identität und Post-Deploy-Smokes bestätigen, bevor Tag und GitHub Release
+  veröffentlicht werden.

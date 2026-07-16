@@ -35,6 +35,19 @@
 - Tested candidate URL / commit:
 - Completed results and evidence location in this PR:
 
+## Release Process (Release PRs Only)
+
+- [ ] Not a release PR; the release-cut process is not required here.
+- [ ] Release PR: the single checklist from
+      [`docs/Release-Process.md`](https://github.com/Jon2050/Conspectus-Mobile/blob/main/docs/Release-Process.md)
+      is copied into this PR or a dedicated PR comment and completed there.
+- Planned version / tag:
+- Candidate commit / `Quality` / `Deploy Preview` evidence:
+- Reviewer-agent approval evidence:
+- Human release-owner `APPROVED FOR RELEASE` evidence:
+- Approved release-notes location:
+- Production commit / `Deploy Production` / post-deploy evidence:
+
 ## Risk Notes
 
 - User impact:

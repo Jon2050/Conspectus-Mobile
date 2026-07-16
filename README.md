@@ -95,6 +95,8 @@ Use these documents as the canonical sources for their topics:
   [docs/auth/Entra-App-Registration.md](docs/auth/Entra-App-Registration.md).
 - CI/CD workflow behavior, artifacts, and failure modes:
   [docs/CI-CD-Pipelines.md](docs/CI-CD-Pipelines.md).
+- Release branch/tag strategy, approvals, release notes, and production verification:
+  [docs/Release-Process.md](docs/Release-Process.md).
 - MVP backlog index and issue completion rules:
   [docs/GitHub-Issues-MVP-Backlog.md](docs/GitHub-Issues-MVP-Backlog.md).
 - Desktop database and business-rule parity reference:
