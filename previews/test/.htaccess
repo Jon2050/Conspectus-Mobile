@@ -1,4 +1,4 @@
-# Applies optional defense-in-depth headers at the root of conspectus.jon2050.de.
+# Applies optional defense-in-depth headers to the /conspectus/ production subtree.
 # The document CSP in index.html remains authoritative when mod_headers is unavailable.
 DirectoryIndex index.html
 
