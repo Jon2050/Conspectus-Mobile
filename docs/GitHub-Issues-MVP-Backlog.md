@@ -679,7 +679,7 @@ An issue is only considered done when:
 - Depends on: `M2-08`
 - GitHub: [#90](https://github.com/Jon2050/Conspectus-Mobile/issues/90)
 
-### :green_circle: M8-10 Add post-deploy smoke monitor job
+### :white_check_mark: M8-10 Add post-deploy smoke monitor job
 
 - Label: `infra`
 - Milestone: `M8 - Hardening + QA + Release`
