@@ -101,6 +101,8 @@ comment. Do not maintain a second release checklist elsewhere.
       applies the update, relaunches successfully, and shows the released footer identity.
 - [ ] With the dedicated QA Microsoft account and disposable database, smoke sign-in, bound-file
       sync, Accounts, and Transfers on production. Do not use a personal financial database.
+- [ ] Run `Post-Deploy Monitor` manually from `main` with `simulate_failure = false`, require a successful
+      result for the exact production `commitSha` and `deployRunId`, and link its evidence artifact.
 - [ ] Record `PASS` or the linked defect for every post-deploy check. Any failed, blocked, or
       unverified check keeps the release incomplete and triggers the applicable rollback procedure;
       do not publish a successful GitHub Release.

@@ -1,0 +1,149 @@
+# Monitors the live production PWA and opens one incident after repeated smoke failures.
+name: Post-Deploy Monitor
+
+on:
+  schedule:
+    - cron: '7,37 * * * *'
+  workflow_dispatch:
+    inputs:
+      simulate_failure:
+        description: Run the real smoke check, then record a controlled failure for alert-path testing
+        required: true
+        default: false
+        type: boolean
+
+env:
+  PRODUCTION_APP_BASE_URL: ${{ vars.PRODUCTION_APP_BASE_URL || 'https://jon2050.de/conspectus/' }}
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  INCIDENT_TITLE: '[M8-10 Monitor] Production smoke failing'
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: post-deploy-production-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    name: Production Smoke Monitor
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require main branch
+        run: |
+          if [ "${GITHUB_REF_NAME}" != 'main' ]; then
+            echo 'Post-Deploy Monitor may only run from main.' >&2
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Restore consecutive-failure state
+        uses: actions/cache/restore@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: .post-deploy-monitor
+          key: post-deploy-monitor-state-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            post-deploy-monitor-state-
+
+      - name: Run production smoke monitor
+        env:
+          SIMULATE_FAILURE: ${{ inputs.simulate_failure || false }}
+        run: >-
+          node scripts/run-post-deploy-monitor.mjs
+          --base-url "${PRODUCTION_APP_BASE_URL}"
+          --state-json .post-deploy-monitor/state.json
+          --output-json .post-deploy-monitor/result.json
+          --simulate-failure "${SIMULATE_FAILURE}"
+          --request-timeout-ms 10000
+          --deadline-seconds 60
+
+      - name: Format issue evidence
+        run: |
+          set -euo pipefail
+          status="$(jq -r '.status' .post-deploy-monitor/result.json)"
+          kind='failure'
+          if [ "${status}" = 'success' ]; then
+            kind='recovery'
+          fi
+          node scripts/format-post-deploy-monitor-alert.mjs \
+            --result-json .post-deploy-monitor/result.json \
+            --output-file .post-deploy-monitor/incident-message.md \
+            --kind "${kind}" \
+            --repository "${GITHUB_REPOSITORY}"
+
+      - name: Open, update, or close monitor incident
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          incident_number="$(gh issue list \
+            --repo "${GITHUB_REPOSITORY}" \
+            --state open \
+            --limit 100 \
+            --json number,title \
+            | jq -r --arg title "${INCIDENT_TITLE}" \
+              '[.[] | select(.title == $title)][0].number // empty')"
+          status="$(jq -r '.status' .post-deploy-monitor/result.json)"
+          alert_required="$(jq -r '.alertRequired' .post-deploy-monitor/result.json)"
+
+          if [ "${status}" = 'failure' ] && [ "${alert_required}" = 'true' ]; then
+            if [ -n "${incident_number}" ]; then
+              gh issue comment "${incident_number}" \
+                --repo "${GITHUB_REPOSITORY}" \
+                --body-file .post-deploy-monitor/incident-message.md
+            else
+              gh issue create \
+                --repo "${GITHUB_REPOSITORY}" \
+                --title "${INCIDENT_TITLE}" \
+                --body-file .post-deploy-monitor/incident-message.md
+            fi
+          elif [ "${status}" = 'success' ] && [ -n "${incident_number}" ]; then
+            gh issue comment "${incident_number}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --body-file .post-deploy-monitor/incident-message.md
+            gh issue close "${incident_number}" --repo "${GITHUB_REPOSITORY}"
+          fi
+
+      - name: Save consecutive-failure state
+        if: always()
+        uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+        with:
+          path: .post-deploy-monitor
+          key: post-deploy-monitor-state-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Upload monitor evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: post-deploy-monitor-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .post-deploy-monitor/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish monitor summary
+        if: always()
+        run: |
+          if [ -f .post-deploy-monitor/result.json ]; then
+            {
+              echo '## Post-deploy production monitor'
+              echo
+              echo '```json'
+              jq . .post-deploy-monitor/result.json
+              echo '```'
+            } >> "${GITHUB_STEP_SUMMARY}"
+          fi
+
+      - name: Fail when production smoke failed
+        run: |
+          if [ "$(jq -r '.status' .post-deploy-monitor/result.json)" != 'success' ]; then
+            echo 'Production smoke monitor failed; see the evidence artifact and incident state.' >&2
+            exit 1
+          fi

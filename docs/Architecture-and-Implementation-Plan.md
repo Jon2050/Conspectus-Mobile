@@ -837,6 +837,12 @@ M8-09 implementation clarification:
 - Pull-request and manual dry-run modes validate producer provenance, artifact metadata, and the current website-consumer contract without mutating production. Execute mode sends the validated existing handoff payload and requires live smoke checks to observe the rollback identity.
 - The website repository remains responsible for staged upload and atomic promotion. The producer rollback workflow performs no manual file copy or FTP operation and budgets eight minutes for live verification so the documented incident procedure can complete inside 15 minutes.
 
+M8-10 implementation clarification:
+
+- A serialized `Post-Deploy Monitor` workflow checks the canonical production route twice per hour and on manual request by discovering the live deploy metadata and reusing the production smoke verifier.
+- Monitor state retains the consecutive-failure count and last-known-success `commitSha`, `deployRunId`, and `qualityRunId`. A single transient failure records evidence without alerting; the second consecutive failure opens one GitHub incident with deploy-run and immutable artifact links.
+- Successful checks reset the counter and close the monitor incident with recovery evidence. Controlled manual failures exercise the same real smoke path before simulating the failure, making alert creation and recovery verifiable without breaking production.
+
 Substeps:
 
 1. Security hardening:
