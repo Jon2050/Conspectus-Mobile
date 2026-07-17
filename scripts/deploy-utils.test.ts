@@ -21,6 +21,10 @@ const rollbackProductionWorkflowPath = path.resolve(
   repositoryRootPath,
   '.github/workflows/rollback-production.yml',
 );
+const postDeployMonitorWorkflowPath = path.resolve(
+  repositoryRootPath,
+  '.github/workflows/post-deploy-monitor.yml',
+);
 const qualityWorkflowPath = path.resolve(repositoryRootPath, '.github/workflows/quality.yml');
 const dependencyAuditWorkflowPath = path.resolve(
   repositoryRootPath,
@@ -201,6 +205,7 @@ describe('workflow action pinning', () => {
       deployPreviewWorkflowPath,
       deployProductionWorkflowPath,
       rollbackProductionWorkflowPath,
+      postDeployMonitorWorkflowPath,
     ];
 
     for (const workflowPath of workflowPaths) {
