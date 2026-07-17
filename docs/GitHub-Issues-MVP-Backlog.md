@@ -5,6 +5,10 @@ Scope includes only MVP.
 Detailed implementation steps and acceptance criteria must live in the corresponding GitHub issue for each entry.
 For each backlog entry below, open the linked GitHub issue for detailed implementation guidance and acceptance criteria.
 
+[`RELEASE-BLOCKERS.md`](../RELEASE-BLOCKERS.md) is the authoritative working file for release
+readiness. An issue can be implementation-complete without making the product releasable; any open
+release blocker must be cleared before M8-11 can be marked done.
+
 ## Issue Status Legend
 
 - `:green_circle:` Open
@@ -607,13 +611,17 @@ An issue is only considered done when:
 - Depends on: `M4-04, M4-05, M4-07, M4-08, M7-01`
 - GitHub: [#211](https://github.com/Jon2050/Conspectus-Mobile/issues/211)
 
-### :white_check_mark: M8-01 Implement CSP and security headers for PWA path
+### :yellow_circle: M8-01 Implement CSP and security headers for PWA path
 
 - Label: `security`
 - Milestone: `M8 - Hardening + QA + Release`
 - Summary: Work includes CSP compatible with Svelte/Vite build output and headers for PWA route on website hosting. It also covers Validate service worker and manifest still function.
 - Depends on: `M2-04`
 - GitHub: [#82](https://github.com/Jon2050/Conspectus-Mobile/issues/82)
+- Not done: The document CSP and artifact validation are implemented, but Free Hosting does not
+  emit the required runtime security headers. The comprehensive production follow-up is tracked in
+  [#120](https://github.com/Jon2050/Conspectus-Mobile/issues/120) and release blocker RB-01 in
+  [`RELEASE-BLOCKERS.md`](../RELEASE-BLOCKERS.md).
 
 ### :white_check_mark: M8-02 Implement PWA Service Worker Update Flow
 
@@ -687,13 +695,16 @@ An issue is only considered done when:
 - Depends on: `M2-05`
 - GitHub: [#91](https://github.com/Jon2050/Conspectus-Mobile/issues/91)
 
-### :green_circle: M8-11 Final MVP release issue
+### :yellow_circle: M8-11 Final MVP release issue
 
 - Label: `feature`
 - Milestone: `M8 - Hardening + QA + Release`
 - Summary: Work includes all milestone issues are closed and Execute release checklist and deployment. It also covers release notes and known limitations.
 - Depends on: `all milestone issues`
 - GitHub: [#92](https://github.com/Jon2050/Conspectus-Mobile/issues/92)
+- Not done: Serious security, production-authentication, physical-device/icon, and final
+  qualification gates remain open. Their evidence and clearing conditions are maintained only in
+  [`RELEASE-BLOCKERS.md`](../RELEASE-BLOCKERS.md).
 
 ### :white_check_mark: M8-12 Clean GitHub Actions, CI/CD pipeline
 
@@ -702,6 +713,9 @@ An issue is only considered done when:
 - Summary: Work includes clarifying GitHub Actions names and responsibilities and ensuring preview deploys only run after successful `Quality` runs. It also covers reusable `Quality` deploy artifacts, a manual production deploy workflow that reuses the published artifact for the current `main` commit, and maintained CI/CD documentation in `docs/CI-CD-Pipelines.md`.
 - Depends on: `M1-08, M2-00, M2-08`
 - GitHub: [#131](https://github.com/Jon2050/Conspectus-Mobile/issues/131)
+- Done clarification: This completed CI/CD cleanup issue is distinct from the later open security
+  issue [#120](https://github.com/Jon2050/Conspectus-Mobile/issues/120), whose title also uses the
+  M8-12 prefix. #120 is tracked with M8-01 under release blocker RB-01.
 
 # Future feature ideas
 

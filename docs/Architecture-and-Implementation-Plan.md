@@ -843,6 +843,11 @@ M8-10 implementation clarification:
 - Monitor state retains the consecutive-failure count and last-known-success `commitSha`, `deployRunId`, and `qualityRunId`. A single transient failure records evidence without alerting; the second consecutive failure opens one GitHub incident with deploy-run and immutable artifact links.
 - Successful checks reset the counter and close the monitor incident with recovery evidence. Controlled manual failures exercise the same real smoke path before simulating the failure, making alert creation and recovery verifiable without breaking production.
 
+M8-11 release-readiness clarification:
+
+- `RELEASE-BLOCKERS.md` is the single working source for serious release blockers, their evidence, and their clearing conditions. The backlog remains the implementation index and `docs/Release-Process.md` remains the ordered release runbook.
+- A green repository gate does not by itself make the product releasable. Runtime security policy, authoritative production authentication, physical-device QA, and exact-candidate approval/deployment evidence must all be cleared before tagging or closing the final release issue.
+
 Substeps:
 
 1. Security hardening:
