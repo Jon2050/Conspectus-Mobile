@@ -152,28 +152,23 @@ jobs:
           } >> "${GITHUB_OUTPUT}"
 
       - name: Fetch public website consumer contract
-        env:
-          CONTRACT_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
-          if [ -z "${CONTRACT_TOKEN}" ]; then
-            echo 'Missing required GitHub Actions token.' >&2
-            exit 1
-          fi
-
-          workflow_api_url="https://api.github.com/repos/${WEBSITE_REPO_FULL_NAME}/contents/.github/workflows/deploy.yml?ref=master"
-          workflow_status="$(curl -sS -L -o website-deploy-workflow.json -w '%{http_code}' \
-            -H "Authorization: Bearer ${CONTRACT_TOKEN}" \
-            -H 'Accept: application/vnd.github+json' \
+          workflow_raw_url="https://raw.githubusercontent.com/${WEBSITE_REPO_FULL_NAME}/master/.github/workflows/deploy.yml"
+          workflow_status="$(curl -sS -L -o website-deploy-workflow.yml -w '%{http_code}' \
             -H 'User-Agent: Conspectus-Mobile-Rollback' \
-            "${workflow_api_url}")"
+            "${workflow_raw_url}")"
 
           if [ "${workflow_status}" != '200' ]; then
             echo "Failed to read website deploy workflow from ${WEBSITE_REPO_FULL_NAME}." >&2
-            echo "Workflow API status: ${workflow_status}" >&2
+            echo "Workflow response status: ${workflow_status}" >&2
             exit 1
           fi
+
+          jq -n \
+            --arg content "$(base64 -w 0 website-deploy-workflow.yml)" \
+            '{encoding: "base64", content: $content}' > website-deploy-workflow.json
 
       - name: Verify website consumer handoff contract
         run: |
