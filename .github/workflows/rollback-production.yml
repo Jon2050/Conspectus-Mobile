@@ -155,27 +155,30 @@ jobs:
         run: |
           set -euo pipefail
 
-          workflow_raw_url="https://raw.githubusercontent.com/${WEBSITE_REPO_FULL_NAME}/master/.github/workflows/deploy.yml"
-          workflow_status="$(curl -sS -L -o website-deploy-workflow.yml -w '%{http_code}' \
+          contract_url="${PRODUCTION_APP_BASE_URL}conspectus-deploy-contract.json?rollback-probe=${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          contract_status="$(curl -sS -L \
+            --connect-timeout 10 \
+            --max-time 30 \
+            --retry 2 \
+            --retry-delay 2 \
+            --retry-all-errors \
+            -o website-deploy-contract.json \
+            -w '%{http_code}' \
             -H 'User-Agent: Conspectus-Mobile-Rollback' \
-            "${workflow_raw_url}")"
+            "${contract_url}")"
 
-          if [ "${workflow_status}" != '200' ]; then
-            echo "Failed to read website deploy workflow from ${WEBSITE_REPO_FULL_NAME}." >&2
-            echo "Workflow response status: ${workflow_status}" >&2
+          if [ "${contract_status}" != '200' ]; then
+            echo "Failed to read live website consumer contract from ${contract_url}." >&2
+            echo "Contract response status: ${contract_status}" >&2
             exit 1
           fi
-
-          jq -n \
-            --arg content "$(base64 -w 0 website-deploy-workflow.yml)" \
-            '{encoding: "base64", content: $content}' > website-deploy-workflow.json
 
       - name: Verify website consumer handoff contract
         run: |
           set -euo pipefail
 
           node scripts/verify-website-consumer-contract.mjs \
-            --workflow-json website-deploy-workflow.json \
+            --contract-json website-deploy-contract.json \
             --producer-repo "${GITHUB_REPOSITORY}"
 
       - name: Record validated dry-run evidence

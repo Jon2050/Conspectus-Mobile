@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const REQUIRED_ARGS = new Set(['workflowJson', 'producerRepo']);
+const REQUIRED_ARGS = new Set(['producerRepo']);
 const REQUIRED_PAYLOAD_FIELDS = ['commitSha', 'deployRunId', 'qualityRunId', 'artifactName'];
 const REQUIRED_CONTRACT_MARKERS = [
   'repository_dispatch',
@@ -21,6 +21,19 @@ const REQUIRED_CONTRACT_MARKERS = [
   'mv ./www/conspectus.__incoming ./www/conspectus',
   'mv ./www/conspectus.__backup ./www/conspectus',
 ];
+const EXPECTED_PUBLIC_CONTRACT = Object.freeze({
+  schemaVersion: 1,
+  eventType: 'conspectus-mobile-production-ready',
+  requiredPayloadFields: ['commitSha', 'deployRunId', 'qualityRunId', 'artifactName'],
+  basePath: '/conspectus/',
+  stagingBaseUrl: 'https://jon2050.de/conspectus.__incoming/',
+  liveBaseUrl: 'https://jon2050.de/conspectus/',
+  stagingDirectory: './www/conspectus.__incoming',
+  liveDirectory: './www/conspectus',
+  backupDirectory: './www/conspectus.__backup',
+  promotionMode: 'atomic-directory-swap',
+  rollbackMode: 'restore-backup-directory',
+});
 
 const assert = (condition, message) => {
   if (!condition) {
@@ -30,6 +43,7 @@ const assert = (condition, message) => {
 
 const parseArgs = (argv) => {
   const args = {
+    contractJson: '',
     workflowJson: '',
     producerRepo: '',
   };
@@ -53,7 +67,41 @@ const parseArgs = (argv) => {
     assert(args[requiredArg], `Missing required --${requiredArg} argument.`);
   }
 
+  assert(
+    Boolean(args.contractJson) !== Boolean(args.workflowJson),
+    'Provide exactly one of --contract-json or --workflow-json.',
+  );
+
   return args;
+};
+
+const verifyPublicContract = (contract, expectedProducerRepo) => {
+  assert(contract && typeof contract === 'object', 'Consumer contract must be a JSON object.');
+  const expectedFields = ['producerRepo', ...Object.keys(EXPECTED_PUBLIC_CONTRACT)].sort();
+  const actualFields = Object.keys(contract).sort();
+  assert(
+    JSON.stringify(actualFields) === JSON.stringify(expectedFields),
+    'Consumer contract fields must exactly match the versioned schema.',
+  );
+  assert(
+    contract.producerRepo === expectedProducerRepo,
+    `Consumer contract producerRepo must be "${expectedProducerRepo}".`,
+  );
+
+  for (const [field, expectedValue] of Object.entries(EXPECTED_PUBLIC_CONTRACT)) {
+    const actualValue = contract[field];
+    if (Array.isArray(expectedValue)) {
+      assert(
+        Array.isArray(actualValue) && JSON.stringify(actualValue) === JSON.stringify(expectedValue),
+        `Consumer contract ${field} mismatch.`,
+      );
+      continue;
+    }
+    assert(
+      actualValue === expectedValue,
+      `Consumer contract ${field} must be ${JSON.stringify(expectedValue)}.`,
+    );
+  }
 };
 
 const readJson = (filePath) => {
@@ -111,10 +159,13 @@ const verifyConsumerContract = (workflowYaml, expectedProducerRepo) => {
 
 const main = () => {
   const args = parseArgs(process.argv.slice(2));
-  const contentsResponse = readJson(args.workflowJson);
-  const workflowYaml = decodeWorkflowYaml(contentsResponse);
-
-  verifyConsumerContract(workflowYaml, args.producerRepo);
+  if (args.contractJson) {
+    verifyPublicContract(readJson(args.contractJson), args.producerRepo);
+  } else {
+    const contentsResponse = readJson(args.workflowJson);
+    const workflowYaml = decodeWorkflowYaml(contentsResponse);
+    verifyConsumerContract(workflowYaml, args.producerRepo);
+  }
 
   console.log(
     `[verify-website-consumer-contract] verified /conspectus/ consumer handoff contract for producer repo "${args.producerRepo}".`,
