@@ -5,6 +5,13 @@ release and keep the completed checklist and all linked evidence in the release 
 [`Manual-Device-QA.md`](Manual-Device-QA.md) supplies the required physical-device sub-gate; it
 does not replace this end-to-end checklist.
 
+[`../RELEASE-BLOCKERS.md`](../RELEASE-BLOCKERS.md) is the authoritative release-readiness working
+file. A candidate may be created to gather the evidence required to clear a blocker, but do not
+approve, merge, deploy, tag, or publish it while a prerequisite blocker (RB-01 through RB-03)
+remains open. Once only RB-04 remains, follow this runbook to perform and record the actions that
+clear it. Update the blocker file with evidence as blockers are cleared instead of maintaining
+another blocker list.
+
 ## Release identity and ownership
 
 - Use an unused semantic version from `package.json`; `package-lock.json` must contain the same
