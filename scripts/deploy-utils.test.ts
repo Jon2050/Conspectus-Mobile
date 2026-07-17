@@ -290,6 +290,9 @@ describe('production rollback workflow contract', () => {
     );
     const publicFetchStepEnd = workflowSource.indexOf('\n      - name:', publicFetchStepStart);
     const publicFetchStep = workflowSource.slice(publicFetchStepStart, publicFetchStepEnd);
+    expect(publicFetchStep).toContain('https://raw.githubusercontent.com/');
+    expect(publicFetchStep).toContain('base64 -w 0 website-deploy-workflow.yml');
     expect(publicFetchStep).not.toContain('WEBSITE_REPO_DISPATCH_TOKEN');
+    expect(publicFetchStep).not.toContain('Authorization: Bearer');
   });
 });
