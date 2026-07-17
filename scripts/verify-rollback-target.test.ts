@@ -34,7 +34,7 @@ const createFixture = (overrides = {}) => {
     },
     metadata: {
       channel: 'production',
-      basePath: '/',
+      basePath: '/conspectus/',
       sourceBranch: 'main',
       commitSha: 'abc123',
       qualityRunId: '1001',
@@ -144,7 +144,7 @@ describe('verify-rollback-target script', () => {
     const fixture = createFixture({
       metadata: {
         channel: 'production',
-        basePath: '/',
+        basePath: '/conspectus/',
         sourceBranch: 'main',
         commitSha: 'wrong-sha',
         qualityRunId: '1001',
@@ -156,6 +156,27 @@ describe('verify-rollback-target script', () => {
       const result = runVerifier(fixture.paths);
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('Rollback metadata commit mismatch');
+    } finally {
+      rmSync(fixture.fixturePath, { force: true, recursive: true });
+    }
+  });
+
+  it('rejects a legacy root-scoped production artifact', () => {
+    const fixture = createFixture({
+      metadata: {
+        channel: 'production',
+        basePath: '/',
+        sourceBranch: 'main',
+        commitSha: 'abc123',
+        qualityRunId: '1001',
+        deployRunId: '2002',
+      },
+    });
+
+    try {
+      const result = runVerifier(fixture.paths);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('basePath must be "/conspectus/"');
     } finally {
       rmSync(fixture.fixturePath, { force: true, recursive: true });
     }

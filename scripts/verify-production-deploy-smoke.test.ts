@@ -459,7 +459,7 @@ describe('verify-production-deploy-smoke script', () => {
   it('keeps the timeout active while reading a stalled response body', async () => {
     let bodyRequestWasAborted = false;
     const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-      if (resolveUrl(input) !== 'https://conspectus.jon2050.de/') {
+      if (resolveUrl(input) !== 'https://jon2050.de/conspectus/') {
         return asResponse(503, 'unavailable');
       }
 

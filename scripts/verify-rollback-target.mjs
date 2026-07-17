@@ -89,7 +89,10 @@ const verifyArtifact = (artifactsResponse, expectedArtifactName) => {
 
 const verifyMetadata = (metadata, expected) => {
   assert(metadata.channel === 'production', 'Rollback metadata channel must be "production".');
-  assert(metadata.basePath === '/', 'Rollback metadata basePath must be "/".');
+  assert(
+    metadata.basePath === '/conspectus/',
+    'Rollback metadata basePath must be "/conspectus/".',
+  );
   assert(metadata.sourceBranch === 'main', 'Rollback metadata sourceBranch must be "main".');
   assert(
     String(metadata.commitSha) === expected.commitSha,
