@@ -671,7 +671,7 @@ An issue is only considered done when:
 - Depends on: `M8-05, M8-06`
 - GitHub: [#89](https://github.com/Jon2050/Conspectus-Mobile/issues/89)
 
-### :green_circle: M8-09 Create rollback procedure for two-repo deployment
+### :white_check_mark: M8-09 Create rollback procedure for two-repo deployment
 
 - Label: `docs`
 - Milestone: `M8 - Hardening + QA + Release`

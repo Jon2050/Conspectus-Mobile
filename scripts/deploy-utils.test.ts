@@ -17,6 +17,10 @@ const deployProductionWorkflowPath = path.resolve(
   repositoryRootPath,
   '.github/workflows/deploy-production.yml',
 );
+const rollbackProductionWorkflowPath = path.resolve(
+  repositoryRootPath,
+  '.github/workflows/rollback-production.yml',
+);
 const qualityWorkflowPath = path.resolve(repositoryRootPath, '.github/workflows/quality.yml');
 const dependencyAuditWorkflowPath = path.resolve(
   repositoryRootPath,
@@ -196,6 +200,7 @@ describe('workflow action pinning', () => {
       dependencyAuditWorkflowPath,
       deployPreviewWorkflowPath,
       deployProductionWorkflowPath,
+      rollbackProductionWorkflowPath,
     ];
 
     for (const workflowPath of workflowPaths) {
@@ -254,5 +259,37 @@ describe('production workflow contracts', () => {
     expect(productionWorkflowSource).toContain(
       'echo "Missing repository variable VITE_AZURE_CLIENT_ID." >&2',
     );
+  });
+});
+
+describe('production rollback workflow contract', () => {
+  it('validates exact historical identity in dry-run mode before an explicit dispatch', () => {
+    const workflowSource = fs.readFileSync(rollbackProductionWorkflowPath, 'utf8');
+
+    expect(workflowSource).toContain('name: Rollback Production');
+    expect(workflowSource).toContain('pull_request:');
+    expect(workflowSource).toContain('workflow_dispatch:');
+    expect(workflowSource).toContain('deploy_run_id:');
+    expect(workflowSource).toContain('commit_sha:');
+    expect(workflowSource).toContain('execute:');
+    expect(workflowSource).toContain('name: Verify rollback target identity');
+    expect(workflowSource).toContain('node scripts/verify-rollback-target.mjs');
+    expect(workflowSource).toContain('name: Verify website consumer handoff contract');
+    expect(workflowSource).toContain('Result: PASS (no deployment dispatched)');
+    expect(workflowSource).toContain(
+      "if: github.event_name == 'workflow_dispatch' && inputs.execute",
+    );
+    expect(workflowSource).toContain('conspectus-mobile-production-ready');
+    expect(workflowSource).toContain('node scripts/verify-production-deploy-smoke.mjs');
+    expect(workflowSource).toContain('--max-attempts 48');
+    expect(workflowSource).toContain('--deadline-seconds 480');
+    expect(workflowSource).toContain('group: deploy-production');
+    expect(workflowSource).toContain('name: Fetch public website consumer contract');
+    const publicFetchStepStart = workflowSource.indexOf(
+      'name: Fetch public website consumer contract',
+    );
+    const publicFetchStepEnd = workflowSource.indexOf('\n      - name:', publicFetchStepStart);
+    const publicFetchStep = workflowSource.slice(publicFetchStepStart, publicFetchStepEnd);
+    expect(publicFetchStep).not.toContain('WEBSITE_REPO_DISPATCH_TOKEN');
   });
 });

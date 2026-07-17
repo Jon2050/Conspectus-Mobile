@@ -9,6 +9,7 @@ const baseOptions = {
   maxAttempts: 1,
   retryDelaySeconds: 0,
   requestTimeoutMs: 1000,
+  deadlineSeconds: 0,
 };
 
 const appHtml = `<!doctype html>
@@ -423,7 +424,71 @@ describe('verify-production-deploy-smoke script', () => {
       maxAttempts: 24,
       retryDelaySeconds: 10,
       requestTimeoutMs: 10000,
+      deadlineSeconds: 0,
     });
+  });
+
+  it('enforces a wall-clock deadline across sequential checks and retries', async () => {
+    let currentTimeMs = 0;
+    const fetchMock = vi.fn(async () => {
+      currentTimeMs += 600;
+      return asResponse(503, 'unavailable');
+    }) as FetchMock;
+    const sleepMock = vi.fn(async (delayMs: number) => {
+      currentTimeMs += delayMs;
+    });
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await expect(
+      runSmokeChecks(
+        {
+          ...baseOptions,
+          maxAttempts: 20,
+          retryDelaySeconds: 10,
+          deadlineSeconds: 1,
+        },
+        fetchMock,
+        sleepMock,
+        () => currentTimeMs,
+      ),
+    ).rejects.toThrow('exceeded the 1s wall-clock deadline');
+    expect(sleepMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps the timeout active while reading a stalled response body', async () => {
+    let bodyRequestWasAborted = false;
+    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      if (resolveUrl(input) !== 'https://conspectus.jon2050.de/') {
+        return asResponse(503, 'unavailable');
+      }
+
+      const stalledBody = new ReadableStream({
+        start(controller) {
+          init?.signal?.addEventListener('abort', () => {
+            bodyRequestWasAborted = true;
+            controller.error(new DOMException('Request aborted', 'AbortError'));
+          });
+        },
+      });
+      return new Response(stalledBody, { status: 200 });
+    }) as FetchMock;
+    const sleepMock = vi.fn(async () => undefined);
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await expect(
+      runSmokeChecks(
+        {
+          ...baseOptions,
+          requestTimeoutMs: 20,
+          deadlineSeconds: 1,
+        },
+        fetchMock,
+        sleepMock,
+      ),
+    ).rejects.toThrow('check=app-route');
+    expect(bodyRequestWasAborted).toBe(true);
   });
 
   it('rejects non-https base URLs', () => {

@@ -1,0 +1,246 @@
+# Validates or executes a deterministic rollback to an existing production artifact.
+name: Rollback Production
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/rollback-production.yml
+      - scripts/verify-rollback-target.mjs
+      - scripts/verify-website-consumer-contract.mjs
+      - scripts/verify-production-deploy-smoke.mjs
+      - docs/Production-Rollback.md
+  workflow_dispatch:
+    inputs:
+      deploy_run_id:
+        description: Successful Deploy Production run containing the known-good artifact
+        required: true
+        type: string
+      commit_sha:
+        description: Full main commit SHA recorded in the known-good deploy metadata
+        required: true
+        type: string
+      execute:
+        description: Dispatch the validated artifact to production
+        required: true
+        default: false
+        type: boolean
+
+env:
+  PRODUCTION_APP_BASE_URL: ${{ vars.PRODUCTION_APP_BASE_URL || 'https://conspectus.jon2050.de/' }}
+  WEBSITE_REPO_FULL_NAME: ${{ vars.WEBSITE_REPO_FULL_NAME || 'Jon2050/Jon2050_Webpage' }}
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  rollback-production:
+    name: ${{ github.event_name == 'pull_request' && 'Rollback Dry Run' || (inputs.execute && 'Execute Production Rollback' || 'Rollback Dry Run') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require main branch for manual runs
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if [ "${GITHUB_REF_NAME}" != 'main' ]; then
+            echo 'Manual rollback validation and execution must be started from main.' >&2
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Resolve rollback target
+        id: target
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REQUESTED_COMMIT_SHA: ${{ inputs.commit_sha }}
+          REQUESTED_DEPLOY_RUN_ID: ${{ inputs.deploy_run_id }}
+        run: |
+          set -euo pipefail
+
+          commit_sha="${REQUESTED_COMMIT_SHA}"
+          deploy_run_id="${REQUESTED_DEPLOY_RUN_ID}"
+
+          if [ "${GITHUB_EVENT_NAME}" = 'pull_request' ]; then
+            runs_status="$(curl -sS -o deploy-runs.json -w '%{http_code}' \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H 'Accept: application/vnd.github+json' \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/deploy-production.yml/runs?branch=main&event=workflow_dispatch&status=success&per_page=20")"
+
+            if [ "${runs_status}" != '200' ]; then
+              echo 'Failed to resolve a known-good production run for the pull-request dry run.' >&2
+              cat deploy-runs.json >&2 || true
+              exit 1
+            fi
+
+            deploy_run_id="$(jq -r '.workflow_runs[0].id // empty' deploy-runs.json)"
+            commit_sha="$(jq -r '.workflow_runs[0].head_sha // empty' deploy-runs.json)"
+          fi
+
+          if [ -z "${commit_sha}" ] || [ -z "${deploy_run_id}" ]; then
+            echo 'Rollback requires both commitSha and deployRunId.' >&2
+            exit 1
+          fi
+
+          if ! [[ "${commit_sha}" =~ ^[0-9a-f]{40}$ ]] || ! [[ "${deploy_run_id}" =~ ^[0-9]+$ ]]; then
+            echo 'Rollback target identity is malformed.' >&2
+            exit 1
+          fi
+
+          {
+            echo "commit_sha=${commit_sha}"
+            echo "deploy_run_id=${deploy_run_id}"
+            echo "artifact_name=conspectus-mobile-production-${commit_sha}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Fetch rollback provenance
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEPLOY_RUN_ID: ${{ steps.target.outputs.deploy_run_id }}
+        run: |
+          set -euo pipefail
+
+          run_status="$(curl -sS -L -o rollback-run.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${DEPLOY_RUN_ID}")"
+          artifacts_status="$(curl -sS -L -o rollback-artifacts.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${DEPLOY_RUN_ID}/artifacts?per_page=100")"
+
+          if [ "${run_status}" != '200' ] || [ "${artifacts_status}" != '200' ]; then
+            echo "Failed to read rollback provenance for deployRunId=${DEPLOY_RUN_ID}." >&2
+            exit 1
+          fi
+
+      - name: Download exact rollback artifact
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: ${{ steps.target.outputs.artifact_name }}
+          path: rollback-artifact
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.target.outputs.deploy_run_id }}
+
+      - name: Verify rollback target identity
+        run: >-
+          node scripts/verify-rollback-target.mjs
+          --run-json rollback-run.json
+          --artifacts-json rollback-artifacts.json
+          --metadata rollback-artifact/deploy-metadata.json
+          --commit-sha "${{ steps.target.outputs.commit_sha }}"
+          --deploy-run-id "${{ steps.target.outputs.deploy_run_id }}"
+
+      - name: Read validated rollback metadata
+        id: metadata
+        run: |
+          set -euo pipefail
+          {
+            echo "quality_run_id=$(jq -r '.qualityRunId' rollback-artifact/deploy-metadata.json)"
+            echo "build_time_utc=$(jq -r '.buildTimeUtc' rollback-artifact/deploy-metadata.json)"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Fetch public website consumer contract
+        run: |
+          set -euo pipefail
+
+          workflow_api_url="https://api.github.com/repos/${WEBSITE_REPO_FULL_NAME}/contents/.github/workflows/deploy.yml?ref=master"
+          workflow_status="$(curl -sS -L -o website-deploy-workflow.json -w '%{http_code}' \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'User-Agent: Conspectus-Mobile-Rollback' \
+            "${workflow_api_url}")"
+
+          if [ "${workflow_status}" != '200' ]; then
+            echo "Failed to read website deploy workflow from ${WEBSITE_REPO_FULL_NAME}." >&2
+            exit 1
+          fi
+
+      - name: Verify website consumer handoff contract
+        run: |
+          set -euo pipefail
+
+          node scripts/verify-website-consumer-contract.mjs \
+            --workflow-json website-deploy-workflow.json \
+            --producer-repo "${GITHUB_REPOSITORY}"
+
+      - name: Record validated dry-run evidence
+        if: github.event_name == 'pull_request' || !inputs.execute
+        run: |
+          {
+            echo '## Production rollback dry run'
+            echo
+            echo '- Result: PASS (no deployment dispatched)'
+            echo '- commitSha: ${{ steps.target.outputs.commit_sha }}'
+            echo '- deployRunId: ${{ steps.target.outputs.deploy_run_id }}'
+            echo '- qualityRunId: ${{ steps.metadata.outputs.quality_run_id }}'
+            echo '- artifactName: ${{ steps.target.outputs.artifact_name }}'
+            echo '- original buildTimeUtc: ${{ steps.metadata.outputs.build_time_utc }}'
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Trigger deterministic website rollback handoff
+        if: github.event_name == 'workflow_dispatch' && inputs.execute
+        env:
+          DISPATCH_TOKEN: ${{ secrets.WEBSITE_REPO_DISPATCH_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          cat > rollback-dispatch-payload.json <<EOF
+          {
+            "event_type": "conspectus-mobile-production-ready",
+            "client_payload": {
+              "commitSha": "${{ steps.target.outputs.commit_sha }}",
+              "deployRunId": "${{ steps.target.outputs.deploy_run_id }}",
+              "qualityRunId": "${{ steps.metadata.outputs.quality_run_id }}",
+              "artifactName": "${{ steps.target.outputs.artifact_name }}"
+            }
+          }
+          EOF
+
+          dispatch_status="$(curl -sS -o rollback-dispatch-response.txt -w '%{http_code}' \
+            -X POST \
+            -H "Authorization: Bearer ${DISPATCH_TOKEN}" \
+            -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/${WEBSITE_REPO_FULL_NAME}/dispatches" \
+            --data-binary @rollback-dispatch-payload.json)"
+
+          if [ "${dispatch_status}" != '204' ]; then
+            echo "Rollback dispatch failed with HTTP ${dispatch_status}." >&2
+            cat rollback-dispatch-response.txt >&2 || true
+            exit 1
+          fi
+
+      - name: Verify executed rollback
+        if: github.event_name == 'workflow_dispatch' && inputs.execute
+        run: >-
+          node scripts/verify-production-deploy-smoke.mjs
+          --base-url "${PRODUCTION_APP_BASE_URL}"
+          --commit-sha "${{ steps.target.outputs.commit_sha }}"
+          --deploy-run-id "${{ steps.target.outputs.deploy_run_id }}"
+          --max-attempts 48
+          --retry-delay-seconds 10
+          --request-timeout-ms 10000
+          --deadline-seconds 480
+
+      - name: Record executed rollback evidence
+        if: github.event_name == 'workflow_dispatch' && inputs.execute
+        run: |
+          {
+            echo '## Production rollback'
+            echo
+            echo '- Result: PASS'
+            echo '- commitSha: ${{ steps.target.outputs.commit_sha }}'
+            echo '- deployRunId: ${{ steps.target.outputs.deploy_run_id }}'
+            echo '- qualityRunId: ${{ steps.metadata.outputs.quality_run_id }}'
+            echo '- production verification budget: 8 minutes'
+          } >> "${GITHUB_STEP_SUMMARY}"

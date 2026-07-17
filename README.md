@@ -97,6 +97,8 @@ Use these documents as the canonical sources for their topics:
   [docs/CI-CD-Pipelines.md](docs/CI-CD-Pipelines.md).
 - Release branch/tag strategy, approvals, release notes, and production verification:
   [docs/Release-Process.md](docs/Release-Process.md).
+- Deterministic two-repository production rollback and incident ownership:
+  [docs/Production-Rollback.md](docs/Production-Rollback.md).
 - MVP backlog index and issue completion rules:
   [docs/GitHub-Issues-MVP-Backlog.md](docs/GitHub-Issues-MVP-Backlog.md).
 - Desktop database and business-rule parity reference:

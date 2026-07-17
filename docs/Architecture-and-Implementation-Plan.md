@@ -831,6 +831,12 @@ M8-08 implementation clarification:
 - GitHub enforces pull-request delivery, rebase-only linear history, and the strict `Quality Gate`; the release process additionally requires reviewer-agent approval, explicit human release-owner acceptance, and complete physical iOS/Android evidence.
 - Production remains a manual deployment of the qualified current `main` commit. The immutable `v<version>` tag and GitHub Release are published only for the exact commit whose production identity, Lighthouse gate, and post-deploy smoke checks passed.
 
+M8-09 implementation clarification:
+
+- Production rollback reuses an unexpired artifact from an exact successful `Deploy Production` run; operators provide its full `commitSha` and `deployRunId`, while workflow validation derives and verifies the artifact name and `qualityRunId` before any dispatch.
+- Pull-request and manual dry-run modes validate producer provenance, artifact metadata, and the current website-consumer contract without mutating production. Execute mode sends the validated existing handoff payload and requires live smoke checks to observe the rollback identity.
+- The website repository remains responsible for staged upload and atomic promotion. The producer rollback workflow performs no manual file copy or FTP operation and budgets eight minutes for live verification so the documented incident procedure can complete inside 15 minutes.
+
 Substeps:
 
 1. Security hardening:
