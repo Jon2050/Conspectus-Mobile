@@ -57,6 +57,7 @@ describe('post-deploy monitor workflow contract', () => {
     expect(workflowSource).toContain('scripts/run-post-deploy-monitor.mjs');
     expect(workflowSource).toContain('scripts/format-post-deploy-monitor-alert.mjs');
     expect(workflowSource).toContain('post-deploy-monitor-${{ github.run_id }}');
+    expect(workflowSource).toContain('include-hidden-files: true');
     expect(workflowSource).toContain('retention-days: 30');
   });
 });
