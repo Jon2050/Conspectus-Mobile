@@ -164,11 +164,11 @@ An issue is only considered done when:
 - Depends on: `M1-08, M2-00`
 - GitHub: [#14](https://github.com/Jon2050/Conspectus-Mobile/issues/14)
 
-### :white_check_mark: M2-02 Configure Vite base path for `/conspectus/webapp/`
+### :white_check_mark: M2-02 Configure Vite base path for `/conspectus/`
 
 - Label: `feature`
 - Milestone: `M2 - Website Integration + Early Deploy`
-- Summary: Work includes production base path to /conspectus/webapp/ and routes, assets, manifest, and service worker scope. It also covers tests for generated asset URLs.
+- Summary: Work includes production base path to /conspectus/ and routes, assets, manifest, and service worker scope. It also covers tests for generated asset URLs.
 - Depends on: `M2-01`
 - GitHub: [#15](https://github.com/Jon2050/Conspectus-Mobile/issues/15)
 
@@ -184,7 +184,7 @@ An issue is only considered done when:
 
 - Label: `infra`
 - Milestone: `M2 - Website Integration + Early Deploy`
-- Summary: Work includes CI job in website repo to fetch approved PWA artifact and files to conspectus/webapp/ output location. It also covers deterministic payload-driven artifact resolution, metadata identity validation, staged atomic replacement with rollback attempt, and fail-closed behavior.
+- Summary: Work includes CI job in website repo to fetch approved PWA artifact and files to conspectus/ output location. It also covers deterministic payload-driven artifact resolution, metadata identity validation, staged atomic replacement with rollback attempt, and fail-closed behavior.
 - Depends on: `M2-03`
 - GitHub: [#19](https://github.com/Jon2050/Conspectus-Mobile/issues/19)
 

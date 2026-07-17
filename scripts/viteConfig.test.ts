@@ -51,15 +51,15 @@ describe('resolveBasePath', () => {
     ).toBe('/previews/test/');
   });
 
-  it('uses the Conspectus subdomain root for production', () => {
-    expect(resolveBasePath({ DEPLOY_CHANNEL: 'production' })).toBe('/');
+  it('uses the Conspectus website subtree for production', () => {
+    expect(resolveBasePath({ DEPLOY_CHANNEL: 'production' })).toBe('/conspectus/');
   });
 
   it('serves local development at the registered localhost redirect root', () => {
     expect(
       resolveViteBasePath(
         {
-          VITE_DEPLOY_BASE_PATH: '/conspectus/webapp/',
+          VITE_DEPLOY_BASE_PATH: '/custom-deploy/',
         },
         'serve',
         'development',
@@ -69,10 +69,10 @@ describe('resolveBasePath', () => {
 
   it('preserves configured base paths for builds and production preview', () => {
     const environment = {
-      VITE_DEPLOY_BASE_PATH: '/conspectus/webapp/',
+      VITE_DEPLOY_BASE_PATH: '/custom-deploy/',
     };
 
-    expect(resolveViteBasePath(environment, 'build', 'production')).toBe('/conspectus/webapp/');
-    expect(resolveViteBasePath(environment, 'serve', 'production')).toBe('/conspectus/webapp/');
+    expect(resolveViteBasePath(environment, 'build', 'production')).toBe('/custom-deploy/');
+    expect(resolveViteBasePath(environment, 'serve', 'production')).toBe('/custom-deploy/');
   });
 });

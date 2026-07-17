@@ -60,7 +60,7 @@
 - [ ] Screenshots are included for UI changes.
 - [ ] Risk and rollback notes are documented.
 - [ ] No secrets, tokens, or credentials were added to the repository.
-- [ ] No unintended path/base URL changes were introduced (production must remain rooted at `https://conspectus.jon2050.de/`).
+- [ ] No unintended path/base URL changes were introduced (production must remain rooted at `https://jon2050.de/conspectus/`).
 
 ## Merge And Cleanup (PR Path)
 

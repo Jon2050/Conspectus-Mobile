@@ -4,7 +4,7 @@ import type { Page } from '@playwright/test';
 export const resolveAppBasePath = (): string => {
   const configuredBasePath = process.env.PLAYWRIGHT_APP_BASE_PATH?.trim();
   if (!configuredBasePath) {
-    return '/';
+    return '/conspectus/';
   }
 
   const withLeadingSlash = configuredBasePath.startsWith('/')

@@ -36,7 +36,7 @@ flowchart TD
 
 - Main preview: `https://jon2050.github.io/Conspectus-Mobile/previews/main/`
 - Shared non-main preview: `https://jon2050.github.io/Conspectus-Mobile/previews/test/`
-- Production: `https://conspectus.jon2050.de/`
+- Production: `https://jon2050.de/conspectus/`
 
 ## Workflows
 
@@ -164,10 +164,10 @@ When a budget is exceeded:
   - fails if dispatch is rejected or if production smoke verification does not observe the expected `deploy-metadata.json`
   - fails if Lighthouse collection, live PWA checks, or a release threshold fails
 - Notes:
-  - rebuilds the app for production because the production base URL (`/`) differs from the preview URLs
+  - rebuilds the app for production because the production base path (`/conspectus/`) differs from the preview URLs
   - the website repo target defaults to `Jon2050/Jon2050_Webpage` and can be overridden with `WEBSITE_REPO_FULL_NAME`
-  - production smoke target defaults to `https://conspectus.jon2050.de/` and can be overridden with `PRODUCTION_APP_BASE_URL`
-  - the production artifact is a static root PWA for `conspectus.jon2050.de`; the website consumer validates `index.html`, the document CSP, and the optional `.htaccess` defense-in-depth headers before upload
+  - production smoke target defaults to `https://jon2050.de/conspectus/` and can be overridden with `PRODUCTION_APP_BASE_URL`
+  - the production artifact is a static PWA scoped to `/conspectus/` on `jon2050.de`; the website consumer validates `index.html`, the document CSP, and the optional `.htaccess` defense-in-depth headers before upload
   - production smoke validates the live document CSP and referrer-policy meta tag without requiring PHP or hosting-package response-header support
   - the CSP keeps general JavaScript evaluation disabled while allowing the narrower WebAssembly permission required by sql.js plus the Microsoft login, Graph, and OneDrive download endpoints used by the app
   - Lighthouse runs only after production smoke observes the expected commit and deploy-run identity; a failure blocks release acceptance but does not attempt an automatic rollback

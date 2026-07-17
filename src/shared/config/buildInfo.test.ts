@@ -11,9 +11,7 @@ import {
 
 describe('buildInfo', () => {
   it('resolves the deploy metadata path relative to the configured app base path', () => {
-    expect(resolveDeployMetadataUrl('/conspectus/webapp/')).toBe(
-      '/conspectus/webapp/deploy-metadata.json',
-    );
+    expect(resolveDeployMetadataUrl('/conspectus/')).toBe('/conspectus/deploy-metadata.json');
     expect(resolveDeployMetadataUrl('/Conspectus-Mobile/previews/test')).toBe(
       '/Conspectus-Mobile/previews/test/deploy-metadata.json',
     );
@@ -29,7 +27,7 @@ describe('buildInfo', () => {
 
     await expect(
       loadBuildInfo({
-        baseUrl: '/conspectus/webapp/',
+        baseUrl: '/conspectus/',
         fetch: fetchImplementation,
       }),
     ).resolves.toEqual({
@@ -37,7 +35,7 @@ describe('buildInfo', () => {
       buildTimeUtc: '2026-03-11T03:05:00Z',
     });
 
-    expect(fetchImplementation).toHaveBeenCalledWith('/conspectus/webapp/deploy-metadata.json', {
+    expect(fetchImplementation).toHaveBeenCalledWith('/conspectus/deploy-metadata.json', {
       headers: {
         accept: 'application/json',
       },
@@ -67,7 +65,7 @@ describe('buildInfo', () => {
 
     await expect(
       loadBuildInfo({
-        baseUrl: '/conspectus/webapp/',
+        baseUrl: '/conspectus/',
         fetch: fetchImplementation,
       }),
     ).resolves.toEqual(getFallbackBuildInfo());

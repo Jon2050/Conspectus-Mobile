@@ -3,7 +3,7 @@ import { parseArgs, runSmokeChecks } from './verify-production-deploy-smoke.mjs'
 import { DOCUMENT_CSP, PRODUCTION_CSP } from './security-policy.mjs';
 
 const baseOptions = {
-  baseUrl: 'https://conspectus.jon2050.de/',
+  baseUrl: 'https://jon2050.de/conspectus/',
   commitSha: 'abc123',
   deployRunId: '2002',
   maxAttempts: 1,
@@ -16,17 +16,17 @@ const appHtml = `<!doctype html>
   <head>
     <meta http-equiv="Content-Security-Policy" content="${DOCUMENT_CSP}" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/icons/moneysack180x180.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/conspectus/icons/moneysack180x180.png" />
   </head>
   <body>
     <div id="app"></div>
-    <script type="module" src="/assets/index.js"></script>
+    <script type="module" src="/conspectus/assets/index.js"></script>
   </body>
 </html>`;
 
 const validDeployMetadata = JSON.stringify({
   channel: 'production',
-  basePath: '/',
+  basePath: '/conspectus/',
   commitSha: 'abc123',
   deployRunId: '2002',
 });
@@ -71,7 +71,7 @@ const createFetchByUrl = (responses: Record<string, MockHttpResponse>): FetchMoc
   }) as FetchMock;
 
 const createHealthyResponses = (): Record<string, MockHttpResponse> => ({
-  'https://conspectus.jon2050.de/': {
+  'https://jon2050.de/conspectus/': {
     status: 200,
     body: appHtml,
     headers: {
@@ -80,11 +80,11 @@ const createHealthyResponses = (): Record<string, MockHttpResponse> => ({
       'referrer-policy': 'strict-origin-when-cross-origin',
     },
   },
-  'https://conspectus.jon2050.de/manifest.webmanifest': {
+  'https://jon2050.de/conspectus/manifest.webmanifest': {
     status: 200,
     body: JSON.stringify({
-      start_url: '/',
-      scope: '/',
+      start_url: '/conspectus/',
+      scope: '/conspectus/',
       icons: [
         {
           src: 'icons/moneysack64x64.png',
@@ -109,31 +109,31 @@ const createHealthyResponses = (): Record<string, MockHttpResponse> => ({
       ],
     }),
   },
-  'https://conspectus.jon2050.de/sw.js': {
+  'https://jon2050.de/conspectus/sw.js': {
     status: 200,
     body: 'self.addEventListener("install", () => {});',
   },
-  'https://conspectus.jon2050.de/deploy-metadata.json': {
+  'https://jon2050.de/conspectus/deploy-metadata.json': {
     status: 200,
     body: validDeployMetadata,
   },
-  'https://conspectus.jon2050.de/icons/moneysack180x180.png': {
+  'https://jon2050.de/conspectus/icons/moneysack180x180.png': {
     status: 200,
     body: 'icon-bytes',
   },
-  'https://conspectus.jon2050.de/icons/moneysack64x64.png': {
+  'https://jon2050.de/conspectus/icons/moneysack64x64.png': {
     status: 200,
     body: 'icon-bytes',
   },
-  'https://conspectus.jon2050.de/icons/moneysack192x192.png': {
+  'https://jon2050.de/conspectus/icons/moneysack192x192.png': {
     status: 200,
     body: 'icon-bytes',
   },
-  'https://conspectus.jon2050.de/icons/moneysack256x256.png': {
+  'https://jon2050.de/conspectus/icons/moneysack256x256.png': {
     status: 200,
     body: 'icon-bytes',
   },
-  'https://conspectus.jon2050.de/icons/moneysack512x512.png': {
+  'https://jon2050.de/conspectus/icons/moneysack512x512.png': {
     status: 200,
     body: 'icon-bytes',
   },
@@ -160,7 +160,7 @@ describe('verify-production-deploy-smoke script', () => {
 
   it('fails when manifest URL check is not HTTP 200', async () => {
     const responses = createHealthyResponses();
-    responses['https://conspectus.jon2050.de/manifest.webmanifest'] = {
+    responses['https://jon2050.de/conspectus/manifest.webmanifest'] = {
       status: 404,
       body: 'missing',
     };
@@ -176,7 +176,7 @@ describe('verify-production-deploy-smoke script', () => {
 
   it('fails when service worker URL check is not HTTP 200', async () => {
     const responses = createHealthyResponses();
-    responses['https://conspectus.jon2050.de/sw.js'] = {
+    responses['https://jon2050.de/conspectus/sw.js'] = {
       status: 404,
       body: 'missing',
     };
@@ -192,7 +192,7 @@ describe('verify-production-deploy-smoke script', () => {
 
   it('fails HTML sanity check when bootstrap markers are missing', async () => {
     const responses = createHealthyResponses();
-    responses['https://conspectus.jon2050.de/'] = {
+    responses['https://jon2050.de/conspectus/'] = {
       status: 200,
       body: '<!doctype html><html><body><main>Missing app root</main></body></html>',
     };
@@ -208,7 +208,7 @@ describe('verify-production-deploy-smoke script', () => {
 
   it('fails when app route is missing moneybag apple-touch-icon link', async () => {
     const responses = createHealthyResponses();
-    responses['https://conspectus.jon2050.de/'] = {
+    responses['https://jon2050.de/conspectus/'] = {
       status: 200,
       body: appHtml.replace(/<link rel="apple-touch-icon"[^>]+\/>/u, ''),
     };
@@ -224,7 +224,7 @@ describe('verify-production-deploy-smoke script', () => {
 
   it('fails when app-route HTML is missing the Content-Security-Policy meta tag', async () => {
     const responses = createHealthyResponses();
-    responses['https://conspectus.jon2050.de/'].body = appHtml.replace(
+    responses['https://jon2050.de/conspectus/'].body = appHtml.replace(
       /<meta http-equiv="Content-Security-Policy"[^>]+\/>/u,
       '',
     );
@@ -240,7 +240,7 @@ describe('verify-production-deploy-smoke script', () => {
 
   it('fails when the CSP omits WebAssembly and OneDrive download permissions', async () => {
     const responses = createHealthyResponses();
-    responses['https://conspectus.jon2050.de/'].body = appHtml.replace(
+    responses['https://jon2050.de/conspectus/'].body = appHtml.replace(
       DOCUMENT_CSP,
       "default-src 'self'; script-src 'self'; connect-src 'self' https://login.microsoftonline.com https://graph.microsoft.com",
     );
@@ -256,7 +256,7 @@ describe('verify-production-deploy-smoke script', () => {
 
   it('fails when app-route HTML has an invalid referrer policy', async () => {
     const responses = createHealthyResponses();
-    responses['https://conspectus.jon2050.de/'].body = appHtml.replace(
+    responses['https://jon2050.de/conspectus/'].body = appHtml.replace(
       'strict-origin-when-cross-origin',
       'unsafe-url',
     );
@@ -272,7 +272,7 @@ describe('verify-production-deploy-smoke script', () => {
 
   it('fails when apple touch icon URL is not reachable', async () => {
     const responses = createHealthyResponses();
-    responses['https://conspectus.jon2050.de/icons/moneysack180x180.png'] = {
+    responses['https://jon2050.de/conspectus/icons/moneysack180x180.png'] = {
       status: 404,
       body: 'missing',
     };
@@ -288,11 +288,31 @@ describe('verify-production-deploy-smoke script', () => {
 
   it('fails when deploy metadata identity does not match expected deploy context', async () => {
     const responses = createHealthyResponses();
-    responses['https://conspectus.jon2050.de/deploy-metadata.json'] = {
+    responses['https://jon2050.de/conspectus/deploy-metadata.json'] = {
+      status: 200,
+      body: JSON.stringify({
+        basePath: '/conspectus/',
+        commitSha: 'different-sha',
+        deployRunId: '2002',
+      }),
+    };
+    const fetchMock = createFetchByUrl(responses);
+    const sleepMock = vi.fn(async () => undefined);
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await expect(runSmokeChecks(baseOptions, fetchMock, sleepMock)).rejects.toThrow(
+      'check=deploy-metadata',
+    );
+  });
+
+  it('fails when deploy metadata reports a legacy root base path', async () => {
+    const responses = createHealthyResponses();
+    responses['https://jon2050.de/conspectus/deploy-metadata.json'] = {
       status: 200,
       body: JSON.stringify({
         basePath: '/',
-        commitSha: 'different-sha',
+        commitSha: 'abc123',
         deployRunId: '2002',
       }),
     };
@@ -311,7 +331,7 @@ describe('verify-production-deploy-smoke script', () => {
     let manifestAttempts = 0;
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
       const resolvedUrl = resolveUrl(input);
-      if (resolvedUrl === 'https://conspectus.jon2050.de/manifest.webmanifest') {
+      if (resolvedUrl === 'https://jon2050.de/conspectus/manifest.webmanifest') {
         manifestAttempts += 1;
         if (manifestAttempts === 1) {
           return asResponse(503, 'temporarily unavailable');
@@ -346,11 +366,11 @@ describe('verify-production-deploy-smoke script', () => {
 
   it('fails when required moneybag manifest icons are missing', async () => {
     const responses = createHealthyResponses();
-    responses['https://conspectus.jon2050.de/manifest.webmanifest'] = {
+    responses['https://jon2050.de/conspectus/manifest.webmanifest'] = {
       status: 200,
       body: JSON.stringify({
-        start_url: '/',
-        scope: '/',
+        start_url: '/conspectus/',
+        scope: '/conspectus/',
         icons: [
           {
             src: 'icons/moneysack64x64.png',
@@ -372,7 +392,7 @@ describe('verify-production-deploy-smoke script', () => {
 
   it('fails when one manifest icon URL is not reachable', async () => {
     const responses = createHealthyResponses();
-    responses['https://conspectus.jon2050.de/icons/moneysack512x512.png'] = {
+    responses['https://jon2050.de/conspectus/icons/moneysack512x512.png'] = {
       status: 404,
       body: 'missing',
     };
@@ -389,7 +409,7 @@ describe('verify-production-deploy-smoke script', () => {
   it('normalizes cli args and applies numeric defaults', () => {
     const args = parseArgs([
       '--base-url',
-      'https://conspectus.jon2050.de',
+      'https://jon2050.de/conspectus',
       '--commit-sha',
       'abc123',
       '--deploy-run-id',
@@ -397,7 +417,7 @@ describe('verify-production-deploy-smoke script', () => {
     ]);
 
     expect(args).toEqual({
-      baseUrl: 'https://conspectus.jon2050.de/',
+      baseUrl: 'https://jon2050.de/conspectus/',
       commitSha: 'abc123',
       deployRunId: '2002',
       maxAttempts: 24,
@@ -410,7 +430,7 @@ describe('verify-production-deploy-smoke script', () => {
     expect(() =>
       parseArgs([
         '--base-url',
-        'http://jon2050.de/conspectus/webapp',
+        'http://jon2050.de/conspectus',
         '--commit-sha',
         'abc123',
         '--deploy-run-id',

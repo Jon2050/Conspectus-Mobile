@@ -40,6 +40,7 @@ const createValidWorkflow = () =>
     "    if: github.event_name == 'repository_dispatch'",
     '    env:',
     '      PRODUCER_REPO: Jon2050/Conspectus-Mobile',
+    "      CONSPECTUS_LIVE_BASE_URL: ${{ vars.CONSPECTUS_LIVE_BASE_URL || 'https://jon2050.de/conspectus/' }}",
     '    steps:',
     '      - name: Validate dispatch payload and token',
     '        env:',
@@ -51,8 +52,10 @@ const createValidWorkflow = () =>
     '        run: |',
     '          run_url="https://api.github.com/repos/${PRODUCER_REPO}/actions/runs/${DEPLOY_RUN_ID}"',
     '      - name: Validate deploy metadata and identity',
+    '        env:',
+    '          EXPECTED_BASE_PATH: /conspectus/',
     '        run: node ./scripts/validate-conspectus-deploy-metadata.mjs ./pwa-artifact/deploy-metadata.json',
-    '      - name: Stage Conspectus subdomain root',
+    '      - name: Stage Conspectus website subtree',
     '        run: |',
     '          node ./scripts/validate-conspectus-security-headers.mjs "${incoming_dir}/.htaccess"',
     '          test -f "${incoming_dir}/index.html"',
@@ -60,6 +63,10 @@ const createValidWorkflow = () =>
     '          mv ./www/conspectus.__incoming ./www/conspectus',
     '      - name: Verify staged static PWA response',
     '        run: node ./scripts/verify-conspectus-staging-response.mjs',
+    '      - name: Verify promoted PWA identity and resources',
+    '        run: node ./scripts/verify-conspectus-live-response.mjs',
+    '      - name: Restore previous PWA after failed live verification',
+    '        run: mv ./www/conspectus.__backup ./www/conspectus',
   ].join('\n');
 
 describe('verify-website-consumer-contract script', () => {
@@ -82,7 +89,9 @@ describe('verify-website-consumer-contract script', () => {
       }
 
       expect(result.status).toBe(0);
-      expect(result.stdout).toContain('[verify-website-consumer-contract] verified consumer');
+      expect(result.stdout).toContain(
+        '[verify-website-consumer-contract] verified /conspectus/ consumer',
+      );
     } finally {
       rmSync(fixturePath, { force: true, recursive: true });
     }
@@ -212,6 +221,56 @@ describe('verify-website-consumer-contract script', () => {
 
       expect(result.status).toBe(1);
       expect(result.stderr).toContain('verify-conspectus-staging-response.mjs');
+    } finally {
+      rmSync(fixturePath, { force: true, recursive: true });
+    }
+  });
+
+  it('fails when the consumer does not bind metadata to the production subtree', () => {
+    const fixturePath = createFixtureDirectory();
+    const workflowJsonPath = path.join(fixturePath, 'workflow.json');
+
+    try {
+      const invalidWorkflow = createValidWorkflow().replace(
+        'EXPECTED_BASE_PATH: /conspectus/',
+        'EXPECTED_BASE_PATH: /',
+      );
+      writeFileSync(workflowJsonPath, encodeWorkflowPayload(invalidWorkflow));
+
+      const result = runVerifier([
+        '--workflow-json',
+        workflowJsonPath,
+        '--producer-repo',
+        'Jon2050/Conspectus-Mobile',
+      ]);
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('EXPECTED_BASE_PATH: /conspectus/');
+    } finally {
+      rmSync(fixturePath, { force: true, recursive: true });
+    }
+  });
+
+  it('fails when the consumer cannot verify and restore a promoted deployment', () => {
+    const fixturePath = createFixtureDirectory();
+    const workflowJsonPath = path.join(fixturePath, 'workflow.json');
+
+    try {
+      const invalidWorkflow = createValidWorkflow().replace(
+        'verify-conspectus-live-response.mjs',
+        'skip-live-response-validation.mjs',
+      );
+      writeFileSync(workflowJsonPath, encodeWorkflowPayload(invalidWorkflow));
+
+      const result = runVerifier([
+        '--workflow-json',
+        workflowJsonPath,
+        '--producer-repo',
+        'Jon2050/Conspectus-Mobile',
+      ]);
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('verify-conspectus-live-response.mjs');
     } finally {
       rmSync(fixturePath, { force: true, recursive: true });
     }

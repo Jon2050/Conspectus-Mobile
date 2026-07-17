@@ -21,11 +21,11 @@ describe('loadRuntimeEnv', () => {
     expect(
       loadRuntimeEnv({
         VITE_AZURE_CLIENT_ID: ' client-id ',
-        VITE_DEPLOY_BASE_PATH: ' /conspectus/webapp/ ',
+        VITE_DEPLOY_BASE_PATH: ' /conspectus/ ',
       }),
     ).toEqual({
       VITE_AZURE_CLIENT_ID: 'client-id',
-      VITE_DEPLOY_BASE_PATH: '/conspectus/webapp/',
+      VITE_DEPLOY_BASE_PATH: '/conspectus/',
     });
   });
 
