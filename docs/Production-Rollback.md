@@ -46,6 +46,10 @@ identity without prior production evidence. If no suitable artifact remains insi
 retention window, stop: this rollback path is unavailable and a newly qualified forward release is
 required.
 
+Only artifacts built for `basePath=/conspectus/` are valid after the path migration. Earlier
+root-scoped artifacts cannot safely restore the current asset, manifest, or service-worker scope and
+must be replaced by a newly qualified forward release.
+
 ## Dry run
 
 Every change to the rollback contract is exercised automatically by the pull-request trigger in
@@ -89,7 +93,7 @@ rollback does not cancel the active operation.
 
 After workflow success:
 
-- fetch `https://conspectus.jon2050.de/deploy-metadata.json` with normal TLS validation and confirm
+- fetch `https://jon2050.de/conspectus/deploy-metadata.json` with normal TLS validation and confirm
   `commitSha`, `deployRunId`, and `qualityRunId`;
 - open the app in a fresh browser profile and confirm the footer identity, manifest, service worker,
   and install icons;
@@ -106,7 +110,7 @@ forward fix. Never claim rollback success from dispatch acceptance alone.
 
 - `Jon2050/Conspectus-Mobile`: owns artifact identity, rollback target validation, dispatch, and live
   identity smoke verification.
-- `Jon2050/Jon2050_Webpage`: owns artifact download, staging validation, FTP upload, and atomic
-  promotion of the Conspectus subdomain root.
+- `Jon2050/Jon2050_Webpage`: owns artifact download, staging validation, FTP upload, live identity
+  verification, and atomic promotion of the `/conspectus/` website subtree.
 
 Changes to either side of this contract require a new dry run before the next release.
