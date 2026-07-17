@@ -21,10 +21,9 @@ Create or update an app registration with the following values:
    - `Single-page application (SPA)`
 3. Redirect URIs:
    - `http://localhost:5173/`
-   - `https://conspectus.jon2050.de/`
+   - `https://jon2050.de/conspectus/`
 
-After the subdomain deployment is live and verified, remove the retired
-`https://jon2050.de/conspectus/webapp/` redirect URI if it is still registered.
+Remove every retired production redirect URI after the exact current URI above has been verified.
 
 Optional for GitHub Pages preview login:
 

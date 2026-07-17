@@ -36,9 +36,7 @@ describe('resolveRequestPath', () => {
   });
 
   it('rejects requests outside the configured base path', () => {
-    expect(
-      resolveRequestPath('/conspectus/webapp/', '/Conspectus-Mobile/previews/test/'),
-    ).toBeNull();
+    expect(resolveRequestPath('/conspectus/', '/Conspectus-Mobile/previews/test/')).toBeNull();
   });
 
   it('rejects directory traversal attempts', () => {

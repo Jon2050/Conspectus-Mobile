@@ -12,10 +12,14 @@ const REQUIRED_CONTRACT_MARKERS = [
   'validate-conspectus-deploy-metadata.mjs',
   'validate-conspectus-security-headers.mjs',
   'verify-conspectus-staging-response.mjs',
+  'verify-conspectus-live-response.mjs',
+  'EXPECTED_BASE_PATH: /conspectus/',
+  'https://jon2050.de/conspectus/',
   '${incoming_dir}/.htaccess',
   '${incoming_dir}/index.html',
   './www/conspectus.__incoming/',
   'mv ./www/conspectus.__incoming ./www/conspectus',
+  'mv ./www/conspectus.__backup ./www/conspectus',
 ];
 
 const assert = (condition, message) => {
@@ -113,7 +117,7 @@ const main = () => {
   verifyConsumerContract(workflowYaml, args.producerRepo);
 
   console.log(
-    `[verify-website-consumer-contract] verified consumer handoff contract for producer repo "${args.producerRepo}".`,
+    `[verify-website-consumer-contract] verified /conspectus/ consumer handoff contract for producer repo "${args.producerRepo}".`,
   );
 };
 

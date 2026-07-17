@@ -60,7 +60,7 @@ describe('verify-production-handoff script', () => {
       });
       writeJson(metadataPath, {
         channel: 'production',
-        basePath: '/',
+        basePath: '/conspectus/',
         sourceBranch: 'main',
         commitSha: 'abc123',
         buildTimeUtc: '2026-03-01T10:20:30Z',
@@ -91,6 +91,45 @@ describe('verify-production-handoff script', () => {
     }
   });
 
+  it('rejects legacy production base metadata', () => {
+    const fixturePath = createFixtureDirectory();
+    const artifactsPath = path.join(fixturePath, 'artifacts.json');
+    const metadataPath = path.join(fixturePath, 'deploy-metadata.json');
+    const artifactName = 'conspectus-mobile-production-abc123';
+
+    try {
+      writeJson(artifactsPath, { artifacts: [{ name: artifactName }] });
+      writeJson(metadataPath, {
+        channel: 'production',
+        basePath: '/',
+        sourceBranch: 'main',
+        commitSha: 'abc123',
+        buildTimeUtc: '2026-03-01T10:20:30Z',
+        qualityRunId: '1001',
+        deployRunId: '2002',
+      });
+
+      const result = runVerifierFailure([
+        '--artifacts-json',
+        artifactsPath,
+        '--metadata',
+        metadataPath,
+        '--artifact-name',
+        artifactName,
+        '--commit-sha',
+        'abc123',
+        '--quality-run-id',
+        '1001',
+        '--deploy-run-id',
+        '2002',
+      ]);
+
+      expect(result.stderr).toContain('Expected "/conspectus/"');
+    } finally {
+      rmSync(fixturePath, { force: true, recursive: true });
+    }
+  });
+
   it('fails when more than one artifact is present for the deploy run', () => {
     const fixturePath = createFixtureDirectory();
     const artifactsPath = path.join(fixturePath, 'artifacts.json');
@@ -103,7 +142,7 @@ describe('verify-production-handoff script', () => {
       });
       writeJson(metadataPath, {
         channel: 'production',
-        basePath: '/',
+        basePath: '/conspectus/',
         sourceBranch: 'main',
         commitSha: 'abc123',
         buildTimeUtc: '2026-03-01T10:20:30Z',
@@ -146,7 +185,7 @@ describe('verify-production-handoff script', () => {
       });
       writeJson(metadataPath, {
         channel: 'production',
-        basePath: '/',
+        basePath: '/conspectus/',
         sourceBranch: 'main',
         commitSha: 'abc123',
         buildTimeUtc: '2026-03-01T10:20:30Z',
@@ -189,7 +228,7 @@ describe('verify-production-handoff script', () => {
       });
       writeJson(metadataPath, {
         channel: 'production',
-        basePath: '/',
+        basePath: '/conspectus/',
         sourceBranch: 'main',
         commitSha: 'wrong-sha',
         buildTimeUtc: '2026-03-01T10:20:30Z',
@@ -232,7 +271,7 @@ describe('verify-production-handoff script', () => {
       });
       writeJson(metadataPath, {
         channel: 'production',
-        basePath: '/',
+        basePath: '/conspectus/',
         sourceBranch: 'feature/test',
         commitSha: 'abc123',
         buildTimeUtc: '2026-03-01T10:20:30Z',

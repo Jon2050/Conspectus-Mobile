@@ -46,7 +46,7 @@ describe('normalizeBasePath', () => {
   });
 
   it('handles nested paths', () => {
-    expect(normalizeBasePath('/conspectus/webapp')).toBe('/conspectus/webapp/');
+    expect(normalizeBasePath('/conspectus')).toBe('/conspectus/');
   });
 
   it('normalizes an empty string to a single slash', () => {
