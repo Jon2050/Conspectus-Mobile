@@ -9,7 +9,7 @@ import { loadEnv } from 'vite';
 // @ts-expect-error -- .mjs import has no type declarations
 import { normalizeBasePath, toPreviewSlug } from './scripts/deploy-utils.mjs';
 
-const DEFAULT_PRODUCTION_BASE_PATH = '/';
+const DEFAULT_PRODUCTION_BASE_PATH = '/conspectus/';
 const LIGHT_APP_THEME_COLOR = '#f3f4f6';
 export const PWA_REGISTER_TYPE = 'prompt' as const;
 const PACKAGE_JSON_URL = new URL('./package.json', import.meta.url);

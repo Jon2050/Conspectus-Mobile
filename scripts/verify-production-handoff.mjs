@@ -79,8 +79,8 @@ const verifyMetadata = (metadata, expectedValues) => {
     `Metadata channel mismatch. Expected "production", got "${metadata.channel}".`,
   );
   assert(
-    metadata.basePath === '/',
-    `Metadata basePath mismatch. Expected "/", got "${metadata.basePath}".`,
+    metadata.basePath === '/conspectus/',
+    `Metadata basePath mismatch. Expected "/conspectus/", got "${metadata.basePath}".`,
   );
   assert(metadata.sourceBranch, 'Metadata sourceBranch is required.');
   if (expectedValues.sourceBranch) {

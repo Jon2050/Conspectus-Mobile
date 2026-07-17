@@ -92,9 +92,9 @@ comment. Do not maintain a second release checklist elsewhere.
 - [ ] Require the complete workflow to succeed: fresh dependency audit, production build and path
       verification, immutable artifact publication, website-consumer contract check, deterministic
       handoff, production identity smoke check, and production Lighthouse gate.
-- [ ] Verify `https://conspectus.jon2050.de/deploy-metadata.json` reports the expected `commitSha`,
+- [ ] Verify `https://jon2050.de/conspectus/deploy-metadata.json` reports the expected `commitSha`,
       `deployRunId`, `qualityRunId`, `sourceBranch`, and `buildTimeUtc`.
-- [ ] Open `https://conspectus.jon2050.de/` and confirm the app shell, manifest, icons, and service
+- [ ] Open `https://jon2050.de/conspectus/` and confirm the app shell, manifest, icons, and service
       worker load without path or policy errors and the footer matches the released version and
       deployed build time.
 - [ ] On the required physical iOS and Android devices, confirm the installed PWA discovers and

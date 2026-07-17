@@ -41,7 +41,7 @@
 - [x] Screenshots are included for UI changes.
 - [x] Risk and rollback notes are documented.
 - [x] No secrets, tokens, or credentials were added to the repository.
-- [x] No breaking path/base URL changes were introduced (must preserve `/conspectus/webapp/` deployment path behavior).
+- [x] The intentional production path migration to `/conspectus/` is documented and covered by contract tests.
 
 ## Merge And Cleanup (PR Path)
 

@@ -29,7 +29,7 @@ Canonical sections by topic:
 - Account type support: **Microsoft personal accounts only**.
 - Platform: **PWA**, no native iOS/Android apps.
 - Backend: **none** (frontend-only).
-- Hosting: `https://conspectus.jon2050.de` (HTTPS available).
+- Hosting: `https://jon2050.de/conspectus` (HTTPS available).
 - OneDrive file selection: ask once, store binding locally.
 - Settings must include local reset/rebind option.
 - Offline database viewing and editing: **not supported**; Settings remains available for recovery.
@@ -282,10 +282,10 @@ Substeps:
      - `main` branch -> `/previews/main/`
      - every non-`main` branch -> `/previews/test/`
 2. Confirm final public route:
-   - `conspectus.jon2050.de/`
+   - `jon2050.de/conspectus/`
 3. Configure Vite/PWA build paths per channel:
    - preview: fixed-slot base path and `start_url` (`/previews/main/` or `/previews/test/`)
-   - production: `/` base path and `start_url`
+   - production: `/conspectus/` base path and `start_url`
    - service worker scope isolation for both channels
 4. Add deploy target structure compatible with existing website static hosting.
 5. Add minimal "PWA shell smoke" page to verify:
@@ -317,7 +317,7 @@ Deliverables:
 Exit criteria:
 
 - Successful `main` pushes update `/previews/main/`; successful non-`main` pushes update `/previews/test/`.
-- PWA opens correctly at `https://conspectus.jon2050.de/`.
+- PWA opens correctly at `https://jon2050.de/conspectus/`.
 - Install prompt/service worker/manifest behavior is testable on mobile devices.
 - Successful manual production deploy runs from `main` produce traceable production artifacts for website consumption.
 
@@ -331,7 +331,7 @@ Substeps:
 
 1. Register Entra app for SPA redirect flow (personal accounts).
 2. Configure redirect URIs:
-   - `https://conspectus.jon2050.de/` (production)
+   - `https://jon2050.de/conspectus/` (production)
    - `http://localhost:5173/` (local development)
 3. Implement MSAL bootstrapping and login state store.
 4. Implement sign-in and sign-out UX.
@@ -791,7 +791,7 @@ Goal: release with confidence on iOS and Android.
 
 M8-01 implementation clarification:
 
-- The PWA is deployed as a static application at the root of `conspectus.jon2050.de`. Its enforceable baseline policy lives in the `index.html` CSP and referrer-policy meta tags; `public/.htaccess` supplies optional defense-in-depth headers when Apache `mod_headers` is available.
+- The PWA is deployed as a static application in the `/conspectus/` subtree of `jon2050.de`. Its enforceable baseline policy lives in the `index.html` CSP and referrer-policy meta tags; `public/.htaccess` supplies optional defense-in-depth headers when Apache `mod_headers` is available.
 - The document CSP permits only the Svelte/Vite and runtime capabilities the app currently needs, including the narrower `script-src 'wasm-unsafe-eval'` permission for sql.js and explicit Microsoft login, Graph, and short-lived OneDrive download endpoints.
 - The optional Apache header CSP matches the document policy and adds `frame-ancestors 'none'`, plus `X-Content-Type-Options: nosniff` and `Referrer-Policy: strict-origin-when-cross-origin`. No PHP runtime is required by the production artifact.
 - The website consumer validates and preserves the artifact-owned files, then requests the public staging path before promotion to prove that the static app shell and its document policy are live. Local Playwright serving exercises the stricter optional header contract; post-deploy smoke checks use the policy that the free hosting package can enforce.
@@ -961,7 +961,7 @@ Recommended:
    - branch previews hosted from this repo on GitHub paths for development validation
    - main-only production artifact handoff for website deployment
 3. Build and deploy static output directly to:
-   - `conspectus.jon2050.de/`
+   - `jon2050.de/conspectus/`
 4. Keep website repo independent; add simple link to PWA route.
 
 Rejected alternatives for MVP (authoritative decision is section `8.3`):
@@ -980,7 +980,7 @@ Pipeline stages:
    - `/previews/main/` for `main`
    - `/previews/test/` for non-`main` branches.
 4. `Deploy Production` is started manually from `main`, requires a successful `Quality` run for the current `main` commit, builds and verifies the production `dist`, adds deployment metadata, publishes one immutable production artifact, dispatches the website repository, and runs production smoke checks against the live site.
-5. Website repo consumes the production artifact from `Deploy Production` and deploys to `conspectus.jon2050.de/`.
+5. Website repo consumes the production artifact from `Deploy Production` and deploys to `jon2050.de/conspectus/`.
 6. GitHub Pages also runs a GitHub-managed `pages-build-deployment` workflow when the `gh-pages` branch is published; this repository does not own or rename that workflow.
 
 ## 8.3 Approved Cross-Repo Deployment Architecture (M2-01)
@@ -1007,7 +1007,7 @@ Producer/consumer CI contract (automation-only, no manual copy):
    - Artifact name format: `conspectus-mobile-production-<commitSha>`.
    - Artifact payload is `dist/` and MUST include `deploy-metadata.json` with:
      - `channel` (`production`)
-     - `basePath` (`/`)
+     - `basePath` (`/conspectus/`)
      - `sourceBranch`
      - `commitSha`
      - `buildTimeUtc`
@@ -1020,16 +1020,16 @@ Producer/consumer CI contract (automation-only, no manual copy):
      - Producer workflow secret `WEBSITE_REPO_DISPATCH_TOKEN` is required for contract verification and dispatch.
      - Producer workflow variable `WEBSITE_REPO_FULL_NAME` may override the default consumer target (`Jon2050/Jon2050_Webpage`).
    - Post-deploy production smoke checks MUST run inside `Deploy Production` after the handoff dispatch succeeds.
-   - Smoke checks MUST target the production app base URL (`https://conspectus.jon2050.de/` by default; override via `PRODUCTION_APP_BASE_URL` repository variable), fail closed, verify deployed `deploy-metadata.json` identity fields (`commitSha`, `deployRunId`) against expected handoff context, and include deploy identity context in logs.
+   - Smoke checks MUST target the production app base URL (`https://jon2050.de/conspectus/` by default; override via `PRODUCTION_APP_BASE_URL` repository variable), fail closed, verify deployed `deploy-metadata.json` identity fields (`commitSha`, `deployRunId`) against expected handoff context, and include deploy identity context in logs.
 2. Consumer (website repository):
    - Trigger on `repository_dispatch` (`conspectus-mobile-production-ready`) and read payload fields as the single source of artifact identity.
    - Resolve artifact deterministically via GitHub Actions API using `deployRunId`:
      - List artifacts for that run and select exact `artifactName`.
      - Download artifact archive from the same run.
    - Consumer token MUST have `actions:read` access to `Conspectus-Mobile` artifacts.
-   - Validate `deploy-metadata.json` before publish (channel is `production`, base path is `/`, identity fields present).
+   - Validate `deploy-metadata.json` before publish (channel is `production`, base path is `/conspectus/`, identity fields present).
    - Validate identity match (`deploy-metadata.commitSha == dispatch.commitSha`, `deploy-metadata.deployRunId == dispatch.deployRunId`).
-   - Perform atomic replacement of the `conspectus/` subdomain root from the artifact contents.
+   - Perform atomic replacement of the website's `conspectus/` subtree from the artifact contents.
    - Fail deployment if artifact download or metadata validation fails.
    - Implementation note (M2-04): consumer automation is implemented in website repo workflow `.github/workflows/deploy.yml` on branch `master` in `Jon2050/Jon2050_Webpage`, with metadata validation script `scripts/validate-conspectus-deploy-metadata.mjs`.
    - Consumer credential note (M2-04): website repo secret `CONSPECTUS_MOBILE_ARTIFACT_TOKEN` must provide `actions:read` access to `Jon2050/Conspectus-Mobile` artifacts.
@@ -1078,7 +1078,7 @@ Privacy principle:
 MVP deliverables:
 
 1. Installable PWA on iOS/Android.
-2. Early integrated deployment on `conspectus.jon2050.de/` for device testing.
+2. Early integrated deployment on `jon2050.de/conspectus/` for device testing.
 3. OneDrive-authenticated access to selected SQLite DB.
 4. eTag-verified cached database reuse during online startup.
 5. Accounts view.

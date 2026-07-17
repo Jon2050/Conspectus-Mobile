@@ -156,7 +156,7 @@ All remaining findings that are not yet fixed, organized by severity and categor
    - Without `cancel-in-progress`, multiple pushes to the same branch queue redundant Quality runs. This wastes CI minutes and delays feedback.
    - **Fix:** Add a `concurrency` block at the workflow top level, matching the pattern used in `deploy-channels.yml` (line 19). Use `group: quality-${{ github.head_ref || github.ref }}` with `cancel-in-progress: true`.
 
-9. ~~**Website-repo-side expectations (M2-04/M2-06) cannot be fully validated from this repository alone.**~~ **RESOLVED** - Added `scripts/verify-website-consumer-contract.mjs` with unit tests and wired it into `.github/workflows/website-deploy-smoke.yml` to validate consumer workflow contract markers (dispatch trigger/type, payload identity fields, producer repo binding, metadata validation step, and `conspectus/webapp` target path) against `Jon2050/Jon2050_Webpage/.github/workflows/deploy.yml` on successful `main` deploy flows.
+9. ~~**Website-repo-side expectations (M2-04/M2-06) cannot be fully validated from this repository alone.**~~ **RESOLVED** - Added `scripts/verify-website-consumer-contract.mjs` with unit tests and wired it into `.github/workflows/website-deploy-smoke.yml` to validate consumer workflow contract markers (dispatch trigger/type, payload identity fields, producer repo binding, metadata validation step, and `conspectus` target path) against `Jon2050/Jon2050_Webpage/.github/workflows/deploy.yml` on successful `main` deploy flows.
 
 #### Security
 

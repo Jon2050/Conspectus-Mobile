@@ -182,7 +182,7 @@ CI test report view in GitHub:
 - `Deploy Preview` runs automatically after a successful `Quality` push run and publishes:
   - `main` to [https://jon2050.github.io/Conspectus-Mobile/previews/main/](https://jon2050.github.io/Conspectus-Mobile/previews/main/)
   - every non-`main` branch to [https://jon2050.github.io/Conspectus-Mobile/previews/test/](https://jon2050.github.io/Conspectus-Mobile/previews/test/)
-- `Deploy Production` is manual, only from `main`, and deploys the current `main` commit to [https://conspectus.jon2050.de/](https://conspectus.jon2050.de/) after confirming a successful `Quality` run for that commit.
+- `Deploy Production` is manual, only from `main`, and deploys the current `main` commit to [https://jon2050.de/conspectus/](https://jon2050.de/conspectus/) after confirming a successful `Quality` run for that commit.
 - GitHub may also show `pages-build-deployment`; that is the GitHub-managed Pages publisher for the `gh-pages` branch, not a project-owned pipeline, and it cannot be renamed in the current branch-based Pages setup.
 
 Detailed workflow behavior, artifacts, and failure modes live in
