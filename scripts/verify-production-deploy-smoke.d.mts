@@ -5,9 +5,11 @@ export interface SmokeCheckOptions {
   maxAttempts: number;
   retryDelaySeconds: number;
   requestTimeoutMs: number;
+  deadlineSeconds: number;
 }
 
 export type SleepFunction = (milliseconds: number) => Promise<void>;
+export type NowFunction = () => number;
 
 export function parseArgs(argv: string[]): SmokeCheckOptions;
 
@@ -15,6 +17,7 @@ export function runSmokeChecks(
   options: SmokeCheckOptions,
   fetchImpl?: typeof fetch,
   sleepImpl?: SleepFunction,
+  nowImpl?: NowFunction,
 ): Promise<void>;
 
 export function main(argv?: string[]): Promise<void>;

@@ -38,9 +38,9 @@ comment. Do not maintain a second release checklist elsewhere.
 
 - [ ] Confirm every issue in the intended release scope is merged, its required checks are green,
       and known limitations are listed in the release notes.
-- [ ] Confirm the applicable rollback runbook is available. For the MVP, issue
-      [M8-09 / #90](https://github.com/Jon2050/Conspectus-Mobile/issues/90) owns the two-repository
-      rollback procedure.
+- [ ] Confirm the two-repository [`Production-Rollback.md`](Production-Rollback.md) runbook is
+      available and a no-mutation `Rollback Production` dry run passes for the selected known-good
+      `commitSha` and `deployRunId`. Link that workflow run in the release evidence.
 - [ ] Pull the current `main`, confirm its `Quality Gate` is successful, and create
       `release/v<version>` from that exact commit.
 - [ ] Update `package.json` and both root version fields in `package-lock.json` to the same unused

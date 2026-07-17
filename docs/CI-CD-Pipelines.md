@@ -30,6 +30,9 @@ flowchart TD
   Production --> Website[Jon2050/Jon2050_Webpage deploy workflow]
   Production --> Smoke[Production smoke verification]
   Smoke --> ProductionLighthouse[Mobile Lighthouse production gate]
+  KnownGood[Known-good commitSha + deployRunId] --> Rollback[Rollback Production]
+  Rollback -->|validated existing artifact| Website
+  Rollback --> Smoke
 ```
 
 ## Fixed URLs
@@ -172,6 +175,35 @@ When a budget is exceeded:
   - the CSP keeps general JavaScript evaluation disabled while allowing the narrower WebAssembly permission required by sql.js plus the Microsoft login, Graph, and OneDrive download endpoints used by the app
   - Lighthouse runs only after production smoke observes the expected commit and deploy-run identity; a failure blocks release acceptance but does not attempt an automatic rollback
 
+### `Rollback Production`
+
+- File: [`.github/workflows/rollback-production.yml`](../.github/workflows/rollback-production.yml)
+- Trigger: pull requests that change the rollback contract, or manual dispatch with a known-good
+  `commitSha`, `deployRunId`, and explicit execute choice
+- Purpose:
+  - prove that a historical successful `main` production artifact is still available and unexpired
+  - verify the exact run provenance, artifact metadata, and current website-consumer contract
+  - support a no-mutation dry run before releases and before an incident rollback
+  - in execute mode, redispatch the validated existing artifact and require production smoke checks
+    to observe its exact identity
+- Depends on:
+  - an unexpired `conspectus-mobile-production-<commitSha>` artifact from the selected successful
+    `Deploy Production` run
+  - repository secret `WEBSITE_REPO_DISPATCH_TOKEN`
+  - the compatible `Jon2050/Jon2050_Webpage` consumer workflow
+- Failure behavior:
+  - rejects malformed inputs, non-`main` or unsuccessful producer runs, missing/expired artifacts,
+    metadata mismatches, consumer-contract drift, dispatch errors, and live identity mismatches
+  - never dispatches in pull-request or manual dry-run mode
+  - execution is main-only, serialized with production deployment, and never cancels an active run
+- Notes:
+  - rollback reuses immutable Actions artifacts and repository dispatch; it performs no manual FTP or
+    filesystem operation
+  - live verification retries for at most eight minutes, leaving time for the incident procedure in
+    [`Production-Rollback.md`](Production-Rollback.md) to complete inside 15 minutes
+  - artifact retention is 90 days, so release preparation must confirm at least one recent
+    known-good rollback target
+
 ### Lighthouse mobile release budgets
 
 Both deployment workflows run the pinned Lighthouse CLI three times with its mobile profile against
@@ -227,7 +259,7 @@ npm run check:lighthouse -- https://jon2050.github.io/Conspectus-Mobile/previews
 ### `conspectus-mobile-production-<commitSha>`
 
 - Producer: `Deploy Production`
-- Consumer: the website repository deploy workflow
+- Consumers: the website repository deploy workflow and `Rollback Production`
 - Required metadata file: `deploy-metadata.json`
 - Required Apache security configuration: `.htaccess`
 - Required static app-shell entrypoint: `index.html`

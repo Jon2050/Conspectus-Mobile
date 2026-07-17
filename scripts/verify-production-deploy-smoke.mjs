@@ -36,6 +36,7 @@ export const parseArgs = (argv) => {
     maxAttempts: '24',
     retryDelaySeconds: '10',
     requestTimeoutMs: '10000',
+    deadlineSeconds: '0',
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -60,6 +61,7 @@ export const parseArgs = (argv) => {
   const maxAttempts = Number(args.maxAttempts);
   const retryDelaySeconds = Number(args.retryDelaySeconds);
   const requestTimeoutMs = Number(args.requestTimeoutMs);
+  const deadlineSeconds = Number(args.deadlineSeconds);
 
   assert(
     Number.isInteger(maxAttempts) && maxAttempts > 0,
@@ -73,6 +75,10 @@ export const parseArgs = (argv) => {
     Number.isInteger(requestTimeoutMs) && requestTimeoutMs > 0,
     '--request-timeout-ms must be a positive integer.',
   );
+  assert(
+    Number.isInteger(deadlineSeconds) && deadlineSeconds >= 0,
+    '--deadline-seconds must be a non-negative integer.',
+  );
   return {
     baseUrl: normalizeBaseUrl(args.baseUrl),
     commitSha: args.commitSha,
@@ -80,6 +86,7 @@ export const parseArgs = (argv) => {
     maxAttempts,
     retryDelaySeconds,
     requestTimeoutMs,
+    deadlineSeconds,
   };
 };
 
@@ -206,18 +213,20 @@ const ensureManifestInstallability = (manifestText, options) => {
   return iconEntries.map((entry) => entry.url);
 };
 
-const fetchWithTimeout = async (fetchImpl, url, requestTimeoutMs) => {
+const fetchWithTimeout = async (fetchImpl, url, requestTimeoutMs, readBody = false) => {
   const controller = new AbortController();
   const timeoutHandle = setTimeout(() => controller.abort(), requestTimeoutMs);
 
   try {
-    return await fetchImpl(url, {
+    const response = await fetchImpl(url, {
       redirect: 'follow',
       signal: controller.signal,
       headers: {
         accept: 'text/html,*/*;q=0.9',
       },
     });
+    const bodyText = readBody ? await response.text() : '';
+    return { response, bodyText };
   } finally {
     clearTimeout(timeoutHandle);
   }
@@ -251,11 +260,40 @@ const createChecks = (options, setManifestIconUrls, setAppleTouchIconUrl) => [
   },
 ];
 
-export const runSmokeChecks = async (options, fetchImpl = fetch, sleepImpl = delay) => {
+export const runSmokeChecks = async (
+  options,
+  fetchImpl = fetch,
+  sleepImpl = delay,
+  nowImpl = Date.now,
+) => {
   const contextLabel = buildContextLabel(options);
+  const deadlineSeconds = options.deadlineSeconds ?? 0;
+  const deadlineAt = deadlineSeconds > 0 ? nowImpl() + deadlineSeconds * 1000 : 0;
   let lastErrors = [];
 
+  const throwDeadlineError = () => {
+    throw new Error(
+      `[verify-production-deploy-smoke] ${contextLabel} exceeded the ${deadlineSeconds}s wall-clock deadline. Last errors: ${lastErrors.join(' | ')}`,
+    );
+  };
+
+  const resolveRequestTimeoutMs = () => {
+    if (deadlineAt === 0) {
+      return options.requestTimeoutMs;
+    }
+
+    const remainingMs = deadlineAt - nowImpl();
+    if (remainingMs <= 0) {
+      throwDeadlineError();
+    }
+
+    return Math.min(options.requestTimeoutMs, remainingMs);
+  };
+
   for (let attempt = 1; attempt <= options.maxAttempts; attempt += 1) {
+    if (deadlineAt > 0 && nowImpl() >= deadlineAt) {
+      throwDeadlineError();
+    }
     let manifestIconUrls = [];
     let appleTouchIconUrl = '';
     const checks = createChecks(
@@ -274,7 +312,12 @@ export const runSmokeChecks = async (options, fetchImpl = fetch, sleepImpl = del
 
     for (const check of checks) {
       try {
-        const response = await fetchWithTimeout(fetchImpl, check.url, options.requestTimeoutMs);
+        const { response, bodyText } = await fetchWithTimeout(
+          fetchImpl,
+          check.url,
+          resolveRequestTimeoutMs(),
+          Boolean(check.validateBody),
+        );
         assert(response.status === 200, `${check.name} returned HTTP ${response.status}.`);
 
         if (check.validateResponse) {
@@ -282,7 +325,6 @@ export const runSmokeChecks = async (options, fetchImpl = fetch, sleepImpl = del
         }
 
         if (check.validateBody) {
-          const bodyText = await response.text();
           check.validateBody(bodyText);
         }
 
@@ -303,10 +345,10 @@ export const runSmokeChecks = async (options, fetchImpl = fetch, sleepImpl = del
           appleTouchIconUrl.length > 0,
           'apple-touch-icon URL missing from bootstrap validation context.',
         );
-        const appleTouchIconResponse = await fetchWithTimeout(
+        const { response: appleTouchIconResponse } = await fetchWithTimeout(
           fetchImpl,
           appleTouchIconUrl,
-          options.requestTimeoutMs,
+          resolveRequestTimeoutMs(),
         );
         assert(
           appleTouchIconResponse.status === 200,
@@ -326,7 +368,11 @@ export const runSmokeChecks = async (options, fetchImpl = fetch, sleepImpl = del
     if (lastErrors.length === 0) {
       for (const iconUrl of manifestIconUrls) {
         try {
-          const iconResponse = await fetchWithTimeout(fetchImpl, iconUrl, options.requestTimeoutMs);
+          const { response: iconResponse } = await fetchWithTimeout(
+            fetchImpl,
+            iconUrl,
+            resolveRequestTimeoutMs(),
+          );
           assert(
             iconResponse.status === 200,
             `manifest icon returned HTTP ${iconResponse.status}.`,
@@ -344,17 +390,27 @@ export const runSmokeChecks = async (options, fetchImpl = fetch, sleepImpl = del
     }
 
     if (lastErrors.length === 0) {
+      if (deadlineAt > 0 && nowImpl() >= deadlineAt) {
+        throwDeadlineError();
+      }
       console.log(
         `[verify-production-deploy-smoke] ${contextLabel} all deployment smoke checks passed for ${options.baseUrl}`,
       );
       return;
     }
 
+    if (deadlineAt > 0 && nowImpl() >= deadlineAt) {
+      throwDeadlineError();
+    }
+
     if (attempt < options.maxAttempts) {
       console.log(
         `[verify-production-deploy-smoke] ${contextLabel} attempt ${attempt}/${options.maxAttempts} failed; retrying in ${options.retryDelaySeconds}s.`,
       );
-      await sleepImpl(options.retryDelaySeconds * 1000);
+      const retryDelayMs = options.retryDelaySeconds * 1000;
+      const boundedRetryDelayMs =
+        deadlineAt > 0 ? Math.min(retryDelayMs, Math.max(0, deadlineAt - nowImpl())) : retryDelayMs;
+      await sleepImpl(boundedRetryDelayMs);
     }
   }
 
