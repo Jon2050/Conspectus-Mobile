@@ -63,10 +63,14 @@ identity fields. It performs no dispatch and no production mutation. It verifies
 1. exact successful producer-run provenance from `main`;
 2. one unexpired artifact named for the requested commit;
 3. artifact metadata (`commitSha`, `deployRunId`, `qualityRunId`, channel, base path, source branch);
-4. the current website consumer's repository-dispatch, staging, validation, and promotion contract.
+4. the current website consumer's repository-dispatch, staging, validation, promotion, and
+   restoration contract, published at
+   `https://jon2050.de/conspectus/conspectus-deploy-contract.json`.
 
-A missing secret, unavailable artifact, identity mismatch, or consumer-contract drift invalidates the
-target. Stop and fix the prerequisite; never bypass a failed dry run.
+The website repository validates this exact-schema descriptor against its private deploy workflow,
+publishes only that file on trusted `master` updates, and verifies the live copy. A missing or stale
+contract, unavailable artifact, identity mismatch, or consumer-contract drift invalidates the target.
+Stop and fix the prerequisite; never bypass a failed dry run.
 
 ## Execute rollback (target: under 15 minutes)
 

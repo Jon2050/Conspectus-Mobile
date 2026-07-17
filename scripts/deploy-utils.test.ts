@@ -290,8 +290,11 @@ describe('production rollback workflow contract', () => {
     );
     const publicFetchStepEnd = workflowSource.indexOf('\n      - name:', publicFetchStepStart);
     const publicFetchStep = workflowSource.slice(publicFetchStepStart, publicFetchStepEnd);
-    expect(publicFetchStep).toContain('https://raw.githubusercontent.com/');
-    expect(publicFetchStep).toContain('base64 -w 0 website-deploy-workflow.yml');
+    expect(publicFetchStep).toContain('${PRODUCTION_APP_BASE_URL}conspectus-deploy-contract.json');
+    expect(publicFetchStep).toContain('--connect-timeout 10');
+    expect(publicFetchStep).toContain('--max-time 30');
+    expect(publicFetchStep).toContain('--retry 2');
+    expect(workflowSource).toContain('--contract-json website-deploy-contract.json');
     expect(publicFetchStep).not.toContain('WEBSITE_REPO_DISPATCH_TOKEN');
     expect(publicFetchStep).not.toContain('Authorization: Bearer');
   });

@@ -28,6 +28,21 @@ const encodeWorkflowPayload = (workflowYaml: string) =>
     2,
   );
 
+const createValidPublicContract = () => ({
+  schemaVersion: 1,
+  producerRepo: 'Jon2050/Conspectus-Mobile',
+  eventType: 'conspectus-mobile-production-ready',
+  requiredPayloadFields: ['commitSha', 'deployRunId', 'qualityRunId', 'artifactName'],
+  basePath: '/conspectus/',
+  stagingBaseUrl: 'https://jon2050.de/conspectus.__incoming/',
+  liveBaseUrl: 'https://jon2050.de/conspectus/',
+  stagingDirectory: './www/conspectus.__incoming',
+  liveDirectory: './www/conspectus',
+  backupDirectory: './www/conspectus.__backup',
+  promotionMode: 'atomic-directory-swap',
+  rollbackMode: 'restore-backup-directory',
+});
+
 const createValidWorkflow = () =>
   [
     'name: Deploy to FTP',
@@ -70,6 +85,72 @@ const createValidWorkflow = () =>
   ].join('\n');
 
 describe('verify-website-consumer-contract script', () => {
+  it('accepts the public live consumer contract', () => {
+    const fixturePath = createFixtureDirectory();
+    const contractJsonPath = path.join(fixturePath, 'contract.json');
+
+    try {
+      writeFileSync(contractJsonPath, JSON.stringify(createValidPublicContract()));
+      const result = runVerifier([
+        '--contract-json',
+        contractJsonPath,
+        '--producer-repo',
+        'Jon2050/Conspectus-Mobile',
+      ]);
+
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('verified /conspectus/ consumer');
+    } finally {
+      rmSync(fixturePath, { force: true, recursive: true });
+    }
+  });
+
+  it('rejects a legacy live consumer base path', () => {
+    const fixturePath = createFixtureDirectory();
+    const contractJsonPath = path.join(fixturePath, 'contract.json');
+
+    try {
+      writeFileSync(
+        contractJsonPath,
+        JSON.stringify({ ...createValidPublicContract(), basePath: '/conspectus/webapp/' }),
+      );
+      const result = runVerifier([
+        '--contract-json',
+        contractJsonPath,
+        '--producer-repo',
+        'Jon2050/Conspectus-Mobile',
+      ]);
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('basePath');
+    } finally {
+      rmSync(fixturePath, { force: true, recursive: true });
+    }
+  });
+
+  it('rejects unexpected public contract fields', () => {
+    const fixturePath = createFixtureDirectory();
+    const contractJsonPath = path.join(fixturePath, 'contract.json');
+
+    try {
+      writeFileSync(
+        contractJsonPath,
+        JSON.stringify({ ...createValidPublicContract(), internalNote: 'do not publish' }),
+      );
+      const result = runVerifier([
+        '--contract-json',
+        contractJsonPath,
+        '--producer-repo',
+        'Jon2050/Conspectus-Mobile',
+      ]);
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('exactly match');
+    } finally {
+      rmSync(fixturePath, { force: true, recursive: true });
+    }
+  });
+
   it('accepts a workflow that matches the producer/consumer handoff contract', () => {
     const fixturePath = createFixtureDirectory();
     const workflowJsonPath = path.join(fixturePath, 'workflow.json');
