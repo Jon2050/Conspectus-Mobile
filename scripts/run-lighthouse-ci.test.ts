@@ -53,8 +53,18 @@ const manifest = JSON.stringify({
   scope: '/Conspectus-Mobile/previews/test/',
   display: 'standalone',
   icons: [
-    { src: 'icons/moneysack192x192.png', sizes: '192x192' },
-    { src: 'icons/moneysack512x512.png', sizes: '512x512' },
+    { src: 'icons/moneysack192x192.png', sizes: '192x192', purpose: 'any' },
+    { src: 'icons/moneysack512x512.png', sizes: '512x512', purpose: 'any' },
+    {
+      src: 'icons/moneysack-maskable192x192.png',
+      sizes: '192x192',
+      purpose: 'maskable',
+    },
+    {
+      src: 'icons/moneysack-maskable512x512.png',
+      sizes: '512x512',
+      purpose: 'maskable',
+    },
   ],
 });
 
@@ -154,6 +164,8 @@ describe('Lighthouse CI runner', () => {
       [new URL('manifest.webmanifest', baseUrl).toString(), asResponse(manifest)],
       [new URL('icons/moneysack192x192.png', baseUrl).toString(), asResponse('icon')],
       [new URL('icons/moneysack512x512.png', baseUrl).toString(), asResponse('icon')],
+      [new URL('icons/moneysack-maskable192x192.png', baseUrl).toString(), asResponse('icon')],
+      [new URL('icons/moneysack-maskable512x512.png', baseUrl).toString(), asResponse('icon')],
       [new URL('sw.js', baseUrl).toString(), asResponse('service worker')],
     ]);
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
@@ -169,10 +181,10 @@ describe('Lighthouse CI runner', () => {
         'installable manifest',
         'route-correct manifest scope',
         'registered service worker scope',
-        '192px and 512px icons',
+        'any and maskable 192px and 512px icons',
       ],
     });
-    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(fetchMock).toHaveBeenCalledTimes(7);
     expect(serviceWorkerVerifier).toHaveBeenCalledWith(baseUrl);
   });
 
@@ -188,6 +200,28 @@ describe('Lighthouse CI runner', () => {
 
     await expect(verifyPwaContract(baseUrl, fetchMock, vi.fn())).rejects.toThrow(
       'Manifest scope must resolve',
+    );
+  });
+
+  it('fails the PWA contract when maskable icon purpose metadata is missing', async () => {
+    const baseUrl = new URL('https://example.com/Conspectus-Mobile/previews/test/');
+    const parsedManifest = JSON.parse(manifest) as {
+      icons: Array<{ src: string; purpose?: string }>;
+    };
+    parsedManifest.icons = parsedManifest.icons.map((icon) =>
+      icon.src.includes('maskable') ? { ...icon, purpose: 'any' } : icon,
+    );
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = input instanceof Request ? input.url : input.toString();
+      if (url === baseUrl.toString()) return asResponse(appHtml);
+      if (url.endsWith('manifest.webmanifest')) {
+        return asResponse(JSON.stringify(parsedManifest));
+      }
+      return asResponse('asset');
+    }) as typeof fetch;
+
+    await expect(verifyPwaContract(baseUrl, fetchMock, vi.fn())).rejects.toThrow(
+      'purpose maskable',
     );
   });
 
@@ -251,6 +285,8 @@ describe('Lighthouse CI runner', () => {
       [new URL('manifest.webmanifest', baseUrl).toString(), asResponse(manifest)],
       [new URL('icons/moneysack192x192.png', baseUrl).toString(), asResponse('icon')],
       [new URL('icons/moneysack512x512.png', baseUrl).toString(), asResponse('icon')],
+      [new URL('icons/moneysack-maskable192x192.png', baseUrl).toString(), asResponse('icon')],
+      [new URL('icons/moneysack-maskable512x512.png', baseUrl).toString(), asResponse('icon')],
       [new URL('sw.js', baseUrl).toString(), asResponse('service worker')],
     ]);
     const fetchMock = vi.fn(async (input: string | URL | Request) => {

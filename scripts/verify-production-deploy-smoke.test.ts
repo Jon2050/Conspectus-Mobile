@@ -96,6 +96,7 @@ const createHealthyResponses = (): Record<string, MockHttpResponse> => ({
           src: 'icons/moneysack192x192.png',
           sizes: '192x192',
           type: 'image/png',
+          purpose: 'any',
         },
         {
           src: 'icons/moneysack256x256.png',
@@ -106,6 +107,19 @@ const createHealthyResponses = (): Record<string, MockHttpResponse> => ({
           src: 'icons/moneysack512x512.png',
           sizes: '512x512',
           type: 'image/png',
+          purpose: 'any',
+        },
+        {
+          src: 'icons/moneysack-maskable192x192.png',
+          sizes: '192x192',
+          type: 'image/png',
+          purpose: 'maskable',
+        },
+        {
+          src: 'icons/moneysack-maskable512x512.png',
+          sizes: '512x512',
+          type: 'image/png',
+          purpose: 'maskable',
         },
       ],
     }),
@@ -138,6 +152,14 @@ const createHealthyResponses = (): Record<string, MockHttpResponse> => ({
     status: 200,
     body: 'icon-bytes',
   },
+  'https://jon2050.de/conspectus/icons/moneysack-maskable192x192.png': {
+    status: 200,
+    body: 'icon-bytes',
+  },
+  'https://jon2050.de/conspectus/icons/moneysack-maskable512x512.png': {
+    status: 200,
+    body: 'icon-bytes',
+  },
 });
 
 afterEach(() => {
@@ -151,7 +173,7 @@ describe('verify-production-deploy-smoke script', () => {
     const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
     await expect(runSmokeChecks(baseOptions, fetchMock, sleepMock)).resolves.toBeUndefined();
-    expect(fetchMock).toHaveBeenCalledTimes(9);
+    expect(fetchMock).toHaveBeenCalledTimes(11);
     expect(consoleLog).toHaveBeenCalledWith(
       expect.stringContaining(
         'commitSha=abc123 deployRunId=2002 all deployment smoke checks passed',
@@ -381,6 +403,26 @@ describe('verify-production-deploy-smoke script', () => {
         ],
       }),
     };
+    const fetchMock = createFetchByUrl(responses);
+    const sleepMock = vi.fn(async () => undefined);
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await expect(runSmokeChecks(baseOptions, fetchMock, sleepMock)).rejects.toThrow(
+      'check=manifest',
+    );
+  });
+
+  it('fails when dedicated maskable icons lose their manifest purpose', async () => {
+    const responses = createHealthyResponses();
+    const manifestResponse = responses['https://jon2050.de/conspectus/manifest.webmanifest'];
+    const manifest = JSON.parse(manifestResponse.body) as {
+      icons: Array<{ src: string; purpose?: string }>;
+    };
+    manifest.icons = manifest.icons.map((icon) =>
+      icon.src.includes('maskable') ? { ...icon, purpose: 'any' } : icon,
+    );
+    manifestResponse.body = JSON.stringify(manifest);
     const fetchMock = createFetchByUrl(responses);
     const sleepMock = vi.fn(async () => undefined);
     vi.spyOn(console, 'log').mockImplementation(() => undefined);

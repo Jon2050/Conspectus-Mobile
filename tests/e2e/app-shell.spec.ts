@@ -1965,6 +1965,7 @@ test('exposes manifest and registers service worker', async ({ context, page }) 
       expect.objectContaining({
         src: expectedIcon.src,
         sizes: expectedIcon.sizes,
+        purpose: expectedIcon.purpose,
       }),
     );
 

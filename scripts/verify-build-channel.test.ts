@@ -35,6 +35,12 @@ const VALID_HTACCESS = `DirectoryIndex index.html
 
 const VALID_SERVICE_WORKER = 'createHandlerBoundToURL("index.html")';
 const VALID_PREVIEW_SERVICE_WORKER = 'createHandlerBoundToURL("index.html")';
+const VALID_MANIFEST_ICONS = [
+  { src: 'icons/moneysack192x192.png', sizes: '192x192', purpose: 'any' },
+  { src: 'icons/moneysack512x512.png', sizes: '512x512', purpose: 'any' },
+  { src: 'icons/moneysack-maskable192x192.png', sizes: '192x192', purpose: 'maskable' },
+  { src: 'icons/moneysack-maskable512x512.png', sizes: '512x512', purpose: 'maskable' },
+];
 
 const createDistFixture = (
   fixtureRootPath: string,
@@ -72,6 +78,7 @@ const createDistFixture = (
         name: 'Conspectus Mobile',
         start_url: basePath,
         scope: basePath,
+        icons: VALID_MANIFEST_ICONS,
       },
       null,
       2,
@@ -117,6 +124,40 @@ describe('verify-build-channel script', () => {
       expect(result.stdout).toContain(
         '[verify-build-channel] production build output is valid for base path /test-app/',
       );
+    } finally {
+      rmSync(fixturePath, { force: true, recursive: true });
+    }
+  });
+
+  it('fails when the build manifest omits maskable install icons', () => {
+    const fixturePath = createFixtureDirectory();
+
+    try {
+      const distPath = createDistFixture(
+        fixturePath,
+        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/test-app/sw.js', { scope: '/test-app/' }); }`,
+      );
+      writeText(
+        path.join(distPath, 'manifest.webmanifest'),
+        JSON.stringify({
+          name: 'Conspectus Mobile',
+          start_url: '/test-app/',
+          scope: '/test-app/',
+          icons: VALID_MANIFEST_ICONS.filter((icon) => icon.purpose === 'any'),
+        }),
+      );
+
+      const result = runVerifier([
+        '--dist',
+        distPath,
+        '--channel',
+        'production',
+        '--base',
+        '/test-app/',
+      ]);
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('purpose maskable');
     } finally {
       rmSync(fixturePath, { force: true, recursive: true });
     }
@@ -339,7 +380,12 @@ describe('verify-build-channel script', () => {
 
       writeText(
         path.join(distPath, 'manifest.webmanifest'),
-        JSON.stringify({ name: 'Conspectus Mobile', start_url: previewBase, scope: previewBase }),
+        JSON.stringify({
+          name: 'Conspectus Mobile',
+          start_url: previewBase,
+          scope: previewBase,
+          icons: VALID_MANIFEST_ICONS,
+        }),
       );
 
       writeText(path.join(distPath, 'assets', 'index.css'), '.app { color: #111; }');
@@ -398,6 +444,7 @@ describe('verify-build-channel script', () => {
           name: 'Conspectus Mobile',
           start_url: '/wrong-path/',
           scope: basePath,
+          icons: VALID_MANIFEST_ICONS,
         }),
       );
 

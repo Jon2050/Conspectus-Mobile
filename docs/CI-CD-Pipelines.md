@@ -87,7 +87,7 @@ flowchart TD
 - Notes:
   - uses `actions/setup-node` npm cache and Playwright browser cache
   - cancels in-progress runs for the same ref via workflow concurrency
-  - `Build Verification` checks the downloaded preview artifact against the JS/CSS bundle budgets before validating base-path correctness, manifest `start_url` and `scope`, service worker scope, the document CSP and artifact-owned Apache security headers, and root-path leakage
+  - `Build Verification` checks the downloaded preview artifact against the JS/CSS bundle budgets before validating base-path correctness, manifest `start_url` and `scope`, `any` and `maskable` 192px/512px install-icon entries, service worker scope, the document CSP and artifact-owned Apache security headers, and root-path leakage
   - `Quality Gate` is the single branch-protection check that should be required on `main`
 
 #### Bundle size budgets
@@ -174,7 +174,7 @@ When a budget is exceeded:
   - the website repo target defaults to `Jon2050/Jon2050_Webpage` and can be overridden with `WEBSITE_REPO_FULL_NAME`
   - production smoke target defaults to `https://jon2050.de/conspectus/` and can be overridden with `PRODUCTION_APP_BASE_URL`
   - the production artifact is a static PWA scoped to `/conspectus/` on `jon2050.de`; the website consumer validates `index.html`, the document CSP, and the optional `.htaccess` defense-in-depth headers before upload
-  - production smoke validates the live document CSP and referrer-policy meta tag without requiring PHP or hosting-package response-header support
+  - production smoke validates the live document CSP, referrer-policy meta tag, padded Apple touch icon, and reachable `any` plus `maskable` 192px/512px manifest icons without requiring PHP or hosting-package response-header support
   - the CSP keeps general JavaScript evaluation disabled while allowing the narrower WebAssembly permission required by sql.js plus the Microsoft login, Graph, and OneDrive download endpoints used by the app
   - Lighthouse runs only after production smoke observes the expected commit and deploy-run identity; a failure blocks release acceptance but does not attempt an automatic rollback
 

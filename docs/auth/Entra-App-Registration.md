@@ -11,6 +11,8 @@ Goal:
 - Configure it as a single-page application (SPA) for personal Microsoft accounts.
 - Define the redirect URI contract used by local development and production.
 
+Application (client) ID: `94c434a2-a0ad-485e-90a6-660a08dd8a48`
+
 ## Required Entra Registration Settings
 
 Create or update an app registration with the following values:
@@ -22,13 +24,13 @@ Create or update an app registration with the following values:
 3. Redirect URIs:
    - `http://localhost:5173/`
    - `https://jon2050.de/conspectus/`
+   - `https://jon2050.github.io/Conspectus-Mobile/previews/main/`
+   - `https://jon2050.github.io/Conspectus-Mobile/previews/test/`
 
 Remove every retired production redirect URI after the exact current URI above has been verified.
 
-Optional for GitHub Pages preview login:
-
-- `https://jon2050.github.io/Conspectus-Mobile/previews/main/`
-- `https://jon2050.github.io/Conspectus-Mobile/previews/test/`
+The GitHub Pages entries are required only while real Microsoft sign-in is tested on those preview
+channels. Remove both together if preview authentication is intentionally retired.
 
 Redirect URI matching note:
 
@@ -37,6 +39,30 @@ Redirect URI matching note:
 - `npm run dev` is pinned to `http://localhost:5173/` with `--strictPort` so local auth testing stays on the registered SPA redirect URI.
 - Local development ignores `VITE_DEPLOY_BASE_PATH`; that setting is reserved for non-channel builds and cannot change the localhost auth callback.
 - If local sign-in is tested from a different host or port, that exact URI must also be registered in the SPA redirect URI list.
+
+## Redirect Mismatch Troubleshooting
+
+The app derives `redirect_uri` from the current origin plus the Vite deployment base path. Do not
+replace that behavior with one hard-coded production URI because local and preview channels need
+their own exact callbacks.
+
+When Microsoft reports an invalid `redirect_uri`:
+
+1. Record the exact app start URL, browser or installed-PWA mode, and footer version/build time.
+2. In the failed authorize request, record only the public `client_id`, decoded `redirect_uri`,
+   Microsoft error code, correlation ID, and timestamp. Never record tokens, authorization codes,
+   passwords, or MFA data.
+3. Compare the decoded URI character-for-character with the SPA entries above, including scheme,
+   host, case-sensitive path, and trailing slash.
+4. Do not use `http://127.0.0.1:5173/`, Vite preview ports such as `http://localhost:4173/`, a
+   retired subdomain, or the removed `/webapp/` route unless that exact URI is deliberately added.
+5. For an old installed PWA, clear the site's data or uninstall it, open the canonical URL in the
+   browser, confirm the current footer identity, and install again before retesting.
+
+On 2026-07-21, the live main preview reached Microsoft's account sign-in page with its expected
+PKCE callback. Separate public authorization probes confirmed that Microsoft also accepted the
+production and test-preview callback values. This does not replace the required real-account
+production sign-in and OneDrive smoke test.
 
 ## Frontend Configuration Contract
 
@@ -102,7 +128,7 @@ Operational notes:
 - Entra app registration exists and is accessible to the project owner.
 - Supported account type is set to personal Microsoft accounts only.
 - SPA platform is configured.
-- Both redirect URIs listed above are configured exactly.
+- Every redirect URI still used for local, production, or preview sign-in is configured exactly.
 - The same `Application (client) ID` is set in local `.env` and repository variable `VITE_AZURE_CLIENT_ID`.
 - Graph delegated permission for file operations is `Files.ReadWrite`.
 - Broader file permissions (`Files.Read.All`, `Files.ReadWrite.All`) are absent.

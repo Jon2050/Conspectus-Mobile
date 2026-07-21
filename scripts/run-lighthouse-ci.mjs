@@ -11,7 +11,12 @@ const DEFAULT_BUDGET_CONFIG_PATH = 'lighthouse-budgets.json';
 const DEFAULT_OUTPUT_DIRECTORY = 'reports/lighthouse';
 const LIGHTHOUSE_CATEGORIES = ['performance', 'accessibility', 'best-practices'];
 const INSTALLABLE_DISPLAYS = new Set(['fullscreen', 'minimal-ui', 'standalone']);
-const REQUIRED_ICON_SIZES = ['192x192', '512x512'];
+const REQUIRED_ICON_SPECS = [
+  { size: '192x192', purpose: 'any' },
+  { size: '512x512', purpose: 'any' },
+  { size: '192x192', purpose: 'maskable' },
+  { size: '512x512', purpose: 'maskable' },
+];
 const require = createRequire(import.meta.url);
 const lighthouseCliPath = require.resolve('lighthouse/cli/index.js');
 
@@ -256,14 +261,16 @@ const findManifestHref = (html) => {
 
 const findRequiredIconUrls = (manifest, baseUrl) => {
   const icons = Array.isArray(manifest.icons) ? manifest.icons : [];
-  return REQUIRED_ICON_SIZES.map((requiredSize) => {
+  return REQUIRED_ICON_SPECS.map(({ size, purpose }) => {
     const match = icons.find(
       (icon) =>
         typeof icon?.src === 'string' &&
         typeof icon?.sizes === 'string' &&
-        icon.sizes.split(/\s+/u).includes(requiredSize),
+        icon.sizes.split(/\s+/u).includes(size) &&
+        typeof icon?.purpose === 'string' &&
+        icon.purpose.split(/\s+/u).includes(purpose),
     );
-    assert(match, `Manifest is missing a ${requiredSize} install icon.`);
+    assert(match, `Manifest is missing a ${size} install icon with purpose ${purpose}.`);
     return new URL(match.src, baseUrl);
   });
 };
@@ -386,7 +393,7 @@ export const verifyPwaContract = async (
       'installable manifest',
       'route-correct manifest scope',
       'registered service worker scope',
-      '192px and 512px icons',
+      'any and maskable 192px and 512px icons',
     ],
   };
 };
