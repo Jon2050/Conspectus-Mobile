@@ -120,6 +120,17 @@ describe('fixed preview slot workflow contract', () => {
     );
     expect(workflowSource).not.toContain('wait-for-quality');
   });
+
+  it('waits for the exact preview commit before running live release checks', () => {
+    const workflowSource = fs.readFileSync(deployPreviewWorkflowPath, 'utf8');
+    expect(workflowSource).toContain('name: Write preview deployment marker');
+    expect(workflowSource).toContain('dist/preview-deploy-marker.json');
+    expect(workflowSource).toContain(
+      'EXPECTED_HEAD_SHA: ${{ needs.prepare-context.outputs.head_sha }}',
+    );
+    expect(workflowSource).toContain('[ "${marker_commit_sha}" = "${EXPECTED_HEAD_SHA}" ]');
+    expect(workflowSource).toContain('?deployment=${cache_buster}');
+  });
 });
 
 describe('quality workflow contract', () => {
