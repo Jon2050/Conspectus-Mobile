@@ -61,8 +61,12 @@ When Microsoft reports an invalid `redirect_uri`:
 
 On 2026-07-21, the live main preview reached Microsoft's account sign-in page with its expected
 PKCE callback. Separate public authorization probes confirmed that Microsoft also accepted the
-production and test-preview callback values. This does not replace the required real-account
-production sign-in and OneDrive smoke test.
+production and test-preview callback values.
+
+On 2026-07-22, the application owner confirmed that the required Entra SPA registration was
+complete and that a real production sign-in and OneDrive application smoke test succeeded at
+`https://jon2050.de/conspectus/`. This is the production verification evidence for release blocker
+RB-02.
 
 ## Frontend Configuration Contract
 

@@ -36,6 +36,7 @@ describe('buildInfo', () => {
     });
 
     expect(fetchImplementation).toHaveBeenCalledWith('/conspectus/deploy-metadata.json', {
+      cache: 'no-store',
       headers: {
         accept: 'application/json',
       },
