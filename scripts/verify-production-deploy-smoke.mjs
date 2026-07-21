@@ -7,8 +7,10 @@ import { assertCspEquivalent, DOCUMENT_CSP, extractCspMetaContent } from './secu
 
 const REQUIRED_ARGS = new Set(['baseUrl', 'commitSha', 'deployRunId']);
 const REQUIRED_MONEYBAG_ICON_SPECS = [
-  { src: 'icons/moneysack192x192.png', sizes: '192x192' },
-  { src: 'icons/moneysack512x512.png', sizes: '512x512' },
+  { src: 'icons/moneysack192x192.png', sizes: '192x192', purpose: 'any' },
+  { src: 'icons/moneysack512x512.png', sizes: '512x512', purpose: 'any' },
+  { src: 'icons/moneysack-maskable192x192.png', sizes: '192x192', purpose: 'maskable' },
+  { src: 'icons/moneysack-maskable512x512.png', sizes: '512x512', purpose: 'maskable' },
 ];
 const REQUIRED_APPLE_TOUCH_ICON = 'icons/moneysack180x180.png';
 
@@ -185,6 +187,7 @@ const ensureManifestInstallability = (manifestText, options) => {
   const iconEntries = rawIcons.map((icon) => {
     const src = typeof icon?.src === 'string' ? icon.src.trim() : '';
     const sizes = typeof icon?.sizes === 'string' ? icon.sizes.trim() : '';
+    const purposes = typeof icon?.purpose === 'string' ? icon.purpose.trim().split(/\s+/u) : [];
     assert(src.length > 0, 'manifest icon entry is missing src.');
     assert(
       src.includes('moneysack'),
@@ -194,6 +197,7 @@ const ensureManifestInstallability = (manifestText, options) => {
     return {
       src,
       sizes,
+      purposes,
       url: new URL(src, options.baseUrl).toString(),
       pathname: toPathname(src, options.baseUrl),
     };
@@ -202,11 +206,14 @@ const ensureManifestInstallability = (manifestText, options) => {
   for (const requiredIcon of REQUIRED_MONEYBAG_ICON_SPECS) {
     const requiredPathname = toPathname(requiredIcon.src, options.baseUrl);
     const iconMatch = iconEntries.find(
-      (entry) => entry.pathname === requiredPathname && entry.sizes === requiredIcon.sizes,
+      (entry) =>
+        entry.pathname === requiredPathname &&
+        entry.sizes === requiredIcon.sizes &&
+        entry.purposes.includes(requiredIcon.purpose),
     );
     assert(
       Boolean(iconMatch),
-      `manifest missing required icon "${requiredIcon.src}" with sizes "${requiredIcon.sizes}".`,
+      `manifest missing required icon "${requiredIcon.src}" with sizes "${requiredIcon.sizes}" and purpose "${requiredIcon.purpose}".`,
     );
   }
 

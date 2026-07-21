@@ -6,7 +6,7 @@ clear RB-04 may begin only after prerequisite blockers RB-01 through RB-03 are c
 remains the implementation index; [`docs/Release-Process.md`](docs/Release-Process.md) remains the
 execution runbook.
 
-Last verified: 2026-07-17
+Last verified: 2026-07-21
 
 ## Current decision
 
@@ -68,19 +68,29 @@ its primary purpose.
 
 1. Authenticate to Microsoft Entra with an account that can manage application
    `94c434a2-a0ad-485e-90a6-660a08dd8a48`.
-2. Verify the SPA redirect list contains exactly the required production URI
-   `https://jon2050.de/conspectus/` and local URI; retain documented optional preview entries only
-   if they are still used.
+2. Verify the SPA redirect list contains the documented local, production, main-preview, and
+   test-preview URIs while all four channels remain in use.
 3. Remove retired production redirects for the deleted subdomain and nested `/webapp/` path.
 4. Use the dedicated QA Microsoft account to sign in on production and verify the callback returns
    to `/conspectus/` without a loop or configuration error.
 
+### Current evidence
+
+On 2026-07-21, the live main preview initiated an MSAL PKCE request with client ID
+`94c434a2-a0ad-485e-90a6-660a08dd8a48` and the exact callback
+`https://jon2050.github.io/Conspectus-Mobile/previews/main/`, then reached the Microsoft account
+sign-in page. Separate public authorization probes also reached Microsoft sign-in for the production
+and test-preview callbacks. The reported redirect error is therefore not reproducible from the
+current canonical deployed URLs without the original device/start-URL context. Real production
+account sign-in and OneDrive access remain unverified, so RB-02 stays open.
+
 ### Why it is not fixed already
 
-The existing Azure CLI refresh token expired. Several device-login attempts expired or remained
-unapproved at the password/passkey/MFA step, so the registration could not be read or changed
-authoritatively. Account secrets and MFA require the human account owner; they cannot be bypassed
-or entered by automation.
+The existing Azure CLI refresh token remains expired. Several device-login attempts expired or
+remained unapproved at the password/passkey/MFA step, so the registration still cannot be inspected
+authoritatively. The exact URL and deployment identity that produced the user's redirect error were
+not captured. Account secrets and MFA require the human account owner; they cannot be bypassed or
+entered by automation.
 
 ## RB-03 — Physical-device QA and install icon are unresolved
 
@@ -104,6 +114,10 @@ session recovery; failure could lose trust or create duplicate financial writes.
 4. Attach the required screenshots, device/browser versions, candidate identity, failures, and
    successful reruns to the release pull request.
 5. Resolve #106 and record `PASS` for every required matrix cell.
+
+The repository repair now uses padded install artwork, dedicated `192x192` and `512x512` maskable
+assets, and build/live contract checks for both `any` and `maskable` manifest purposes. This is only
+the automated prerequisite for QA-01; physical installed-icon verification is still required.
 
 ### Why it is not fixed already
 

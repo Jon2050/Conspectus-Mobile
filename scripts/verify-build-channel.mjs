@@ -79,6 +79,12 @@ const getAbsolutePathReferences = (htmlText) => {
 };
 
 const TEXT_FILE_EXTENSIONS = new Set(['.html', '.js', '.css', '.webmanifest']);
+const REQUIRED_INSTALL_ICON_SPECS = [
+  { size: '192x192', purpose: 'any' },
+  { size: '512x512', purpose: 'any' },
+  { size: '192x192', purpose: 'maskable' },
+  { size: '512x512', purpose: 'maskable' },
+];
 
 const collectTextFiles = (directoryPath) => {
   const discoveredFiles = [];
@@ -197,6 +203,20 @@ const verifyManifest = (manifestText, expectedBasePath) => {
     manifest.scope === expectedBasePath,
     `Manifest scope mismatch. Expected "${expectedBasePath}", got "${manifest.scope}".`,
   );
+
+  const icons = Array.isArray(manifest.icons) ? manifest.icons : [];
+  for (const { size, purpose } of REQUIRED_INSTALL_ICON_SPECS) {
+    const hasRequiredIcon = icons.some(
+      (icon) =>
+        typeof icon?.src === 'string' &&
+        icon.src.trim().length > 0 &&
+        typeof icon?.sizes === 'string' &&
+        icon.sizes.split(/\s+/u).includes(size) &&
+        typeof icon?.purpose === 'string' &&
+        icon.purpose.split(/\s+/u).includes(purpose),
+    );
+    assert(hasRequiredIcon, `Manifest is missing a ${size} install icon with purpose ${purpose}.`);
+  }
 };
 
 const collectJavaScriptAssets = (distDir) => {

@@ -302,7 +302,9 @@ Substeps:
    - keep production website rollout manual in this repository via `Deploy Production`, which requires a successful `Quality` run for the current `main` commit, rebuilds the production variant, publishes the immutable production handoff artifact, and dispatches the website repo
    - run build-output path/scope assertions in `Quality` for preview and in `Deploy Production` for production so each channel is validated at its own deployment boundary
 8. Verify production installability contract (`M2-07`):
-   - enforce install icon contract in automated checks (`manifest` includes moneybag `192x192` and `512x512`, HTML includes moneybag `apple-touch-icon`)
+   - enforce install icon contract in automated checks (`manifest` includes padded moneybag
+     `192x192` and `512x512` assets for both `any` and `maskable` purposes; HTML includes the padded
+     moneybag `apple-touch-icon`)
    - keep manual iOS Safari / Android Chrome Add to Home Screen checklist and evidence in GitHub issue [#25](https://github.com/Jon2050/Conspectus-Mobile/issues/25)
    - track discovered installability defects as `bug` issues (current follow-up: icon cropping/centering issue `#106`)
 
