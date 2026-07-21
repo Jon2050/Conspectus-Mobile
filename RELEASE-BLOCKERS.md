@@ -6,22 +6,22 @@ clear RB-04 may begin only after prerequisite blockers RB-01 through RB-03 are c
 remains the implementation index; [`docs/Release-Process.md`](docs/Release-Process.md) remains the
 execution runbook.
 
-Last verified: 2026-07-21
+Last verified: 2026-07-22
 
 ## Current decision
 
 **NOT READY FOR RELEASE**
 
-| ID    | Serious release blocker                                   | Status | Cleared only when                                                                                                               |
-| ----- | --------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| RB-01 | Runtime security headers are absent                       | Open   | #82 and #120 meet their production acceptance criteria or an explicit security/product decision formally changes those criteria |
-| RB-02 | Production Microsoft sign-in is not verified              | Open   | The Entra SPA redirects are verified and a real production sign-in returns to `/conspectus/`                                    |
-| RB-03 | Physical-device QA and install icon are unresolved        | Open   | Every required iOS/Android scenario passes on the exact candidate and #106 is resolved                                          |
-| RB-04 | No qualified, approved, deployed release candidate exists | Open   | The full release process, final review, exact-SHA deployment, tag, and GitHub Release are complete                              |
+| ID    | Release-readiness item                                    | Status                  | Cleared only when                                                                                                               |
+| ----- | --------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| RB-01 | Runtime security headers are absent                       | Cleared — risk accepted | #82 and #120 meet their production acceptance criteria or an explicit security/product decision formally changes those criteria |
+| RB-02 | Production Microsoft sign-in                              | Cleared — verified      | The Entra SPA redirects are verified and a real production sign-in returns to `/conspectus/`                                    |
+| RB-03 | Physical-device QA is incomplete                          | Open                    | Every required iOS/Android scenario passes on the exact candidate and #106 is resolved                                          |
+| RB-04 | No qualified, approved, deployed release candidate exists | Open                    | The full release process, final review, exact-SHA deployment, tag, and GitHub Release are complete                              |
 
-## RB-01 — Runtime security headers are absent
+## RB-01 — Runtime security-header limitation accepted
 
-### Why this seriously blocks release
+### Original risk
 
 The production app handles authentication and a personal financial database. Its HTML document
 contains a CSP fallback, but the live response currently supplies only HSTS—not runtime
@@ -32,19 +32,20 @@ cannot provide every header-only protection, and the current acceptance criteria
 production hosting stack to deliver and verify these headers. Describing this as complete would be
 factually incorrect.
 
-### How to fix it
+### Decision and residual risk
 
-1. Provide a production edge or hosting capability that can set deterministic response headers.
-2. Apply the canonical CSP plus `X-Content-Type-Options: nosniff` and the agreed referrer policy to
-   every app-route response.
-3. Re-enable strict live header assertions in the cross-repository smoke contract.
-4. Run a complete production deployment and verify the headers directly against
-   `https://jon2050.de/conspectus/` on repeated requests.
-5. Close #82 and #120 only after their production evidence is linked.
+On 2026-07-22, the application owner explicitly accepted this limitation for the current MVP
+because the free production host cannot emit the headers and changing hosting is not available.
+Production retains HSTS plus the checked document-level CSP and referrer-policy meta tags. It does
+not receive runtime `Content-Security-Policy`, `X-Content-Type-Options`, or `Referrer-Policy`
+headers. In particular, the document CSP cannot supply header-only protections such as
+`frame-ancestors`, and no response-level MIME-sniffing protection is present.
 
-An explicit product/security decision may instead change the acceptance criteria and retain the
-document CSP as a known limitation. That is risk acceptance, not a technical fix, and must be
-documented before it can clear this blocker.
+This decision clears RB-01 by formally changing the release criterion; it does not claim technical
+equivalence or close the tracking issues. Reconsider the decision when hosting capabilities change,
+when the application exposure changes materially, or after any relevant security incident. A future
+technical fix remains: provide a capable host/edge, apply the canonical headers, restore strict live
+header assertions, and verify them repeatedly against production.
 
 ### Why it is not fixed already
 
@@ -54,9 +55,9 @@ free hosting layer cannot enforce the required response headers. No paid package
 and moving the domain behind another edge/proxy would be a material infrastructure and security
 decision that must not be made implicitly.
 
-## RB-02 — Production Microsoft sign-in is not verified
+## RB-02 — Production Microsoft sign-in verified
 
-### Why this seriously blocks release
+### Original risk
 
 Microsoft redirect URI matching is exact. If the Entra SPA registration lacks
 `https://jon2050.de/conspectus/`, or still depends on a retired production URI, users can reach the
@@ -64,7 +65,7 @@ app but cannot complete sign-in. Authentication and OneDrive binding are core MV
 release without an authoritative configuration check and real sign-in smoke would be unusable for
 its primary purpose.
 
-### How to fix it
+### Required verification
 
 1. Authenticate to Microsoft Entra with an account that can manage application
    `94c434a2-a0ad-485e-90a6-660a08dd8a48`.
@@ -74,40 +75,39 @@ its primary purpose.
 4. Use the dedicated QA Microsoft account to sign in on production and verify the callback returns
    to `/conspectus/` without a loop or configuration error.
 
-### Current evidence
+### Clearing evidence
 
 On 2026-07-21, the live main preview initiated an MSAL PKCE request with client ID
 `94c434a2-a0ad-485e-90a6-660a08dd8a48` and the exact callback
 `https://jon2050.github.io/Conspectus-Mobile/previews/main/`, then reached the Microsoft account
 sign-in page. Separate public authorization probes also reached Microsoft sign-in for the production
-and test-preview callbacks. The reported redirect error is therefore not reproducible from the
-current canonical deployed URLs without the original device/start-URL context. Real production
-account sign-in and OneDrive access remain unverified, so RB-02 stays open.
+and test-preview callbacks.
 
-### Why it is not fixed already
+On 2026-07-22, the application owner confirmed that the required Entra registration was completed
+and manually verified real production Microsoft sign-in and OneDrive application behavior. The
+tested production deployment is successful run
+[`29871002715`](https://github.com/Jon2050/Conspectus-Mobile/actions/runs/29871002715) for commit
+`835651dc121ee7a5a637bf7db0d97bafb643bd01`, with live build time
+`2026-07-21T21:42:34Z`. This clears RB-02.
 
-The existing Azure CLI refresh token remains expired. Several device-login attempts expired or
-remained unapproved at the password/passkey/MFA step, so the registration still cannot be inspected
-authoritatively. The exact URL and deployment identity that produced the user's redirect error were
-not captured. Account secrets and MFA require the human account owner; they cannot be bypassed or
-entered by automation.
-
-## RB-03 — Physical-device QA and install icon are unresolved
+## RB-03 — Physical-device QA incomplete
 
 ### Why this seriously blocks release
 
 iOS Safari, installed iOS PWAs, Android Chrome, and installed Android PWAs differ in installation,
 service-worker lifecycle, storage, authentication, viewport handling, and network recovery.
-Automated desktop-browser tests cannot establish those platform behaviors. In addition,
-[#106](https://github.com/Jon2050/Conspectus-Mobile/issues/106) reports a cropped/off-center
-home-screen icon, directly conflicting with the required `QA-01` result. The remaining scenarios
-exercise real OneDrive reads and writes, upload interruption, offline protection, and expired
-session recovery; failure could lose trust or create duplicate financial writes.
+Automated desktop-browser tests cannot establish those platform behaviors. When this blocker was
+opened, [#106](https://github.com/Jon2050/Conspectus-Mobile/issues/106) reported a
+cropped/off-center home-screen icon that directly conflicted with the required `QA-01` result. The
+corrected icon is now deployed, but its required installed-device evidence is not recorded. The
+remaining scenarios exercise real OneDrive reads and writes, upload interruption, offline
+protection, and expired session recovery; failure could lose trust or create duplicate financial
+writes.
 
 ### How to fix it
 
-1. Correct the install icon padding/centering and supply appropriate maskable icon metadata, then
-   verify the built manifest and Apple touch icon.
+1. Retain the completed icon padding/maskable metadata and automated manifest/Apple touch-icon
+   verification.
 2. Create the exact release candidate and freeze its shared preview slot.
 3. Run every scenario in [`docs/Manual-Device-QA.md`](docs/Manual-Device-QA.md) on a physical iPhone
    and a supported physical Android phone using the disposable QA account/database.
@@ -119,21 +119,23 @@ The repository repair now uses padded install artwork, dedicated `192x192` and `
 assets, and build/live contract checks for both `any` and `maskable` manifest purposes. This is only
 the automated prerequisite for QA-01; physical installed-icon verification is still required.
 
-### Why it is not fixed already
+### Why it remains open
 
-The known icon defect has not received a reviewed asset change, and the required evidence needs
-physical devices, interactive Microsoft authentication, and a disposable OneDrive fixture.
-Browser emulation would not satisfy the committed release gate.
+The reviewed icon correction is deployed, and the application owner confirmed that a phone updated
+to the current production build. The complete QA-01 through QA-08 matrix, exact iOS/Android device
+and browser versions, disposable OneDrive fixture evidence, and required screenshots are not yet
+recorded. Browser emulation or a general manual smoke does not satisfy the committed release gate.
 
 ## RB-04 — No qualified, approved, deployed release candidate exists
 
 ### Why this seriously blocks release
 
-The current repository `main` and its required checks are green, but production still identifies
-an older commit. There is no release-candidate PR, completed final M8 review, physical QA evidence,
-human `APPROVED FOR RELEASE` decision, exact-SHA production deployment, immutable version tag, or
-GitHub Release. Publishing now would detach the announced version from the code and evidence that
-were actually deployed.
+The current repository `main` and its required checks are green, and production deployment run
+`29871002715` successfully published exact main commit
+`835651dc121ee7a5a637bf7db0d97bafb643bd01`. However, there is no completed release-candidate
+version/PR, final M8 review, full physical QA evidence, recorded human `APPROVED FOR RELEASE`
+decision, immutable version tag, or GitHub Release. A successful production workflow alone does not
+complete the repository's release process.
 
 ### How to fix it
 
@@ -153,5 +155,7 @@ After RB-01 through RB-03 are cleared:
 
 ### Why it is not fixed already
 
-The upstream security, authentication, icon, and device gates are still open. The release process
-correctly forbids creating a successful tag or release merely because repository CI is green.
+RB-01 is cleared by explicit risk acceptance and RB-02 by real production verification. RB-03 and
+the remaining release-process evidence above are still open. The release process correctly forbids
+creating a successful tag or release merely because repository CI and one production deployment are
+green.

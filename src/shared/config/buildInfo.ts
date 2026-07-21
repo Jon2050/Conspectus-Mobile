@@ -55,6 +55,7 @@ export const loadBuildInfo = async (options: BuildInfoLoaderOptions = {}): Promi
 
   try {
     const response = await fetchImplementation(resolveDeployMetadataUrl(options.baseUrl), {
+      cache: 'no-store',
       headers: {
         accept: 'application/json',
       },

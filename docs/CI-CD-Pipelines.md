@@ -176,6 +176,9 @@ When a budget is exceeded:
   - the production artifact is a static PWA scoped to `/conspectus/` on `jon2050.de`; the website consumer validates `index.html`, the document CSP, and the optional `.htaccess` defense-in-depth headers before upload
   - production smoke validates the live document CSP, referrer-policy meta tag, padded Apple touch icon, and reachable `any` plus `maskable` 192px/512px manifest icons without requiring PHP or hosting-package response-header support
   - the CSP keeps general JavaScript evaluation disabled while allowing the narrower WebAssembly permission required by sql.js plus the Microsoft login, Graph, and OneDrive download endpoints used by the app
+  - the current free host does not emit runtime CSP, `X-Content-Type-Options`, or `Referrer-Policy` response headers; the owner accepted this documented MVP limitation on 2026-07-22, while the document policies and optional artifact-owned `.htaccess` remain enforced by build and smoke contracts
+  - the footer fetches `deploy-metadata.json` with browser caching disabled so a newly deployed identity is not hidden by an older cached metadata response
+  - service-worker updates remain prompt-based: an open client shows **Update now** instead of replacing the running shell automatically, protecting unsaved transfer state; closing all app tabs and reopening also lets an activated update take control
   - Lighthouse runs only after production smoke observes the expected commit and deploy-run identity; a failure blocks release acceptance but does not attempt an automatic rollback
 
 ### `Rollback Production`
