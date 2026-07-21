@@ -16,7 +16,7 @@ Last verified: 2026-07-22
 | ----- | --------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | RB-01 | Runtime security headers are absent                       | Cleared — risk accepted | #82 and #120 meet their production acceptance criteria or an explicit security/product decision formally changes those criteria |
 | RB-02 | Production Microsoft sign-in                              | Cleared — verified      | The Entra SPA redirects are verified and a real production sign-in returns to `/conspectus/`                                    |
-| RB-03 | Physical-device QA is incomplete                          | Open                    | Every required iOS/Android scenario passes on the exact candidate and #106 is resolved                                          |
+| RB-03 | Physical-device QA is incomplete                          | Cleared — owner waiver  | Every required iOS/Android scenario passes, or the owner explicitly accepts the unverified-device risk for the named release    |
 | RB-04 | No qualified, approved, deployed release candidate exists | Open                    | The full release process, final review, exact-SHA deployment, tag, and GitHub Release are complete                              |
 
 ## RB-01 — Runtime security-header limitation accepted
@@ -90,9 +90,9 @@ tested production deployment is successful run
 `835651dc121ee7a5a637bf7db0d97bafb643bd01`, with live build time
 `2026-07-21T21:42:34Z`. This clears RB-02.
 
-## RB-03 — Physical-device QA incomplete
+## RB-03 — Physical-device QA waived for v1.0.0
 
-### Why this seriously blocks release
+### Original risk
 
 iOS Safari, installed iOS PWAs, Android Chrome, and installed Android PWAs differ in installation,
 service-worker lifecycle, storage, authentication, viewport handling, and network recovery.
@@ -117,14 +117,22 @@ writes.
 
 The repository repair now uses padded install artwork, dedicated `192x192` and `512x512` maskable
 assets, and build/live contract checks for both `any` and `maskable` manifest purposes. This is only
-the automated prerequisite for QA-01; physical installed-icon verification is still required.
+the automated prerequisite for QA-01; physical installed-icon verification remains the default
+release requirement unless explicitly waived as recorded below.
 
-### Why it remains open
+### Owner decision and residual risk
 
 The reviewed icon correction is deployed, and the application owner confirmed that a phone updated
-to the current production build. The complete QA-01 through QA-08 matrix, exact iOS/Android device
-and browser versions, disposable OneDrive fixture evidence, and required screenshots are not yet
-recorded. Browser emulation or a general manual smoke does not satisfy the committed release gate.
+to the current production build. On 2026-07-22, the owner explicitly instructed the release process
+to take physical QA as approved for version `1.0.0`. This clears RB-03 for that named release through
+a one-release owner waiver, not through observed `PASS` results.
+
+The QA-01 through QA-08 matrix, exact iOS/Android device and browser versions, disposable OneDrive
+fixture evidence, and required screenshots were not supplied. The residual risks therefore include
+unverified installed-icon rendering, platform-specific service-worker/update behavior, mobile
+layout, interrupted upload recovery, offline protection, and expired-session recovery. The
+[`docs/Manual-Device-QA.md`](docs/Manual-Device-QA.md) gate remains the default for later releases;
+this waiver does not mark its scenarios as executed and does not close #106.
 
 ## RB-04 — No qualified, approved, deployed release candidate exists
 
@@ -155,7 +163,7 @@ After RB-01 through RB-03 are cleared:
 
 ### Why it is not fixed already
 
-RB-01 is cleared by explicit risk acceptance and RB-02 by real production verification. RB-03 and
-the remaining release-process evidence above are still open. The release process correctly forbids
-creating a successful tag or release merely because repository CI and one production deployment are
-green.
+RB-01 is cleared by explicit risk acceptance, RB-02 by real production verification, and RB-03 by
+the version-specific owner waiver recorded above. The remaining RB-04 release-process evidence is
+still open. The release process correctly forbids creating a successful tag or release merely
+because repository CI and one production deployment are green.

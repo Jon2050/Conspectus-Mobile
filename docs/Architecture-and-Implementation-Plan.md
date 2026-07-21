@@ -831,7 +831,7 @@ M8-06 implementation clarification:
 M8-08 implementation clarification:
 
 - Every production release uses the single ordered checklist in `docs/Release-Process.md`, with a `release/v<version>` candidate branch, synchronized package and lockfile versions, and retained release pull request evidence.
-- GitHub enforces pull-request delivery, rebase-only linear history, and the strict `Quality Gate`; the release process additionally requires reviewer-agent approval, explicit human release-owner acceptance, and complete physical iOS/Android evidence.
+- GitHub enforces pull-request delivery, rebase-only linear history, and the strict `Quality Gate`; the release process additionally requires reviewer-agent approval, explicit human release-owner acceptance, and complete physical iOS/Android evidence. For `v1.0.0` only, the owner accepted the residual risk of leaving that device matrix `NOT RUN`; this scoped waiver is not an observed pass and does not change later release gates.
 - Production remains a manual deployment of the qualified current `main` commit. The immutable `v<version>` tag and GitHub Release are published only for the exact commit whose production identity, Lighthouse gate, and post-deploy smoke checks passed.
 
 M8-09 implementation clarification:
@@ -929,6 +929,8 @@ Recommended additional:
 The canonical execution, pass/fail, and release-evidence contract is
 [`docs/Manual-Device-QA.md`](Manual-Device-QA.md). Both required physical-device rows must pass
 every required scenario before release. Emulators may supplement this gate but cannot satisfy it.
+For `v1.0.0` only, the documented owner waiver permits release with all unexecuted rows retained as
+`NOT RUN` and the residual risks explicitly accepted; it does not establish a physical QA pass.
 
 Manual scenarios:
 
@@ -946,7 +948,8 @@ Hard gates before release:
 2. Typecheck and lint pass.
 3. Bundle size within budget.
 4. No high severity dependency vulnerabilities.
-5. Manual device smoke tests pass.
+5. Manual device smoke tests pass, except for the documented, release-specific `v1.0.0` owner
+   waiver.
 
 ## 6.6 Observability and Error Handling
 

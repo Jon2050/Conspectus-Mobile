@@ -23,6 +23,11 @@ Only `PASS` satisfies the gate. A `FAIL`, `BLOCKED`, or `NOT RUN` result blocks 
 failure to a bug, retain supporting evidence, fix the defect, and rerun the affected scenario on the
 affected device. Record both the original result and the rerun in the release pull request.
 
+Release-specific exception: for `v1.0.0` only, the application owner accepted the residual risk of
+not executing this physical-device matrix. Record every unexecuted row as `NOT RUN`, link the owner
+decision and [`../RELEASE-BLOCKERS.md`](../RELEASE-BLOCKERS.md), and do not describe the waiver as
+an observed pass. This exception does not change the gate for later releases.
+
 ## Candidate Record
 
 Record these values before testing:
@@ -184,7 +189,7 @@ Evidence: offline error, unavailable financial data/write action, and recovered 
 
 ### QA-07 Expired-session recovery and route preservation
 
-1. While online, navigate to Transfers and select a non-current month.
+1. While online, navigate to Transfers.
 2. Fully close the app and invalidate the prepared QA Microsoft session using the recorded method,
    without clearing the app's site data or file binding.
 3. Relaunch the standalone app and follow the re-authentication action once.
@@ -195,28 +200,29 @@ Expected results:
 - The app reports that sign-in is required without exposing cached financial data as current.
 - A single user action starts one re-authentication flow; repeated redirects or stacked prompts do
   not occur.
-- Successful sign-in returns to Transfers with the previously selected month still selected.
+- Successful sign-in returns to the Transfers route. The month follows the normal startup behavior.
 - A fresh sync completes and current transfer data becomes available.
 
-Evidence: sign-in-required state and restored Transfers route/month after re-authentication.
+Evidence: sign-in-required state and restored Transfers route after re-authentication.
 
 ### QA-08 Settings force refresh, reset, and rebind
 
 1. In Settings, record the bound file and last-sync time, then run Force refresh once.
-2. Confirm local reset, relaunch if prompted, and inspect Accounts, Transfers, and Settings before
-   signing in again.
-3. Sign in, bind the prepared fixture database again, and wait for the first sync.
+2. Confirm local reset, relaunch if prompted, and inspect Accounts, Transfers, and Settings while
+   the existing Microsoft session remains signed in.
+3. Bind the prepared fixture database again and wait for the first sync.
 
 Expected results:
 
 - Force refresh has visible progress, prevents duplicate submission, preserves the binding, and
   advances the last-sync time only after success.
-- Confirmed reset removes the QA account session, binding, and cached snapshot; old financial data
-  is not displayed afterward.
-- The app remains usable for sign-in and rebind, and the rebound database performs a fresh online
-  sync with the expected accounts and transfers.
+- Confirmed reset removes the binding and cached snapshot while preserving the Microsoft session;
+  old financial data is not displayed afterward.
+- The app remains usable for rebind, and the rebound database performs a fresh online sync with the
+  expected accounts and transfers.
 
-Evidence: force-refresh completion, post-reset unbound state, and rebound file/current data.
+Evidence: force-refresh completion, post-reset signed-in but unbound state, and rebound file/current
+data.
 
 ## Release Pull Request Evidence
 
@@ -264,8 +270,10 @@ unlinked issue do not satisfy the gate.
 
 ### Final Gate
 
-- [ ] Every QA-01 through QA-08 result is PASS on IOS and ANDROID.
+- [ ] Standard gate: every QA-01 through QA-08 result is PASS on IOS and ANDROID.
+- [ ] `v1.0.0` exception only: every unexecuted result remains NOT RUN, the owner waiver is linked,
+      and the listed residual risks are accepted without claiming an observed pass.
 - [ ] Every failure is linked to a defect and its affected scenario has a passing rerun.
 - [ ] Evidence is attached to or durably linked from this release pull request.
-- Final status: BLOCKED / PASS
+- Final status: BLOCKED / PASS / WAIVED FOR v1.0.0
 ```

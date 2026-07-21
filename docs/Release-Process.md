@@ -73,11 +73,14 @@ comment. Do not maintain a second release checklist elsewhere.
       recorded candidate before starting device QA.
 - [ ] Complete every required iOS and Android scenario in
       [`Manual-Device-QA.md`](Manual-Device-QA.md). Only `PASS` in every required row satisfies the
-      gate; attach or link the required evidence and passing reruns.
+      normal gate; attach or link the required evidence and passing reruns. For `v1.0.0` only, the
+      owner may instead record the scoped waiver in that document and `RELEASE-BLOCKERS.md`, leave
+      every unexecuted row as `NOT RUN`, and accept the listed residual risks.
 - [ ] Resolve every release pull request conversation and confirm the release notes still match the
       qualified candidate.
 - [ ] Obtain and record an explicit `APPROVED FOR RELEASE` decision from the human release owner
-      after the automated and physical-device evidence is complete.
+      after the automated evidence and either physical-device evidence or the scoped `v1.0.0`
+      waiver are complete.
 
 ### 3. Merge and lock the production target
 
@@ -105,14 +108,17 @@ comment. Do not maintain a second release checklist elsewhere.
       worker load without path or policy errors and the footer matches the released version and
       deployed build time.
 - [ ] On the required physical iOS and Android devices, confirm the installed PWA discovers and
-      applies the update, relaunches successfully, and shows the released footer identity.
+      applies the update, relaunches successfully, and shows the released footer identity. The
+      scoped `v1.0.0` waiver also covers this device-only post-deploy check; retain it as unverified
+      rather than recording `PASS`.
 - [ ] With the dedicated QA Microsoft account and disposable database, smoke sign-in, bound-file
       sync, Accounts, and Transfers on production. Do not use a personal financial database.
 - [ ] Run `Post-Deploy Monitor` manually from `main` with `simulate_failure = false`, require a successful
       result for the exact production `commitSha` and `deployRunId`, and link its evidence artifact.
-- [ ] Record `PASS` or the linked defect for every post-deploy check. Any failed, blocked, or
-      unverified check keeps the release incomplete and triggers the applicable rollback procedure;
-      do not publish a successful GitHub Release.
+- [ ] Record `PASS`, the scoped `v1.0.0` owner waiver for device-only checks, or the linked defect
+      for every post-deploy check. Any failed, blocked, or unverified check not covered by that
+      waiver keeps the release incomplete and triggers the applicable rollback procedure; do not
+      publish a successful GitHub Release.
 
 ### 5. Tag, publish, and close
 
