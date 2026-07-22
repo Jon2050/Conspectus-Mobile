@@ -47,8 +47,7 @@
     "countFound": "{count} Transfers gefunden.",
     "emptyBox": "Es gibt keine Transfers für diesen Monat.",
     "primaryIncome": "EINNAHMEN",
-    "primarySpendings": "AUSGABEN",
-    "buyplace": "Geschäft"
+    "primarySpendings": "AUSGABEN"
   },
   "addTransfer": {
     "title": "Neuer Transfer",
@@ -204,18 +203,9 @@
       "unknown": "Unbekannt"
     }
   },
-  "deploymentInfo": {
-    "title": "Deployment-Info",
-    "version": "Version",
-    "commit": "Commit",
-    "build": "Build"
-  },
   "loadingPlaceholder": {
     "title": "Lade...",
     "description": "Dein mobiler Arbeitsplatz wird vorbereitet."
-  },
-  "toast": {
-    "dismiss": "Schließen"
   },
   "sync": {
     "startup": {
@@ -224,11 +214,7 @@
       "onlineChanged": "Neueste DB von OneDrive heruntergeladen.",
       "fileMissing": "Die ausgewählte OneDrive-Datenbank ist am gespeicherten Pfad nicht mehr verfügbar. Wähle in den Einstellungen eine andere Datenbank aus.",
       "completed": "DB-Synchronisation abgeschlossen.",
-      "failed": "Start-Synchronisation fehlgeschlagen.",
-      "failedUnexpected": "Start-Synchronisation unerwartet fehlgeschlagen. Bitte prüfe die Browser-Konsole und versuche es erneut."
-    },
-    "upload": {
-      "uploading": "Datenbank wird auf OneDrive hochgeladen..."
+      "failed": "Start-Synchronisation fehlgeschlagen."
     },
     "dbRuntimeError": {
       "initFailed": "Konnte lokale SQLite-Laufzeitumgebung nicht initialisieren. Lade die App neu.",

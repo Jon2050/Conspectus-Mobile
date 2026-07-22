@@ -47,8 +47,7 @@
     "countFound": "{count} transfers found.",
     "emptyBox": "There are no transfers recorded for this month.",
     "primaryIncome": "INCOME",
-    "primarySpendings": "SPENDINGS",
-    "buyplace": "Store"
+    "primarySpendings": "SPENDINGS"
   },
   "addTransfer": {
     "title": "New Transfer",
@@ -204,18 +203,9 @@
       "unknown": "Unknown"
     }
   },
-  "deploymentInfo": {
-    "title": "Deployment Info",
-    "version": "Version",
-    "commit": "Commit",
-    "build": "Build"
-  },
   "loadingPlaceholder": {
     "title": "Loading...",
     "description": "Preparing your mobile workspace."
-  },
-  "toast": {
-    "dismiss": "Dismiss"
   },
   "sync": {
     "startup": {
@@ -224,11 +214,7 @@
       "onlineChanged": "Downloaded the latest DB from OneDrive.",
       "fileMissing": "The selected OneDrive database is no longer available at its saved path. Select another DB file in Settings.",
       "completed": "DB sync completed.",
-      "failed": "Startup sync failed.",
-      "failedUnexpected": "Startup sync failed unexpectedly. Check the browser console and retry."
-    },
-    "upload": {
-      "uploading": "Uploading database to OneDrive..."
+      "failed": "Startup sync failed."
     },
     "dbRuntimeError": {
       "initFailed": "Failed to initialize the local SQLite runtime. Reload the app and try syncing again.",
