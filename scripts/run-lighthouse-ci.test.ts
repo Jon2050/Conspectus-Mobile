@@ -78,6 +78,13 @@ describe('Lighthouse CI runner', () => {
     expect(() => parseArgs(['--url', 'http://example.com/app/'])).toThrow(
       'Use an absolute HTTPS URL',
     );
+    expect(
+      parseArgs(['https://example.com/app', 'reports/custom', '--number-of-runs', '1'])
+        .numberOfRuns,
+    ).toBe(1);
+    expect(() => parseArgs(['https://example.com/app', '--number-of-runs', '0'])).toThrow(
+      'positive integer',
+    );
   });
 
   it('validates the committed budget schema', () => {

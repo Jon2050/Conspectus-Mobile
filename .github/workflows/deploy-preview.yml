@@ -8,8 +8,8 @@ on:
       - completed
 
 env:
-  PREVIEW_SMOKE_MAX_ATTEMPTS: '18'
-  PREVIEW_SMOKE_RETRY_DELAY_SECONDS: '10'
+  PREVIEW_SMOKE_MAX_ATTEMPTS: '60'
+  PREVIEW_SMOKE_RETRY_DELAY_SECONDS: '3'
 
 permissions:
   actions: read
@@ -352,6 +352,8 @@ jobs:
           npm run check:lighthouse --
           "${PREVIEW_URL}"
           reports/lighthouse/preview
+          --number-of-runs
+          "${{ needs.prepare-context.outputs.preview_slot == 'main' && '3' || '1' }}"
 
       - name: Upload preview Lighthouse reports
         if: always() && steps.lighthouse.outcome != 'skipped'

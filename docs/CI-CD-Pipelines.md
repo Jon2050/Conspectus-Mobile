@@ -52,7 +52,8 @@ flowchart TD
 ### `Dependency Audit`
 
 - File: [`.github/workflows/dependency-audit.yml`](../.github/workflows/dependency-audit.yml)
-- Trigger: pull requests, weekly schedule, manual dispatch, and reusable calls from `Quality`
+- Trigger: pull requests that change `package.json` or `package-lock.json`, weekly schedule, manual
+  dispatch, and reusable calls from `Quality`
 - Purpose:
   - scan the complete npm dependency tree, including development tooling
   - fail when npm reports a high or critical vulnerability
@@ -71,14 +72,17 @@ flowchart TD
 - Purpose:
   - validate dependency security, formatting, linting, type safety, dead code, unit tests, preview build correctness, bundle size, and Playwright smoke
   - produce the reusable `quality-preview-dist` artifact after `Build App (Preview)`
-- Stage order:
-  - `Dependency Audit`
-  - `Detect Relevant Changes`
-  - `Format, Lint, Typecheck, and Dead Code`
-  - `Unit Tests`
-  - `Build App (Preview)`
-  - `Build Verification`
-  - `E2E Smoke Tests`
+- Stage graph for code-bearing non-main branches:
+  - `Dependency Audit` and `Detect Relevant Changes` start immediately
+  - `Format, Lint, Typecheck, and Dead Code`, `Unit Tests`, and `Build App (Preview)` fan out after
+    change detection
+  - bundle and channel verification run inside the build job before its artifact is uploaded
+  - isolated Chromium and Pixel 5 E2E jobs fan out after the verified build
+  - `Quality Gate` joins every result
+- Protected `main` merge graph:
+  - dependency audit and change detection
+  - exact-SHA preview build with bundle and channel verification
+  - Chromium critical-user-journey smoke
   - `Quality Gate`
 - Depends on: none
 - Downstream dependencies:
@@ -90,13 +94,18 @@ flowchart TD
 - Notes:
   - uses `actions/setup-node` npm cache and Playwright browser cache
   - cancels in-progress runs for the same ref via workflow concurrency
-  - `Build Verification` checks the downloaded preview artifact against the JS/CSS bundle budgets before validating base-path correctness, manifest `start_url` and `scope`, `any` and `maskable` 192px/512px install-icon entries, service worker scope, the document CSP and artifact-owned Apache security headers, and root-path leakage
+  - the build job checks `dist` against the JS/CSS bundle budgets before validating base-path
+    correctness, manifest `start_url` and `scope`, install icons, service worker scope, document CSP,
+    artifact-owned Apache security headers, and root-path leakage, then uploads the verified artifact
+  - the active no-bypass, strict, rebase-only main ruleset requires the full branch `Quality Gate` to
+    be current before merging; the lighter main run therefore verifies the exact merged build and
+    critical runtime path without repeating every pre-merge check
   - `Quality Gate` is the single branch-protection check that should be required on `main`
 
 #### Bundle size budgets
 
-`Build Verification` runs `npm run check:bundle-size` against the exact preview artifact produced
-by `Build App (Preview)`. The checker recursively includes every `.js` and `.css` file under
+`Build App (Preview)` runs `npm run check:bundle-size` against its exact preview output before
+upload. The checker recursively includes every `.js` and `.css` file under
 `dist`, including generated service-worker and Workbox runtime files. WASM, source maps, images,
 HTML, manifests, and other asset types are outside the M8-04 JS/CSS budget scope.
 
@@ -110,8 +119,8 @@ limits per asset class:
 
 Raw totals guard parse, storage, and uncompressed delivery cost. Gzip totals are calculated by
 compressing each emitted file independently and summing the results, matching separate network
-resources. A missing JS/CSS class or any exceeded limit fails `Build Verification`, which blocks
-E2E, preview deployment, production eligibility, and the branch `Quality Gate`.
+resources. A missing JS/CSS class or any exceeded limit fails the build job, which blocks E2E,
+preview deployment, production eligibility, and the branch `Quality Gate`.
 
 When a budget is exceeded:
 
@@ -132,7 +141,8 @@ When a budget is exceeded:
   - publish the verified preview artifact from `Quality` to GitHub Pages
   - deploy `main` to `/previews/main/`
   - deploy every non-`main` branch to the shared `/previews/test/` slot
-  - run the mobile Lighthouse release gate against the reachable deployed route
+  - run one mobile Lighthouse release check for the shared non-main slot and the three-run median
+    release gate for the main slot
 - Depends on:
   - a successful `Quality` run
   - the presence of the `quality-preview-dist` artifact on that `Quality` run
@@ -246,17 +256,19 @@ When a budget is exceeded:
 
 ### Lighthouse mobile release budgets
 
-Both deployment workflows run the pinned Lighthouse CLI three times with its mobile profile against
-the real deployed HTTPS route. Category thresholds use the median of the three runs to reduce normal
-measurement variance. Deterministic audits must pass in every run.
+Main preview and production deployments run the pinned Lighthouse CLI three times with its mobile
+profile against the real deployed HTTPS route. Category thresholds use the median to reduce normal
+measurement variance. The high-churn shared non-main preview runs the same checks once for faster
+feedback; main and production retain the release-grade three-run evidence. Deterministic audits must
+pass in every collected run.
 
-| Check           | Minimum | Aggregation |
-| --------------- | ------: | ----------- |
-| Performance     |     80% | Median      |
-| Accessibility   |     90% | Median      |
-| Best Practices  |     90% | Median      |
-| HTTPS           |    100% | Every run   |
-| Mobile viewport |    100% | Every run   |
+| Check           | Minimum | Main/production | Non-main preview |
+| --------------- | ------: | --------------- | ---------------- |
+| Performance     |     80% | Median          | Single run       |
+| Accessibility   |     90% | Median          | Single run       |
+| Best Practices  |     90% | Median          | Single run       |
+| HTTPS           |    100% | Every run       | Every run        |
+| Mobile viewport |    100% | Every run       | Every run        |
 
 The release runner also checks the deployed same-origin PWA manifest, route-correct `start_url` and
 scope, browser-confirmed service-worker registration/scope, and required 192px/512px install icons.
@@ -315,7 +327,8 @@ npm run check:lighthouse -- https://jon2050.github.io/Conspectus-Mobile/previews
 ### `lighthouse-preview-<slot>-<commitSha>` / `lighthouse-production-<commitSha>`
 
 - Producers: `Deploy Preview` and `Deploy Production`
-- Contents: three mobile Lighthouse HTML/JSON reports, `summary.json`, and `summary.md`
+- Contents: one report for non-main previews or three reports for main/production, plus
+  `summary.json` and `summary.md`
 - Retention: 90 days
 - Failure behavior: reports remain available when collection completed but a release threshold failed
 

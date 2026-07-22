@@ -44,6 +44,7 @@ export interface LighthouseEvaluation {
 
 export function parseArgs(argv: string[]): {
   budgetConfig: string;
+  numberOfRuns: number | null;
   outputDir: string;
   url: URL;
 };

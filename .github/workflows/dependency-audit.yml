@@ -4,6 +4,9 @@ name: Dependency Audit
 on:
   workflow_call:
   pull_request:
+    paths:
+      - package.json
+      - package-lock.json
   schedule:
     - cron: '17 3 * * 2'
   workflow_dispatch:

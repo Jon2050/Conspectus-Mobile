@@ -126,7 +126,9 @@ jobs:
     name: Format, Lint, Typecheck, and Dead Code
     needs:
       - detect-code-changes
-    if: needs.detect-code-changes.outputs.code_changed == 'true'
+    if: >-
+      needs.detect-code-changes.outputs.code_changed == 'true' &&
+      github.ref_name != github.event.repository.default_branch
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -167,8 +169,9 @@ jobs:
     name: Unit Tests
     needs:
       - detect-code-changes
-      - lint-typecheck
-    if: needs.detect-code-changes.outputs.code_changed == 'true'
+    if: >-
+      needs.detect-code-changes.outputs.code_changed == 'true' &&
+      github.ref_name != github.event.repository.default_branch
     runs-on: ubuntu-latest
     permissions:
       actions: write
@@ -218,7 +221,6 @@ jobs:
     name: Build App (Preview)
     needs:
       - detect-code-changes
-      - unit-tests
     if: needs.detect-code-changes.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
     permissions:
@@ -252,40 +254,6 @@ jobs:
           DEPLOY_PREVIEW_BASE_PREFIX: /${{ github.event.repository.name }}
         run: npm run build
 
-      - name: Upload preview build artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: quality-preview-dist
-          if-no-files-found: error
-          include-hidden-files: true
-          path: dist
-          retention-days: 7
-
-  build-verification:
-    name: Build Verification
-    needs:
-      - detect-code-changes
-      - build
-    if: needs.detect-code-changes.outputs.code_changed == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
-      - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: 22
-
-      - name: Download preview build artifact
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
-        with:
-          name: quality-preview-dist
-          path: dist
-
       - name: Enforce JS/CSS bundle size budgets
         run: npm run check:bundle-size
 
@@ -296,13 +264,26 @@ jobs:
           --channel preview
           --base "/${{ github.event.repository.name }}/previews/${{ github.ref_name == 'main' && 'main' || 'test' }}/"
 
+      - name: Upload preview build artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: quality-preview-dist
+          if-no-files-found: error
+          include-hidden-files: true
+          path: dist
+          retention-days: 7
+
   e2e-tests:
-    name: E2E Critical Journeys
+    name: E2E Critical Journeys (${{ matrix.project }})
     needs:
       - detect-code-changes
-      - build-verification
+      - build
     if: needs.detect-code-changes.outputs.code_changed == 'true'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ${{ fromJSON(github.ref_name == github.event.repository.default_branch && '["chromium"]' || '["chromium", "pixel-5"]') }}
     permissions:
       actions: read
       contents: read
@@ -360,13 +341,18 @@ jobs:
         env:
           PLAYWRIGHT_APP_BASE_PATH: /${{ github.event.repository.name }}/previews/${{ github.ref_name == 'main' && 'main' || 'test' }}/
           PLAYWRIGHT_WEB_SERVER_BUILD: '0'
-        run: npm run test:e2e
+        run: |
+          if [ "${GITHUB_REF_NAME}" = "${{ github.event.repository.default_branch }}" ]; then
+            npx playwright test tests/e2e/critical-user-journeys.spec.ts --project="${{ matrix.project }}"
+          else
+            npm run test:e2e -- --project="${{ matrix.project }}"
+          fi
 
       - name: Upload Playwright failure diagnostics
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: playwright-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          name: playwright-diagnostics-${{ matrix.project }}-${{ github.run_id }}-${{ github.run_attempt }}
           if-no-files-found: warn
           path: |
             playwright-report
@@ -378,7 +364,7 @@ jobs:
         if: always()
         run: >-
           node scripts/publish-test-summary.mjs
-          --title "E2E Test Report"
+          --title "E2E Test Report (${{ matrix.project }})"
           --files reports/playwright/junit.xml
 
   quality-gate:
@@ -389,7 +375,6 @@ jobs:
       - lint-typecheck
       - unit-tests
       - build
-      - build-verification
       - e2e-tests
     if: always()
     runs-on: ubuntu-latest
@@ -405,7 +390,6 @@ jobs:
           E2E_RESULT: ${{ needs.e2e-tests.result }}
           LINT_RESULT: ${{ needs.lint-typecheck.result }}
           UNIT_RESULT: ${{ needs.unit-tests.result }}
-          VERIFY_RESULT: ${{ needs.build-verification.result }}
         run: |
           set -euo pipefail
 
@@ -424,6 +408,15 @@ jobs:
             exit 0
           fi
 
+          if [ "${GITHUB_REF_NAME}" = "${{ github.event.repository.default_branch }}" ]; then
+            if [ "${BUILD_RESULT}" != 'success' ] || [ "${E2E_RESULT}" != 'success' ]; then
+              echo "Post-merge build or Chromium smoke did not succeed (build=${BUILD_RESULT}, e2e=${E2E_RESULT})." >&2
+              exit 1
+            fi
+            echo "Protected main merge completed the exact-SHA build verification and Chromium critical-journey smoke."
+            exit 0
+          fi
+
           while IFS=':' read -r job_name job_result; do
             if [ "${job_result}" != 'success' ]; then
               echo "${job_name} did not succeed (result=${job_result})." >&2
@@ -433,7 +426,6 @@ jobs:
           Format, Lint, and Typecheck:${LINT_RESULT}
           Unit Tests:${UNIT_RESULT}
           Build App (Preview):${BUILD_RESULT}
-          Build Verification:${VERIFY_RESULT}
           E2E Critical Journeys:${E2E_RESULT}
           EOF
 
