@@ -147,6 +147,7 @@ Local quality scripts:
 - `npm run format` - verifies deterministic formatting with Prettier.
 - `npm run lint` - runs ESLint and fails on warnings/errors.
 - `npm run typecheck` - runs Svelte + TypeScript checks in strict mode.
+- `npm run check:dead-code` - checks for unused files, exports, and dependencies with Knip.
 - `npm run test` - runs app Vitest tests plus script Vitest tests.
 - `npm run build` - creates a production build in `dist/`.
 - `npm run check:bundle-size` - checks an existing `dist/` against the committed JS/CSS raw and
@@ -156,6 +157,8 @@ Local quality scripts:
   and enforces the committed score and PWA deployment budgets. A local Chrome/Chromium install is
   required.
 - `npm run test:e2e` - runs Playwright browser tests.
+- `npm run check:local` - runs formatting, linting, type checking, dead-code analysis, tests,
+  production build, and bundle-size verification in sequence.
 
 Playwright release-gate policy:
 

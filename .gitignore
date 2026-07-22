@@ -16,6 +16,9 @@ playwright-report
 test-results
 reports
 tests/fixtures/conspectusDB.db
+output/
+.playwright-mcp/
+test-output*.txt
 
 # Editor directories and files
 .vscode/*

@@ -90,7 +90,6 @@ export default defineConfig(({ command, mode }) => {
           'icons/moneysack64x64.png',
           'icons/moneysack256x256.png',
           'icons/moneysack512x512.png',
-          'icons/moneysack-maskable512x512.png',
         ],
         manifest: {
           name: 'Conspectus Mobile',
@@ -137,17 +136,11 @@ export default defineConfig(({ command, mode }) => {
               src: 'icons/moneysack512x512.png',
               sizes: '512x512',
               type: 'image/png',
-              purpose: 'any',
+              purpose: 'any maskable',
             },
             {
               src: 'icons/moneysack-maskable192x192.png',
               sizes: '192x192',
-              type: 'image/png',
-              purpose: 'maskable',
-            },
-            {
-              src: 'icons/moneysack-maskable512x512.png',
-              sizes: '512x512',
               type: 'image/png',
               purpose: 'maskable',
             },

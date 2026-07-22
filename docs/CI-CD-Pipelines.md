@@ -69,12 +69,12 @@ flowchart TD
 - File: [`.github/workflows/quality.yml`](../.github/workflows/quality.yml)
 - Trigger: every push to every branch except `gh-pages`
 - Purpose:
-  - validate dependency security, formatting, linting, type safety, unit tests, preview build correctness, bundle size, and Playwright smoke
+  - validate dependency security, formatting, linting, type safety, dead code, unit tests, preview build correctness, bundle size, and Playwright smoke
   - produce the reusable `quality-preview-dist` artifact after `Build App (Preview)`
 - Stage order:
   - `Dependency Audit`
   - `Detect Relevant Changes`
-  - `Format, Lint, and Typecheck`
+  - `Format, Lint, Typecheck, and Dead Code`
   - `Unit Tests`
   - `Build App (Preview)`
   - `Build Verification`

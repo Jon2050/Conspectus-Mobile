@@ -37,9 +37,8 @@ const VALID_SERVICE_WORKER = 'createHandlerBoundToURL("index.html")';
 const VALID_PREVIEW_SERVICE_WORKER = 'createHandlerBoundToURL("index.html")';
 const VALID_MANIFEST_ICONS = [
   { src: 'icons/moneysack192x192.png', sizes: '192x192', purpose: 'any' },
-  { src: 'icons/moneysack512x512.png', sizes: '512x512', purpose: 'any' },
+  { src: 'icons/moneysack512x512.png', sizes: '512x512', purpose: 'any maskable' },
   { src: 'icons/moneysack-maskable192x192.png', sizes: '192x192', purpose: 'maskable' },
-  { src: 'icons/moneysack-maskable512x512.png', sizes: '512x512', purpose: 'maskable' },
 ];
 
 const createDistFixture = (
@@ -143,7 +142,13 @@ describe('verify-build-channel script', () => {
           name: 'Conspectus Mobile',
           start_url: '/test-app/',
           scope: '/test-app/',
-          icons: VALID_MANIFEST_ICONS.filter((icon) => icon.purpose === 'any'),
+          icons: VALID_MANIFEST_ICONS.map((icon) => ({
+            ...icon,
+            purpose: icon.purpose
+              .split(/\s+/u)
+              .filter((purpose) => purpose !== 'maskable')
+              .join(' '),
+          })),
         }),
       );
 

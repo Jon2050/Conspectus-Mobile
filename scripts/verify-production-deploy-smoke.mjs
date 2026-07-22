@@ -10,7 +10,7 @@ const REQUIRED_MONEYBAG_ICON_SPECS = [
   { src: 'icons/moneysack192x192.png', sizes: '192x192', purpose: 'any' },
   { src: 'icons/moneysack512x512.png', sizes: '512x512', purpose: 'any' },
   { src: 'icons/moneysack-maskable192x192.png', sizes: '192x192', purpose: 'maskable' },
-  { src: 'icons/moneysack-maskable512x512.png', sizes: '512x512', purpose: 'maskable' },
+  { src: 'icons/moneysack512x512.png', sizes: '512x512', purpose: 'maskable' },
 ];
 const REQUIRED_APPLE_TOUCH_ICON = 'icons/moneysack180x180.png';
 

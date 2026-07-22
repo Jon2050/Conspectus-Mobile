@@ -124,11 +124,3 @@ export const applyStartupDbRuntimeError = (
     branch: STARTUP_DB_RUNTIME_FAILURE_BRANCH,
   });
 };
-
-export const startupSyncStateController = {
-  beginStartupSync,
-  updateStartupSyncProgress,
-  applyStartupFreshnessDecision,
-  applyStartupDbRuntimeError,
-  applyUnexpectedStartupSyncError,
-};
