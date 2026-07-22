@@ -94,14 +94,12 @@ Use these documents as the canonical sources for their topics:
   [docs/auth/Entra-App-Registration.md](docs/auth/Entra-App-Registration.md).
 - CI/CD workflow behavior, artifacts, and failure modes:
   [docs/CI-CD-Pipelines.md](docs/CI-CD-Pipelines.md).
-- Current release readiness, serious blockers, and clearing conditions:
-  [RELEASE-BLOCKERS.md](RELEASE-BLOCKERS.md).
 - Release branch/tag strategy, approvals, release notes, and production verification:
   [docs/Release-Process.md](docs/Release-Process.md).
 - Deterministic two-repository production rollback and incident ownership:
   [docs/Production-Rollback.md](docs/Production-Rollback.md).
-- MVP backlog index and issue completion rules:
-  [docs/GitHub-Issues-MVP-Backlog.md](docs/GitHub-Issues-MVP-Backlog.md).
+- Active GitHub issue backlog, status, and dependencies:
+  [docs/GitHub-Issues-Backlog.md](docs/GitHub-Issues-Backlog.md).
 - Desktop database and business-rule parity reference:
   [docs/Conspectus-Desktop-Info.md](docs/Conspectus-Desktop-Info.md).
 - Contribution and delivery workflow for humans and coding agents:
