@@ -10,14 +10,14 @@ Last verified: 2026-07-22
 
 ## Current decision
 
-**NOT READY FOR RELEASE**
+**RELEASED — v1.0.0**
 
-| ID    | Release-readiness item                                    | Status                  | Cleared only when                                                                                                               |
-| ----- | --------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| RB-01 | Runtime security headers are absent                       | Cleared — risk accepted | #82 and #120 meet their production acceptance criteria or an explicit security/product decision formally changes those criteria |
-| RB-02 | Production Microsoft sign-in                              | Cleared — verified      | The Entra SPA redirects are verified and a real production sign-in returns to `/conspectus/`                                    |
-| RB-03 | Physical-device QA is incomplete                          | Cleared — owner waiver  | Every required iOS/Android scenario passes, or the owner explicitly accepts the unverified-device risk for the named release    |
-| RB-04 | No qualified, approved, deployed release candidate exists | Open                    | The full release process, final review, exact-SHA deployment, tag, and GitHub Release are complete                              |
+| ID    | Release-readiness item                          | Status                  | Cleared only when                                                                                                               |
+| ----- | ----------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| RB-01 | Runtime security headers are absent             | Cleared — risk accepted | #82 and #120 meet their production acceptance criteria or an explicit security/product decision formally changes those criteria |
+| RB-02 | Production Microsoft sign-in                    | Cleared — verified      | The Entra SPA redirects are verified and a real production sign-in returns to `/conspectus/`                                    |
+| RB-03 | Physical-device QA is incomplete                | Cleared — owner waiver  | Every required iOS/Android scenario passes, or the owner explicitly accepts the unverified-device risk for the named release    |
+| RB-04 | Qualified, approved, deployed versioned release | Cleared — released      | The full release process, final review, exact-SHA deployment, tag, and GitHub Release are complete                              |
 
 ## RB-01 — Runtime security-header limitation accepted
 
@@ -134,36 +134,34 @@ layout, interrupted upload recovery, offline protection, and expired-session rec
 [`docs/Manual-Device-QA.md`](docs/Manual-Device-QA.md) gate remains the default for later releases;
 this waiver does not mark its scenarios as executed and does not close #106.
 
-## RB-04 — No qualified, approved, deployed release candidate exists
+## RB-04 — v1.0.0 released
 
-### Why this seriously blocks release
+### Clearing evidence
 
-The current repository `main` and its required checks are green, and production deployment run
-`29871002715` successfully published exact main commit
-`835651dc121ee7a5a637bf7db0d97bafb643bd01`. However, there is no completed release-candidate
-version/PR, final M8 review, full physical QA evidence, recorded human `APPROVED FOR RELEASE`
-decision, immutable version tag, or GitHub Release. A successful production workflow alone does not
-complete the repository's release process.
+Version `1.0.0` completed the release process on 2026-07-22:
 
-### How to fix it
+- Release [PR #241](https://github.com/Jon2050/Conspectus-Mobile/pull/241) retained the local gate
+  results, final reviewer `APPROVED`, owner `APPROVED FOR RELEASE`, known limitations, and scoped
+  physical-QA waiver. Candidate commit `76677c1a51b7b402e30e63dee66b77be6d4790f6` passed
+  [Quality](https://github.com/Jon2050/Conspectus-Mobile/actions/runs/29878224925) and
+  [Deploy Preview with Lighthouse](https://github.com/Jon2050/Conspectus-Mobile/actions/runs/29878539550).
+- The PR was rebase-merged as exact `main` commit
+  `d9ea5e6c96978332e9bc73f86309cff545777894`. That SHA passed
+  [main Quality](https://github.com/Jon2050/Conspectus-Mobile/actions/runs/29878724850) and
+  [main Deploy Preview with Lighthouse](https://github.com/Jon2050/Conspectus-Mobile/actions/runs/29879062379).
+- [Deploy Production run 29879204128](https://github.com/Jon2050/Conspectus-Mobile/actions/runs/29879204128)
+  published that exact commit. Live `deploy-metadata.json` reported build time
+  `2026-07-22T00:06:13Z`, Quality run `29878724850`, and deploy run `29879204128`; a real browser
+  showed `Ver. 1.0.0 22.07.2026 02:06`.
+- [Post-Deploy Monitor run 29879368833](https://github.com/Jon2050/Conspectus-Mobile/actions/runs/29879368833)
+  passed against the live production identity. The no-mutation rollback dry run is
+  [29877437864](https://github.com/Jon2050/Conspectus-Mobile/actions/runs/29877437864).
+- Annotated tag [`v1.0.0`](https://github.com/Jon2050/Conspectus-Mobile/releases/tag/v1.0.0) targets
+  the deployed main commit, and the GitHub Release is published from that tag.
 
-After RB-01 through RB-03 are cleared:
+This clears RB-04. The accepted RB-01 hosting limitation and RB-03 device-QA waiver remain visible
+release risks; clearing RB-04 does not claim those risks were technically eliminated.
 
-1. Complete [#114](https://github.com/Jon2050/Conspectus-Mobile/issues/114), create
-   `docs/m8_post_review.md`, and resolve every release-relevant finding.
-2. Follow [`docs/Release-Process.md`](docs/Release-Process.md) from an exact green `main` commit:
-   create the release branch, set the unused version, prepare notes, and run the full local,
-   reviewer, CI, preview, Lighthouse, and physical-device gates.
-3. Obtain the recorded human release approval, rebase-merge the release PR, and deploy that exact
-   resulting `main` SHA manually.
-4. Verify production metadata, authentication, disposable-database reads/writes, Lighthouse,
-   monitoring, and rollback evidence.
-5. Only then create the annotated tag and GitHub Release and close
-   [#92](https://github.com/Jon2050/Conspectus-Mobile/issues/92).
-
-### Why it is not fixed already
-
-RB-01 is cleared by explicit risk acceptance, RB-02 by real production verification, and RB-03 by
-the version-specific owner waiver recorded above. The remaining RB-04 release-process evidence is
-still open. The release process correctly forbids creating a successful tag or release merely
-because repository CI and one production deployment are green.
+GitHub issues and backlog status were intentionally not changed because this was a manual release
+task. In particular, the final MVP issue remains separate from this versioned release while its
+all-issues-closed criterion conflicts with the retained CSP follow-up.
