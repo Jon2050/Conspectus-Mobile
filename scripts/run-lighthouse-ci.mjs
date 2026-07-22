@@ -46,6 +46,7 @@ const normalizeBaseUrl = (value) => {
 export const parseArgs = (argv) => {
   const args = {
     budgetConfig: DEFAULT_BUDGET_CONFIG_PATH,
+    numberOfRuns: null,
     outputDir: DEFAULT_OUTPUT_DIRECTORY,
     url: '',
   };
@@ -64,6 +65,11 @@ export const parseArgs = (argv) => {
     }
     if (current === '--output-dir') {
       args.outputDir = argv[index + 1] ?? '';
+      index += 1;
+      continue;
+    }
+    if (current === '--number-of-runs') {
+      args.numberOfRuns = Number(argv[index + 1] ?? '');
       index += 1;
       continue;
     }
@@ -91,6 +97,10 @@ export const parseArgs = (argv) => {
   assert(args.url, 'Missing required --url argument.');
   assert(args.budgetConfig, 'The --budget-config argument requires a file path.');
   assert(args.outputDir, 'The --output-dir argument requires a directory path.');
+  assert(
+    args.numberOfRuns === null || (Number.isInteger(args.numberOfRuns) && args.numberOfRuns > 0),
+    'The --number-of-runs argument requires a positive integer.',
+  );
 
   return {
     ...args,
@@ -449,7 +459,11 @@ export const main = async (argv = process.argv.slice(2)) => {
   const args = parseArgs(argv);
   const configPath = path.resolve(process.cwd(), args.budgetConfig);
   const outputDirectory = path.resolve(process.cwd(), args.outputDir);
-  const budgetConfig = readBudgetConfig(configPath);
+  const committedBudgetConfig = readBudgetConfig(configPath);
+  const budgetConfig = {
+    ...committedBudgetConfig,
+    numberOfRuns: args.numberOfRuns ?? committedBudgetConfig.numberOfRuns,
+  };
   fs.mkdirSync(outputDirectory, { recursive: true });
 
   const reports = [];

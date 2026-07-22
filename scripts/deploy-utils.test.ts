@@ -130,6 +130,11 @@ describe('fixed preview slot workflow contract', () => {
     );
     expect(workflowSource).toContain('[ "${marker_commit_sha}" = "${EXPECTED_HEAD_SHA}" ]');
     expect(workflowSource).toContain('?deployment=${cache_buster}');
+    expect(workflowSource).toContain("PREVIEW_SMOKE_RETRY_DELAY_SECONDS: '3'");
+    expect(workflowSource).toContain('--number-of-runs');
+    expect(workflowSource).toContain(
+      "needs.prepare-context.outputs.preview_slot == 'main' && '3' || '1'",
+    );
   });
 });
 
@@ -141,7 +146,7 @@ describe('quality workflow contract', () => {
     expect(workflowSource).not.toContain('pull_request:');
   });
 
-  it('splits quality stages into detect -> lint/typecheck -> unit -> build preview -> build verification -> e2e -> gate', () => {
+  it('fans lint, unit, and build out after detection and shards E2E by browser project', () => {
     const workflowSource = fs.readFileSync(qualityWorkflowPath, 'utf8');
     expect(workflowSource).toContain('run: npm run check:dead-code');
     expect(workflowSource).toContain('lint-typecheck:');
@@ -150,24 +155,24 @@ describe('quality workflow contract', () => {
     );
     expect(workflowSource).toContain('unit-tests:');
     expect(workflowSource).toMatch(
-      /unit-tests:\n(?:.*\n)*?\s+needs:\n\s+- detect-code-changes\n\s+- lint-typecheck/,
+      /unit-tests:\n(?:.*\n)*?\s+needs:\n\s+- detect-code-changes\n\s+if:/,
     );
     expect(workflowSource).toContain('build:');
     expect(workflowSource).toMatch(/build:\n(?:.*\n)*?\s+name: Build App \(Preview\)/);
-    expect(workflowSource).toMatch(
-      /build:\n(?:.*\n)*?\s+needs:\n\s+- detect-code-changes\n\s+- unit-tests/,
-    );
-    expect(workflowSource).toContain('build-verification:');
-    expect(workflowSource).toMatch(
-      /build-verification:\n(?:.*\n)*?\s+needs:\n\s+- detect-code-changes\n\s+- build/,
-    );
+    expect(workflowSource).toMatch(/build:\n(?:.*\n)*?\s+needs:\n\s+- detect-code-changes\n\s+if:/);
+    expect(workflowSource).not.toContain('build-verification:');
+    expect(workflowSource).toContain('name: Enforce JS/CSS bundle size budgets');
+    expect(workflowSource).toContain('name: Verify preview build output paths and scope');
     expect(workflowSource).toContain('e2e-tests:');
     expect(workflowSource).toMatch(
-      /e2e-tests:\n(?:.*\n)*?\s+needs:\n\s+- detect-code-changes\n\s+- build-verification/,
+      /e2e-tests:\n(?:.*\n)*?\s+needs:\n\s+- detect-code-changes\n\s+- build/,
     );
+    expect(workflowSource).toContain('project: ${{ fromJSON(');
+    expect(workflowSource).toContain('["chromium", "pixel-5"]');
+    expect(workflowSource).toContain('tests/e2e/critical-user-journeys.spec.ts');
     expect(workflowSource).toContain('quality-gate:');
     expect(workflowSource).toMatch(
-      /quality-gate:\n(?:.*\n)*?\s+needs:\n\s+- dependency-audit\n\s+- detect-code-changes\n\s+- lint-typecheck\n\s+- unit-tests\n\s+- build\n\s+- build-verification\n\s+- e2e-tests/,
+      /quality-gate:\n(?:.*\n)*?\s+needs:\n\s+- dependency-audit\n\s+- detect-code-changes\n\s+- lint-typecheck\n\s+- unit-tests\n\s+- build\n\s+- e2e-tests/,
     );
     expect(workflowSource).toContain('name: Quality Gate');
     expect(workflowSource).toContain('name: quality-preview-dist');
@@ -177,6 +182,17 @@ describe('quality workflow contract', () => {
       "DEPLOY_PREVIEW_SLUG: ${{ github.ref_name == 'main' && 'main' || 'test' }}",
     );
     expect(workflowSource).toContain('PLAYWRIGHT_APP_BASE_PATH:');
+    expect(workflowSource).toContain(
+      'Protected main merge completed the exact-SHA build verification and Chromium critical-journey smoke.',
+    );
+    expect(workflowSource).toContain('github.ref_name != github.event.repository.default_branch');
+  });
+
+  it('runs the local quality prerequisites concurrently before build verification', () => {
+    const packageManifest = JSON.parse(fs.readFileSync(packageManifestPath, 'utf8')) as {
+      scripts: Record<string, string>;
+    };
+    expect(packageManifest.scripts['check:local']).toBe('node scripts/run-local-quality.mjs');
   });
 
   it('requires dependency auditing before both code-bearing and docs-only pushes pass', () => {
@@ -201,6 +217,7 @@ describe('dependency audit workflow contract', () => {
 
     expect(workflowSource).toContain('workflow_call:');
     expect(workflowSource).toContain('pull_request:');
+    expect(workflowSource).toContain('paths:\n      - package.json\n      - package-lock.json');
     expect(workflowSource).toContain('schedule:');
     expect(workflowSource).toMatch(/cron: '[^']+'/);
     expect(workflowSource).toContain('workflow_dispatch:');
@@ -259,6 +276,7 @@ describe('production workflow contracts', () => {
     );
     expect(workflowSource).toContain('conspectus-mobile-production-ready');
     expect(workflowSource).toContain('node scripts/verify-production-deploy-smoke.mjs');
+    expect(workflowSource).toContain("PRODUCTION_SMOKE_RETRY_DELAY_SECONDS: '3'");
   });
 
   it('exports the required Vite client id variable before validating or building production', () => {

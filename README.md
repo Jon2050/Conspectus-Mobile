@@ -157,20 +157,23 @@ Local quality scripts:
   and enforces the committed score and PWA deployment budgets. A local Chrome/Chromium install is
   required.
 - `npm run test:e2e` - runs Playwright browser tests.
-- `npm run check:local` - runs formatting, linting, type checking, dead-code analysis, tests,
-  production build, and bundle-size verification in sequence.
+- `npm run check:local` - runs formatting, linting, type checking, dead-code analysis, and tests
+  concurrently, then creates the production build and verifies its bundle size.
 
 Playwright release-gate policy:
 
 - Local runs use zero retries so deterministic failures surface immediately.
-- CI uses one retry for transient browser or runner noise and one worker because the suite shares
-  the served build and service-worker files.
+- CI uses one retry for transient browser or runner noise and one worker per isolated browser-project
+  job because the suite shares the served build and service-worker files inside each job.
 - CI rejects focused tests, retains traces/screenshots/videos on failure, and uploads the HTML
   report plus raw test results when the E2E job fails.
 - A test that still fails after the CI retry blocks `Quality`; repeated flaky behavior must be
   fixed at its root cause instead of increasing retries.
 
-The `Quality` workflow runs on every push to non-`gh-pages` branches. Branches whose effective diff is docs-only skip the heavy jobs.
+The `Quality` workflow runs on every push to non-`gh-pages` branches. Code-bearing non-main branches
+run full checks with Chromium and Pixel 5 E2E jobs in parallel. Protected `main` merges reuse the
+strict, up-to-date branch gate and run the exact-SHA build verification plus a Chromium critical-
+journey smoke. Branches whose effective diff is docs-only skip the heavy jobs.
 
 CI test report view in GitHub:
 
