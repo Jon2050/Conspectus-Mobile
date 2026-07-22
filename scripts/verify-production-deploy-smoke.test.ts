@@ -107,17 +107,11 @@ const createHealthyResponses = (): Record<string, MockHttpResponse> => ({
           src: 'icons/moneysack512x512.png',
           sizes: '512x512',
           type: 'image/png',
-          purpose: 'any',
+          purpose: 'any maskable',
         },
         {
           src: 'icons/moneysack-maskable192x192.png',
           sizes: '192x192',
-          type: 'image/png',
-          purpose: 'maskable',
-        },
-        {
-          src: 'icons/moneysack-maskable512x512.png',
-          sizes: '512x512',
           type: 'image/png',
           purpose: 'maskable',
         },
@@ -156,10 +150,6 @@ const createHealthyResponses = (): Record<string, MockHttpResponse> => ({
     status: 200,
     body: 'icon-bytes',
   },
-  'https://jon2050.de/conspectus/icons/moneysack-maskable512x512.png': {
-    status: 200,
-    body: 'icon-bytes',
-  },
 });
 
 afterEach(() => {
@@ -173,7 +163,7 @@ describe('verify-production-deploy-smoke script', () => {
     const consoleLog = vi.spyOn(console, 'log').mockImplementation(() => undefined);
 
     await expect(runSmokeChecks(baseOptions, fetchMock, sleepMock)).resolves.toBeUndefined();
-    expect(fetchMock).toHaveBeenCalledTimes(11);
+    expect(fetchMock).toHaveBeenCalledTimes(10);
     expect(consoleLog).toHaveBeenCalledWith(
       expect.stringContaining(
         'commitSha=abc123 deployRunId=2002 all deployment smoke checks passed',
@@ -413,7 +403,7 @@ describe('verify-production-deploy-smoke script', () => {
     );
   });
 
-  it('fails when dedicated maskable icons lose their manifest purpose', async () => {
+  it('fails when maskable icons lose their manifest purpose', async () => {
     const responses = createHealthyResponses();
     const manifestResponse = responses['https://jon2050.de/conspectus/manifest.webmanifest'];
     const manifest = JSON.parse(manifestResponse.body) as {

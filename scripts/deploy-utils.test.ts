@@ -143,6 +143,7 @@ describe('quality workflow contract', () => {
 
   it('splits quality stages into detect -> lint/typecheck -> unit -> build preview -> build verification -> e2e -> gate', () => {
     const workflowSource = fs.readFileSync(qualityWorkflowPath, 'utf8');
+    expect(workflowSource).toContain('run: npm run check:dead-code');
     expect(workflowSource).toContain('lint-typecheck:');
     expect(workflowSource).toMatch(
       /lint-typecheck:\n(?:.*\n)*?\s+needs:\n\s+- detect-code-changes/,

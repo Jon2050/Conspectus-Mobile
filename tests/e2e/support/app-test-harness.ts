@@ -1,7 +1,7 @@
 // Provides deterministic localhost boundary mocks shared by Playwright browser journeys.
 import type { Page } from '@playwright/test';
 
-export const resolveAppBasePath = (): string => {
+const resolveAppBasePath = (): string => {
   const configuredBasePath = process.env.PLAYWRIGHT_APP_BASE_PATH?.trim();
   if (!configuredBasePath) {
     return '/conspectus/';
@@ -16,7 +16,7 @@ export const resolveAppBasePath = (): string => {
 export const APP_BASE_PATH = resolveAppBasePath();
 export const RUNTIME_CLIENT_ID_PATTERN = /VITE_AZURE_CLIENT_ID:"[^"]*"/g;
 export const appPath = (suffix = ''): string => `${APP_BASE_PATH}${suffix}`;
-export const SQLITE_DATABASE_HEADER_BYTES = [
+const SQLITE_DATABASE_HEADER_BYTES = [
   0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, 0x20, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x20, 0x33, 0x00,
 ];
 export const createSqliteBytes = (payloadBytes: readonly number[] = [1, 2, 3, 4]): number[] => [
@@ -45,16 +45,11 @@ export const REQUIRED_MANIFEST_ICONS = [
   {
     src: 'icons/moneysack512x512.png',
     sizes: '512x512',
-    purpose: 'any',
+    purpose: 'any maskable',
   },
   {
     src: 'icons/moneysack-maskable192x192.png',
     sizes: '192x192',
-    purpose: 'maskable',
-  },
-  {
-    src: 'icons/moneysack-maskable512x512.png',
-    sizes: '512x512',
     purpose: 'maskable',
   },
 ];

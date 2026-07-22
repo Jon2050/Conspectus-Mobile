@@ -54,15 +54,10 @@ const manifest = JSON.stringify({
   display: 'standalone',
   icons: [
     { src: 'icons/moneysack192x192.png', sizes: '192x192', purpose: 'any' },
-    { src: 'icons/moneysack512x512.png', sizes: '512x512', purpose: 'any' },
+    { src: 'icons/moneysack512x512.png', sizes: '512x512', purpose: 'any maskable' },
     {
       src: 'icons/moneysack-maskable192x192.png',
       sizes: '192x192',
-      purpose: 'maskable',
-    },
-    {
-      src: 'icons/moneysack-maskable512x512.png',
-      sizes: '512x512',
       purpose: 'maskable',
     },
   ],
@@ -165,7 +160,6 @@ describe('Lighthouse CI runner', () => {
       [new URL('icons/moneysack192x192.png', baseUrl).toString(), asResponse('icon')],
       [new URL('icons/moneysack512x512.png', baseUrl).toString(), asResponse('icon')],
       [new URL('icons/moneysack-maskable192x192.png', baseUrl).toString(), asResponse('icon')],
-      [new URL('icons/moneysack-maskable512x512.png', baseUrl).toString(), asResponse('icon')],
       [new URL('sw.js', baseUrl).toString(), asResponse('service worker')],
     ]);
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
@@ -286,7 +280,6 @@ describe('Lighthouse CI runner', () => {
       [new URL('icons/moneysack192x192.png', baseUrl).toString(), asResponse('icon')],
       [new URL('icons/moneysack512x512.png', baseUrl).toString(), asResponse('icon')],
       [new URL('icons/moneysack-maskable192x192.png', baseUrl).toString(), asResponse('icon')],
-      [new URL('icons/moneysack-maskable512x512.png', baseUrl).toString(), asResponse('icon')],
       [new URL('sw.js', baseUrl).toString(), asResponse('service worker')],
     ]);
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
