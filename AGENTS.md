@@ -1,8 +1,8 @@
 # Repository Guidance for AI Agents
 
 This file gives durable operating guidance for AI coding agents working in this repository.
-Use `README.md` as the human-facing project entry point and source for setup, commands,
-module layout, and contribution conventions.
+Use `README.md` as the human-facing project entry point and source for setup, commands, and module
+layout. Use `docs/CONTRIBUTING.md` for the contribution and delivery workflow.
 
 ## Before Editing
 

@@ -29,8 +29,8 @@ Provide fast mobile access to a personal Conspectus SQLite database stored in On
 - OneDrive sync via Microsoft Graph
 - SQLite in browser via sql.js
 - Local cache via IndexedDB
-- Architecture rationale, runtime flows, and milestone delivery details live in
-  [docs/Architecture-and-Implementation-Plan.md](docs/Architecture-and-Implementation-Plan.md).
+- Durable architecture decisions, runtime flows, and safety invariants live in
+  [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Getting Started
 
@@ -87,10 +87,9 @@ Important:
 
 Use these documents as the canonical sources for their topics:
 
-- Project setup, environment variables, module layout, and contribution conventions: this
-  README.
-- Architecture decisions, runtime flows, sync/write behavior, and milestone detail:
-  [docs/Architecture-and-Implementation-Plan.md](docs/Architecture-and-Implementation-Plan.md).
+- Project setup, environment variables, and module layout: this README.
+- Architecture decisions, runtime flows, and sync/write safety invariants:
+  [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 - Entra app registration, redirect URIs, and Graph delegated scopes:
   [docs/auth/Entra-App-Registration.md](docs/auth/Entra-App-Registration.md).
 - CI/CD workflow behavior, artifacts, and failure modes:
@@ -105,9 +104,8 @@ Use these documents as the canonical sources for their topics:
   [docs/GitHub-Issues-MVP-Backlog.md](docs/GitHub-Issues-MVP-Backlog.md).
 - Desktop database and business-rule parity reference:
   [docs/Conspectus-Desktop-Info.md](docs/Conspectus-Desktop-Info.md).
-- Human orchestration workflow and reusable agent prompts:
-  [docs/Human-Workflow.md](docs/Human-Workflow.md) and
-  [docs/prompts/Task-Prompt-Template.md](docs/prompts/Task-Prompt-Template.md).
+- Contribution and delivery workflow for humans and coding agents:
+  [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).
 
 ## Security
 
@@ -194,35 +192,5 @@ Detailed workflow behavior, artifacts, and failure modes live in
 
 ## Contribution Workflow
 
-The MVP backlog and issue completion rules live in
-[docs/GitHub-Issues-MVP-Backlog.md](docs/GitHub-Issues-MVP-Backlog.md). Use the GitHub
-issue templates in [.github/ISSUE_TEMPLATE](.github/ISSUE_TEMPLATE/) when creating new issues
-instead of copying issue body text from this README.
-
-Required primary issue labels:
-
-- `feature`: user-visible functionality or behavior changes.
-- `infra`: repository, CI/CD, tooling, workflow, or deployment plumbing.
-- `bug`: incorrect current behavior.
-- `docs`: documentation-only work.
-- `test`: automated test work and QA harness improvements.
-- `security`: security, auth hardening, scopes, headers, or dependency risk mitigation.
-
-Use exactly one primary label per issue. If work spans multiple areas, choose the dominant work
-type and describe secondary concerns in the issue body.
-
-For backlog issue delivery:
-
-- Work from a dedicated issue branch whose name contains the milestone and issue number, such as
-  `feature/M5-07-localize-formatting`.
-- Start commit summaries for backlog issue work with the issue prefix, such as
-  `feat: [M5-07] add formatting utility`.
-- Include an `Agent:` trailer in every commit message. The `commit-msg` hook rejects commits
-  without one.
-- Use the pull request template in [.github/pull_request_template.md](.github/pull_request_template.md).
-- PR titles and descriptions must include the milestone and issue number.
-- Merge PRs into `main` with **Rebase and merge**, then delete the head branch.
-
-Backlog status markers are updated in the issue branch so the change reaches `main` through the
-PR. An issue is only done after the implementation has reached `main`, required checks are green,
-the head branch is deleted, and the GitHub issue/backlog state is complete.
+The canonical issue, branch, commit, verification, review, merge, agent-collaboration, and release
+workflow is maintained in [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).

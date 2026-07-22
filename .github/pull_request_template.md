@@ -1,8 +1,8 @@
 # Pull Request
 
-## Linked Issue (Required)
+## Linked Issue or Task
 
-- Closes #<issue-id>
+- Closes #<issue-id>, or describe the manual task when no issue exists:
 
 ## Context
 
@@ -55,7 +55,7 @@
 
 ## QS Checklist
 
-- [ ] Linked issue ID is included in this PR.
+- [ ] The linked issue or manual-task context is included in this PR.
 - [ ] Lint, typecheck, tests, and build were run and pass.
 - [ ] Screenshots are included for UI changes.
 - [ ] Risk and rollback notes are documented.
