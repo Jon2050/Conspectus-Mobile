@@ -1,3 +1,9 @@
+# Post-Milestone Review Prompt Template
+
+This template guides maintainers and reviewers through a static review after a milestone. It
+produces a review report only and does not authorize source changes, release decisions, or GitHub
+state changes. The selected milestone and its review file define the scope.
+
 Task: Perform a comprehensive post-milestone review for Milestone `{{MILESTONE_NUMBER}}` (`{{MILESTONE_TITLE}}`) of this GitHub repository.
 
 Write all findings into `docs/m{{MILESTONE_NUMBER}}_post_review.md`.
@@ -23,7 +29,7 @@ Before reviewing any source code, read these documents in order:
 
 1. `README.md`
 2. `docs/ARCHITECTURE.md`
-3. `docs/GitHub-Issues-MVP-Backlog.md`
+3. `docs/GitHub-Issues-Backlog.md`
 
 Extract:
 
@@ -241,7 +247,7 @@ Fill these placeholders before running the prompt:
 
 # Post-Milestone Review Fix Findings Prompt Template (Dont include this into the review prompt)
 
-First, read the files README.md and docs\ARCHITECTURE.md to understand this project. The milestone {{MILESTONE_NUMBER}} was just implemented and the project is currently in a review for the code changes after milestone {{MILESTONE_NUMBER}}. Multiple reviewers already wrote a review file docs\m{{MILESTONE_NUMBER}}\_post_review.md. Please read it also. Please then fix the findings {{FINDINGS_TO_FIX}}. When doing that, stick to the code and architecture guidelines you find in the file docs\prompts\Task-Prompt-Template.md and also use the development process described there. Add new tests if appropriate. But after the findings are fixed and all local quality gates passed, mark the findings in the review file as solved/fixed and commit the changes locally to the review-fixing branch. Don't push the commit yet.
+First, read the files README.md and docs\ARCHITECTURE.md to understand this project. The milestone {{MILESTONE_NUMBER}} was just implemented and the project is currently in a review for the code changes after milestone {{MILESTONE_NUMBER}}. Multiple reviewers already wrote a review file docs\m{{MILESTONE_NUMBER}}\_post_review.md. Please read it also. Please then fix the findings {{FINDINGS_TO_FIX}}. When doing that, stick to the code and architecture guidelines you find in the file docs\prompts\Issue-Task-Prompt-Template.md and also use the development process described there. Add new tests if appropriate. But after the findings are fixed and all local quality gates passed, mark the findings in the review file as solved/fixed and commit the changes locally to the review-fixing branch. Don't push the commit yet.
 
 # Fix Findings Review Prompt Template (Dont include this into the review prompt)
 

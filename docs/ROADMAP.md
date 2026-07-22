@@ -1,5 +1,10 @@
 # Future feature ideas
 
+This document collects uncommitted product ideas for maintainers and product owners. It supports
+prioritization but does not define approved requirements, release scope, or architecture. Each idea
+should record its value, status, dependencies, and relevant privacy, security, and cost
+considerations.
+
 ## Image capture with remote llm detection for faster expense entry
 
 User takes a picture of a receipt, and the app uses a remote llm to extract the relevant information and prefill the Add Expense form.

@@ -1,3 +1,9 @@
+# Issue Task Prompt Template
+
+This template guides a coding agent through delivery of an existing GitHub issue. It supplements,
+but does not replace, `AGENTS.md`, `docs/CONTRIBUTING.md`, and the issue's acceptance criteria. Use
+it only when the task explicitly delegates any required publication, merge, or issue-state changes.
+
 Task: Implement the issue `{{TASK_ID}}` end-to-end with full verification.
 
 ## Non-negotiable rules:
@@ -20,8 +26,9 @@ Always print in which step you are!
 1. Load context from:
    - `README.md`
    - `docs/ARCHITECTURE.md`
+   - `docs/prompts/CONTRIBUTING.md`
    - `docs/Conspectus-Desktop-Info.md`
-   - `docs/GitHub-Issues-MVP-Backlog.md`
+   - `docs/GitHub-Issues-Backlog.md`
      Then locate the task by its id on GitHub and extract implementation steps, acceptance criteria, and dependencies/constraints. Also from the comments on GitHub.
 2. Plan with one planning subagent. Refine until concrete, testable, and mapped from each acceptance criterion to file-level code/test changes. Make clear, that the planning subagent should not write any code, just the plan.
 3. Create/use a dedicated issue branch with a proper name containing the milestone and issue number (e.g., `feature/M6-03-localize-formatting` or `bug/M6-03-fix-locale`).
@@ -35,10 +42,10 @@ Always print in which step you are!
    - `npm run build`
    - `npm run test:e2e` when changed behavior is e2e-relevant.
      Fix any issues found during the verification gate before proceeding with step 5.
-6. Run review gate with one reviewer subagent against acceptance criteria and code review best practices. Use the `docs/prompts/Local-CodeReview-Prompt-Template.md` to prompt the reviewer subagent. Fill in the template the placeholders like `{{BRANCH_NAME}}`, `{{ISSUE_NUMBERS_OR_DESCRIPTION}}`, `{{CONTEXT_FILES}}` with the actual values. If gaps are found and the reviewer subagent does not send APPROVED, fix the issues it found and repeat steps 4-6 (if the reviewer found problems with the task iteself and the acceptance criteria) or 5-6 (if it only found other problems) until satisfied.
+6. Run the review gate with one reviewer subagent against the acceptance criteria and code review best practices. Use `docs/prompts/Code-Review-Prompt-Template.md` in `local` mode and replace every configuration placeholder with the current branch/diff, issue, context files, and reviewer identity. If gaps are found and the reviewer subagent does not return `APPROVED`, fix the issues it found and repeat steps 4-6 (if the reviewer found problems with the task itself and the acceptance criteria) or 5-6 (if it found only other problems) until satisfied.
 7. Git + GitHub flow:
    - At this point, all local checks and tests must be green and the reviewer subagent must have APPROVED the current diff. If not, go back to step 6.
-   - Update the backlog status marker for this issue in `docs/GitHub-Issues-MVP-Backlog.md` to done (`:white_check_mark:`) so that it is included in the issue branch commits.
+   - Update the backlog status marker for this issue in `docs/GitHub-Issues-Backlog.md` to done (`:white_check_mark:`) so that it is included in the issue branch commits.
    - Open a PR to `main` from the issue branch (direct-main is not allowed for issue delivery). The PR title and description MUST explicitly contain the milestone and issue number (e.g., `feat: [M5-07] Add formatting utilities`). Link the issue (for example: `Closes #<issue-id>`)
    - Use a clear commit message referencing the issue and acceptance criteria mapping. Every commit message belonging to a backlog issue MUST start with the issue prefix in the summary (e.g., `feat: [M5-07] add formatting utility`).
    - Commit and push.
@@ -46,7 +53,7 @@ Always print in which step you are!
 9. Completion (Note: If the PR merge is delayed/asynchronous and your turn ends, the very first step upon resuming or in any follow-up task after the merge is to complete this checklist):
    - Merge the PR to `main` (or verify it has been merged), then delete the remote head branch. Checkout and pull the latest `main` branch locally and delete the local head branch.
    - Mark the issue as done in GitHub. Also add a brief comment with a summary of what you did and why. Also mention if you made any assumptions or any problems you encountered. Comment must be well formatted.
-   - Verify that `docs/GitHub-Issues-MVP-Backlog.md` status marker is updated to done (`:white_check_mark:`) on the merged `main` branch.
+   - Verify that `docs/GitHub-Issues-Backlog.md` status marker is updated to done (`:white_check_mark:`) on the merged `main` branch.
    - Update `docs/ARCHITECTURE.md` only when the issue changes a durable architecture decision,
      runtime flow, ownership boundary, or safety invariant. Keep issue completion notes and release
      evidence in GitHub or the appropriate archive instead. Do not alter unrelated sections.

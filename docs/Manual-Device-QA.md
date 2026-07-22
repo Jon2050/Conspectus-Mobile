@@ -23,11 +23,6 @@ Only `PASS` satisfies the gate. A `FAIL`, `BLOCKED`, or `NOT RUN` result blocks 
 failure to a bug, retain supporting evidence, fix the defect, and rerun the affected scenario on the
 affected device. Record both the original result and the rerun in the release pull request.
 
-Release-specific exception: for `v1.0.0` only, the application owner accepted the residual risk of
-not executing this physical-device matrix. Record every unexecuted row as `NOT RUN`, link the owner
-decision and [`../RELEASE-BLOCKERS.md`](../RELEASE-BLOCKERS.md), and do not describe the waiver as
-an observed pass. This exception does not change the gate for later releases.
-
 ## Candidate Record
 
 Record these values before testing:
@@ -270,10 +265,8 @@ unlinked issue do not satisfy the gate.
 
 ### Final Gate
 
-- [ ] Standard gate: every QA-01 through QA-08 result is PASS on IOS and ANDROID.
-- [ ] `v1.0.0` exception only: every unexecuted result remains NOT RUN, the owner waiver is linked,
-      and the listed residual risks are accepted without claiming an observed pass.
+- [ ] Every QA-01 through QA-08 result is PASS on IOS and ANDROID.
 - [ ] Every failure is linked to a defect and its affected scenario has a passing rerun.
 - [ ] Evidence is attached to or durably linked from this release pull request.
-- Final status: BLOCKED / PASS / WAIVED FOR v1.0.0
+- Final status: BLOCKED / PASS
 ```

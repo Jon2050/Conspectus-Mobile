@@ -14,7 +14,7 @@ Wenn du ein neues Feature oder einen Bugfix implementieren willst, folgst du die
 
 ### 2. Agenten beauftragen (Task-Prompt)
 
-- Kopiere den Inhalt aus [Task-Prompt-Template.md](./prompts/Task-Prompt-Template.md).
+- Kopiere den Inhalt aus [Issue-Task-Prompt-Template.md](./prompts/Issue-Task-Prompt-Template.md).
 - Ersetze alle Vorkommen von `M4-08` durch dein ausgewähltes Issue.
 - Starte den Entwicklungs-Agenten mit diesem befüllten Prompt.
 

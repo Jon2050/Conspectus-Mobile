@@ -1,12 +1,19 @@
+# Manual Task Prompt Template
+
+This template is for repository work that is not tied to an existing GitHub issue. It defines
+task-specific context only; repository workflow, verification, and delivery rules remain canonical
+in `AGENTS.md` and `docs/CONTRIBUTING.md`.
+
 Manual task for repository `C:\Users\Jonas\Repositories\Conspectus-Mobile`.
 
 First, read these files in full:
 
 - `README.md`
 - `docs/ARCHITECTURE.md`
-- `docs/prompts/Task-Prompt-Template.md`
+- `docs/prompts/CONTRIBUTING.md`
+- `docs/prompts/Issue-Task-Prompt-Template.md`
 
-Follow all rules, quality requirements, verification gates, subagent rules, and review-gate requirements defined in `Task-Prompt-Template.md` but ignore the Issue mentioned there.
+Follow all rules, quality requirements, verification gates, subagent rules, and review-gate requirements defined in `Issue-Task-Prompt-Template.md` but ignore the Issue mentioned there.
 
 Important: The task below does not refer to an existing GitHub issue or a planned backlog issue. It is a manual task. Therefore:
 

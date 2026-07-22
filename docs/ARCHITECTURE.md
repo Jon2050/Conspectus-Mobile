@@ -234,6 +234,7 @@ Use one canonical document per topic:
 | ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
 | Setup, commands, aliases, and module entry point           | [`README.md`](../README.md)                                                                          |
 | Contribution and delivery workflow                         | [`CONTRIBUTING.md`](CONTRIBUTING.md)                                                                 |
+| Active GitHub issue backlog and status                     | [`GitHub-Issues-Backlog.md`](GitHub-Issues-Backlog.md)                                               |
 | Durable architecture, runtime flows, and safety invariants | This document                                                                                        |
 | Entra redirects and Graph delegated scopes                 | [`auth/Entra-App-Registration.md`](auth/Entra-App-Registration.md)                                   |
 | Desktop parity and business-rule reference                 | [`Conspectus-Desktop-Info.md`](Conspectus-Desktop-Info.md)                                           |

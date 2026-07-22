@@ -1,19 +1,22 @@
 # CI/CD Pipelines
 
-## GitHub Action pinning
-
-All third-party and GitHub-maintained actions in repository workflows are pinned to full commit SHAs with their reviewed release version in an adjacent comment. To update an action, review the upstream release and commit, replace both the SHA and version comment in every workflow use, run the local quality gate, and review the workflow diff before merging.
-
-After these pinned workflows reach the default branch, repository administrators must enable **Require actions to be pinned to a full-length commit SHA** in **Settings → Actions → General**. That repository setting is intentionally applied after publication so it cannot block the unpinned workflow revision already on the default branch.
-
-This document is the operational reference for the project-owned GitHub Actions in this repository.
-It also explains the GitHub-managed Pages workflow that appears in the Actions UI.
+This document is the canonical operational reference for maintainers who change or diagnose this
+repository's GitHub Actions. It defines workflow triggers, gates, artifacts, deployment channels,
+and failure behavior. Release approval and execution remain owned by
+[`Release-Process.md`](Release-Process.md). It also explains the GitHub-managed Pages workflow that
+appears in the Actions UI.
 
 Production workflow success is necessary but is not the complete release gate. Every production
 release must follow the single checklist in [`Release-Process.md`](Release-Process.md), including
 human release-owner acceptance and the physical-device evidence from
 [`Manual-Device-QA.md`](Manual-Device-QA.md). The active default-branch ruleset strictly requires
 the `Quality Gate`; the additional human and device gates are recorded in the release pull request.
+
+## GitHub Action pinning
+
+All third-party and GitHub-maintained actions in repository workflows are pinned to full commit SHAs with their reviewed release version in an adjacent comment. To update an action, review the upstream release and commit, replace both the SHA and version comment in every workflow use, run the local quality gate, and review the workflow diff before merging.
+
+After these pinned workflows reach the default branch, repository administrators must enable **Require actions to be pinned to a full-length commit SHA** in **Settings → Actions → General**. That repository setting is intentionally applied after publication so it cannot block the unpinned workflow revision already on the default branch.
 
 ## Workflow Graph
 
@@ -150,7 +153,7 @@ When a budget is exceeded:
 - Purpose:
   - confirm that the current `main` commit already has a successful `Quality` run
   - re-scan dependencies immediately before building to catch advisories published after `Quality`
-  - build the production app for `/`
+  - build the production app for `/conspectus/`
   - verify the production build output and append `deploy-metadata.json`
   - publish exactly one immutable artifact named `conspectus-mobile-production-<commitSha>` from the deploy run itself
   - verify website consumer contract compatibility
