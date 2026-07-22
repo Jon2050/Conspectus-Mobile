@@ -1,4 +1,4 @@
-Task: Implement the issue `M7-01` end-to-end with full verification.
+Task: Implement the issue `{{TASK_ID}}` end-to-end with full verification.
 
 ## Non-negotiable rules:
 
@@ -19,10 +19,10 @@ Always print in which step you are!
 
 1. Load context from:
    - `README.md`
-   - `docs/Architecture-and-Implementation-Plan.md`
+   - `docs/ARCHITECTURE.md`
    - `docs/Conspectus-Desktop-Info.md`
    - `docs/GitHub-Issues-MVP-Backlog.md`
-     Then locate `M7-01` and extract implementation steps, acceptance criteria, and dependencies/constraints from GitHub. Also from the comments on GitHub.
+     Then locate the task by its id on GitHub and extract implementation steps, acceptance criteria, and dependencies/constraints. Also from the comments on GitHub.
 2. Plan with one planning subagent. Refine until concrete, testable, and mapped from each acceptance criterion to file-level code/test changes. Make clear, that the planning subagent should not write any code, just the plan.
 3. Create/use a dedicated issue branch with a proper name containing the milestone and issue number (e.g., `feature/M6-03-localize-formatting` or `bug/M6-03-fix-locale`).
    3.1. Increase the app version in `package.json` to `0.<milestone_number>.<issue_title_number>`. (e.g. `0.6.03` for issue `M6-03`)
@@ -47,7 +47,9 @@ Always print in which step you are!
    - Merge the PR to `main` (or verify it has been merged), then delete the remote head branch. Checkout and pull the latest `main` branch locally and delete the local head branch.
    - Mark the issue as done in GitHub. Also add a brief comment with a summary of what you did and why. Also mention if you made any assumptions or any problems you encountered. Comment must be well formatted.
    - Verify that `docs/GitHub-Issues-MVP-Backlog.md` status marker is updated to done (`:white_check_mark:`) on the merged `main` branch.
-   - Update docs/Architecture-and-Implementation-Plan.md: Append something or modify ONLY the specific section relevant to this issue to reflect implementation realities if something changed, got redefined or became clearer during this task. STRICTLY FORBIDDEN: Do not reformat, summarize, or alter any unrelated parts of this document.
+   - Update `docs/ARCHITECTURE.md` only when the issue changes a durable architecture decision,
+     runtime flow, ownership boundary, or safety invariant. Keep issue completion notes and release
+     evidence in GitHub or the appropriate archive instead. Do not alter unrelated sections.
    - Provide final report with changed files, commands/results, CI status, acceptance criteria checklist, and assumptions.
      You are not fully done before step 9 is not completed and all CI pipelines, checks and tests are green. You have to confirm this always after every push or merge!
 
