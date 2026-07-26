@@ -1,5 +1,6 @@
 // Resolves the cache store used by Settings local-reset actions, with localhost-only test override support.
 import { appCacheStore, closeAppCacheStoreConnections, type CacheStore } from '@cache';
+import { AUTH_SESSION_RESUME_STORAGE_KEY } from '@auth';
 
 export type SettingsCacheStore = Pick<CacheStore, 'readSnapshot' | 'clearAll'>;
 
@@ -20,17 +21,20 @@ const defaultCacheStore: SettingsCacheStore = {
 
     const errors: unknown[] = [];
 
-    const clearConspectusStorageKeys = (storage: Storage): void => {
+    const clearConspectusStorageKeys = (
+      storage: Storage,
+      preservedKeys: ReadonlySet<string> = new Set(),
+    ): void => {
       for (let index = storage.length - 1; index >= 0; index -= 1) {
         const key = storage.key(index);
-        if (key !== null && key.startsWith('conspectus.')) {
+        if (key !== null && key.startsWith('conspectus.') && !preservedKeys.has(key)) {
           storage.removeItem(key);
         }
       }
     };
 
     try {
-      clearConspectusStorageKeys(window.localStorage);
+      clearConspectusStorageKeys(window.localStorage, new Set([AUTH_SESSION_RESUME_STORAGE_KEY]));
     } catch (error) {
       errors.push(error);
     }

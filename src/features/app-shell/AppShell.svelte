@@ -169,6 +169,24 @@
     }
   };
 
+  const attemptAutomaticTokenRecovery = async (): Promise<void> => {
+    if (authRecoveryIsPending) {
+      return;
+    }
+
+    authRecoveryIsPending = true;
+    authRecoveryError = null;
+
+    try {
+      const redirectStartPage = new URL(toRouteHash(currentRoute), window.location.href).toString();
+      await resolveAppAuthClient().attemptSessionResume(redirectStartPage);
+    } catch (error) {
+      authRecoveryError = toRecoveryErrorMessage(error);
+    } finally {
+      authRecoveryIsPending = false;
+    }
+  };
+
   const retryPendingTransfer = (): void => {
     void addTransferSaveController.retry($_, pendingTransferIsOffline);
   };
@@ -261,6 +279,9 @@
 
       applyStartupFreshnessDecision(syncStateStore, decision);
       logStartupFreshnessDecision(decision, binding?.name ?? null);
+      if (decision.kind === 'error' && decision.branch === 'online_auth_expired') {
+        void attemptAutomaticTokenRecovery();
+      }
     } catch (error) {
       if (!appShellIsMounted || syncId !== currentSyncId) {
         return;

@@ -17,6 +17,7 @@ const createMinimalAuthClient = (): AuthClient => ({
     },
   })),
   signIn: vi.fn(async () => {}),
+  attemptSessionResume: vi.fn(async () => false),
   reauthenticate: vi.fn(async () => {}),
   signOut: vi.fn(async () => {}),
   getAccessToken: vi.fn(async () => 'graph-access-token'),

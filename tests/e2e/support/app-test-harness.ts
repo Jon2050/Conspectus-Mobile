@@ -199,16 +199,20 @@ export const inspectTransferMonthSwipeMove = async (
 export type MockAuthClientOptions = {
   readonly initializeDelayMs?: number;
   readonly signInDelayMs?: number;
+  readonly attemptSessionResumeDelayMs?: number;
   readonly reauthenticateDelayMs?: number;
   readonly signOutDelayMs?: number;
   readonly consumeRedirectHashOnInitialize?: boolean;
   readonly failInitialize?: boolean;
   readonly failSignIn?: boolean;
+  readonly failAttemptSessionResume?: boolean;
   readonly failReauthenticate?: boolean;
   readonly failSignOut?: boolean;
   readonly failGetAccessToken?: boolean;
   readonly getAccessTokenErrorCode?: string;
   readonly startAuthenticated?: boolean;
+  readonly resumeSessionOnInitialize?: boolean;
+  readonly attemptSessionResumeResult?: boolean;
 };
 
 export type MockGraphError = {
@@ -312,9 +316,13 @@ export const installMockAuthClient = async (
     let isInitialized = false;
     let isAuthenticated = mockOptions.startAuthenticated ?? false;
     const trackedWindow = window as typeof window & {
+      __CONSPECTUS_SESSION_RESUME_START_PAGES__?: string[];
       __CONSPECTUS_REAUTHENTICATE_START_PAGES__?: string[];
+      __CONSPECTUS_STARTUP_SESSION_RESUME_COUNT__?: number;
     };
+    trackedWindow.__CONSPECTUS_SESSION_RESUME_START_PAGES__ = [];
     trackedWindow.__CONSPECTUS_REAUTHENTICATE_START_PAGES__ = [];
+    trackedWindow.__CONSPECTUS_STARTUP_SESSION_RESUME_COUNT__ = 0;
 
     const toSession = () => ({
       isAuthenticated,
@@ -339,6 +347,11 @@ export const installMockAuthClient = async (
           }
         }
 
+        if (mockOptions.resumeSessionOnInitialize) {
+          isAuthenticated = true;
+          trackedWindow.__CONSPECTUS_STARTUP_SESSION_RESUME_COUNT__ = 1;
+        }
+
         isInitialized = true;
       },
       getSession() {
@@ -360,6 +373,18 @@ export const installMockAuthClient = async (
           };
         }
         isAuthenticated = true;
+      },
+      async attemptSessionResume(redirectStartPage: string) {
+        trackedWindow.__CONSPECTUS_SESSION_RESUME_START_PAGES__?.push(redirectStartPage);
+        await resolveDelay(mockOptions.attemptSessionResumeDelayMs);
+        if (mockOptions.failAttemptSessionResume) {
+          throw {
+            code: 'network_error',
+            message: 'Mock automatic session restoration failure.',
+          };
+        }
+
+        return mockOptions.attemptSessionResumeResult ?? false;
       },
       async reauthenticate(redirectStartPage: string) {
         trackedWindow.__CONSPECTUS_REAUTHENTICATE_START_PAGES__?.push(redirectStartPage);
