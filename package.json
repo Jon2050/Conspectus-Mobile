@@ -63,5 +63,8 @@
     "dexie": "^4.3.0",
     "sql.js": "^1.14.1",
     "svelte-i18n": "^4.0.1"
+  },
+  "overrides": {
+    "filelist": "2.0.2"
   }
 }
