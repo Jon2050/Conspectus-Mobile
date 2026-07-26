@@ -13,6 +13,10 @@ import {
   createMsalConfiguration,
   resolveAuthRedirectUri,
 } from './msalAuthClient';
+import {
+  AUTH_SESSION_RESUME_ATTEMPT_STORAGE_KEY,
+  createAuthSessionResumeStore,
+} from './authSessionResumeStore';
 import { AUTH_REQUEST_SCOPES } from './scopes';
 
 type CreateAuthClientArg = NonNullable<Parameters<typeof createAuthClient>[0]>;
@@ -20,11 +24,13 @@ type MsalInstance = NonNullable<CreateAuthClientArg['msalInstance']>;
 
 interface MockMsalOptions {
   readonly redirectResult?: AuthenticationResult | null;
+  readonly handleRedirectError?: unknown;
   readonly initialActiveAccount?: AccountInfo | null;
   readonly cachedAccounts?: AccountInfo[];
   readonly silentResult?: AuthenticationResult;
   readonly silentError?: unknown;
   readonly redirectError?: unknown;
+  readonly loginRedirectError?: unknown;
   readonly logoutError?: unknown;
 }
 
@@ -35,6 +41,7 @@ const createAccount = (username: string, homeAccountId: string): AccountInfo => 
   username,
   localAccountId: `${homeAccountId}-local`,
   name: `Name ${username}`,
+  loginHint: username,
 });
 
 const createAuthenticationResult = (
@@ -60,13 +67,23 @@ const createMockMsalInstance = (options: MockMsalOptions = {}) => {
   const cachedAccounts = options.cachedAccounts ?? [];
 
   const initialize = vi.fn(async () => {});
-  const handleRedirectPromise = vi.fn(async () => options.redirectResult ?? null);
+  const handleRedirectPromise = vi.fn(async () => {
+    if (options.handleRedirectError !== undefined) {
+      throw options.handleRedirectError;
+    }
+
+    return options.redirectResult ?? null;
+  });
   const getActiveAccount = vi.fn(() => activeAccount);
   const setActiveAccount = vi.fn((account: AccountInfo | null) => {
     activeAccount = account;
   });
   const getAllAccounts = vi.fn(() => [...cachedAccounts]);
-  const loginRedirect = vi.fn(async () => {});
+  const loginRedirect = vi.fn(async () => {
+    if (options.loginRedirectError !== undefined) {
+      throw options.loginRedirectError;
+    }
+  });
   const acquireTokenRedirect = vi.fn(async () => {
     if (options.redirectError !== undefined) {
       throw options.redirectError;
@@ -113,6 +130,32 @@ const createMockMsalInstance = (options: MockMsalOptions = {}) => {
     acquireTokenSilent,
     getActiveAccountValue: (): AccountInfo | null => activeAccount,
   };
+};
+
+const createMemoryStorage = () => {
+  const values = new Map<string, string>();
+
+  return {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      values.set(key, value);
+    },
+    removeItem: (key: string) => {
+      values.delete(key);
+    },
+  };
+};
+
+const createResumeStoreHarness = () => {
+  const localStorage = createMemoryStorage();
+  const sessionStorage = createMemoryStorage();
+  const store = createAuthSessionResumeStore({
+    localStorage,
+    sessionStorage,
+    now: () => Date.parse('2026-07-26T12:00:00.000Z'),
+  });
+
+  return { localStorage, sessionStorage, store };
 };
 
 describe('createAuthClient', () => {
@@ -181,6 +224,88 @@ describe('createAuthClient', () => {
     await client.initialize();
 
     expect(mockMsal.getActiveAccountValue()).toEqual(accountA);
+  });
+
+  it('automatically attempts a promptless session resume from a valid stored hint', async () => {
+    const resumeHarness = createResumeStoreHarness();
+    resumeHarness.store.save('remembered-home', 'remembered@example.com');
+    const mockMsal = createMockMsalInstance();
+    const client = createAuthClient({
+      msalInstance: mockMsal.instance,
+      sessionResumeStore: resumeHarness.store,
+      redirectStartPageResolver: () => 'https://conspectus.local/#/accounts',
+    });
+
+    await client.initialize();
+
+    expect(mockMsal.loginRedirect).toHaveBeenCalledWith({
+      scopes: [...AUTH_REQUEST_SCOPES],
+      prompt: 'none',
+      loginHint: 'remembered@example.com',
+      redirectStartPage: 'https://conspectus.local/#/accounts',
+    });
+    expect(resumeHarness.store.readAttempt()).toEqual({
+      homeAccountId: 'remembered-home',
+      kind: 'session_resume',
+    });
+  });
+
+  it('does not automatically resume without a valid stored hint', async () => {
+    const resumeHarness = createResumeStoreHarness();
+    const mockMsal = createMockMsalInstance();
+    const client = createAuthClient({
+      msalInstance: mockMsal.instance,
+      sessionResumeStore: resumeHarness.store,
+    });
+
+    await client.initialize();
+
+    expect(mockMsal.loginRedirect).not.toHaveBeenCalled();
+  });
+
+  it('stops a failed promptless session resume without creating a redirect loop', async () => {
+    const resumeHarness = createResumeStoreHarness();
+    resumeHarness.store.save('remembered-home', 'remembered@example.com');
+    resumeHarness.store.claimAttempt('remembered-home', 'session_resume');
+    const mockMsal = createMockMsalInstance({
+      handleRedirectError: new InteractionRequiredAuthError(
+        InteractionRequiredAuthErrorCodes.loginRequired,
+        'login required',
+      ),
+    });
+    const client = createAuthClient({
+      msalInstance: mockMsal.instance,
+      sessionResumeStore: resumeHarness.store,
+    });
+
+    await client.initialize();
+
+    expect(client.getSession().isAuthenticated).toBe(false);
+    expect(resumeHarness.store.read()).toBeNull();
+    expect(mockMsal.loginRedirect).not.toHaveBeenCalled();
+  });
+
+  it('persists the redirect account hint and clears the automatic attempt marker', async () => {
+    const resumeHarness = createResumeStoreHarness();
+    resumeHarness.store.claimAttempt('redirect-home', 'session_resume');
+    const redirectAccount = createAccount('redirect@example.com', 'redirect-home');
+    const mockMsal = createMockMsalInstance({
+      redirectResult: createAuthenticationResult(redirectAccount),
+    });
+    const client = createAuthClient({
+      msalInstance: mockMsal.instance,
+      sessionResumeStore: resumeHarness.store,
+    });
+
+    await client.initialize();
+
+    expect(resumeHarness.store.read()).toMatchObject({
+      homeAccountId: 'redirect-home',
+      loginHint: 'redirect@example.com',
+    });
+    expect(
+      resumeHarness.sessionStorage.getItem(AUTH_SESSION_RESUME_ATTEMPT_STORAGE_KEY),
+    ).toBeNull();
   });
 
   it('acquires token silently when a session exists', async () => {
@@ -299,6 +424,9 @@ describe('createAuthClient', () => {
     const client = createAuthClient({ msalInstance: mockMsal.instance });
 
     await expect(client.signIn()).rejects.toMatchObject({ code: 'not_initialized' });
+    await expect(client.attemptSessionResume('https://conspectus.local/')).rejects.toMatchObject({
+      code: 'not_initialized',
+    });
     await expect(client.signOut()).rejects.toMatchObject({ code: 'not_initialized' });
     await expect(client.getAccessToken(['Files.ReadWrite'])).rejects.toMatchObject({
       code: 'not_initialized',
@@ -339,6 +467,35 @@ describe('createAuthClient', () => {
     expect(mockMsal.loginRedirect).not.toHaveBeenCalled();
   });
 
+  it('attempts token recovery automatically only once per browser session', async () => {
+    const resumeHarness = createResumeStoreHarness();
+    const activeAccount = createAccount('active@example.com', 'active-home');
+    const mockMsal = createMockMsalInstance({
+      initialActiveAccount: activeAccount,
+    });
+    const client = createAuthClient({
+      msalInstance: mockMsal.instance,
+      sessionResumeStore: resumeHarness.store,
+    });
+
+    await client.initialize();
+
+    await expect(client.attemptSessionResume('https://conspectus.local/#/transfers')).resolves.toBe(
+      true,
+    );
+    await expect(client.attemptSessionResume('https://conspectus.local/#/transfers')).resolves.toBe(
+      false,
+    );
+
+    expect(mockMsal.acquireTokenRedirect).toHaveBeenCalledTimes(1);
+    expect(mockMsal.acquireTokenRedirect).toHaveBeenCalledWith({
+      account: activeAccount,
+      scopes: ['Files.ReadWrite'],
+      prompt: 'none',
+      redirectStartPage: 'https://conspectus.local/#/transfers',
+    });
+  });
+
   it('requires the existing active account for safe re-authentication', async () => {
     const mockMsal = createMockMsalInstance();
     const client = createAuthClient({ msalInstance: mockMsal.instance });
@@ -375,17 +532,24 @@ describe('createAuthClient', () => {
   });
 
   it('clears active account and logs out against the active account context', async () => {
+    const resumeHarness = createResumeStoreHarness();
     const activeAccount = createAccount('active@example.com', 'active-home');
     const mockMsal = createMockMsalInstance({
       initialActiveAccount: activeAccount,
     });
-    const client = createAuthClient({ msalInstance: mockMsal.instance });
+    const client = createAuthClient({
+      msalInstance: mockMsal.instance,
+      sessionResumeStore: resumeHarness.store,
+    });
 
     await client.initialize();
+    await client.attemptSessionResume('https://conspectus.local/#/settings');
     await client.signOut();
 
     expect(mockMsal.setActiveAccount).toHaveBeenLastCalledWith(null);
     expect(mockMsal.logoutRedirect).toHaveBeenCalledWith({ account: activeAccount });
+    expect(resumeHarness.store.read()).toBeNull();
+    expect(resumeHarness.store.readAttempt()).toBeNull();
   });
 
   it('restores the prior active account when sign-out fails', async () => {

@@ -15,6 +15,10 @@ import {
 import { loadRuntimeEnv } from '@shared';
 
 import type { AuthAccount, AuthClient, AuthErrorCode, AuthSession } from './index';
+import {
+  createAuthSessionResumeStore,
+  type AuthSessionResumeStore,
+} from './authSessionResumeStore';
 import { AUTH_REQUEST_SCOPES, GRAPH_ONEDRIVE_FILE_SCOPES } from './scopes';
 
 const MSAL_CONSUMERS_AUTHORITY = 'https://login.microsoftonline.com/consumers';
@@ -33,6 +37,8 @@ type MsalInstance = {
 
 export interface CreateAuthClientOptions {
   readonly msalInstance?: MsalInstance;
+  readonly sessionResumeStore?: AuthSessionResumeStore;
+  readonly redirectStartPageResolver?: () => string;
 }
 
 class AuthClientError extends Error {
@@ -190,6 +196,16 @@ const toAuthAccount = (account: AccountInfo | null): AuthAccount | null => {
   };
 };
 
+const resolveAccountLoginHint = (account: AccountInfo): string | null => {
+  const loginHint = account.loginHint?.trim();
+  if (loginHint) {
+    return loginHint;
+  }
+
+  const username = account.username.trim();
+  return username.length > 0 ? username : null;
+};
+
 export const resolveAuthRedirectUri = (origin: string, appBasePath: string): string =>
   new URL(appBasePath, `${origin.replace(/\/+$/u, '')}/`).toString();
 
@@ -231,6 +247,9 @@ const ensureActiveAccount = (msalInstance: MsalInstance): AccountInfo => {
 
 export const createAuthClient = (options: CreateAuthClientOptions = {}): AuthClient => {
   let msalInstance: MsalInstance | null = options.msalInstance ?? null;
+  const sessionResumeStore = options.sessionResumeStore ?? createAuthSessionResumeStore();
+  const redirectStartPageResolver =
+    options.redirectStartPageResolver ?? (() => window.location.href);
   let isInitialized = false;
 
   const resolveMsalInstance = (): MsalInstance => {
@@ -248,6 +267,13 @@ export const createAuthClient = (options: CreateAuthClientOptions = {}): AuthCli
     }
   };
 
+  const persistAccountResumeHint = (account: AccountInfo): void => {
+    const loginHint = resolveAccountLoginHint(account);
+    if (loginHint !== null) {
+      sessionResumeStore.save(account.homeAccountId, loginHint);
+    }
+  };
+
   return {
     async initialize(): Promise<void> {
       if (isInitialized) {
@@ -257,12 +283,71 @@ export const createAuthClient = (options: CreateAuthClientOptions = {}): AuthCli
       try {
         const resolvedMsalInstance = resolveMsalInstance();
         await resolvedMsalInstance.initialize();
-        const redirectResult = await resolvedMsalInstance.handleRedirectPromise();
+        const pendingAutomaticAttempt = sessionResumeStore.readAttempt();
+        let redirectResult: AuthenticationResult | null;
+
+        try {
+          redirectResult = await resolvedMsalInstance.handleRedirectPromise();
+        } catch (error) {
+          const normalizedError = normalizeAuthError(error, 'Failed to initialize authentication.');
+          if (pendingAutomaticAttempt !== null && normalizedError.code === 'interaction_required') {
+            if (pendingAutomaticAttempt.kind === 'session_resume') {
+              sessionResumeStore.clear();
+            }
+
+            const preferredAccount = resolvePreferredAccount(resolvedMsalInstance, null);
+            if (preferredAccount !== null) {
+              resolvedMsalInstance.setActiveAccount(preferredAccount);
+              persistAccountResumeHint(preferredAccount);
+            }
+            isInitialized = true;
+            return;
+          }
+
+          throw normalizedError;
+        }
+
         const preferredAccount = resolvePreferredAccount(resolvedMsalInstance, redirectResult);
         if (preferredAccount !== null) {
           resolvedMsalInstance.setActiveAccount(preferredAccount);
+          persistAccountResumeHint(preferredAccount);
+        }
+        if (redirectResult?.account !== null && redirectResult?.account !== undefined) {
+          sessionResumeStore.clearAttempt();
         }
         isInitialized = true;
+
+        if (preferredAccount !== null || sessionResumeStore.readAttempt() !== null) {
+          return;
+        }
+
+        const resumeRecord = sessionResumeStore.read();
+        if (
+          resumeRecord === null ||
+          !sessionResumeStore.claimAttempt(resumeRecord.homeAccountId, 'session_resume')
+        ) {
+          return;
+        }
+
+        const resumeRequest: RedirectRequest = {
+          scopes: [...AUTH_REQUEST_SCOPES],
+          prompt: 'none',
+          loginHint: resumeRecord.loginHint,
+          redirectStartPage: redirectStartPageResolver(),
+        };
+
+        try {
+          await resolvedMsalInstance.loginRedirect(resumeRequest);
+        } catch (error) {
+          const normalizedError = normalizeAuthError(error, 'Session restoration failed.');
+          if (normalizedError.code === 'interaction_required') {
+            sessionResumeStore.clear();
+            return;
+          }
+
+          isInitialized = false;
+          throw normalizedError;
+        }
       } catch (error) {
         throw normalizeAuthError(error, 'Failed to initialize authentication.');
       }
@@ -285,6 +370,7 @@ export const createAuthClient = (options: CreateAuthClientOptions = {}): AuthCli
 
     async signIn(): Promise<void> {
       assertInitialized();
+      sessionResumeStore.clearAttempt();
 
       const signInRequest: RedirectRequest = {
         scopes: [...AUTH_REQUEST_SCOPES],
@@ -298,8 +384,53 @@ export const createAuthClient = (options: CreateAuthClientOptions = {}): AuthCli
       }
     },
 
+    async attemptSessionResume(redirectStartPage: string): Promise<boolean> {
+      assertInitialized();
+
+      const resolvedMsalInstance = resolveMsalInstance();
+      const activeAccount = resolvedMsalInstance.getActiveAccount();
+      const resumeRecord = activeAccount === null ? sessionResumeStore.read() : null;
+      const homeAccountId = activeAccount?.homeAccountId ?? resumeRecord?.homeAccountId ?? null;
+      const attemptKind = activeAccount === null ? 'session_resume' : 'token_recovery';
+
+      if (homeAccountId === null || !sessionResumeStore.claimAttempt(homeAccountId, attemptKind)) {
+        return false;
+      }
+
+      try {
+        if (activeAccount !== null) {
+          await resolvedMsalInstance.acquireTokenRedirect({
+            account: activeAccount,
+            scopes: [...GRAPH_ONEDRIVE_FILE_SCOPES],
+            prompt: 'none',
+            redirectStartPage,
+          });
+        } else if (resumeRecord !== null) {
+          await resolvedMsalInstance.loginRedirect({
+            scopes: [...AUTH_REQUEST_SCOPES],
+            prompt: 'none',
+            loginHint: resumeRecord.loginHint,
+            redirectStartPage,
+          });
+        }
+
+        return true;
+      } catch (error) {
+        const normalizedError = normalizeAuthError(error, 'Session restoration failed.');
+        if (normalizedError.code === 'interaction_required') {
+          if (activeAccount === null) {
+            sessionResumeStore.clear();
+          }
+          return false;
+        }
+
+        throw normalizedError;
+      }
+    },
+
     async reauthenticate(redirectStartPage: string): Promise<void> {
       assertInitialized();
+      sessionResumeStore.clearAttempt();
 
       const resolvedMsalInstance = resolveMsalInstance();
       const activeAccount = ensureActiveAccount(resolvedMsalInstance);
@@ -323,6 +454,8 @@ export const createAuthClient = (options: CreateAuthClientOptions = {}): AuthCli
       const activeAccount = resolvedMsalInstance.getActiveAccount();
       const logoutRequest = activeAccount !== null ? { account: activeAccount } : undefined;
 
+      sessionResumeStore.clear();
+      sessionResumeStore.clearAttempt();
       resolvedMsalInstance.setActiveAccount(null);
 
       try {
@@ -330,6 +463,7 @@ export const createAuthClient = (options: CreateAuthClientOptions = {}): AuthCli
       } catch (error) {
         if (activeAccount !== null) {
           resolvedMsalInstance.setActiveAccount(activeAccount);
+          persistAccountResumeHint(activeAccount);
         }
         throw normalizeAuthError(error, 'Sign-out failed.');
       }
@@ -357,6 +491,7 @@ export const createAuthClient = (options: CreateAuthClientOptions = {}): AuthCli
         const tokenResult = await resolvedMsalInstance.acquireTokenSilent(tokenRequest);
         if (tokenResult.account !== null) {
           resolvedMsalInstance.setActiveAccount(tokenResult.account);
+          persistAccountResumeHint(tokenResult.account);
         }
         return tokenResult.accessToken;
       } catch (error) {

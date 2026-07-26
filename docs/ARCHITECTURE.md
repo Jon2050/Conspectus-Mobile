@@ -92,9 +92,17 @@ Authentication behavior:
 1. Initialize MSAL and process any redirect result before route handling can discard it.
 2. Restore the active account deterministically from the redirect result, current active account,
    or cached accounts.
-3. Acquire Graph tokens silently first.
-4. Surface an explicit reauthentication action when interaction is required; preserve the route
-   that requested recovery.
+3. When MSAL has no cached account, use a token-free account hint retained for up to 30 days to
+   attempt one promptless Microsoft session restoration per browser session.
+4. Acquire Graph tokens silently first. If Microsoft requires interaction after an active session
+   expires, attempt one promptless redirect recovery while preserving the requesting route.
+5. Keep the existing explicit sign-in or reauthentication action as the fallback when Microsoft
+   cannot restore the session without user interaction.
+
+The app-owned restoration record contains only the MSAL home-account ID, login hint, and expiry;
+access, refresh, and ID tokens remain owned by MSAL and are never copied into app storage. Explicit
+sign-out clears the record. The 30-day window controls only whether Conspectus attempts restoration:
+Microsoft can still require interaction earlier because of account, browser, or tenant policy.
 
 The selected OneDrive database binding contains `driveId`, `itemId`, filename, and parent path. It
 is persisted per Microsoft account so switching accounts cannot reuse another account's binding.
@@ -172,11 +180,13 @@ reuse, and application operation:
 - schema-versioned selected-file bindings;
 - cached database bytes and their matching eTag/sync metadata;
 - MSAL-managed authentication state;
+- the token-free authentication restoration hint described above;
 - PWA/service-worker caches and short-lived UI state.
 
 Confirmed local reset clears app-owned bindings, database snapshots, and app cache data after
 closing active Dexie connections. It intentionally preserves the Microsoft authentication session
-so the user can rebind without an unnecessary sign-in. Sign-out remains a separate explicit action.
+and restoration hint so the user can rebind without an unnecessary sign-in. Sign-out remains a
+separate explicit action.
 
 ## PWA lifecycle and deployment
 

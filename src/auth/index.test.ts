@@ -55,6 +55,7 @@ describe('auth barrel contract', () => {
         initialize: expect.any(Function),
         getSession: expect.any(Function),
         signIn: expect.any(Function),
+        attemptSessionResume: expect.any(Function),
         reauthenticate: expect.any(Function),
         signOut: expect.any(Function),
         getAccessToken: expect.any(Function),

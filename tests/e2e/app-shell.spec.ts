@@ -956,12 +956,42 @@ test('fails fast on non-retryable startup metadata errors and surfaces the clear
   expect(await getGraphDownloadCallCount(page)).toBe(0);
 });
 
-test('starts one safe re-authentication and preserves the current screen after token expiry', async ({
+test('restores a remembered Microsoft session before startup sync without a sign-in click', async ({
+  page,
+}) => {
+  await installMockAuthClient(page, {
+    resumeSessionOnInitialize: true,
+  });
+  await installMockGraphClient(page);
+  await installMockCacheStore(page);
+  await installMockDbRuntime(page, {
+    accountRows: [{ accountId: 1, name: 'Remembered account', amountCents: 1_000 }],
+  });
+  await installPersistedBinding(page);
+  await installMockStartupNetworkState(page, true);
+
+  await page.goto(appPath('#/accounts'));
+
+  await expect(page.getByText('Remembered account')).toBeVisible();
+  const startupResumeCount = await page.evaluate(
+    () =>
+      (
+        window as typeof window & {
+          __CONSPECTUS_STARTUP_SESSION_RESUME_COUNT__?: number;
+        }
+      ).__CONSPECTUS_STARTUP_SESSION_RESUME_COUNT__,
+  );
+  expect(startupResumeCount).toBe(1);
+  expect(await getGraphMetadataCallCount(page)).toBe(1);
+});
+
+test('starts one automatic promptless recovery and preserves the current screen after token expiry', async ({
   page,
 }) => {
   await installMockAuthClient(page, {
     startAuthenticated: true,
-    reauthenticateDelayMs: 250,
+    attemptSessionResumeDelayMs: 250,
+    attemptSessionResumeResult: true,
   });
   await installMockGraphClient(page, {
     metadataErrorSequence: [
@@ -987,15 +1017,28 @@ test('starts one safe re-authentication and preserves the current screen after t
   const recoveryButton = page.getByTestId('stale-token-recovery-button');
   const previousUrl = page.url();
   await expect(recoveryButton).toBeVisible();
-  await recoveryButton.evaluate((button) => {
-    button.click();
-    button.click();
-  });
-  await expect(recoveryButton).toBeDisabled();
-  await expect(recoveryButton).toHaveAttribute('aria-busy', 'true');
-  await expect(recoveryButton).toBeEnabled();
-
-  const redirectStartPages = await page.evaluate(
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (
+            window as typeof window & {
+              __CONSPECTUS_SESSION_RESUME_START_PAGES__?: string[];
+            }
+          ).__CONSPECTUS_SESSION_RESUME_START_PAGES__,
+      ),
+    )
+    .toEqual([previousUrl]);
+  const sessionResumeStartPages = await page.evaluate(
+    () =>
+      (
+        window as typeof window & {
+          __CONSPECTUS_SESSION_RESUME_START_PAGES__?: string[];
+        }
+      ).__CONSPECTUS_SESSION_RESUME_START_PAGES__,
+  );
+  expect(sessionResumeStartPages).toEqual([previousUrl]);
+  const interactiveStartPages = await page.evaluate(
     () =>
       (
         window as typeof window & {
@@ -1003,7 +1046,7 @@ test('starts one safe re-authentication and preserves the current screen after t
         }
       ).__CONSPECTUS_REAUTHENTICATE_START_PAGES__,
   );
-  expect(redirectStartPages).toEqual([previousUrl]);
+  expect(interactiveStartPages).toEqual([]);
   await expect(page).toHaveURL(previousUrl);
   await expect(page.getByTestId('route-transfers')).toBeVisible();
 });

@@ -20,6 +20,7 @@ export interface AuthClient {
   initialize(): Promise<void>;
   getSession(): AuthSession;
   signIn(): Promise<void>;
+  attemptSessionResume(redirectStartPage: string): Promise<boolean>;
   reauthenticate(redirectStartPage: string): Promise<void>;
   signOut(): Promise<void>;
   getAccessToken(scopes: readonly string[]): Promise<string>;
@@ -32,5 +33,15 @@ export interface AuthError {
 }
 
 export { createAuthClient } from './msalAuthClient';
+export {
+  AUTH_SESSION_RESUME_STORAGE_KEY,
+  createAuthSessionResumeStore,
+} from './authSessionResumeStore';
+export type {
+  AuthSessionResumeAttempt,
+  AuthSessionResumeAttemptKind,
+  AuthSessionResumeRecord,
+  AuthSessionResumeStore,
+} from './authSessionResumeStore';
 export { AUTH_OIDC_SCOPES, GRAPH_ONEDRIVE_FILE_SCOPES, AUTH_REQUEST_SCOPES } from './scopes';
 export type { AuthRequestScope } from './scopes';

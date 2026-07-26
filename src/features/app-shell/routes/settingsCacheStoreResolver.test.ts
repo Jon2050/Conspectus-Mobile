@@ -39,6 +39,9 @@ describe('settings cache store resolver', () => {
       appCacheStore: { readSnapshot: appCacheStoreReadSnapshot },
       closeAppCacheStoreConnections,
     }));
+    vi.doMock('@auth', () => ({
+      AUTH_SESSION_RESUME_STORAGE_KEY: 'conspectus.authSessionResume',
+    }));
   });
 
   afterEach(() => {
@@ -80,6 +83,7 @@ describe('settings cache store resolver', () => {
   it('clears app-owned storage, CacheStorage, and IndexedDB entries by default', async () => {
     const localStorage = createMemoryStorage({
       'conspectus.selectedDriveItemBinding': '{"value":1}',
+      'conspectus.authSessionResume': '{"version":1}',
       'other-app-key': 'keep',
     });
     const sessionStorage = createMemoryStorage({
@@ -106,6 +110,7 @@ describe('settings cache store resolver', () => {
     await resolveSettingsCacheStore().clearAll();
 
     expect(localStorage.getItem('conspectus.selectedDriveItemBinding')).toBeNull();
+    expect(localStorage.getItem('conspectus.authSessionResume')).toBe('{"version":1}');
     expect(localStorage.getItem('other-app-key')).toBe('keep');
     expect(sessionStorage.getItem('conspectus.session')).toBeNull();
     expect(sessionStorage.getItem('untouched')).toBe('keep');
