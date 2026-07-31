@@ -79,8 +79,35 @@
       "normalizing": "Foto wird sicher vorbereitet...",
       "stageOne": "Foto auslesen",
       "stageTwo": "Transferdaten erstellen",
+      "freshAction": "Neuen Kassenbon fotografieren",
+      "sourceAccount": "Quellkonto für alle Transfers",
+      "accountRequired": "Wähle ein Quellkonto, damit die Transfers automatisch erstellt werden können.",
+      "progressLabel": "Fortschritt der Kassenbonverarbeitung",
+      "steps": {
+        "extraction": "Foto auslesen",
+        "derivation": "Transferdaten erstellen",
+        "creation": "Transfers erstellen"
+      },
+      "stepStates": {
+        "pending": "Ausstehend",
+        "active": "In Bearbeitung",
+        "complete": "Abgeschlossen",
+        "error": "Fehlgeschlagen"
+      },
       "analysisSuccessOne": "Transferdaten für 1 Transfer wurden erstellt.",
       "analysisSuccessMany": "Transferdaten für {count} Transfers wurden erstellt.",
+      "preparationErrors": {
+        "options_unavailable": "Konten und Kategorien sind nicht mehr aktuell verfügbar. Starte mit einem neuen Foto.",
+        "offline": "Die Internetverbindung wurde unterbrochen. Starte online mit einem neuen Foto.",
+        "source_account_unavailable": "Das gewählte Quellkonto ist nicht mehr gültig. Starte mit einem neuen Foto.",
+        "primary_spendings_unavailable": "Das primäre Ausgabenkonto ist nicht eindeutig verfügbar. Starte mit einem neuen Foto.",
+        "category_not_found": "Die Kategorie \"{detail}\" ist in der aktuellen Datenbank nicht vorhanden. Starte nach der Korrektur mit einem neuen Foto.",
+        "category_ambiguous": "Die Kategorie \"{detail}\" ist in der aktuellen Datenbank nicht eindeutig. Starte nach der Korrektur mit einem neuen Foto.",
+        "invalid_transfer": "Mindestens ein Transfer verletzt die lokalen Conspectus-Regeln: {detail} Starte mit einem neuen Foto.",
+        "invalid_item_coverage": "Die Bonpositionen sind nicht genau einmal auf die Transfers verteilt. Starte mit einem neuen Foto.",
+        "non_positive_amount": "Mindestens ein Transferbetrag ist nicht positiv oder kein sicherer Centwert. Starte mit einem neuen Foto.",
+        "total_mismatch": "Die Transfersumme stimmt nicht exakt mit dem Bonbetrag überein. Starte mit einem neuen Foto."
+      },
       "errors": {
         "empty_file": "Das ausgewählte Bild ist leer. Nimm ein neues Foto auf.",
         "source_too_large": "Das Foto ist zu groß. Nimm ein neues Foto mit höchstens 20 MB auf.",

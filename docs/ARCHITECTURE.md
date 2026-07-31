@@ -179,7 +179,14 @@ Receipt analysis is an abortable, two-stage feature workflow behind typed OpenRo
    category arrays, per-group arithmetic, and an exact receipt-total match. Machine-readable mapping
    declarations in the active editable prompt bind every accepted transfer name to its exact ordered
    category list; prompts without unambiguous declarations are not ready for capture. The validated
-   result remains transient for the later account/category-resolution and save workflow.
+   result and only its item-index coverage proof remain transient for local preparation.
+5. While both remote stages run, show the current valid source accounts without preselecting one.
+   Stage 2 never waits for or receives that selection. Once both the validated derivation and a
+   deliberate current-run source selection exist, resolve every category name by one exact current
+   local match, target the sole primary spendings account, revalidate coverage and exact cent totals,
+   and reuse the existing Add Transfer validation and transfer-type rules. The resulting immutable
+   command batch is held only in memory for M9-05; this preparation step performs no SQLite, cache,
+   Graph, or OneDrive mutation and exposes no review or editing surface.
 
 Both calls use the explicitly selected model without model or provider fallback. They add no app
 owned ZDR or data-collection routing restriction, so stricter OpenRouter account preferences and

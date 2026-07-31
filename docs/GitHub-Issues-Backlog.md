@@ -166,7 +166,7 @@ Exit criteria:
 - Depends on: `M9-01, M9-02`
 - GitHub: [#253](https://github.com/Jon2050/Conspectus-Mobile/issues/253)
 
-### :green_circle: M9-04 Select the source account and show staged automatic processing
+### :white_check_mark: M9-04 Select the source account and show staged automatic processing
 
 - Label: `feature`
 - Milestone: `M9 - Receipt Capture + OpenRouter`

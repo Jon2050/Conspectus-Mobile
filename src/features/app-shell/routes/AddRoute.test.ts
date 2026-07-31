@@ -16,6 +16,10 @@ import type {
   ReceiptAnalysisController,
   ReceiptAnalysisState,
 } from '../../receipt/receiptAnalysisController';
+import type {
+  ReceiptTransferPreparationController,
+  ReceiptTransferPreparationState,
+} from '../../receipt/receiptTransferPreparationController';
 
 const READY_OPTIONS_STATE: AddTransferOptionsState = {
   operation: 'ready',
@@ -85,6 +89,30 @@ const createMockReceiptAnalysisController = (
   dispose: () => {},
 });
 
+const createMockReceiptPreparationController = (
+  state: ReceiptTransferPreparationState,
+): ReceiptTransferPreparationController => ({
+  getState: () => state,
+  subscribe: (listener) => {
+    listener(state);
+    return () => {};
+  },
+  beginRun: () => {},
+  handleCaptureFailure: () => {},
+  handleAnalysisState: () => {},
+  selectSourceAccount: () => {},
+  refreshOptions: () => {},
+  failForOffline: () => {},
+  reset: () => {},
+  dispose: () => {},
+});
+
+const PROCESSING_STEPS = [
+  { id: 'extraction' as const, status: 'active' as const },
+  { id: 'derivation' as const, status: 'pending' as const },
+  { id: 'creation' as const, status: 'pending' as const },
+];
+
 const renderAddRoute = (props: Record<string, unknown> = {}) =>
   render(AddRoute, {
     props: {
@@ -148,21 +176,36 @@ describe('AddRoute component', () => {
         phase: 'normalizing',
         errorCode: null,
       }),
+      receiptPreparationController: createMockReceiptPreparationController({
+        phase: 'processing',
+        steps: PROCESSING_STEPS,
+        sourceAccountId: null,
+        readyForCommit: null,
+        error: null,
+      }),
     }).body;
-    expect(normalizing).toContain('data-testid="receipt-normalizing-status"');
-    expect(normalizing).toContain('role="status"');
-    expect(normalizing).toMatch(/data-testid="receipt-photo-button"[^>]*disabled/);
-    expect(normalizing).toMatch(/data-testid="add-transfer-submit"[^>]*disabled/);
+    expect(normalizing).toContain('data-testid="receipt-progress"');
+    expect(normalizing).toContain('aria-live="polite"');
+    expect(normalizing).toMatch(/data-testid="receipt-step-extraction"[^>]*data-state="active"/);
+    expect(normalizing).not.toContain('data-testid="receipt-photo-button"');
+    expect(normalizing).not.toContain('data-testid="add-transfer-submit"');
 
     const handedOff = renderAddRoute({
       receiptCaptureController: createMockReceiptCaptureController({
         phase: 'handed_off',
         errorCode: null,
       }),
+      receiptPreparationController: createMockReceiptPreparationController({
+        phase: 'processing',
+        steps: PROCESSING_STEPS,
+        sourceAccountId: null,
+        readyForCommit: null,
+        error: null,
+      }),
     }).body;
-    expect(handedOff).toContain('data-testid="receipt-stage-one-status"');
+    expect(handedOff).toContain('data-testid="receipt-step-extraction"');
     expect(handedOff).toContain('Foto auslesen');
-    expect(handedOff).toMatch(/data-testid="receipt-photo-button"[^>]*disabled/);
+    expect(handedOff).not.toContain('data-testid="receipt-photo-button"');
   });
 
   it('shows stage-two progress and a validated analysis result without a review or retry action', () => {
@@ -177,13 +220,24 @@ describe('AddRoute component', () => {
         errorCode: null,
         errorReason: null,
         derivation: null,
+        extractedItemIndexes: null,
+      }),
+      receiptPreparationController: createMockReceiptPreparationController({
+        phase: 'processing',
+        steps: [
+          { id: 'extraction', status: 'complete' },
+          { id: 'derivation', status: 'active' },
+          { id: 'creation', status: 'pending' },
+        ],
+        sourceAccountId: null,
+        readyForCommit: null,
+        error: null,
       }),
     }).body;
-    expect(deriving).toContain('data-testid="receipt-stage-two-status"');
+    expect(deriving).toMatch(/data-testid="receipt-step-derivation"[^>]*data-state="active"/);
     expect(deriving).toContain('Transferdaten erstellen');
-    expect(deriving).toMatch(/data-testid="receipt-photo-button"[^>]*disabled/);
     expect(deriving).not.toMatch(/data-testid="add-transfer-from-account"[^>]*disabled/);
-    expect(deriving).toMatch(/data-testid="add-transfer-date"[^>]*disabled/);
+    expect(deriving).not.toContain('data-testid="add-transfer-date"');
 
     const succeeded = renderAddRoute({
       receiptCaptureController: createMockReceiptCaptureController(),
@@ -207,6 +261,29 @@ describe('AddRoute component', () => {
             },
           ],
         },
+        extractedItemIndexes: [0],
+      }),
+      receiptPreparationController: createMockReceiptPreparationController({
+        phase: 'ready_for_commit',
+        steps: [
+          { id: 'extraction', status: 'complete' },
+          { id: 'derivation', status: 'complete' },
+          { id: 'creation', status: 'active' },
+        ],
+        sourceAccountId: 11,
+        readyForCommit: [
+          {
+            bookingDateEpochDay: 20665,
+            name: 'Lebensmittel',
+            amountCents: 500,
+            transferTypeId: 1,
+            fromAccountId: 11,
+            toAccountId: 2,
+            categoryIds: [20],
+            buyplace: 'Markt',
+          },
+        ],
+        error: null,
       }),
     }).body;
     expect(succeeded).toContain('data-testid="receipt-analysis-success"');
@@ -218,34 +295,37 @@ describe('AddRoute component', () => {
   it('uses the plural success copy for multiple validated transfers', () => {
     const { body } = renderAddRoute({
       receiptCaptureController: createMockReceiptCaptureController(),
-      receiptAnalysisController: createMockReceiptAnalysisController({
-        phase: 'succeeded',
-        stage: null,
-        errorCode: null,
-        errorReason: null,
-        derivation: {
-          status: 'ok',
-          errorReason: null,
-          receiptTotalCents: 500,
-          transfers: [
-            {
-              name: 'Lebensmittel',
-              amountCents: 300,
-              categoryNames: ['Einkauf'],
-              buyplace: 'Markt',
-              receiptDate: '2026-07-31',
-              sourceItemIndexes: [0],
-            },
-            {
-              name: 'Haushalt',
-              amountCents: 200,
-              categoryNames: ['Haushalt'],
-              buyplace: 'Markt',
-              receiptDate: '2026-07-31',
-              sourceItemIndexes: [1],
-            },
-          ],
-        },
+      receiptPreparationController: createMockReceiptPreparationController({
+        phase: 'ready_for_commit',
+        steps: [
+          { id: 'extraction', status: 'complete' },
+          { id: 'derivation', status: 'complete' },
+          { id: 'creation', status: 'active' },
+        ],
+        sourceAccountId: 11,
+        readyForCommit: [
+          {
+            bookingDateEpochDay: 20665,
+            name: 'Lebensmittel',
+            amountCents: 300,
+            transferTypeId: 1,
+            fromAccountId: 11,
+            toAccountId: 2,
+            categoryIds: [20],
+            buyplace: 'Markt',
+          },
+          {
+            bookingDateEpochDay: 20665,
+            name: 'Haushalt',
+            amountCents: 200,
+            transferTypeId: 1,
+            fromAccountId: 11,
+            toAccountId: 2,
+            categoryIds: [22],
+            buyplace: 'Markt',
+          },
+        ],
+        error: null,
       }),
     });
 
@@ -256,6 +336,7 @@ describe('AddRoute component', () => {
     const controller = createMockOptionsController({
       ...READY_OPTIONS_STATE,
       fromAccountOptions: [{ accountId: 11, name: 'Checking', accountTypeId: 3 }],
+      toAccountOptions: [{ accountId: 2, name: 'Spendings', accountTypeId: 2 }],
     });
     for (const phase of ['extracting', 'deriving'] as const) {
       const { body } = renderAddRoute({
@@ -270,12 +351,27 @@ describe('AddRoute component', () => {
           errorCode: null,
           errorReason: null,
           derivation: null,
+          extractedItemIndexes: null,
+        }),
+        receiptPreparationController: createMockReceiptPreparationController({
+          phase: 'processing',
+          steps:
+            phase === 'extracting'
+              ? PROCESSING_STEPS
+              : [
+                  { id: 'extraction', status: 'complete' },
+                  { id: 'derivation', status: 'active' },
+                  { id: 'creation', status: 'pending' },
+                ],
+          sourceAccountId: null,
+          readyForCommit: null,
+          error: null,
         }),
       });
 
       expect(body).not.toMatch(/data-testid="add-transfer-from-account"[^>]*disabled/);
-      expect(body).toMatch(/data-testid="add-transfer-name"[^>]*disabled/);
-      expect(body).toMatch(/data-testid="receipt-photo-button"[^>]*disabled/);
+      expect(body).not.toContain('data-testid="add-transfer-name"');
+      expect(body).not.toContain('data-testid="receipt-photo-button"');
     }
   });
 
@@ -291,6 +387,18 @@ describe('AddRoute component', () => {
         errorCode: 'model_error',
         errorReason: 'Der Gesamtbetrag ist unlesbar.',
         derivation: null,
+        extractedItemIndexes: null,
+      }),
+      receiptPreparationController: createMockReceiptPreparationController({
+        phase: 'error',
+        steps: [
+          { id: 'extraction', status: 'error' },
+          { id: 'derivation', status: 'pending' },
+          { id: 'creation', status: 'pending' },
+        ],
+        sourceAccountId: null,
+        readyForCommit: null,
+        error: null,
       }),
     });
 
@@ -298,6 +406,7 @@ describe('AddRoute component', () => {
     expect(body).toContain('Der Gesamtbetrag ist unlesbar.');
     expect(body).not.toContain('receipt-analysis-retry');
     expect(body).not.toMatch(/data-testid="receipt-photo-button"[^>]*disabled/);
+    expect(body).toContain('Neuen Kassenbon fotografieren');
   });
 
   it('renders actionable localized capture errors without source details', () => {
@@ -312,6 +421,58 @@ describe('AddRoute component', () => {
     expect(body).toContain('Das Foto konnte nicht gelesen werden');
     expect(body).not.toContain('.heic');
     expect(body).not.toContain('EXIF');
+  });
+
+  it('renders a specific local preparation failure and clears the source selector', () => {
+    const { body } = renderAddRoute({
+      receiptCaptureController: createMockReceiptCaptureController(),
+      receiptPreparationController: createMockReceiptPreparationController({
+        phase: 'error',
+        steps: [
+          { id: 'extraction', status: 'complete' },
+          { id: 'derivation', status: 'complete' },
+          { id: 'creation', status: 'error' },
+        ],
+        sourceAccountId: null,
+        readyForCommit: null,
+        error: { code: 'category_not_found', detail: 'Einkauf' },
+      }),
+    });
+
+    expect(body).toContain('Die Kategorie "Einkauf"');
+    expect(body).toMatch(/data-testid="receipt-step-creation"[^>]*data-state="error"/);
+    expect(body).not.toContain('data-testid="add-transfer-from-account"');
+    expect(body).toContain('Neuen Kassenbon fotografieren');
+  });
+
+  it.each([
+    {
+      code: 'source_account_unavailable' as const,
+      message: 'Das gewählte Quellkonto ist nicht mehr gültig.',
+    },
+    {
+      code: 'primary_spendings_unavailable' as const,
+      message: 'Das primäre Ausgabenkonto ist nicht eindeutig verfügbar.',
+    },
+  ])('renders the account-topology failure $code as a fresh-photo restart', ({ code, message }) => {
+    const { body } = renderAddRoute({
+      receiptCaptureController: createMockReceiptCaptureController(),
+      receiptPreparationController: createMockReceiptPreparationController({
+        phase: 'error',
+        steps: [
+          { id: 'extraction', status: 'complete' },
+          { id: 'derivation', status: 'complete' },
+          { id: 'creation', status: 'error' },
+        ],
+        sourceAccountId: null,
+        readyForCommit: null,
+        error: { code, detail: null },
+      }),
+    });
+
+    expect(body).toContain(message);
+    expect(body).not.toContain('data-testid="add-transfer-from-account"');
+    expect(body).toContain('Neuen Kassenbon fotografieren');
   });
 
   it('renders the date field with app-input class', () => {

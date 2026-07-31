@@ -1,4 +1,4 @@
-<!-- Renders the Add Transfer bottom-sheet form with all MVP fields for mobile data entry. -->
+<!-- Renders manual Add Transfer entry and the transient staged receipt-preparation workflow. -->
 <script lang="ts">
   import { onDestroy, onMount, tick } from 'svelte';
   import { _ } from 'svelte-i18n';
@@ -15,11 +15,18 @@
     type SyncStateStore,
     type NetworkStateStore,
   } from '@shared';
+  import {
+    createReceiptTransferPreparationController,
+    listReceiptSourceAccountOptions,
+  } from '../../receipt';
   import type {
     ReceiptAnalysisController,
     ReceiptAnalysisState,
     ReceiptCaptureController,
     ReceiptCaptureState,
+    ReceiptTransferPreparationController,
+    ReceiptTransferPreparationError,
+    ReceiptTransferPreparationState,
   } from '../../receipt';
   import BottomSheet from '../components/BottomSheet.svelte';
   import ProgressIndicator from '../components/ProgressIndicator.svelte';
@@ -58,6 +65,8 @@
   export let canOpenPanel = true;
   export let receiptCaptureController: ReceiptCaptureController | null = null;
   export let receiptAnalysisController: ReceiptAnalysisController | null = null;
+  export let receiptPreparationController: ReceiptTransferPreparationController =
+    createReceiptTransferPreparationController();
 
   let isOpen = true;
   let componentHasMounted = false;
@@ -77,7 +86,10 @@
     errorCode: null,
     errorReason: null,
     derivation: null,
+    extractedItemIndexes: null,
   };
+  let receiptPreparationState: ReceiptTransferPreparationState =
+    receiptPreparationController.getState();
   let lastObservedSyncState: SyncState = 'idle';
   $: isOffline = !$networkStateStore;
   $: isOptionsLoading = optionsState.operation === 'loading';
@@ -99,6 +111,21 @@
     receiptCaptureState.phase === 'handed_off' ||
     receiptAnalysisState.phase === 'extracting' ||
     receiptAnalysisState.phase === 'deriving';
+  $: receiptWorkflowIsActive = receiptPreparationState.phase !== 'idle';
+  $: receiptSourceAccountOptions = listReceiptSourceAccountOptions(optionsState);
+  const translateReceiptPreparationError = (
+    error: ReceiptTransferPreparationError | null,
+  ): string | null => {
+    if (error === null) return null;
+    const detail =
+      error.code === 'invalid_transfer' && error.detail?.startsWith('addTransfer.')
+        ? $_(error.detail)
+        : error.detail;
+    return $_(`addTransfer.receipt.preparationErrors.${error.code}`, {
+      values: { detail: detail ?? '' },
+    });
+  };
+  $: receiptPreparationError = translateReceiptPreparationError(receiptPreparationState.error);
   $: receiptAnalysisError =
     receiptAnalysisState.phase !== 'error' || receiptAnalysisState.errorCode === null
       ? null
@@ -106,6 +133,7 @@
         ? $_(`addTransfer.receipt.analysisErrors.${receiptAnalysisState.errorCode}`)
         : `${$_(`addTransfer.receipt.analysisErrors.${receiptAnalysisState.errorCode}`)} ${receiptAnalysisState.errorReason}`;
   $: receiptCaptureError =
+    receiptPreparationError ??
     receiptAnalysisError ??
     (receiptCaptureState.errorCode === null
       ? null
@@ -233,7 +261,14 @@
     }
 
     clearValidation();
+    receiptPreparationController.beginRun();
     void receiptCaptureController.capture(file);
+  };
+
+  const handleReceiptSourceAccountChange = (event: Event): void => {
+    const value = (event.currentTarget as HTMLSelectElement).value;
+    const sourceAccountId = value.length === 0 ? null : Number(value);
+    receiptPreparationController.selectSourceAccount(sourceAccountId, optionsState);
   };
 
   const handleReceiptFileCancel = (event: Event): void => {
@@ -254,6 +289,7 @@
   const categoryIconUrl = `${navIconBaseUrl}icons/category_55.png`;
   const unsubscribeController = controller.subscribe((nextState) => {
     optionsState = nextState;
+    receiptPreparationController.refreshOptions(nextState);
   });
   const unsubscribeSaveController = saveController.subscribe((nextState) => {
     saveState = nextState;
@@ -261,11 +297,28 @@
   const unsubscribeReceiptCaptureController =
     receiptCaptureController?.subscribe((nextState) => {
       receiptCaptureState = nextState;
+      if (nextState.phase === 'error') {
+        receiptPreparationController.handleCaptureFailure();
+      }
     }) ?? (() => {});
   const unsubscribeReceiptAnalysisController =
     receiptAnalysisController?.subscribe((nextState) => {
       receiptAnalysisState = nextState;
+      receiptPreparationController.handleAnalysisState(nextState, optionsState);
     }) ?? (() => {});
+  const unsubscribeReceiptPreparationController = receiptPreparationController.subscribe(
+    (nextState) => {
+      const isNewLocalFailure =
+        nextState.phase === 'error' &&
+        nextState.error !== null &&
+        receiptPreparationState.phase !== 'error';
+      receiptPreparationState = nextState;
+      if (isNewLocalFailure) {
+        receiptCaptureController?.reset();
+        receiptAnalysisController?.reset();
+      }
+    },
+  );
   const unsubscribeSyncState = syncStateStore.subscribe((syncSnapshot) => {
     if (syncSnapshot.state === lastObservedSyncState) {
       return;
@@ -283,6 +336,7 @@
     }
 
     receiptCaptureController?.cancel();
+    receiptPreparationController.reset();
     isOpen = false;
     if (typeof window !== 'undefined') {
       window.location.hash = '#/transfers';
@@ -304,6 +358,17 @@
 
   $: if (!canOpenPanel) {
     receiptCaptureController?.cancel();
+    receiptPreparationController.reset();
+  }
+
+  $: if (
+    componentHasMounted &&
+    receiptWorkflowIsActive &&
+    isOffline &&
+    receiptPreparationState.phase !== 'error'
+  ) {
+    receiptPreparationController.failForOffline();
+    receiptCaptureController?.cancel();
   }
 
   onMount(() => {
@@ -318,8 +383,10 @@
     unsubscribeSaveController();
     unsubscribeReceiptCaptureController();
     unsubscribeReceiptAnalysisController();
+    unsubscribeReceiptPreparationController();
     unsubscribeSyncState();
     receiptCaptureController?.cancel();
+    receiptPreparationController.reset();
   });
 </script>
 
@@ -507,268 +574,335 @@
             accept="image/*"
             capture="environment"
             hidden
-            disabled={receiptCaptureIsDisabled}
+            disabled={receiptCaptureIsDisabled ||
+              (receiptWorkflowIsActive && receiptPreparationState.phase !== 'error')}
             on:change={handleReceiptFileChange}
             on:cancel={handleReceiptFileCancel}
           />
-          <button
-            type="button"
-            class="app-button app-button--secondary add-transfer-form__action"
-            data-testid="receipt-photo-button"
-            aria-controls="receipt-image-capture"
-            disabled={receiptCaptureIsDisabled}
-            on:click={openReceiptCapture}
-          >
-            <span aria-hidden="true">📷</span>
-            {$_('addTransfer.receipt.action')}
-          </button>
           {#if receiptCaptureController === null}
+            <button
+              type="button"
+              class="app-button app-button--secondary add-transfer-form__action"
+              data-testid="receipt-photo-button"
+              aria-controls="receipt-image-capture"
+              disabled
+            >
+              <span aria-hidden="true">📷</span>
+              {$_('addTransfer.receipt.action')}
+            </button>
             <p class="add-transfer-form__receipt-hint" data-testid="receipt-capture-unavailable">
               {$_('addTransfer.receipt.integrationPending')}
             </p>
-          {:else if receiptCaptureState.phase === 'normalizing'}
-            <p
-              class="add-transfer-form__status"
-              role="status"
-              data-testid="receipt-normalizing-status"
+          {:else if !receiptWorkflowIsActive}
+            <button
+              type="button"
+              class="app-button app-button--secondary add-transfer-form__action"
+              data-testid="receipt-photo-button"
+              aria-controls="receipt-image-capture"
+              disabled={receiptCaptureIsDisabled}
+              on:click={openReceiptCapture}
             >
-              {$_('addTransfer.receipt.normalizing')}
-            </p>
-          {:else if receiptAnalysisState.phase === 'extracting' || (receiptAnalysisController === null && receiptCaptureState.phase === 'handed_off')}
-            <p
-              class="add-transfer-form__status"
-              role="status"
-              data-testid="receipt-stage-one-status"
+              <span aria-hidden="true">📷</span>
+              {$_('addTransfer.receipt.action')}
+            </button>
+          {:else}
+            <ol
+              class="receipt-progress"
+              aria-label={$_('addTransfer.receipt.progressLabel')}
+              aria-live="polite"
+              data-testid="receipt-progress"
             >
-              {$_('addTransfer.receipt.stageOne')}
-            </p>
-          {:else if receiptAnalysisState.phase === 'deriving'}
-            <p
-              class="add-transfer-form__status"
-              role="status"
-              data-testid="receipt-stage-two-status"
-            >
-              {$_('addTransfer.receipt.stageTwo')}
-            </p>
-          {:else if receiptAnalysisState.phase === 'succeeded' && receiptAnalysisState.derivation !== null}
-            <p
-              class="add-transfer-form__status"
-              role="status"
-              data-testid="receipt-analysis-success"
-            >
-              {$_(
-                receiptAnalysisState.derivation.transfers.length === 1
-                  ? 'addTransfer.receipt.analysisSuccessOne'
-                  : 'addTransfer.receipt.analysisSuccessMany',
-                {
-                  values: { count: receiptAnalysisState.derivation.transfers.length },
-                },
-              )}
-            </p>
+              {#each receiptPreparationState.steps as step (step.id)}
+                <li
+                  class={`receipt-progress__step receipt-progress__step--${step.status}`}
+                  data-testid={`receipt-step-${step.id}`}
+                  data-state={step.status}
+                  aria-current={step.status === 'active' ? 'step' : undefined}
+                >
+                  <span class="receipt-progress__marker" aria-hidden="true"></span>
+                  <span>{$_(`addTransfer.receipt.steps.${step.id}`)}</span>
+                  <span class="app-visually-hidden"
+                    >{$_(`addTransfer.receipt.stepStates.${step.status}`)}</span
+                  >
+                </li>
+              {/each}
+            </ol>
+
+            {#if receiptPreparationState.phase === 'error'}
+              <button
+                type="button"
+                class="app-button app-button--secondary add-transfer-form__action"
+                data-testid="receipt-photo-button"
+                aria-controls="receipt-image-capture"
+                disabled={receiptCaptureIsDisabled}
+                on:click={openReceiptCapture}
+              >
+                <span aria-hidden="true">📷</span>
+                {$_('addTransfer.receipt.freshAction')}
+              </button>
+            {:else}
+              <div class="add-transfer-form__field receipt-source-account">
+                <label class="add-transfer-form__label" for="receipt-source-account">
+                  {$_('addTransfer.receipt.sourceAccount')}
+                </label>
+                <select
+                  id="receipt-source-account"
+                  class="app-input"
+                  data-testid="add-transfer-from-account"
+                  value={receiptPreparationState.sourceAccountId ?? ''}
+                  disabled={receiptPreparationState.phase === 'ready_for_commit'}
+                  on:change={handleReceiptSourceAccountChange}
+                >
+                  <option value="">{$_('addTransfer.fromAccountPlaceholder')}</option>
+                  {#each receiptSourceAccountOptions as account (account.accountId)}
+                    <option value={account.accountId}>{getAccountName(account)}</option>
+                  {/each}
+                </select>
+              </div>
+              {#if receiptPreparationState.phase === 'waiting_for_source'}
+                <p
+                  class="add-transfer-form__status"
+                  role="status"
+                  data-testid="receipt-account-required"
+                >
+                  {$_('addTransfer.receipt.accountRequired')}
+                </p>
+              {:else if receiptPreparationState.phase === 'ready_for_commit' && receiptPreparationState.readyForCommit !== null}
+                <p
+                  class="add-transfer-form__status"
+                  role="status"
+                  data-testid="receipt-analysis-success"
+                >
+                  {$_(
+                    receiptPreparationState.readyForCommit.length === 1
+                      ? 'addTransfer.receipt.analysisSuccessOne'
+                      : 'addTransfer.receipt.analysisSuccessMany',
+                    { values: { count: receiptPreparationState.readyForCommit.length } },
+                  )}
+                </p>
+              {/if}
+            {/if}
           {/if}
         </section>
 
-        <div class="add-transfer-form__field">
-          <label class="add-transfer-form__label" for="add-transfer-date"
-            >{$_('addTransfer.date')}</label
-          >
-          <input
-            id="add-transfer-date"
-            type="date"
-            class="app-input"
-            data-testid="add-transfer-date"
-            bind:value={fields.date}
-            disabled={controlsAreDisabled}
-            required
-          />
-        </div>
-
-        <div class="add-transfer-form__field">
-          <label class="add-transfer-form__label" for="add-transfer-name"
-            >{$_('addTransfer.name')}</label
-          >
-          <input
-            id="add-transfer-name"
-            type="text"
-            class="app-input"
-            data-testid="add-transfer-name"
-            placeholder={$_('addTransfer.namePlaceholder')}
-            bind:value={fields.name}
-            disabled={controlsAreDisabled}
-            autocomplete="off"
-          />
-        </div>
-
-        <div class="add-transfer-form__field">
-          <label class="add-transfer-form__label" for="add-transfer-buyplace"
-            >{$_('addTransfer.buyplace')}</label
-          >
-          <input
-            id="add-transfer-buyplace"
-            type="text"
-            class="app-input"
-            data-testid="add-transfer-buyplace"
-            placeholder={$_('addTransfer.buyplacePlaceholder')}
-            bind:value={fields.buyplace}
-            disabled={controlsAreDisabled}
-            autocomplete="off"
-          />
-        </div>
-
-        <div class="add-transfer-form__field">
-          <label class="add-transfer-form__label" for="add-transfer-amount"
-            >{$_('addTransfer.amount')}</label
-          >
-          <input
-            bind:this={amountInputElement}
-            id="add-transfer-amount"
-            type="text"
-            inputmode="numeric"
-            class="app-input"
-            data-testid="add-transfer-amount"
-            placeholder={$_('addTransfer.amountPlaceholder')}
-            bind:value={fields.amount}
-            disabled={controlsAreDisabled}
-            autocomplete="off"
-            on:keydown={handleAmountKeydown}
-            on:input={handleAmountInput}
-            on:paste={handleAmountPaste}
-          />
-        </div>
-
-        <div class="add-transfer-form__field">
-          <label class="add-transfer-form__label" for="add-transfer-from-account"
-            >{$_('addTransfer.fromAccount')}</label
-          >
-          <select
-            id="add-transfer-from-account"
-            class="app-input"
-            data-testid="add-transfer-from-account"
-            bind:value={fields.fromAccountId}
-            disabled={sourceAccountIsDisabled}
-          >
-            <option value={null}>{$_('addTransfer.fromAccountPlaceholder')}</option>
-            {#each optionsState.fromAccountOptions as account (account.accountId)}
-              <option value={account.accountId}>{getAccountName(account)}</option>
-            {/each}
-          </select>
-        </div>
-
-        <div class="add-transfer-form__field">
-          <label class="add-transfer-form__label" for="add-transfer-to-account"
-            >{$_('addTransfer.toAccount')}</label
-          >
-          <select
-            id="add-transfer-to-account"
-            class="app-input"
-            data-testid="add-transfer-to-account"
-            bind:value={fields.toAccountId}
-            disabled={controlsAreDisabled}
-          >
-            <option value={null}>{$_('addTransfer.toAccountPlaceholder')}</option>
-            {#each optionsState.toAccountOptions as account (account.accountId)}
-              <option value={account.accountId}>{getAccountName(account)}</option>
-            {/each}
-          </select>
-        </div>
-
-        <div class="add-transfer-form__field">
-          <div class="add-transfer-form__label-row">
-            <img
-              class="add-transfer-form__category-icon"
-              src={categoryIconUrl}
-              alt=""
-              aria-hidden="true"
-              width="20"
-              height="20"
+        {#if !receiptWorkflowIsActive}
+          <div class="add-transfer-form__field">
+            <label class="add-transfer-form__label" for="add-transfer-date"
+              >{$_('addTransfer.date')}</label
+            >
+            <input
+              id="add-transfer-date"
+              type="date"
+              class="app-input"
+              data-testid="add-transfer-date"
+              bind:value={fields.date}
+              disabled={controlsAreDisabled}
+              required
             />
-            <label class="add-transfer-form__label" for="add-transfer-category-1"
-              >{$_('addTransfer.categories')}</label
-            >
           </div>
-          <div class="add-transfer-form__category-selects">
-            <select
-              id="add-transfer-category-1"
-              class="app-input"
-              data-testid="add-transfer-category-1"
-              bind:value={fields.category1Id}
-              disabled={controlsAreDisabled}
-            >
-              <option value={NO_CATEGORY_SELECTED}>{$_('addTransfer.categoryPlaceholder')}</option>
-              {#each optionsState.categoryOptions as cat (cat.categoryId)}
-                <option value={cat.categoryId}>{cat.name}</option>
-              {/each}
-            </select>
-            <select
-              id="add-transfer-category-2"
-              class="app-input"
-              data-testid="add-transfer-category-2"
-              bind:value={fields.category2Id}
-              disabled={controlsAreDisabled}
-            >
-              <option value={NO_CATEGORY_SELECTED}>{$_('addTransfer.categoryPlaceholder')}</option>
-              {#each optionsState.categoryOptions as cat (cat.categoryId)}
-                <option value={cat.categoryId}>{cat.name}</option>
-              {/each}
-            </select>
-            <select
-              id="add-transfer-category-3"
-              class="app-input"
-              data-testid="add-transfer-category-3"
-              bind:value={fields.category3Id}
-              disabled={controlsAreDisabled}
-            >
-              <option value={NO_CATEGORY_SELECTED}>{$_('addTransfer.categoryPlaceholder')}</option>
-              {#each optionsState.categoryOptions as cat (cat.categoryId)}
-                <option value={cat.categoryId}>{cat.name}</option>
-              {/each}
-            </select>
-          </div>
-        </div>
 
-        <div class="add-transfer-form__actions">
-          <button
-            type="button"
-            class="app-button app-button--secondary add-transfer-form__action"
-            data-testid="add-transfer-close"
-            disabled={isSubmitting || saveIsBusy}
-            on:click={handleClose}
-          >
-            {$_('addTransfer.close')}
-          </button>
-          {#if saveState.canRetry}
+          <div class="add-transfer-form__field">
+            <label class="add-transfer-form__label" for="add-transfer-name"
+              >{$_('addTransfer.name')}</label
+            >
+            <input
+              id="add-transfer-name"
+              type="text"
+              class="app-input"
+              data-testid="add-transfer-name"
+              placeholder={$_('addTransfer.namePlaceholder')}
+              bind:value={fields.name}
+              disabled={controlsAreDisabled}
+              autocomplete="off"
+            />
+          </div>
+
+          <div class="add-transfer-form__field">
+            <label class="add-transfer-form__label" for="add-transfer-buyplace"
+              >{$_('addTransfer.buyplace')}</label
+            >
+            <input
+              id="add-transfer-buyplace"
+              type="text"
+              class="app-input"
+              data-testid="add-transfer-buyplace"
+              placeholder={$_('addTransfer.buyplacePlaceholder')}
+              bind:value={fields.buyplace}
+              disabled={controlsAreDisabled}
+              autocomplete="off"
+            />
+          </div>
+
+          <div class="add-transfer-form__field">
+            <label class="add-transfer-form__label" for="add-transfer-amount"
+              >{$_('addTransfer.amount')}</label
+            >
+            <input
+              bind:this={amountInputElement}
+              id="add-transfer-amount"
+              type="text"
+              inputmode="numeric"
+              class="app-input"
+              data-testid="add-transfer-amount"
+              placeholder={$_('addTransfer.amountPlaceholder')}
+              bind:value={fields.amount}
+              disabled={controlsAreDisabled}
+              autocomplete="off"
+              on:keydown={handleAmountKeydown}
+              on:input={handleAmountInput}
+              on:paste={handleAmountPaste}
+            />
+          </div>
+
+          <div class="add-transfer-form__field">
+            <label class="add-transfer-form__label" for="add-transfer-from-account"
+              >{$_('addTransfer.fromAccount')}</label
+            >
+            <select
+              id="add-transfer-from-account"
+              class="app-input"
+              data-testid="add-transfer-from-account"
+              bind:value={fields.fromAccountId}
+              disabled={sourceAccountIsDisabled}
+            >
+              <option value={null}>{$_('addTransfer.fromAccountPlaceholder')}</option>
+              {#each optionsState.fromAccountOptions as account (account.accountId)}
+                <option value={account.accountId}>{getAccountName(account)}</option>
+              {/each}
+            </select>
+          </div>
+
+          <div class="add-transfer-form__field">
+            <label class="add-transfer-form__label" for="add-transfer-to-account"
+              >{$_('addTransfer.toAccount')}</label
+            >
+            <select
+              id="add-transfer-to-account"
+              class="app-input"
+              data-testid="add-transfer-to-account"
+              bind:value={fields.toAccountId}
+              disabled={controlsAreDisabled}
+            >
+              <option value={null}>{$_('addTransfer.toAccountPlaceholder')}</option>
+              {#each optionsState.toAccountOptions as account (account.accountId)}
+                <option value={account.accountId}>{getAccountName(account)}</option>
+              {/each}
+            </select>
+          </div>
+
+          <div class="add-transfer-form__field">
+            <div class="add-transfer-form__label-row">
+              <img
+                class="add-transfer-form__category-icon"
+                src={categoryIconUrl}
+                alt=""
+                aria-hidden="true"
+                width="20"
+                height="20"
+              />
+              <label class="add-transfer-form__label" for="add-transfer-category-1"
+                >{$_('addTransfer.categories')}</label
+              >
+            </div>
+            <div class="add-transfer-form__category-selects">
+              <select
+                id="add-transfer-category-1"
+                class="app-input"
+                data-testid="add-transfer-category-1"
+                bind:value={fields.category1Id}
+                disabled={controlsAreDisabled}
+              >
+                <option value={NO_CATEGORY_SELECTED}>{$_('addTransfer.categoryPlaceholder')}</option
+                >
+                {#each optionsState.categoryOptions as cat (cat.categoryId)}
+                  <option value={cat.categoryId}>{cat.name}</option>
+                {/each}
+              </select>
+              <select
+                id="add-transfer-category-2"
+                class="app-input"
+                data-testid="add-transfer-category-2"
+                bind:value={fields.category2Id}
+                disabled={controlsAreDisabled}
+              >
+                <option value={NO_CATEGORY_SELECTED}>{$_('addTransfer.categoryPlaceholder')}</option
+                >
+                {#each optionsState.categoryOptions as cat (cat.categoryId)}
+                  <option value={cat.categoryId}>{cat.name}</option>
+                {/each}
+              </select>
+              <select
+                id="add-transfer-category-3"
+                class="app-input"
+                data-testid="add-transfer-category-3"
+                bind:value={fields.category3Id}
+                disabled={controlsAreDisabled}
+              >
+                <option value={NO_CATEGORY_SELECTED}>{$_('addTransfer.categoryPlaceholder')}</option
+                >
+                {#each optionsState.categoryOptions as cat (cat.categoryId)}
+                  <option value={cat.categoryId}>{cat.name}</option>
+                {/each}
+              </select>
+            </div>
+          </div>
+
+          <div class="add-transfer-form__actions">
             <button
               type="button"
-              class="app-button app-button--primary add-transfer-form__action"
-              data-testid="add-transfer-retry"
-              disabled={saveIsBusy || isOffline}
-              on:click={handleRetry}
+              class="app-button app-button--secondary add-transfer-form__action"
+              data-testid="add-transfer-close"
+              disabled={isSubmitting || saveIsBusy}
+              on:click={handleClose}
             >
-              {$_('addTransfer.save.retry')}
+              {$_('addTransfer.close')}
             </button>
-          {:else if saveState.phase === 'conflict' || saveState.phase === 'conflict_syncing'}
+            {#if saveState.canRetry}
+              <button
+                type="button"
+                class="app-button app-button--primary add-transfer-form__action"
+                data-testid="add-transfer-retry"
+                disabled={saveIsBusy || isOffline}
+                on:click={handleRetry}
+              >
+                {$_('addTransfer.save.retry')}
+              </button>
+            {:else if saveState.phase === 'conflict' || saveState.phase === 'conflict_syncing'}
+              <button
+                type="button"
+                class="app-button app-button--primary add-transfer-form__action"
+                data-testid="add-transfer-resolve-conflict"
+                disabled={saveState.phase === 'conflict_syncing' || isOffline}
+                on:click={handleResolveConflict}
+              >
+                {saveState.phase === 'conflict_syncing'
+                  ? $_('addTransfer.save.conflictSyncingButton')
+                  : $_('addTransfer.save.conflictAction')}
+              </button>
+            {:else}
+              <button
+                type="submit"
+                class="app-button app-button--primary add-transfer-form__action"
+                data-testid="add-transfer-submit"
+                disabled={submitIsDisabled}
+              >
+                {saveIsBusy || isSubmitting ? $_('addTransfer.saving') : $_('addTransfer.submit')}
+              </button>
+            {/if}
+          </div>
+        {:else}
+          <div class="add-transfer-form__actions">
             <button
               type="button"
-              class="app-button app-button--primary add-transfer-form__action"
-              data-testid="add-transfer-resolve-conflict"
-              disabled={saveState.phase === 'conflict_syncing' || isOffline}
-              on:click={handleResolveConflict}
+              class="app-button app-button--secondary add-transfer-form__action"
+              data-testid="add-transfer-close"
+              disabled={isSubmitting || saveIsBusy}
+              on:click={handleClose}
             >
-              {saveState.phase === 'conflict_syncing'
-                ? $_('addTransfer.save.conflictSyncingButton')
-                : $_('addTransfer.save.conflictAction')}
+              {$_('addTransfer.close')}
             </button>
-          {:else}
-            <button
-              type="submit"
-              class="app-button app-button--primary add-transfer-form__action"
-              data-testid="add-transfer-submit"
-              disabled={submitIsDisabled}
-            >
-              {saveIsBusy || isSubmitting ? $_('addTransfer.saving') : $_('addTransfer.submit')}
-            </button>
-          {/if}
-        </div>
+          </div>
+        {/if}
       </form>
     </BottomSheet>
   {/if}
@@ -849,6 +983,75 @@
   .add-transfer-form__receipt-hint {
     color: var(--text-secondary);
     font-size: 0.84rem;
+  }
+
+  .receipt-progress {
+    display: grid;
+    gap: 0.55rem;
+    margin: 0.35rem 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .receipt-progress__step {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-height: 2.75rem;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid color-mix(in srgb, var(--text-secondary) 22%, transparent);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    background: var(--surface-strong);
+    font-weight: 650;
+  }
+
+  .receipt-progress__marker {
+    width: 0.8rem;
+    height: 0.8rem;
+    flex: 0 0 auto;
+    border: 2px solid currentColor;
+    border-radius: 999px;
+  }
+
+  .receipt-progress__step--active {
+    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 8%, var(--surface-strong));
+  }
+
+  .receipt-progress__step--active .receipt-progress__marker {
+    background: currentColor;
+  }
+
+  .receipt-progress__step--complete {
+    color: var(--positive);
+  }
+
+  .receipt-progress__step--complete .receipt-progress__marker {
+    background: currentColor;
+  }
+
+  .receipt-progress__step--error {
+    border-color: color-mix(in srgb, var(--error) 50%, transparent);
+    color: var(--error);
+    background: color-mix(in srgb, var(--error) 8%, var(--surface-strong));
+  }
+
+  .receipt-source-account {
+    margin-top: 0.2rem;
+  }
+
+  .app-visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 
   .add-transfer-form__conflict {

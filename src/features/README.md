@@ -29,6 +29,11 @@ Receipt AI settings:
   `receipt/receiptAnalysisController.ts` orchestrates the two OpenRouter stages. The analysis
   controller revalidates each selected model immediately before use, releases image bytes after
   stage 1, parses the active prompt's canonical transfer/category declarations, and retains only a
-  structurally, arithmetically, and mapping-validated transient derivation for the later
-  local-transfer workflow. Cancellation and supersession clear every transient result and never
-  expose raw or normalized bytes through public UI state.
+  structurally, arithmetically, and mapping-validated transient derivation plus its item-index
+  coverage proof for the later local-transfer workflow.
+- `receipt/receiptTransferPreparationController.ts` owns the deliberate per-run source selection,
+  accessible three-step progress state, and immutable in-memory command handoff. Its pure command
+  builder resolves exact current category names, targets the sole primary spendings account, and
+  reuses Add Transfer validation and type derivation without writing SQLite or OneDrive.
+- Cancellation, account/file context changes, and supersession clear selection, coverage proof,
+  derivation, and prepared commands; public UI state never exposes raw or normalized image bytes.
