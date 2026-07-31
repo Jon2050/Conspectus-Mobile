@@ -146,6 +146,21 @@ diagnostics. Browser storage is not equivalent to a server-held secret; code run
 controlling the same browser profile may be able to access it. Confirmed local reset removes the
 record, and explicit OpenRouter deletion removes the complete record for the active account.
 
+Receipt capture uses one native file input with `accept="image/*"` and `capture="environment"` so
+supported mobile operating systems own the camera/picker UI. The app does not create a camera stream,
+preview, shutter, or separate gallery flow. Selected images are decoded with their browser-applied
+orientation, limited to a 20 MiB source, resized without upscaling to a maximum 2560-pixel long edge,
+and canvas-encoded once as JPEG at quality `0.85`; encoded output above 4 MiB is rejected. Canvas
+re-encoding transfers raster pixels instead of original EXIF, GPS, camera, or device metadata.
+
+Raw files, decoded surfaces, normalized bytes, and temporary object URLs remain ephemeral. The
+normalization owner releases decoder/canvas resources on every outcome, and the receipt-run owner
+zeroes its normalized byte buffer after the stage-1 consumer finishes or when navigation, database
+binding, account, reset, sign-out, cancellation, or supersession abandons the run. No receipt image is
+written to IndexedDB, SQLite, OneDrive, service-worker caches, logs, diagnostics, or application
+backups. Browser and operating-system internals may still use implementation-defined temporary file
+storage for native `File` and canvas APIs; the application neither requests nor retains such storage.
+
 M9-01 performs only catalog requests and sends no receipt, extracted result, database content,
 account/category data, balance, or transfer history. The receipt workflow privacy boundary disclosed
 before later use is that stage 1 sends the image to OpenRouter and a routed vision provider, while

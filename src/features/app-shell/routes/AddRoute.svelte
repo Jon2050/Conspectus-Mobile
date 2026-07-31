@@ -15,6 +15,7 @@
     type SyncStateStore,
     type NetworkStateStore,
   } from '@shared';
+  import type { ReceiptCaptureController, ReceiptCaptureState } from '../../receipt';
   import BottomSheet from '../components/BottomSheet.svelte';
   import ProgressIndicator from '../components/ProgressIndicator.svelte';
   import {
@@ -50,14 +51,20 @@
   export let syncStateStore: SyncStateStore = appSyncStateStore;
   export let networkStateStore: NetworkStateStore = appNetworkStateStore;
   export let canOpenPanel = true;
+  export let receiptCaptureController: ReceiptCaptureController | null = null;
 
   let isOpen = true;
   let componentHasMounted = false;
   let hasRequestedOptionsLoad = false;
   let formElement: HTMLFormElement | null = null;
   let amountInputElement: HTMLInputElement | null = null;
+  let receiptFileInputElement: HTMLInputElement | null = null;
   let optionsState: AddTransferOptionsState = controller.getState();
   let saveState: AddTransferSaveState = saveController.getState();
+  let receiptCaptureState: ReceiptCaptureState = receiptCaptureController?.getState() ?? {
+    phase: 'idle',
+    errorCode: null,
+  };
   let lastObservedSyncState: SyncState = 'idle';
   $: isOffline = !$networkStateStore;
   $: isOptionsLoading = optionsState.operation === 'loading';
@@ -74,13 +81,26 @@
     saveState.phase === 'remote_commit_recovery_failed';
   $: saveBlocksEditing =
     saveState.canRetry || conflictRecoveryIsRequired || remoteCommitRecoveryIsRequired;
+  $: receiptCaptureIsBusy =
+    receiptCaptureState.phase === 'normalizing' || receiptCaptureState.phase === 'handed_off';
+  $: receiptCaptureError =
+    receiptCaptureState.errorCode === null
+      ? null
+      : $_(`addTransfer.receipt.errors.${receiptCaptureState.errorCode}`);
   $: effectiveFormError =
     formError ??
+    receiptCaptureError ??
     (conflictRecoveryIsRequired ? null : saveState.errorMessage) ??
     optionsState.error?.message ??
     null;
-  $: controlsAreDisabled = isSubmitting || isOptionsLoading || saveIsBusy || saveBlocksEditing;
+  $: controlsAreDisabled =
+    isSubmitting || isOptionsLoading || saveIsBusy || saveBlocksEditing || receiptCaptureIsBusy;
   $: submitIsDisabled = controlsAreDisabled || isOffline || optionsState.operation !== 'ready';
+  $: receiptCaptureIsDisabled =
+    receiptCaptureController === null ||
+    controlsAreDisabled ||
+    isOffline ||
+    optionsState.operation !== 'ready';
 
   let validationErrors: string[] = [];
   const allowedAmountNavigationKeys = new Set(['Tab', 'ArrowLeft', 'ArrowRight', 'Home', 'End']);
@@ -174,6 +194,28 @@
     await saveController.resolveConflict($_, isOffline);
   };
 
+  const openReceiptCapture = (): void => {
+    if (!receiptCaptureIsDisabled) {
+      receiptFileInputElement?.click();
+    }
+  };
+
+  const handleReceiptFileChange = (event: Event): void => {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.item(0) ?? null;
+    input.value = '';
+    if (file === null || receiptCaptureController === null) {
+      return;
+    }
+
+    clearValidation();
+    void receiptCaptureController.capture(file);
+  };
+
+  const handleReceiptFileCancel = (event: Event): void => {
+    (event.currentTarget as HTMLInputElement).value = '';
+  };
+
   const getAccountName = (account: { name: string; accountTypeId: number | null }) => {
     if (account.accountTypeId === PRIMARY_INCOME_ACCOUNT_TYPE_ID) {
       return $_('transfers.primaryIncome');
@@ -192,6 +234,10 @@
   const unsubscribeSaveController = saveController.subscribe((nextState) => {
     saveState = nextState;
   });
+  const unsubscribeReceiptCaptureController =
+    receiptCaptureController?.subscribe((nextState) => {
+      receiptCaptureState = nextState;
+    }) ?? (() => {});
   const unsubscribeSyncState = syncStateStore.subscribe((syncSnapshot) => {
     if (syncSnapshot.state === lastObservedSyncState) {
       return;
@@ -208,6 +254,7 @@
       return;
     }
 
+    receiptCaptureController?.cancel();
     isOpen = false;
     if (typeof window !== 'undefined') {
       window.location.hash = '#/transfers';
@@ -227,6 +274,10 @@
     isOpen = true;
   }
 
+  $: if (!canOpenPanel) {
+    receiptCaptureController?.cancel();
+  }
+
   onMount(() => {
     componentHasMounted = true;
     if (canOpenPanel) {
@@ -237,7 +288,9 @@
   onDestroy(() => {
     unsubscribeController();
     unsubscribeSaveController();
+    unsubscribeReceiptCaptureController();
     unsubscribeSyncState();
+    receiptCaptureController?.cancel();
   });
 </script>
 
@@ -273,7 +326,7 @@
         bind:this={formElement}
         class="add-transfer-form"
         data-testid="add-transfer-form"
-        aria-busy={isSubmitting || isOptionsLoading || saveIsBusy}
+        aria-busy={isSubmitting || isOptionsLoading || saveIsBusy || receiptCaptureIsBusy}
         on:submit|preventDefault={handleSubmit}
         on:input={clearValidation}
         on:change={clearValidation}
@@ -403,6 +456,62 @@
             </p>
           {/each}
         {/if}
+
+        <section
+          class="add-transfer-form__receipt add-transfer-form__upload"
+          aria-labelledby="receipt-capture-heading"
+        >
+          <div class="add-transfer-form__upload">
+            <h4 id="receipt-capture-heading">{$_('addTransfer.receipt.heading')}</h4>
+            <p class="add-transfer-form__receipt-hint">
+              {$_('addTransfer.receipt.description')}
+            </p>
+          </div>
+          <input
+            bind:this={receiptFileInputElement}
+            id="receipt-image-capture"
+            data-testid="receipt-image-input"
+            type="file"
+            accept="image/*"
+            capture="environment"
+            hidden
+            disabled={receiptCaptureIsDisabled}
+            on:change={handleReceiptFileChange}
+            on:cancel={handleReceiptFileCancel}
+          />
+          <button
+            type="button"
+            class="app-button app-button--secondary add-transfer-form__action"
+            data-testid="receipt-photo-button"
+            aria-controls="receipt-image-capture"
+            disabled={receiptCaptureIsDisabled}
+            on:click={openReceiptCapture}
+          >
+            <span aria-hidden="true">📷</span>
+            {$_('addTransfer.receipt.action')}
+          </button>
+          {#if receiptCaptureController === null}
+            <p class="add-transfer-form__receipt-hint" data-testid="receipt-capture-unavailable">
+              {$_('addTransfer.receipt.integrationPending')}
+            </p>
+          {:else if receiptCaptureState.phase === 'normalizing'}
+            <p
+              class="add-transfer-form__status"
+              role="status"
+              data-testid="receipt-normalizing-status"
+            >
+              {$_('addTransfer.receipt.normalizing')}
+            </p>
+          {:else if receiptCaptureState.phase === 'handed_off'}
+            <p
+              class="add-transfer-form__status"
+              role="status"
+              data-testid="receipt-stage-one-status"
+            >
+              {$_('addTransfer.receipt.stageOne')}
+            </p>
+          {/if}
+        </section>
 
         <div class="add-transfer-form__field">
           <label class="add-transfer-form__label" for="add-transfer-date"
@@ -675,6 +784,16 @@
     display: flex;
     flex-direction: column;
     gap: 0.3rem;
+  }
+
+  .add-transfer-form__receipt h4,
+  .add-transfer-form__receipt p {
+    margin: 0;
+  }
+
+  .add-transfer-form__receipt-hint {
+    color: var(--text-secondary);
+    font-size: 0.84rem;
   }
 
   .add-transfer-form__conflict {

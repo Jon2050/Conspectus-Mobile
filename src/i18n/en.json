@@ -70,6 +70,24 @@
     "submit": "Save transfer",
     "saving": "Saving transfer...",
     "close": "Close",
+    "receipt": {
+      "heading": "Capture receipt",
+      "description": "Take a photo using your device's camera picker.",
+      "action": "Photograph receipt",
+      "integrationPending": "Receipt processing is currently unavailable.",
+      "normalizing": "Preparing the photo securely...",
+      "stageOne": "Read photo",
+      "errors": {
+        "empty_file": "The selected image is empty. Take a new photo.",
+        "source_too_large": "The photo is too large. Take a new photo no larger than 20 MB.",
+        "decode_failed": "The photo could not be read. Take a new, clear photo.",
+        "invalid_dimensions": "The photo has invalid dimensions. Take a new photo.",
+        "encode_failed": "The photo could not be prepared safely. Take a new photo.",
+        "output_too_large": "The prepared photo is still too large. Take a new photo at a lower resolution.",
+        "configuration_unavailable": "Receipt AI is not fully configured. Check the API key and both models in Settings.",
+        "stage_one_failed": "The photo could not be read. Start again with a new photo."
+      }
+    },
     "save": {
       "localSave": "Saving transfer locally and preparing the database upload...",
       "uploading": "Uploading updated database to OneDrive...",

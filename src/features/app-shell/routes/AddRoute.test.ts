@@ -8,6 +8,10 @@ import type {
   AddTransferOptionsState,
 } from './addTransferOptionsController';
 import type { AddTransferSaveController, AddTransferSaveState } from './addTransferSaveController';
+import type {
+  ReceiptCaptureController,
+  ReceiptCaptureState,
+} from '../../receipt/receiptCaptureController';
 
 const READY_OPTIONS_STATE: AddTransferOptionsState = {
   operation: 'ready',
@@ -50,6 +54,20 @@ const createMockSaveController = (
   reset: () => {},
 });
 
+const createMockReceiptCaptureController = (
+  state: ReceiptCaptureState = { phase: 'idle', errorCode: null },
+): ReceiptCaptureController => ({
+  getState: () => state,
+  subscribe: (listener) => {
+    listener(state);
+    return () => {};
+  },
+  capture: async () => true,
+  cancel: () => {},
+  reset: () => {},
+  dispose: () => {},
+});
+
 const renderAddRoute = (props: Record<string, unknown> = {}) =>
   render(AddRoute, {
     props: {
@@ -78,6 +96,68 @@ describe('AddRoute component', () => {
 
     expect(body).toContain('data-testid="add-transfer-form"');
     expect(body).toContain('<form');
+  });
+
+  it('renders one accessible native environment-camera input without a custom camera flow', () => {
+    const { body } = renderAddRoute({
+      receiptCaptureController: createMockReceiptCaptureController(),
+    });
+
+    expect(body).toContain('data-testid="receipt-photo-button"');
+    expect(body).toContain('Kassenbon fotografieren');
+    expect(body).toMatch(
+      /data-testid="receipt-image-input"[^>]*type="file"[^>]*accept="image\/\*"[^>]*capture="environment"/,
+    );
+    expect(body).not.toContain('multiple');
+    expect(body).not.toContain('getUserMedia');
+    expect(body).not.toContain('receipt-preview');
+    expect(body).not.toContain('gallery');
+    expect(body).not.toMatch(/data-testid="receipt-photo-button"[^>]*disabled/);
+  });
+
+  it('disables capture when no stage-one consumer is composed', () => {
+    const { body } = renderAddRoute();
+
+    expect(body).toMatch(/data-testid="receipt-image-input"[^>]*disabled/);
+    expect(body).toMatch(/data-testid="receipt-photo-button"[^>]*disabled/);
+    expect(body).toContain('data-testid="receipt-capture-unavailable"');
+  });
+
+  it('shows accessible preparation and stage-one states while preventing duplicate actions', () => {
+    const normalizing = renderAddRoute({
+      receiptCaptureController: createMockReceiptCaptureController({
+        phase: 'normalizing',
+        errorCode: null,
+      }),
+    }).body;
+    expect(normalizing).toContain('data-testid="receipt-normalizing-status"');
+    expect(normalizing).toContain('role="status"');
+    expect(normalizing).toMatch(/data-testid="receipt-photo-button"[^>]*disabled/);
+    expect(normalizing).toMatch(/data-testid="add-transfer-submit"[^>]*disabled/);
+
+    const handedOff = renderAddRoute({
+      receiptCaptureController: createMockReceiptCaptureController({
+        phase: 'handed_off',
+        errorCode: null,
+      }),
+    }).body;
+    expect(handedOff).toContain('data-testid="receipt-stage-one-status"');
+    expect(handedOff).toContain('Foto auslesen');
+    expect(handedOff).toMatch(/data-testid="receipt-photo-button"[^>]*disabled/);
+  });
+
+  it('renders actionable localized capture errors without source details', () => {
+    const { body } = renderAddRoute({
+      receiptCaptureController: createMockReceiptCaptureController({
+        phase: 'error',
+        errorCode: 'decode_failed',
+      }),
+    });
+
+    expect(body).toContain('data-testid="add-transfer-form-error"');
+    expect(body).toContain('Das Foto konnte nicht gelesen werden');
+    expect(body).not.toContain('.heic');
+    expect(body).not.toContain('EXIF');
   });
 
   it('renders the date field with app-input class', () => {

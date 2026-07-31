@@ -52,15 +52,14 @@ export const reconcileOpenRouterModelSelections = (
     : null,
 });
 
-export const toReadyOpenRouterReceiptConfiguration = (
+export const toStoredReadyOpenRouterReceiptConfiguration = (
   settings: StoredOpenRouterReceiptSettings,
-  catalog: OpenRouterCompatibleModelCatalog,
 ): ReadyOpenRouterReceiptConfiguration | null => {
   const transferPrompt = resolveTransferDerivationPrompt(settings);
   if (
     !settings.apiKey.trim() ||
-    !includesModel(catalog.visionModels, settings.visionModelId) ||
-    !includesModel(catalog.transferModels, settings.transferModelId) ||
+    settings.visionModelId === null ||
+    settings.transferModelId === null ||
     !RECEIPT_EXTRACTION_SYSTEM_PROMPT.text.trim() ||
     !transferPrompt.trim()
   ) {
@@ -74,4 +73,18 @@ export const toReadyOpenRouterReceiptConfiguration = (
     extractionPrompt: RECEIPT_EXTRACTION_SYSTEM_PROMPT,
     transferPrompt,
   };
+};
+
+export const toReadyOpenRouterReceiptConfiguration = (
+  settings: StoredOpenRouterReceiptSettings,
+  catalog: OpenRouterCompatibleModelCatalog,
+): ReadyOpenRouterReceiptConfiguration | null => {
+  if (
+    !includesModel(catalog.visionModels, settings.visionModelId) ||
+    !includesModel(catalog.transferModels, settings.transferModelId)
+  ) {
+    return null;
+  }
+
+  return toStoredReadyOpenRouterReceiptConfiguration(settings);
 };
