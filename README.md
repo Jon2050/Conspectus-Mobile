@@ -120,6 +120,7 @@ The codebase is organized into architecture-aligned module roots in `src/`:
 - `graph`: Microsoft Graph API client logic.
 - `db`: SQLite/sql.js data access and write logic.
 - `cache`: local cache persistence (IndexedDB/Dexie).
+- `openrouter`: authenticated OpenRouter catalog access and provider-error normalization.
 - `features`: UI feature modules and user workflows.
 - `shared`: cross-module utilities and shared state.
 
@@ -135,6 +136,7 @@ Import convention:
   - `@graph`
   - `@db`
   - `@cache`
+  - `@openrouter`
   - `@features`
   - `@shared`
 - Use relative imports only for files inside the same module.

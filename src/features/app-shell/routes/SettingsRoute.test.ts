@@ -1,6 +1,7 @@
 // Guards the SettingsRoute theme contract for destructive/error surfaces in light and dark mode.
 import { describe, expect, it } from 'vitest';
 import settingsRouteSource from './SettingsRoute.svelte?raw';
+import openRouterSectionSource from './SettingsOpenRouterSection.svelte?raw';
 
 describe('SettingsRoute styling', () => {
   it('renders dedicated metadata and risk-grouped action sections', () => {
@@ -47,5 +48,19 @@ describe('SettingsRoute styling', () => {
     expect(settingsRouteSource).toContain('min-height: 2.75rem;');
     expect(settingsRouteSource).toContain('color: var(--text-primary);');
     expect(settingsRouteSource).toContain('text-decoration-color: var(--accent);');
+  });
+
+  it('renders key-safe live OpenRouter controls without exposing the extraction prompt', () => {
+    expect(settingsRouteSource).toContain('<SettingsOpenRouterSection');
+    expect(openRouterSectionSource).toContain('type="password"');
+    expect(openRouterSectionSource).toContain('autocomplete="new-password"');
+    expect(openRouterSectionSource).toContain('data-testid="openrouter-vision-model"');
+    expect(openRouterSectionSource).toContain('data-testid="openrouter-transfer-model"');
+    expect(openRouterSectionSource).toContain('data-testid="openrouter-transfer-prompt"');
+    expect(openRouterSectionSource.match(/<textarea/gu)).toHaveLength(1);
+    expect(openRouterSectionSource).not.toContain('RECEIPT_EXTRACTION_SYSTEM_PROMPT');
+    expect(openRouterSectionSource).not.toContain('manual model');
+    expect(openRouterSectionSource).toContain('data-testid="openrouter-privacy-disclosure"');
+    expect(openRouterSectionSource).toContain("aria-busy={state.catalogStatus === 'loading'}");
   });
 });

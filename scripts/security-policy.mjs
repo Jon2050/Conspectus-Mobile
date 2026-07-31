@@ -5,7 +5,7 @@ export const DOCUMENT_CSP = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "img-src 'self' data:",
   "font-src 'self' https://fonts.gstatic.com",
-  "connect-src 'self' https://login.microsoftonline.com https://graph.microsoft.com https://*.1drv.com https://*.microsoftpersonalcontent.com",
+  "connect-src 'self' https://login.microsoftonline.com https://graph.microsoft.com https://*.1drv.com https://*.microsoftpersonalcontent.com https://openrouter.ai",
   "frame-src 'self' https://login.microsoftonline.com",
   "worker-src 'self'",
   "manifest-src 'self'",

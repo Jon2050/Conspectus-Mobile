@@ -83,6 +83,7 @@ describe('settings cache store resolver', () => {
   it('clears app-owned storage, CacheStorage, and IndexedDB entries by default', async () => {
     const localStorage = createMemoryStorage({
       'conspectus.selectedDriveItemBinding': '{"value":1}',
+      'conspectus.openRouterReceiptSettings': '{"secret":"must-clear"}',
       'conspectus.authSessionResume': '{"version":1}',
       'other-app-key': 'keep',
     });
@@ -110,6 +111,7 @@ describe('settings cache store resolver', () => {
     await resolveSettingsCacheStore().clearAll();
 
     expect(localStorage.getItem('conspectus.selectedDriveItemBinding')).toBeNull();
+    expect(localStorage.getItem('conspectus.openRouterReceiptSettings')).toBeNull();
     expect(localStorage.getItem('conspectus.authSessionResume')).toBe('{"version":1}');
     expect(localStorage.getItem('other-app-key')).toBe('keep');
     expect(sessionStorage.getItem('conspectus.session')).toBeNull();

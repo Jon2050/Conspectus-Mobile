@@ -132,7 +132,7 @@ Exit criteria:
    shows the three named processing stages and then a localized created-transfer count; failures,
    retries, conflicts, and cache reconciliation cannot create duplicate or partial transfers.
 
-### :green_circle: M9-01 Configure live OpenRouter model choices, derivation prompt, and receipt privacy
+### :white_check_mark: M9-01 Configure live OpenRouter model choices, derivation prompt, and receipt privacy
 
 - Label: `security`
 - Milestone: `M9 - Receipt Capture + OpenRouter`

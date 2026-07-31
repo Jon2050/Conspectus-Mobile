@@ -33,6 +33,8 @@ Durable constraints:
 - Microsoft Graph provides OneDrive file discovery, metadata, download, and upload operations.
 - `sql.js` opens and modifies SQLite bytes in the browser.
 - Dexie persists database snapshots and sync metadata in IndexedDB.
+- OpenRouter supplies the user-funded live model catalog and, in later receipt-processing flows,
+  the two remote AI stages.
 - Vitest and Playwright provide unit, integration, component, and browser coverage.
 
 The production artifact is static and is deployed below `/conspectus/` on `jon2050.de`.
@@ -41,18 +43,19 @@ The production artifact is static and is deployed below `/conspectus/` on `jon20
 
 Source code is divided into architecture-aligned roots under `src/`:
 
-| Module     | Ownership                                                                             |
-| ---------- | ------------------------------------------------------------------------------------- |
-| `auth`     | MSAL lifecycle, account session state, token acquisition, and reauthentication        |
-| `graph`    | Typed Microsoft Graph and OneDrive requests plus provider-error normalization         |
-| `db`       | sql.js lifecycle, schema-compatible queries, transactions, and database-byte export   |
-| `cache`    | IndexedDB/Dexie persistence for database snapshots and sync metadata                  |
-| `features` | Screens, user workflows, and orchestration across lower-level modules                 |
-| `shared`   | Cross-cutting configuration, state, formatting, utilities, and reusable UI primitives |
+| Module       | Ownership                                                                                   |
+| ------------ | ------------------------------------------------------------------------------------------- |
+| `auth`       | MSAL lifecycle, account session state, token acquisition, and reauthentication              |
+| `graph`      | Typed Microsoft Graph and OneDrive requests plus provider-error normalization               |
+| `db`         | sql.js lifecycle, schema-compatible queries, transactions, and database-byte export         |
+| `cache`      | IndexedDB/Dexie persistence for database snapshots and sync metadata                        |
+| `openrouter` | Authenticated OpenRouter catalog requests, parsing, filtering, and safe error normalization |
+| `features`   | Screens, user workflows, and orchestration across lower-level modules                       |
+| `shared`     | Cross-cutting configuration, state, formatting, utilities, and reusable UI primitives       |
 
 Each module exposes its public surface through `index.ts`. Cross-module imports use the aliases
-`@auth`, `@graph`, `@db`, `@cache`, `@features`, and `@shared`; relative imports are reserved for
-files inside the same module.
+`@auth`, `@graph`, `@db`, `@cache`, `@openrouter`, `@features`, and `@shared`; relative imports are
+reserved for files inside the same module.
 
 Dependency rules are enforced by ESLint:
 
@@ -60,6 +63,8 @@ Dependency rules are enforced by ESLint:
 - `auth` may depend on `shared`, but not on Graph, database, cache, or feature code.
 - `graph` may depend on `auth` and `shared`, but not on database, cache, or feature code.
 - `db` and `cache` may depend on `shared`, but not on feature code or unrelated infrastructure.
+- `openrouter` may depend on `shared`, but not on authentication, Graph, database, cache, or
+  feature code.
 - `shared` must not depend on `features` and must not contain feature-specific behavior.
 - Infrastructure modules must never import feature UI.
 
@@ -77,6 +82,8 @@ Important ownership rules:
 - Provider details stay behind typed module interfaces.
 - UI components do not issue raw Graph requests or SQL statements.
 - Database queries and writes stay in `db`; multi-service orchestration stays in `features`.
+- OpenRouter HTTP details and provider errors stay in `openrouter`; account-scoped receipt settings,
+  prompts, readiness, and UI orchestration stay in `features`.
 - App-wide auth, binding, sync, toast, network, and update state use shared stores.
 - Pending transfer upload and conflict-recovery state is owned above the Add Transfer sheet so
   navigation cannot accidentally repeat the local SQL write.
@@ -108,6 +115,44 @@ The selected OneDrive database binding contains `driveId`, `itemId`, filename, a
 is persisted per Microsoft account so switching accounts cannot reuse another account's binding.
 The path and filename are fallback recovery data; the stable Graph item ID remains the primary
 identity.
+
+## Receipt AI configuration and privacy
+
+Receipt AI uses a user-owned OpenRouter API key stored only in the browser. The configuration record
+is schema-versioned and keyed by the active Microsoft `homeAccountId`; it contains the key, an
+independent model ID for each AI role, and only a user override of the transfer-derivation prompt.
+It is never synchronized to OneDrive. The extraction prompt and current default derivation prompt
+remain versioned application assets instead of persisted user data.
+
+The Settings catalog contract is:
+
+1. Send the key only in the `Authorization` header of a bodyless, no-store request to OpenRouter's
+   authenticated `/api/v1/models/user` endpoint. This account-filtered endpoint keeps the user's
+   OpenRouter provider preferences, privacy settings, and guardrails effective.
+2. Treat the key as validated for the current Settings visit only after that request succeeds and
+   returns a parseable catalog. Never use a bundled or previously fetched model list.
+3. Offer receipt extraction only from current models with image input, text output, zero prompt and
+   completion prices, and no nonzero request or image surcharge.
+4. Offer transfer derivation only from current models with text input/output, zero prompt and
+   completion prices, no nonzero request surcharge, and advertised `structured_outputs` support.
+5. Keep the two selections independent and allow the same eligible model in both roles. A successful
+   refresh removes a saved role selection that is no longer eligible without choosing a replacement.
+   Authentication, network, parse, and provider failures disable the controls but do not prove the
+   saved selection invalid.
+
+The key is write-only in the UI after successful validation: the app displays only a fixed configured
+state and does not put it in URLs, logs, telemetry, provider error text, service-worker caches, or
+diagnostics. Browser storage is not equivalent to a server-held secret; code running in or people
+controlling the same browser profile may be able to access it. Confirmed local reset removes the
+record, and explicit OpenRouter deletion removes the complete record for the active account.
+
+M9-01 performs only catalog requests and sends no receipt, extracted result, database content,
+account/category data, balance, or transfer history. The receipt workflow privacy boundary disclosed
+before later use is that stage 1 sends the image to OpenRouter and a routed vision provider, while
+stage 2 sends only the extracted receipt data to OpenRouter and a routed text provider. Provider
+logging, retention, and training policies vary. The app does not force ZDR or no-data-collection
+routing because that would remove eligible free endpoints; stricter OpenRouter account settings and
+guardrails still apply.
 
 ## Verified-online read flow
 
@@ -178,15 +223,17 @@ Local persistence contains only the data needed for account-specific binding, ve
 reuse, and application operation:
 
 - schema-versioned selected-file bindings;
+- schema-versioned per-account OpenRouter receipt settings containing the user-owned API key, two
+  model IDs, and an optional derivation-prompt override;
 - cached database bytes and their matching eTag/sync metadata;
 - MSAL-managed authentication state;
 - the token-free authentication restoration hint described above;
 - PWA/service-worker caches and short-lived UI state.
 
 Confirmed local reset clears app-owned bindings, database snapshots, and app cache data after
-closing active Dexie connections. It intentionally preserves the Microsoft authentication session
-and restoration hint so the user can rebind without an unnecessary sign-in. Sign-out remains a
-separate explicit action.
+closing active Dexie connections. It also clears OpenRouter receipt settings and their in-memory UI
+state. It intentionally preserves the Microsoft authentication session and restoration hint so the
+user can rebind without an unnecessary sign-in. Sign-out remains a separate explicit action.
 
 ## PWA lifecycle and deployment
 
@@ -213,6 +260,9 @@ listed below.
 - The app stores no telemetry by default and no server-side copy of the financial database.
 - Production requires HTTPS; localhost HTTP is used only for the registered development callback.
 - Downloaded and uploaded content is treated as untrusted external data until validated.
+- The deployment CSP permits OpenRouter only as an explicit `connect-src`; catalog requests use
+  `cache: no-store`, omit browser credentials, reject redirects, and never expose provider response
+  bodies as user-facing errors.
 - SQL values are parameterized and database mutations are transactional.
 - Dependency advisories, CSP behavior, build output, and deployment identity are checked in CI and
   deployment workflows.

@@ -120,7 +120,7 @@
   },
   "settings": {
     "title": "Einstellungen",
-    "description": "Authentifizierung für den OneDrive-Zugriff.",
+    "description": "Verwalte OneDrive-Zugriff, lokale Daten und kontobezogene Beleg-KI-Einstellungen.",
     "safety": {
       "heading": "Schütze deine Daten",
       "warning": "Schließe die Desktop-App, bevor du Conspectus Mobile verwendest. Verwende niemals beide Apps gleichzeitig.",
@@ -142,6 +142,58 @@
       "name": "Name",
       "username": "Benutzername",
       "unknown": "Unbekannt"
+    },
+    "openRouter": {
+      "heading": "Beleg-KI mit OpenRouter",
+      "description": "Verwende deinen eigenen OpenRouter-Schlüssel und wähle getrennte aktuelle Modelle zum Auslesen des Belegs und Erstellen der Transfers.",
+      "privacy": {
+        "heading": "Datenschutz und wechselnde Verfügbarkeit",
+        "localKey": "Dein API-Schlüssel wird nur in diesem Browser für das aktive Microsoft-Konto gespeichert. Ein im Browser gespeicherter Schlüssel ist für Personen oder schädliche Skripte mit Zugriff auf dieses Browserprofil erreichbar; er ist nicht wie ein serverseitiges Geheimnis geschützt.",
+        "stageOne": "Stufe 1 sendet das Belegfoto an OpenRouter und einen weitergeleiteten Vision-Anbieter.",
+        "stageTwo": "Stufe 2 sendet nur die ausgelesenen Belegdaten an OpenRouter und einen weitergeleiteten Textanbieter; das Bild wird nicht erneut gesendet.",
+        "providerPolicies": "Protokollierungs-, Aufbewahrungs- und Trainingsrichtlinien von OpenRouter und den weitergeleiteten Anbietern unterscheiden sich. Kostenlose Modelle können jederzeit verschwinden oder kostenpflichtig werden.",
+        "routing": "Conspectus erzwingt weder Zero Data Retention noch ein Routing ohne Datenerfassung. Strengere Datenschutzeinstellungen und Guardrails in deinem OpenRouter-Konto gelten weiterhin.",
+        "catalogOnly": "Beim Speichern dieser Einstellungen oder Laden des Katalogs werden weder Beleg, Ausleseergebnis, Conspectus-Datenbank, Konten, Kategorien, Salden noch Transferverlauf gesendet."
+      },
+      "key": {
+        "label": "OpenRouter-API-Schlüssel",
+        "replaceLabel": "Neuer OpenRouter-API-Schlüssel",
+        "placeholder": "OpenRouter-API-Schlüssel eingeben",
+        "help": "Der Schlüssel wird nur im Authorization-Header gesendet. Nach der Validierung wird er nie wieder im Klartext angezeigt.",
+        "configured": "API-Schlüssel eingerichtet",
+        "save": "Schlüssel speichern und prüfen",
+        "replace": "Schlüssel ersetzen und prüfen",
+        "validating": "Schlüssel wird geprüft...",
+        "delete": "Schlüssel und Beleg-KI-Einstellungen löschen"
+      },
+      "status": {
+        "keyNeeded": "Füge einen API-Schlüssel hinzu und prüfe ihn, um aktuelle Modelloptionen zu laden.",
+        "keyRequired": "Gib vor der Prüfung einen API-Schlüssel ein.",
+        "loading": "Schlüssel wird geprüft und der aktuelle OpenRouter-Modellkatalog geladen...",
+        "validated": "Der API-Schlüssel ist gültig und der aktuelle Modellkatalog wurde geladen.",
+        "invalidKey": "OpenRouter hat diesen API-Schlüssel abgelehnt. Gib einen gültigen Ersatz ein oder lösche die gespeicherte Konfiguration.",
+        "networkError": "Der OpenRouter-Katalog ist nicht erreichbar. Prüfe die Verbindung und versuche es erneut.",
+        "providerError": "OpenRouter konnte den Modellkatalog nicht bereitstellen. Versuche es später erneut.",
+        "invalidResponse": "OpenRouter hat einen unlesbaren Modellkatalog zurückgegeben. Versuche es später erneut.",
+        "storageError": "Die geprüften Beleg-KI-Einstellungen konnten auf diesem Gerät nicht gespeichert werden.",
+        "retry": "Katalogprüfung wiederholen"
+      },
+      "models": {
+        "visionLabel": "Modell zum Auslesen des Belegs",
+        "transferLabel": "Modell zum Ableiten der Transfers",
+        "placeholder": "Kompatibles kostenloses Modell wählen",
+        "noVisionModels": "Derzeit ist kein kostenloses Modell mit Bildeingabe und Textausgabe zum Auslesen von Belegen verfügbar.",
+        "noTransferModels": "Derzeit ist kein kostenloses Textmodell mit Unterstützung für strukturierte Ausgaben zum Ableiten von Transfers verfügbar."
+      },
+      "prompt": {
+        "label": "Prompt zum Ableiten der Transfers",
+        "help": "Dies ist ein einzelner Freitext-Prompt. Passe die klar markierten Gruppen- und Kategoriezuordnungen an deine Conspectus-Kategorien an.",
+        "reset": "Auf aktuellen Standard zurücksetzen"
+      },
+      "configuration": {
+        "ready": "Die Beleg-KI-Konfiguration ist bereit.",
+        "notReady": "Die Beleg-KI-Konfiguration ist nicht bereit. Prüfe den Schlüssel, wähle beide Modelle und verwende einen nicht leeren Ableitungs-Prompt."
+      }
     },
     "db": {
       "heading": "Datenbank-Datei",
@@ -175,7 +227,7 @@
     "reset": {
       "button": "Lokale App-Daten zurücksetzen",
       "title": "Lokale App-Daten zurücksetzen?",
-      "description": "Hiermit werden die lokale DB-Dateibindung und die zwischengespeicherten App-Daten auf diesem Gerät für das angemeldete Konto gelöscht.",
+      "description": "Hiermit werden die lokale DB-Dateibindung, zwischengespeicherte App-Daten und OpenRouter-Beleg-KI-Einstellungen auf diesem Gerät gelöscht. Deine Microsoft-Anmeldung bleibt erhalten.",
       "status": "Lokale App-Daten werden zurückgesetzt...",
       "cancel": "Abbrechen",
       "confirm": "Zurücksetzen bestätigen"
