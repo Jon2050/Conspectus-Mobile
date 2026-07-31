@@ -58,3 +58,9 @@ export interface CreateTransferResult {
   readonly transferId: number;
   readonly persistedAtIso: string;
 }
+
+export interface CreateTransferBatchResult {
+  readonly transferIds: readonly number[];
+  readonly createdCount: number;
+  readonly persistedAtIso: string;
+}

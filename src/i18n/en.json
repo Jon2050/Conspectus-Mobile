@@ -130,6 +130,39 @@
         "output_limit": "The model response was too long or exceeded a processing limit. Start with a new photo.",
         "invalid_prompt": "The derivation prompt has no unambiguously verifiable group and category mappings. Check Receipt AI settings and start with a new photo.",
         "model_error": "The model could not process the receipt unambiguously:"
+      },
+      "commit": {
+        "successOne": "1 transfer created",
+        "successMany": "{count} transfers created",
+        "pendingTitle": "Receipt transfer sync needs attention",
+        "pendingDescription": "Open the receipt workflow to continue the duplicate-safe OneDrive recovery.",
+        "pendingRemoteSavedDescription": "The transfers are already saved to OneDrive. Open the receipt workflow for the local refresh status; do not save again.",
+        "pendingAction": "Open receipt status",
+        "retryUpload": "Retry OneDrive upload",
+        "refreshConflict": "Download latest database",
+        "refreshingConflict": "Downloading and verifying the latest OneDrive database...",
+        "conflictReady": "The latest database is verified. Save the unchanged validated batch explicitly.",
+        "retryAfterConflict": "Create transfers again",
+        "recoveringLocalCommit": "The local export failed after the batch transaction. Restoring the verified OneDrive database before another write...",
+        "retryLocalRecovery": "Retry verified database restore",
+        "reconcilingRemoteCommit": "Transfers are saved to OneDrive. Refreshing local data...",
+        "remoteCommitRecoveryFailed": "The transfers were saved to OneDrive, but local data could not be refreshed. Do not save them again; reopen the app when OneDrive is reachable.",
+        "uploadFailed": "The database upload failed. Retry uses the already exported database and cannot create duplicate transfers.",
+        "localFailed": "The complete transfer batch was not uploaded. The verified OneDrive database is active again.",
+        "conflict": "OneDrive contains newer data. Refresh before explicitly creating the batch again.",
+        "conflictReadyToast": "Latest OneDrive data loaded. The validated batch can be created explicitly.",
+        "errors": {
+          "offline": "An internet connection is required to create receipt transfers.",
+          "context_unavailable": "The authenticated OneDrive database is not verified and current. The batch was not created.",
+          "context_changed": "The account or OneDrive file changed. This receipt batch can no longer continue.",
+          "validation_failed": "The validated receipt batch no longer matches the current accounts or categories.",
+          "local_failed": "The complete batch could not be saved locally. No partial batch was retained.",
+          "local_commit_recovery_failed": "The local export failed after the batch transaction, and the verified OneDrive database could not be restored. Retry the restore before another write.",
+          "upload_failed": "The OneDrive upload failed before confirmed acceptance. Retry uses the same exported database bytes.",
+          "conflict": "OneDrive has newer data. Download it before explicitly creating the batch again.",
+          "conflict_sync_failed": "The latest OneDrive database could not be downloaded and verified.",
+          "remote_commit_recovery_failed": "The transfers are saved to OneDrive, but the verified local refresh failed. Do not save them again."
+        }
       }
     },
     "save": {

@@ -148,6 +148,7 @@ describe('database upload handoff service', () => {
       name: 'DatabaseUploadError',
       code: 'conflict',
       cause: conflict,
+      expectedETag: '"etag-1"',
     });
 
     expect(cacheStore.writeSnapshot).not.toHaveBeenCalled();
@@ -155,6 +156,39 @@ describe('database upload handoff service', () => {
       state: 'stale',
       branch: 'upload_conflict',
     });
+  });
+
+  it('rejects retained bytes when the cached eTag advanced before retry', async () => {
+    const graphClient = createGraphClient();
+    const cacheStore = createCacheStore(
+      createSnapshot({
+        metadata: {
+          eTag: '"etag-2"',
+          lastSyncAtIso: '2026-03-11T10:15:00.000Z',
+        },
+      }),
+    );
+    const syncStateStore = createSyncStateStore();
+    const service = createDatabaseUploadHandoffService(
+      graphClient,
+      cacheStore,
+      () => DRIVE_ITEM_BINDING,
+      syncStateStore,
+    );
+
+    await expect(
+      service.uploadExportedDatabase(Uint8Array.from([1, 2, 3]), {
+        expectedETag: '"etag-1"',
+      }),
+    ).rejects.toMatchObject({
+      name: 'DatabaseUploadError',
+      code: 'conflict',
+      expectedETag: '"etag-1"',
+    });
+
+    expect(graphClient.uploadFile).not.toHaveBeenCalled();
+    expect(cacheStore.writeSnapshot).not.toHaveBeenCalled();
+    expect(get(syncStateStore)).toMatchObject({ state: 'stale', branch: 'upload_conflict' });
   });
 
   it('reports a cache recovery requirement after OneDrive accepts the upload', async () => {

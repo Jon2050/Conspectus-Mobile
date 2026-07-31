@@ -20,6 +20,10 @@ import type {
   ReceiptTransferPreparationController,
   ReceiptTransferPreparationState,
 } from '../../receipt/receiptTransferPreparationController';
+import type {
+  ReceiptTransferCommitController,
+  ReceiptTransferCommitState,
+} from '../receiptTransferCommitController';
 
 const READY_OPTIONS_STATE: AddTransferOptionsState = {
   operation: 'ready',
@@ -102,9 +106,30 @@ const createMockReceiptPreparationController = (
   handleAnalysisState: () => {},
   selectSourceAccount: () => {},
   refreshOptions: () => {},
+  claimReadyForCommit: () => null,
+  markCommitActive: () => {},
+  markCommitFailed: () => {},
+  markCommitted: () => {},
   failForOffline: () => {},
   reset: () => {},
   dispose: () => {},
+});
+
+const createMockReceiptCommitController = (
+  state: ReceiptTransferCommitState,
+): ReceiptTransferCommitController => ({
+  getState: () => state,
+  subscribe: (listener) => {
+    listener(state);
+    return () => {};
+  },
+  commit: async () => {},
+  retryUpload: async () => {},
+  resolveConflict: async () => {},
+  retryAfterConflict: async () => {},
+  retryLocalCommitRecovery: async () => {},
+  invalidate: () => {},
+  reset: () => {},
 });
 
 const PROCESSING_STEPS = [
@@ -330,6 +355,122 @@ describe('AddRoute component', () => {
     });
 
     expect(body).toContain('Transferdaten für 2 Transfers wurden erstellt.');
+  });
+
+  it('keeps the final step active during upload and shows the exact committed count afterward', () => {
+    const committingPreparation = createMockReceiptPreparationController({
+      phase: 'committing',
+      steps: [
+        { id: 'extraction', status: 'complete' },
+        { id: 'derivation', status: 'complete' },
+        { id: 'creation', status: 'active' },
+      ],
+      sourceAccountId: 11,
+      readyForCommit: null,
+      error: null,
+    });
+    const uploading = renderAddRoute({
+      receiptCaptureController: createMockReceiptCaptureController(),
+      receiptPreparationController: committingPreparation,
+      receiptCommitController: createMockReceiptCommitController({
+        phase: 'uploading',
+        createdCount: 2,
+        error: null,
+        progress: { loadedBytes: 5, totalBytes: 10 },
+        recoveryProgress: null,
+      }),
+    }).body;
+    expect(uploading).toMatch(/data-testid="receipt-step-creation"[^>]*data-state="active"/);
+    expect(uploading).not.toContain('receipt-commit-success');
+
+    const saved = renderAddRoute({
+      receiptCaptureController: createMockReceiptCaptureController(),
+      receiptPreparationController: createMockReceiptPreparationController({
+        phase: 'committed',
+        steps: [
+          { id: 'extraction', status: 'complete' },
+          { id: 'derivation', status: 'complete' },
+          { id: 'creation', status: 'complete' },
+        ],
+        sourceAccountId: null,
+        readyForCommit: null,
+        error: null,
+      }),
+      receiptCommitController: createMockReceiptCommitController({
+        phase: 'saved',
+        createdCount: 2,
+        error: null,
+        progress: null,
+        recoveryProgress: null,
+      }),
+    }).body;
+    expect(saved).toMatch(/data-testid="receipt-step-creation"[^>]*data-state="complete"/);
+    expect(saved).toContain('data-testid="receipt-commit-success"');
+    expect(saved).toContain('2 Transfers erstellt');
+  });
+
+  it('offers only the appropriate duplicate-safe recovery action for receipt commit failures', () => {
+    const preparation = createMockReceiptPreparationController({
+      phase: 'commit_failed',
+      steps: [
+        { id: 'extraction', status: 'complete' },
+        { id: 'derivation', status: 'complete' },
+        { id: 'creation', status: 'error' },
+      ],
+      sourceAccountId: null,
+      readyForCommit: null,
+      error: null,
+    });
+    const uploadFailed = renderAddRoute({
+      receiptCaptureController: createMockReceiptCaptureController(),
+      receiptPreparationController: preparation,
+      receiptCommitController: createMockReceiptCommitController({
+        phase: 'upload_failed',
+        createdCount: 1,
+        error: { code: 'upload_failed', detail: null, preparationError: null },
+        progress: null,
+        recoveryProgress: null,
+      }),
+    }).body;
+    expect(uploadFailed).toContain('data-testid="receipt-upload-retry"');
+    expect(uploadFailed).not.toContain('receipt-photo-button');
+
+    const localRecoveryFailed = renderAddRoute({
+      receiptCaptureController: createMockReceiptCaptureController(),
+      receiptPreparationController: preparation,
+      receiptCommitController: createMockReceiptCommitController({
+        phase: 'local_commit_recovery_failed',
+        createdCount: 1,
+        error: {
+          code: 'local_commit_recovery_failed',
+          detail: null,
+          preparationError: null,
+        },
+        progress: null,
+        recoveryProgress: null,
+      }),
+    }).body;
+    expect(localRecoveryFailed).toContain('data-testid="receipt-local-recovery-retry"');
+    expect(localRecoveryFailed).not.toContain('receipt-photo-button');
+
+    const remoteSaved = renderAddRoute({
+      receiptCaptureController: createMockReceiptCaptureController(),
+      receiptPreparationController: preparation,
+      receiptCommitController: createMockReceiptCommitController({
+        phase: 'remote_commit_recovery_failed',
+        createdCount: 1,
+        error: {
+          code: 'remote_commit_recovery_failed',
+          detail: null,
+          preparationError: null,
+        },
+        progress: null,
+        recoveryProgress: null,
+      }),
+    }).body;
+    expect(remoteSaved).toContain('data-testid="receipt-remote-saved"');
+    expect(remoteSaved).not.toContain('receipt-upload-retry');
+    expect(remoteSaved).not.toContain('receipt-conflict-retry');
   });
 
   it('keeps source-account selection enabled throughout both analysis stages', () => {

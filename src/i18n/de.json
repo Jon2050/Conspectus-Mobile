@@ -130,6 +130,39 @@
         "output_limit": "Die Modellantwort war zu lang oder überschritt eine Verarbeitungsgrenze. Starte mit einem neuen Foto.",
         "invalid_prompt": "Der Ableitungs-Prompt enthält keine eindeutig prüfbaren Gruppen- und Kategoriezuordnungen. Prüfe die Beleg-KI-Einstellungen und starte mit einem neuen Foto.",
         "model_error": "Das Modell konnte den Beleg nicht eindeutig verarbeiten:"
+      },
+      "commit": {
+        "successOne": "1 Transfer erstellt",
+        "successMany": "{count} Transfers erstellt",
+        "pendingTitle": "Belegtransfer-Synchronisierung benötigt Aufmerksamkeit",
+        "pendingDescription": "Öffne den Belegablauf, um die duplikatsichere OneDrive-Wiederherstellung fortzusetzen.",
+        "pendingRemoteSavedDescription": "Die Transfers sind bereits in OneDrive gespeichert. Öffne den Belegablauf für den lokalen Aktualisierungsstatus und speichere nicht erneut.",
+        "pendingAction": "Belegstatus öffnen",
+        "retryUpload": "OneDrive-Upload wiederholen",
+        "refreshConflict": "Aktuelle Datenbank laden",
+        "refreshingConflict": "Aktuelle OneDrive-Datenbank wird geladen und geprüft...",
+        "conflictReady": "Die aktuelle Datenbank ist geprüft. Erstelle den unveränderten validierten Stapel ausdrücklich erneut.",
+        "retryAfterConflict": "Transfers erneut erstellen",
+        "recoveringLocalCommit": "Der lokale Export ist nach der Stapeltransaktion fehlgeschlagen. Die geprüfte OneDrive-Datenbank wird vor einem weiteren Schreibvorgang wiederhergestellt...",
+        "retryLocalRecovery": "Geprüfte Datenbank erneut wiederherstellen",
+        "reconcilingRemoteCommit": "Die Transfers sind in OneDrive gespeichert. Lokale Daten werden aktualisiert...",
+        "remoteCommitRecoveryFailed": "Die Transfers wurden in OneDrive gespeichert, aber die lokalen Daten konnten nicht aktualisiert werden. Speichere sie nicht erneut und öffne die App wieder, sobald OneDrive erreichbar ist.",
+        "uploadFailed": "Der Datenbank-Upload ist fehlgeschlagen. Die Wiederholung nutzt nur die bereits exportierte Datenbank und erzeugt keine doppelten Transfers.",
+        "localFailed": "Der vollständige Transferstapel wurde nicht hochgeladen. Die geprüfte OneDrive-Datenbank ist wieder aktiv.",
+        "conflict": "OneDrive enthält neuere Daten. Aktualisiere zuerst und erstelle den Stapel danach ausdrücklich erneut.",
+        "conflictReadyToast": "Aktuelle OneDrive-Daten wurden geladen. Der validierte Stapel kann ausdrücklich erstellt werden.",
+        "errors": {
+          "offline": "Zum Erstellen der Belegtransfers ist eine Internetverbindung erforderlich.",
+          "context_unavailable": "Die angemeldete OneDrive-Datenbank ist nicht geprüft und aktuell. Der Stapel wurde nicht erstellt.",
+          "context_changed": "Das Konto oder die OneDrive-Datei wurde geändert. Dieser Belegstapel kann nicht fortgesetzt werden.",
+          "validation_failed": "Der validierte Belegstapel passt nicht mehr zu den aktuellen Konten oder Kategorien.",
+          "local_failed": "Der vollständige Stapel konnte lokal nicht gespeichert werden. Es wurde kein Teilstapel behalten.",
+          "local_commit_recovery_failed": "Der lokale Export ist nach der Stapeltransaktion fehlgeschlagen und die geprüfte OneDrive-Datenbank konnte nicht wiederhergestellt werden. Stelle sie vor einem weiteren Schreibvorgang erneut wieder her.",
+          "upload_failed": "Der OneDrive-Upload ist vor bestätigter Annahme fehlgeschlagen. Die Wiederholung nutzt dieselben exportierten Datenbankbytes.",
+          "conflict": "OneDrive enthält neuere Daten. Lade sie, bevor du den Stapel ausdrücklich erneut erstellst.",
+          "conflict_sync_failed": "Die aktuelle OneDrive-Datenbank konnte nicht geladen und geprüft werden.",
+          "remote_commit_recovery_failed": "Die Transfers sind in OneDrive gespeichert, aber die geprüfte lokale Aktualisierung ist fehlgeschlagen. Speichere sie nicht erneut."
+        }
       }
     },
     "save": {

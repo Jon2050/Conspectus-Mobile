@@ -4,6 +4,7 @@ import {
   DbRuntimeError,
   resolveAppBrowserDbRuntime,
   type BrowserDbRuntime,
+  type CreateTransferBatchResult,
   type CreateTransferInput,
   type CreateTransferResult,
   type TransferWriteService,
@@ -23,6 +24,7 @@ export interface DatabaseUploadProgress {
 export interface DatabaseUploadOptions {
   readonly onUploadStart?: () => void;
   readonly onProgress?: (progress: DatabaseUploadProgress) => void;
+  readonly expectedETag?: string;
 }
 
 export interface TransferSaveExportService {
@@ -33,8 +35,20 @@ export interface TransferSaveExportService {
   retryExportedDatabaseUpload(dbBytes: Uint8Array, options?: DatabaseUploadOptions): Promise<void>;
 }
 
+export interface TransferBatchSaveExportService extends TransferSaveExportService {
+  createTransferBatchAndExport(
+    inputs: readonly CreateTransferInput[],
+    options?: DatabaseUploadOptions,
+  ): Promise<CreateTransferBatchResult>;
+}
+
 export interface PendingTransferUpload {
   readonly transferResult: CreateTransferResult;
+  readonly dbBytes: Uint8Array;
+}
+
+export interface PendingTransferBatchUpload {
+  readonly batchResult: CreateTransferBatchResult;
   readonly dbBytes: Uint8Array;
 }
 
@@ -51,6 +65,37 @@ export class TransferUploadPendingError extends Error {
     }
   }
 }
+
+export class TransferBatchUploadPendingError extends Error {
+  readonly pendingUpload: PendingTransferBatchUpload;
+  readonly cause?: unknown;
+
+  constructor(pendingUpload: PendingTransferBatchUpload, cause: unknown) {
+    super(cause instanceof Error ? cause.message : 'Uploading the transfer batch failed.');
+    this.name = 'TransferBatchUploadPendingError';
+    this.pendingUpload = pendingUpload;
+    if (cause !== undefined) {
+      this.cause = cause;
+    }
+  }
+}
+
+export class TransferBatchExportRecoveryRequiredError extends Error {
+  readonly batchResult: CreateTransferBatchResult;
+  readonly cause?: unknown;
+
+  constructor(batchResult: CreateTransferBatchResult, cause: unknown) {
+    super(cause instanceof Error ? cause.message : 'Exporting the transfer batch failed.');
+    this.name = 'TransferBatchExportRecoveryRequiredError';
+    this.batchResult = batchResult;
+    if (cause !== undefined) {
+      this.cause = cause;
+    }
+  }
+}
+
+type TransferWriteOperations = Pick<TransferWriteService, 'createTransfer'> &
+  Partial<Pick<TransferWriteService, 'createTransfers'>>;
 
 type TransferExportRuntime = Pick<BrowserDbRuntime, 'exportBytes'>;
 type TransferExportRuntimeProvider = TransferExportRuntime | (() => TransferExportRuntime);
@@ -71,10 +116,10 @@ const cloneExportedBytes = (dbBytes: Uint8Array): Uint8Array => {
 };
 
 export const createTransferSaveExportService = (
-  transferWriteService: Pick<TransferWriteService, 'createTransfer'>,
+  transferWriteService: TransferWriteOperations,
   dbRuntime: TransferExportRuntimeProvider,
   uploadHandoff: DatabaseUploadHandoff,
-): TransferSaveExportService => ({
+): TransferBatchSaveExportService => ({
   async createTransferAndExport(
     input: CreateTransferInput,
     options?: DatabaseUploadOptions,
@@ -98,6 +143,37 @@ export const createTransferSaveExportService = (
     return transferResult;
   },
 
+  async createTransferBatchAndExport(
+    inputs: readonly CreateTransferInput[],
+    options?: DatabaseUploadOptions,
+  ): Promise<CreateTransferBatchResult> {
+    if (transferWriteService.createTransfers === undefined) {
+      throw new DbRuntimeError('db_query_failed', 'Batch transfer writes are unavailable.');
+    }
+    const batchResult = transferWriteService.createTransfers(inputs);
+    let exportedBytes: Uint8Array;
+    try {
+      exportedBytes = cloneExportedBytes(resolveTransferExportRuntime(dbRuntime).exportBytes());
+    } catch (error) {
+      throw new TransferBatchExportRecoveryRequiredError(batchResult, error);
+    }
+
+    try {
+      options?.onUploadStart?.();
+      await uploadHandoff.uploadExportedDatabase(exportedBytes, options);
+    } catch (error) {
+      throw new TransferBatchUploadPendingError(
+        {
+          batchResult,
+          dbBytes: exportedBytes,
+        },
+        error,
+      );
+    }
+
+    return batchResult;
+  },
+
   async retryExportedDatabaseUpload(
     dbBytes: Uint8Array,
     options?: DatabaseUploadOptions,
@@ -107,7 +183,7 @@ export const createTransferSaveExportService = (
   },
 });
 
-export const createAppTransferSaveExportService = (): TransferSaveExportService =>
+export const createAppTransferSaveExportService = (): TransferBatchSaveExportService =>
   createTransferSaveExportService(
     appTransferWriteService,
     resolveAppBrowserDbRuntime,

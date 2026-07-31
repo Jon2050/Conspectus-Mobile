@@ -248,6 +248,7 @@ export type MockGraphClientOptions = {
   readonly downloadErrorSequence?: readonly MockGraphError[];
   readonly uploadErrorSequence?: readonly MockGraphError[];
   readonly uploadDelayMs?: number;
+  readonly failUploadWhenOfflineAfterDelay?: boolean;
 };
 
 export type MockStartupSnapshot = {
@@ -267,6 +268,7 @@ export type MockStartupSnapshot = {
 export type MockCacheStoreOptions = {
   readonly failClearAll?: boolean;
   readonly clearAllDelayMs?: number;
+  readonly writeSnapshotErrorSequence?: readonly boolean[];
   readonly startupSnapshot?: MockStartupSnapshot | null;
 };
 
@@ -652,6 +654,13 @@ export const installMockGraphClient = async (
           });
         }
 
+        if (mockOptions.failUploadWhenOfflineAfterDelay && !window.navigator.onLine) {
+          throw {
+            code: 'network_error',
+            message: 'Mock upload lost connectivity.',
+          };
+        }
+
         return {
           eTag: '"etag-2"',
           sizeBytes: bytes.length,
@@ -704,6 +713,7 @@ export const installMockCacheStore = async (
       dbBytes: new Uint8Array(snapshot.dbBytes),
     });
 
+    const writeSnapshotErrorSequence = [...(mockOptions.writeSnapshotErrorSequence ?? [])];
     const storedSnapshots = new Map<
       string,
       {
@@ -762,6 +772,9 @@ export const installMockCacheStore = async (
         };
         dbBytes: Uint8Array;
       }) {
+        if (writeSnapshotErrorSequence.shift() === true) {
+          throw new Error('Mock cache snapshot write failure.');
+        }
         (
           window as Window & { __CONSPECTUS_LAST_WRITTEN_SYNC_AT__?: string }
         ).__CONSPECTUS_LAST_WRITTEN_SYNC_AT__ = snapshot.metadata.lastSyncAtIso;
@@ -1104,6 +1117,7 @@ export const installReadyAddTransferTestDb = async (
   page: Page,
   dbRuntimeOptions: MockDbRuntimeOptions = {},
   graphOptions: MockGraphClientOptions = {},
+  cacheOptions: MockCacheStoreOptions = {},
 ): Promise<void> => {
   await installPersistedBinding(page);
   await installMockDbRuntime(page, {
@@ -1111,6 +1125,7 @@ export const installReadyAddTransferTestDb = async (
     ...dbRuntimeOptions,
   });
   await installMockCacheStore(page, {
+    ...cacheOptions,
     startupSnapshot: {
       metadata: { eTag: 'existing-etag', lastSyncAtIso: new Date().toISOString() },
       dbBytes: createSqliteBytes([1, 2, 3]),

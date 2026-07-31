@@ -187,6 +187,24 @@ Receipt analysis is an abortable, two-stage feature workflow behind typed OpenRo
    and reuse the existing Add Transfer validation and transfer-type rules. The resulting immutable
    command batch is held only in memory for M9-05; this preparation step performs no SQLite, cache,
    Graph, or OneDrive mutation and exposes no review or editing surface.
+6. Claim a prepared command batch once, revalidate it against the authenticated verified-current
+   runtime, and apply all transfer inserts and balance changes in one SQLite transaction. Export one
+   full snapshot and send it through the existing eTag/`If-Match` upload boundary. The final progress
+   step remains active until OneDrive acceptance and required cache reconciliation; only then is the
+   exact singular/plural created count shown.
+
+After command handoff, image, extraction, raw response, and derivation state is released. A retryable
+pre-commit upload failure retains only the already exported database bytes and the eTag against
+which they were produced, so retry repeats neither the AI stages, local validation, transaction,
+nor export and cannot attach stale bytes to newer cached metadata. An eTag conflict instead discards those
+stale bytes, refreshes the authoritative runtime, retains only the immutable commands, revalidates
+them, and waits for an explicit save-again action without adding a review screen. When OneDrive
+accepts the upload but local cache persistence fails, the remote commit is final: all write retries
+are disabled and the app forces verified reconciliation. A remaining reconciliation failure says
+that OneDrive is already updated and cannot resume the batch. If the local transaction commits but
+the subsequent SQLite export fails or is empty, the app closes that runtime and restores the
+verified OneDrive snapshot before enabling another write, preventing an unreported local batch from
+entering a later upload.
 
 Both calls use the explicitly selected model without model or provider fallback. They add no app
 owned ZDR or data-collection routing restriction, so stricter OpenRouter account preferences and
@@ -234,14 +252,15 @@ Consequences:
 
 ## Transfer write flow
 
-Creating a transfer mirrors the desktop application's business and database behavior:
+Creating one manual transfer or an automatic validated receipt batch mirrors the desktop
+application's business and database behavior:
 
 1. Require online state and a ready, current database runtime.
 2. Validate the date, name, positive integer-cent amount, available account selections, category
    selections, and primary-account combination rules.
 3. Derive the desktop-compatible transfer type from the selected account types.
-4. In one SQLite transaction, insert the transfer, decrement the source balance, and increment the
-   destination balance.
+4. In one SQLite transaction, insert the transfer or every transfer in the batch and apply every
+   matching source/destination balance change. Any statement failure rolls back the entire action.
 5. Export a new full SQLite byte snapshot.
 6. Upload the full file to OneDrive with `If-Match` using the current eTag.
 7. After remote success, persist the uploaded bytes and returned eTag and refresh visible data.
@@ -251,11 +270,18 @@ Safety invariants:
 - A failed SQL statement rolls back the entire local transaction.
 - Success is not shown before OneDrive accepts the upload.
 - A retryable transport failure retries the already exported bytes; it does not repeat the local
-  SQL transaction.
+  SQL transaction. The retry remains bound to its original eTag and becomes a conflict if cached
+  authoritative metadata has advanced.
+- A post-transaction export failure closes the locally changed runtime and restores the verified
+  OneDrive snapshot before another write is allowed.
+- Missing or otherwise untrustworthy cached upload metadata after a local commit uses the same
+  authoritative restore path; the locally changed runtime is never left available for a later
+  unrelated export.
 - A cache failure after remote success is a reconciliation problem, not a retryable remote write.
 - An eTag conflict discards stale pending bytes, closes the current sql.js runtime, downloads and
-  validates the latest OneDrive snapshot, reopens the runtime, and only then allows the user to
-  review and submit the preserved draft again.
+  validates the latest OneDrive snapshot, and reopens the runtime. Manual entry then allows review
+  and resubmission of its draft; receipt creation revalidates immutable commands and requires an
+  explicit save-again action without exposing a review surface or rerunning either model.
 - The application never silently overwrites a remotely changed database.
 
 ## Data compatibility

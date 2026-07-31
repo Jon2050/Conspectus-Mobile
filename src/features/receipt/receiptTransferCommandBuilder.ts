@@ -268,3 +268,72 @@ export const buildReceiptTransferCommands = (
 
   return { ok: true, commands: Object.freeze(commands) };
 };
+
+export const validatePreparedReceiptTransferCommands = (
+  commands: readonly CreateTransferInput[],
+  optionsState: AddTransferOptionsState,
+): ReceiptTransferPreparationError | null => {
+  if (!Object.isFrozen(commands) || commands.length === 0 || optionsState.operation !== 'ready') {
+    return { code: 'options_unavailable', detail: null };
+  }
+
+  const destination = findPrimarySpendingsAccount(optionsState);
+  if (destination === null) {
+    return { code: 'primary_spendings_unavailable', detail: null };
+  }
+  const validSources = listReceiptSourceAccountOptions(optionsState);
+  const currentCategoryIds = new Set(
+    optionsState.categoryOptions.map((category) => category.categoryId),
+  );
+  const sourceAccountId = commands[0]?.fromAccountId;
+
+  for (const command of commands) {
+    if (
+      !Object.isFrozen(command) ||
+      !Object.isFrozen(command.categoryIds) ||
+      command.fromAccountId !== sourceAccountId ||
+      command.toAccountId !== destination.accountId ||
+      !Number.isSafeInteger(command.bookingDateEpochDay) ||
+      !Number.isSafeInteger(command.amountCents) ||
+      command.amountCents <= 0 ||
+      command.categoryIds.length > 3 ||
+      new Set(command.categoryIds).size !== command.categoryIds.length ||
+      command.categoryIds.some((categoryId) => !currentCategoryIds.has(categoryId))
+    ) {
+      return { code: 'invalid_transfer', detail: null };
+    }
+
+    const source = validSources.find((account) => account.accountId === command.fromAccountId);
+    if (source === undefined) {
+      return { code: 'source_account_unavailable', detail: null };
+    }
+    if (
+      deriveTransferType(source.accountTypeId, destination.accountTypeId) !== command.transferTypeId
+    ) {
+      return { code: 'invalid_transfer', detail: null };
+    }
+
+    const fields: AddTransferFormFields = {
+      date: new Date(command.bookingDateEpochDay * 86_400_000).toISOString().slice(0, 10),
+      name: command.name,
+      amount: formatAmountInputDigits(String(command.amountCents)),
+      fromAccountId: command.fromAccountId,
+      toAccountId: command.toAccountId,
+      category1Id: command.categoryIds[0] ?? -1,
+      category2Id: command.categoryIds[1] ?? -1,
+      category3Id: command.categoryIds[2] ?? -1,
+      buyplace: command.buyplace ?? '',
+    };
+    const validationErrors = validateAddTransfer(
+      fields,
+      optionsState.fromAccountOptions,
+      optionsState.toAccountOptions,
+      (key) => key,
+    );
+    if (validationErrors.length > 0) {
+      return { code: 'invalid_transfer', detail: validationErrors[0] ?? null };
+    }
+  }
+
+  return null;
+};

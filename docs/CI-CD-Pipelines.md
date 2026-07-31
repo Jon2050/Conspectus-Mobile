@@ -114,7 +114,7 @@ limits per asset class:
 
 | Asset class |               Raw limit |              Gzip limit |
 | ----------- | ----------------------: | ----------------------: |
-| JavaScript  | 690 KiB (706,560 bytes) | 210 KiB (215,040 bytes) |
+| JavaScript  | 712 KiB (729,088 bytes) | 214 KiB (219,136 bytes) |
 | CSS         |   32 KiB (32,768 bytes) |  5.75 KiB (5,888 bytes) |
 
 Raw totals guard parse, storage, and uncompressed delivery cost. Gzip totals are calculated by

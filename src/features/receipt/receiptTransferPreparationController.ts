@@ -17,6 +17,9 @@ export type ReceiptTransferPreparationPhase =
   | 'processing'
   | 'waiting_for_source'
   | 'ready_for_commit'
+  | 'committing'
+  | 'commit_failed'
+  | 'committed'
   | 'error';
 
 export interface ReceiptProcessingStep {
@@ -43,6 +46,10 @@ export interface ReceiptTransferPreparationController {
   ): void;
   selectSourceAccount(sourceAccountId: number | null, optionsState: AddTransferOptionsState): void;
   refreshOptions(optionsState: AddTransferOptionsState): void;
+  claimReadyForCommit(): readonly CreateTransferInput[] | null;
+  markCommitActive(): void;
+  markCommitFailed(): void;
+  markCommitted(): void;
   failForOffline(): void;
   reset(): void;
   dispose(): void;
@@ -226,12 +233,7 @@ export const createReceiptTransferPreparationController =
       },
 
       selectSourceAccount(sourceAccountId, optionsState): void {
-        if (
-          isDisposed ||
-          state.phase === 'idle' ||
-          state.phase === 'error' ||
-          state.phase === 'ready_for_commit'
-        ) {
+        if (isDisposed || !['processing', 'waiting_for_source'].includes(state.phase)) {
           return;
         }
         publish({ ...state, sourceAccountId });
@@ -251,12 +253,7 @@ export const createReceiptTransferPreparationController =
       },
 
       refreshOptions(optionsState): void {
-        if (
-          isDisposed ||
-          state.phase === 'idle' ||
-          state.phase === 'error' ||
-          state.phase === 'ready_for_commit'
-        ) {
+        if (isDisposed || !['processing', 'waiting_for_source'].includes(state.phase)) {
           return;
         }
         if (optionsState.operation !== 'ready') {
@@ -273,6 +270,48 @@ export const createReceiptTransferPreparationController =
         if (state.sourceAccountId !== null && derivation !== null) {
           tryPrepare(optionsState);
         }
+      },
+
+      claimReadyForCommit(): readonly CreateTransferInput[] | null {
+        if (isDisposed || state.phase !== 'ready_for_commit' || state.readyForCommit === null) {
+          return null;
+        }
+        const commands = state.readyForCommit;
+        publish({
+          phase: 'committing',
+          steps: steps('complete', 'complete', 'active'),
+          sourceAccountId: state.sourceAccountId,
+          readyForCommit: null,
+          error: null,
+        });
+        return commands;
+      },
+
+      markCommitActive(): void {
+        if (isDisposed || !['committing', 'commit_failed'].includes(state.phase)) return;
+        publish({ ...state, phase: 'committing', steps: steps('complete', 'complete', 'active') });
+      },
+
+      markCommitFailed(): void {
+        if (isDisposed || state.phase !== 'committing') return;
+        publish({
+          phase: 'commit_failed',
+          steps: steps('complete', 'complete', 'error'),
+          sourceAccountId: null,
+          readyForCommit: null,
+          error: null,
+        });
+      },
+
+      markCommitted(): void {
+        if (isDisposed || state.phase !== 'committing') return;
+        publish({
+          phase: 'committed',
+          steps: steps('complete', 'complete', 'complete'),
+          sourceAccountId: null,
+          readyForCommit: null,
+          error: null,
+        });
       },
 
       failForOffline(): void {

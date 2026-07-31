@@ -18,11 +18,18 @@ export type DatabaseUploadErrorCode =
 export class DatabaseUploadError extends Error {
   readonly code: DatabaseUploadErrorCode;
   readonly cause?: unknown;
+  readonly expectedETag: string | null;
 
-  constructor(code: DatabaseUploadErrorCode, message: string, cause?: unknown) {
+  constructor(
+    code: DatabaseUploadErrorCode,
+    message: string,
+    cause?: unknown,
+    expectedETag: string | null = null,
+  ) {
     super(message);
     this.name = 'DatabaseUploadError';
     this.code = code;
+    this.expectedETag = expectedETag;
     if (cause !== undefined) {
       this.cause = cause;
     }
@@ -50,16 +57,21 @@ const resolveBinding = (provider: BindingProvider): DriveItemBinding | null =>
 const isGraphConflict = (error: unknown): boolean =>
   typeof error === 'object' && error !== null && (error as { code?: unknown }).code === 'conflict';
 
-const toUploadError = (error: unknown, conflictMessage: string, failureMessage: string): Error => {
+const toUploadError = (
+  error: unknown,
+  conflictMessage: string,
+  failureMessage: string,
+  expectedETag: string | null,
+): Error => {
   if (error instanceof DatabaseUploadError) {
     return error;
   }
 
   if (isGraphConflict(error)) {
-    return new DatabaseUploadError('conflict', conflictMessage, error);
+    return new DatabaseUploadError('conflict', conflictMessage, error, expectedETag);
   }
 
-  return new DatabaseUploadError('upload_failed', failureMessage, error);
+  return new DatabaseUploadError('upload_failed', failureMessage, error, expectedETag);
 };
 
 export const createDatabaseUploadHandoffService = (
@@ -97,6 +109,7 @@ export const createDatabaseUploadHandoffService = (
       syncStateStore.setSyncing(uploadingMessage, { branch: DEFAULT_UPLOAD_PROGRESS_BRANCH });
 
       let uploadResult: Awaited<ReturnType<GraphClient['uploadFile']>>;
+      let expectedETag = uploadOptions?.expectedETag ?? null;
 
       try {
         const currentSnapshot = await cacheStore.readSnapshot(binding);
@@ -107,17 +120,23 @@ export const createDatabaseUploadHandoffService = (
           );
         }
 
+        if (expectedETag !== null && currentSnapshot.metadata.eTag !== expectedETag) {
+          throw new DatabaseUploadError('conflict', conflictMessage, undefined, expectedETag);
+        }
+
+        expectedETag ??= currentSnapshot.metadata.eTag;
+
         uploadResult = await graphClient.uploadFile(
           binding,
           dbBytes,
-          currentSnapshot.metadata.eTag,
+          expectedETag,
           (loadedBytes, totalBytes) => {
             syncStateStore.updateProgress(loadedBytes, totalBytes, 'upload');
             uploadOptions?.onProgress?.({ loadedBytes, totalBytes });
           },
         );
       } catch (error) {
-        const uploadError = toUploadError(error, conflictMessage, failureMessage);
+        const uploadError = toUploadError(error, conflictMessage, failureMessage, expectedETag);
 
         if (
           uploadError instanceof DatabaseUploadError &&

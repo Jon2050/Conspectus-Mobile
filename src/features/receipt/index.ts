@@ -9,7 +9,10 @@ export type {
   ReceiptAnalysisStage,
   ReceiptAnalysisState,
 } from './receiptAnalysisController';
-export { listReceiptSourceAccountOptions } from './receiptTransferCommandBuilder';
+export {
+  listReceiptSourceAccountOptions,
+  validatePreparedReceiptTransferCommands,
+} from './receiptTransferCommandBuilder';
 export type {
   ReceiptTransferCommandBuildResult,
   ReceiptTransferPreparationError,

@@ -11,6 +11,7 @@ export {
   type BrowserDbRuntimeOpenOptions,
   type CategoryRecord,
   type CreateTransferInput,
+  type CreateTransferBatchResult,
   type CreateTransferResult,
   type TransferRecord,
 } from './types';
