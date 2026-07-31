@@ -1,9 +1,147 @@
 // Verifies the browser-visible native receipt capture boundary without simulating OS camera UI.
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page, type Request } from '@playwright/test';
 
-import { appPath, installReadyAddTransferTestDb } from './support/app-test-harness';
+import {
+  appPath,
+  getGraphUploadCallCount,
+  getLocalTransferWriteCallCount,
+  installReadyAddTransferTestDb,
+} from './support/app-test-harness';
 
 test.use({ viewport: { width: 320, height: 720 } });
+
+const RECEIPT_IMAGE = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64',
+);
+
+const MODEL = {
+  id: 'provider/shared:free',
+  name: 'Shared Free Model',
+  architecture: {
+    input_modalities: ['text', 'image'],
+    output_modalities: ['text'],
+  },
+  pricing: { prompt: '0', completion: '0', request: '0', image: '0' },
+  supported_parameters: ['structured_outputs'],
+};
+
+const EXTRACTION = {
+  status: 'ok',
+  errorReason: null,
+  storeName: 'Markt',
+  receiptDate: '2026-07-31',
+  currency: 'EUR',
+  receiptTotalCents: 350,
+  items: [
+    {
+      index: 0,
+      name: 'Brot',
+      quantityText: null,
+      lineTotalCents: 350,
+      kind: 'item',
+    },
+  ],
+};
+
+const DERIVATION = {
+  status: 'ok',
+  errorReason: null,
+  receiptTotalCents: 350,
+  transfers: [
+    {
+      name: 'Lebensmittel',
+      amountCents: 350,
+      categoryNames: ['Einkauf', 'Lebensmittel'],
+      buyplace: 'Markt',
+      receiptDate: '2026-07-31',
+      sourceItemIndexes: [0],
+    },
+  ],
+};
+
+const installReadyReceiptConfiguration = async (page: Page): Promise<void> => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'conspectus.openRouterReceiptSettings',
+      JSON.stringify({
+        version: 1,
+        settingsByAccountId: {
+          'mock-home-account': {
+            apiKey: 'sk-or-e2e-secret',
+            visionModelId: 'provider/shared:free',
+            transferModelId: 'provider/shared:free',
+            transferPromptOverride: null,
+          },
+        },
+      }),
+    );
+  });
+};
+
+const installReceiptAnalysisRoutes = async (
+  page: Page,
+  completionBodies: readonly unknown[],
+): Promise<{ readonly catalogRequests: Request[]; readonly completionRequests: Request[] }> => {
+  const catalogRequests: Request[] = [];
+  const completionRequests: Request[] = [];
+
+  await page.route('https://openrouter.ai/api/v1/models/user', async (route) => {
+    const request = route.request();
+    if (request.method() === 'OPTIONS') {
+      await route.fulfill({
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'authorization,content-type',
+          'Access-Control-Allow-Methods': 'GET,OPTIONS',
+        },
+      });
+      return;
+    }
+    catalogRequests.push(request);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: JSON.stringify({ data: [MODEL] }),
+    });
+  });
+
+  await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
+    const request = route.request();
+    if (request.method() === 'OPTIONS') {
+      await route.fulfill({
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'authorization,content-type',
+          'Access-Control-Allow-Methods': 'POST,OPTIONS',
+        },
+      });
+      return;
+    }
+
+    completionRequests.push(request);
+    const response = completionBodies[completionRequests.length - 1] ?? completionBodies.at(-1);
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: JSON.stringify({
+        choices: [
+          {
+            finish_reason: 'stop',
+            message: { role: 'assistant', content: JSON.stringify(response) },
+          },
+        ],
+      }),
+    });
+  });
+
+  return { catalogRequests, completionRequests };
+};
 
 test('exposes one native outward-camera image input without custom capture or gallery UI', async ({
   page,
@@ -24,6 +162,9 @@ test('exposes one native outward-camera image input without custom capture or ga
   const photoButton = page.getByTestId('receipt-photo-button');
   const nativeInput = page.getByTestId('receipt-image-input');
   await expect(photoButton).toBeVisible();
+  await expect(page.getByTestId('receipt-semantic-risk')).toContainText(
+    'AI classification can still be semantically wrong',
+  );
   await expect(photoButton).toHaveAccessibleName('Photograph receipt');
   await expect(nativeInput).toHaveAttribute('type', 'file');
   await expect(nativeInput).toHaveAttribute('accept', 'image/*');
@@ -41,4 +182,98 @@ test('exposes one native outward-camera image input without custom capture or ga
     }));
   expect(captureSectionSize.clientWidth).toBeGreaterThan(0);
   expect(captureSectionSize.scrollWidth).toBeLessThanOrEqual(captureSectionSize.clientWidth);
+});
+
+test('runs the two isolated OpenRouter stages while account selection remains open and performs no write', async ({
+  page,
+}) => {
+  await installReadyReceiptConfiguration(page);
+  const requests = await installReceiptAnalysisRoutes(page, [EXTRACTION, DERIVATION]);
+  await installReadyAddTransferTestDb(page, {
+    fromAccountOptionRows: [
+      { accountId: 1, name: 'Primary Income', amountCents: 0, accountTypeId: 1 },
+      { accountId: 11, name: 'Checking', amountCents: 1000, accountTypeId: 3 },
+    ],
+    toAccountOptionRows: [
+      { accountId: 2, name: 'Primary Spendings', amountCents: 0, accountTypeId: 2 },
+      { accountId: 11, name: 'Checking', amountCents: 1000, accountTypeId: 3 },
+    ],
+  });
+  await page.goto(appPath('#/add'));
+
+  await page.getByTestId('receipt-image-input').setInputFiles({
+    name: 'receipt.png',
+    mimeType: 'image/png',
+    buffer: RECEIPT_IMAGE,
+  });
+  await expect(page.getByTestId('receipt-stage-one-status')).toBeVisible();
+  await expect(page.getByTestId('add-transfer-from-account')).toBeEnabled();
+  await page.getByTestId('add-transfer-from-account').selectOption('11');
+  await expect(page.getByTestId('receipt-stage-two-status')).toBeVisible();
+  await expect(page.getByTestId('add-transfer-from-account')).toBeEnabled();
+  await expect(page.getByTestId('add-transfer-from-account')).toHaveValue('11');
+  await expect(page.getByTestId('receipt-analysis-success')).toContainText(
+    'Transfer data for 1 transfer is ready.',
+  );
+
+  expect(requests.catalogRequests).toHaveLength(2);
+  expect(requests.completionRequests).toHaveLength(2);
+  const stageOneRequest = requests.completionRequests[0];
+  const stageTwoRequest = requests.completionRequests[1];
+  expect(stageOneRequest?.headers().authorization).toBe('Bearer sk-or-e2e-secret');
+  expect(stageTwoRequest?.headers().authorization).toBe('Bearer sk-or-e2e-secret');
+  const stageOneBody = stageOneRequest?.postDataJSON() as Record<string, unknown>;
+  const stageTwoBody = stageTwoRequest?.postDataJSON() as Record<string, unknown>;
+  expect(JSON.stringify(stageOneBody)).toContain('data:image/jpeg;base64,');
+  expect(JSON.stringify(stageTwoBody)).not.toContain('data:image/jpeg;base64,');
+  expect(JSON.stringify(stageTwoBody)).not.toContain('accountId');
+  expect(stageOneBody.provider).toEqual({ allow_fallbacks: false });
+  expect(stageTwoBody.provider).toEqual({
+    allow_fallbacks: false,
+    require_parameters: true,
+  });
+  expect(stageTwoBody.response_format).toMatchObject({
+    type: 'json_schema',
+    json_schema: { strict: true },
+  });
+  expect(await getLocalTransferWriteCallCount(page)).toBe(0);
+  expect(await getGraphUploadCallCount(page)).toBe(0);
+});
+
+test('ends a model-declared failure and starts again only after a fresh file selection', async ({
+  page,
+}) => {
+  await installReadyReceiptConfiguration(page);
+  const requests = await installReceiptAnalysisRoutes(page, [
+    {
+      status: 'error',
+      errorReason: 'Der Gesamtbetrag ist nicht eindeutig lesbar.',
+      storeName: null,
+      receiptDate: null,
+      currency: null,
+      receiptTotalCents: null,
+      items: [],
+    },
+    EXTRACTION,
+    DERIVATION,
+  ]);
+  await installReadyAddTransferTestDb(page);
+  await page.goto(appPath('#/add'));
+
+  const input = page.getByTestId('receipt-image-input');
+  await input.setInputFiles({ name: 'first.png', mimeType: 'image/png', buffer: RECEIPT_IMAGE });
+  await expect(page.getByTestId('add-transfer-form-error')).toContainText(
+    'Der Gesamtbetrag ist nicht eindeutig lesbar.',
+  );
+  expect(requests.completionRequests).toHaveLength(1);
+  await page.waitForTimeout(300);
+  expect(requests.completionRequests).toHaveLength(1);
+  await expect(page.getByTestId('receipt-photo-button')).toBeEnabled();
+  await expect(page.getByTestId('receipt-analysis-retry')).toHaveCount(0);
+
+  await input.setInputFiles({ name: 'second.png', mimeType: 'image/png', buffer: RECEIPT_IMAGE });
+  await expect(page.getByTestId('receipt-analysis-success')).toBeVisible();
+  expect(requests.completionRequests).toHaveLength(3);
+  expect(await getLocalTransferWriteCallCount(page)).toBe(0);
+  expect(await getGraphUploadCallCount(page)).toBe(0);
 });

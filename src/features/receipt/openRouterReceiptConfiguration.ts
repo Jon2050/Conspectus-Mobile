@@ -1,6 +1,7 @@
 // Defines stored and currently validated OpenRouter receipt configuration contracts.
 import type { OpenRouterCompatibleModelCatalog } from '@openrouter';
 
+import { parseReceiptTransferCategoryMappings } from './receiptAnalysisContracts';
 import {
   DEFAULT_TRANSFER_DERIVATION_PROMPT,
   RECEIPT_EXTRACTION_SYSTEM_PROMPT,
@@ -56,12 +57,14 @@ export const toStoredReadyOpenRouterReceiptConfiguration = (
   settings: StoredOpenRouterReceiptSettings,
 ): ReadyOpenRouterReceiptConfiguration | null => {
   const transferPrompt = resolveTransferDerivationPrompt(settings);
+  const transferMappings = parseReceiptTransferCategoryMappings(transferPrompt);
   if (
     !settings.apiKey.trim() ||
     settings.visionModelId === null ||
     settings.transferModelId === null ||
     !RECEIPT_EXTRACTION_SYSTEM_PROMPT.text.trim() ||
-    !transferPrompt.trim()
+    !transferPrompt.trim() ||
+    !transferMappings.ok
   ) {
     return null;
   }

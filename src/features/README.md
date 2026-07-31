@@ -25,6 +25,10 @@ Receipt AI settings:
   at most 4 MiB output.
 - `receipt/browserReceiptImageCodec.ts` decodes browser-supported camera formats with their applied
   orientation and canvas-re-encodes pixels so source EXIF/GPS/device metadata is not copied.
-- `receipt/receiptCaptureController.ts` owns a single in-memory capture until its typed M9-03
-  stage-one consumer settles, then zeroes the normalized byte buffer. Cancellation and supersession
-  never expose raw or normalized bytes through public UI state.
+- `receipt/receiptCaptureController.ts` owns a single in-memory capture while
+  `receipt/receiptAnalysisController.ts` orchestrates the two OpenRouter stages. The analysis
+  controller revalidates each selected model immediately before use, releases image bytes after
+  stage 1, parses the active prompt's canonical transfer/category declarations, and retains only a
+  structurally, arithmetically, and mapping-validated transient derivation for the later
+  local-transfer workflow. Cancellation and supersession clear every transient result and never
+  expose raw or normalized bytes through public UI state.

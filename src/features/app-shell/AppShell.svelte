@@ -58,12 +58,13 @@
   } from './routes/addTransferFormState';
   import {
     browserReceiptImageCodec,
+    createReceiptAnalysisController,
     createReceiptCaptureController,
     createReceiptImageNormalizer,
     openRouterSettingsStore,
     toStoredReadyOpenRouterReceiptConfiguration,
+    type ReceiptAnalysisController,
     type ReceiptCaptureController,
-    type ReceiptStageOneStarter,
   } from '../receipt';
   import {
     createAddTransferSaveController,
@@ -79,7 +80,7 @@
   export let addTransferSaveController: AddTransferSaveController =
     createAddTransferSaveController();
   export let receiptCaptureController: ReceiptCaptureController | null = null;
-  export let receiptStageOneStarter: ReceiptStageOneStarter | null = null;
+  export let receiptAnalysisController: ReceiptAnalysisController | null = null;
   export let loadingDelayMs = 160;
   export let showLoadingPlaceholder = true;
 
@@ -107,8 +108,14 @@
   let authRecoveryError: string | null = null;
   let bindingRepairPersistenceIsRunning = false;
   let stopFooterVisibilityTracking = (): void => {};
+  const ownedReceiptAnalysisController =
+    receiptCaptureController === null && receiptAnalysisController === null
+      ? createReceiptAnalysisController()
+      : null;
+  const effectiveReceiptAnalysisController =
+    receiptAnalysisController ?? ownedReceiptAnalysisController;
   const ownedReceiptCaptureController =
-    receiptCaptureController === null && receiptStageOneStarter !== null
+    receiptCaptureController === null && effectiveReceiptAnalysisController !== null
       ? createReceiptCaptureController({
           normalizer: createReceiptImageNormalizer(browserReceiptImageCodec),
           resolveConfiguration: () => {
@@ -119,7 +126,7 @@
             const settings = openRouterSettingsStore.read(accountId);
             return settings === null ? null : toStoredReadyOpenRouterReceiptConfiguration(settings);
           },
-          stageOneStarter: receiptStageOneStarter,
+          stageOneStarter: effectiveReceiptAnalysisController,
         })
       : null;
   const effectiveReceiptCaptureController =
@@ -569,6 +576,11 @@
     } else {
       ownedReceiptCaptureController.dispose();
     }
+    if (ownedReceiptAnalysisController === null) {
+      effectiveReceiptAnalysisController?.reset();
+    } else {
+      ownedReceiptAnalysisController.dispose();
+    }
     resolveAppDbRuntime().close();
     disconnectFooterVisibilityTracking();
   });
@@ -705,6 +717,7 @@
           bind:fields={addTransferFields}
           saveController={addTransferSaveController}
           receiptCaptureController={effectiveReceiptCaptureController}
+          receiptAnalysisController={effectiveReceiptAnalysisController}
           {networkStateStore}
           canOpenPanel={addTransferDatabaseIsReady}
         />
