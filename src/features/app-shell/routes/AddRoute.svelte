@@ -1,6 +1,7 @@
 <!-- Renders manual Add Transfer entry and the transient staged receipt-preparation workflow. -->
 <script lang="ts">
   import { onDestroy, onMount, tick } from 'svelte';
+  import { get } from 'svelte/store';
   import { _ } from 'svelte-i18n';
   import {
     appAccountQueryService,
@@ -30,6 +31,12 @@
   } from '../../receipt';
   import BottomSheet from '../components/BottomSheet.svelte';
   import ProgressIndicator from '../components/ProgressIndicator.svelte';
+  import {
+    createReceiptTransferCommitController,
+    type ReceiptTransferCommitContext,
+    type ReceiptTransferCommitController,
+    type ReceiptTransferCommitState,
+  } from '../receiptTransferCommitController';
   import {
     createInitialFormFields,
     NO_CATEGORY_SELECTED,
@@ -67,6 +74,13 @@
   export let receiptAnalysisController: ReceiptAnalysisController | null = null;
   export let receiptPreparationController: ReceiptTransferPreparationController =
     createReceiptTransferPreparationController();
+  export let receiptCommitController: ReceiptTransferCommitController =
+    createReceiptTransferCommitController();
+  export let resolveReceiptCommitIdentity: () => {
+    readonly isAuthenticated: boolean;
+    readonly isVerifiedCurrent: boolean;
+    readonly contextKey: string | null;
+  } = () => ({ isAuthenticated: false, isVerifiedCurrent: false, contextKey: null });
 
   let isOpen = true;
   let componentHasMounted = false;
@@ -90,6 +104,7 @@
   };
   let receiptPreparationState: ReceiptTransferPreparationState =
     receiptPreparationController.getState();
+  let receiptCommitState: ReceiptTransferCommitState = receiptCommitController.getState();
   let lastObservedSyncState: SyncState = 'idle';
   $: isOffline = !$networkStateStore;
   $: isOptionsLoading = optionsState.operation === 'loading';
@@ -111,7 +126,32 @@
     receiptCaptureState.phase === 'handed_off' ||
     receiptAnalysisState.phase === 'extracting' ||
     receiptAnalysisState.phase === 'deriving';
-  $: receiptWorkflowIsActive = receiptPreparationState.phase !== 'idle';
+  $: receiptWorkflowIsActive =
+    receiptPreparationState.phase !== 'idle' || receiptCommitState.phase !== 'idle';
+  $: receiptCommitIsBusy = [
+    'validating',
+    'local_save',
+    'uploading',
+    'local_commit_syncing',
+    'conflict_syncing',
+    'remote_commit_syncing',
+  ].includes(receiptCommitState.phase);
+  $: displayedReceiptSteps =
+    receiptPreparationState.phase !== 'idle'
+      ? receiptPreparationState.steps
+      : [
+          { id: 'extraction' as const, status: 'complete' as const },
+          { id: 'derivation' as const, status: 'complete' as const },
+          {
+            id: 'creation' as const,
+            status:
+              receiptCommitState.phase === 'saved'
+                ? ('complete' as const)
+                : receiptCommitIsBusy
+                  ? ('active' as const)
+                  : ('error' as const),
+          },
+        ];
   $: receiptSourceAccountOptions = listReceiptSourceAccountOptions(optionsState);
   const translateReceiptPreparationError = (
     error: ReceiptTransferPreparationError | null,
@@ -126,6 +166,12 @@
     });
   };
   $: receiptPreparationError = translateReceiptPreparationError(receiptPreparationState.error);
+  $: receiptCommitError =
+    receiptCommitState.error === null
+      ? null
+      : receiptCommitState.error.preparationError !== null
+        ? translateReceiptPreparationError(receiptCommitState.error.preparationError)
+        : $_(`addTransfer.receipt.commit.errors.${receiptCommitState.error.code}`);
   $: receiptAnalysisError =
     receiptAnalysisState.phase !== 'error' || receiptAnalysisState.errorCode === null
       ? null
@@ -133,6 +179,7 @@
         ? $_(`addTransfer.receipt.analysisErrors.${receiptAnalysisState.errorCode}`)
         : `${$_(`addTransfer.receipt.analysisErrors.${receiptAnalysisState.errorCode}`)} ${receiptAnalysisState.errorReason}`;
   $: receiptCaptureError =
+    receiptCommitError ??
     receiptPreparationError ??
     receiptAnalysisError ??
     (receiptCaptureState.errorCode === null
@@ -145,7 +192,12 @@
     optionsState.error?.message ??
     null;
   $: controlsAreDisabled =
-    isSubmitting || isOptionsLoading || saveIsBusy || saveBlocksEditing || receiptCaptureIsBusy;
+    isSubmitting ||
+    isOptionsLoading ||
+    saveIsBusy ||
+    receiptCommitIsBusy ||
+    saveBlocksEditing ||
+    receiptCaptureIsBusy;
   $: sourceAccountIsDisabled = isSubmitting || isOptionsLoading || saveIsBusy || saveBlocksEditing;
   $: submitIsDisabled = controlsAreDisabled || isOffline || optionsState.operation !== 'ready';
   $: receiptCaptureIsDisabled =
@@ -261,6 +313,7 @@
     }
 
     clearValidation();
+    receiptCommitController.reset();
     receiptPreparationController.beginRun();
     void receiptCaptureController.capture(file);
   };
@@ -273,6 +326,40 @@
 
   const handleReceiptFileCancel = (event: Event): void => {
     (event.currentTarget as HTMLInputElement).value = '';
+  };
+
+  const createReceiptCommitContext = (): ReceiptTransferCommitContext => {
+    const identity = resolveReceiptCommitIdentity();
+    return {
+      isOnline: get(networkStateStore),
+      isAuthenticated: identity.isAuthenticated,
+      isVerifiedCurrent: identity.isVerifiedCurrent,
+      contextKey: identity.contextKey,
+      optionsState,
+    };
+  };
+
+  const retryReceiptUpload = async (): Promise<void> => {
+    receiptPreparationController.markCommitActive();
+    await receiptCommitController.retryUpload(createReceiptCommitContext(), $_);
+  };
+
+  const resolveReceiptConflict = async (): Promise<void> => {
+    receiptPreparationController.markCommitActive();
+    await receiptCommitController.resolveConflict(async () => {
+      await controller.load();
+      return createReceiptCommitContext();
+    }, $_);
+  };
+
+  const retryReceiptAfterConflict = async (): Promise<void> => {
+    receiptPreparationController.markCommitActive();
+    await receiptCommitController.retryAfterConflict(createReceiptCommitContext(), $_);
+  };
+
+  const retryReceiptLocalCommitRecovery = async (): Promise<void> => {
+    receiptPreparationController.markCommitActive();
+    await receiptCommitController.retryLocalCommitRecovery($_);
   };
 
   const getAccountName = (account: { name: string; accountTypeId: number | null }) => {
@@ -319,6 +406,39 @@
       }
     },
   );
+  const unsubscribeReceiptCommitController = receiptCommitController.subscribe((nextState) => {
+    receiptCommitState = nextState;
+    if (nextState.phase === 'saved') {
+      receiptPreparationController.markCommitted();
+      receiptCaptureController?.reset();
+      receiptAnalysisController?.reset();
+    } else if (
+      [
+        'upload_failed',
+        'local_commit_recovery_failed',
+        'conflict',
+        'conflict_ready',
+        'remote_commit_recovery_failed',
+        'failed',
+        'invalidated',
+      ].includes(nextState.phase)
+    ) {
+      receiptPreparationController.markCommitFailed();
+      receiptCaptureController?.reset();
+      receiptAnalysisController?.reset();
+    } else if (
+      [
+        'validating',
+        'local_save',
+        'uploading',
+        'local_commit_syncing',
+        'conflict_syncing',
+        'remote_commit_syncing',
+      ].includes(nextState.phase)
+    ) {
+      receiptPreparationController.markCommitActive();
+    }
+  });
   const unsubscribeSyncState = syncStateStore.subscribe((syncSnapshot) => {
     if (syncSnapshot.state === lastObservedSyncState) {
       return;
@@ -331,12 +451,15 @@
   });
 
   const handleClose = (): void => {
-    if (saveIsBusy) {
+    if (saveIsBusy || receiptCommitIsBusy) {
       return;
     }
 
     receiptCaptureController?.cancel();
     receiptPreparationController.reset();
+    if (receiptCommitController.getState().phase === 'saved') {
+      receiptCommitController.reset();
+    }
     isOpen = false;
     if (typeof window !== 'undefined') {
       window.location.hash = '#/transfers';
@@ -365,10 +488,23 @@
     componentHasMounted &&
     receiptWorkflowIsActive &&
     isOffline &&
-    receiptPreparationState.phase !== 'error'
+    ['processing', 'waiting_for_source', 'ready_for_commit'].includes(receiptPreparationState.phase)
   ) {
     receiptPreparationController.failForOffline();
     receiptCaptureController?.cancel();
+  }
+
+  $: if (
+    componentHasMounted &&
+    receiptPreparationState.phase === 'ready_for_commit' &&
+    receiptCommitState.phase === 'idle'
+  ) {
+    const commands = receiptPreparationController.claimReadyForCommit();
+    if (commands !== null) {
+      receiptCaptureController?.reset();
+      receiptAnalysisController?.reset();
+      void receiptCommitController.commit(commands, createReceiptCommitContext(), $_);
+    }
   }
 
   onMount(() => {
@@ -384,6 +520,7 @@
     unsubscribeReceiptCaptureController();
     unsubscribeReceiptAnalysisController();
     unsubscribeReceiptPreparationController();
+    unsubscribeReceiptCommitController();
     unsubscribeSyncState();
     receiptCaptureController?.cancel();
     receiptPreparationController.reset();
@@ -414,7 +551,7 @@
 
     <BottomSheet
       {isOpen}
-      canClose={!saveIsBusy}
+      canClose={!saveIsBusy && !receiptCommitIsBusy}
       title={$_('addTransfer.title')}
       on:close={handleClose}
     >
@@ -612,7 +749,7 @@
               aria-live="polite"
               data-testid="receipt-progress"
             >
-              {#each receiptPreparationState.steps as step (step.id)}
+              {#each displayedReceiptSteps as step (step.id)}
                 <li
                   class={`receipt-progress__step receipt-progress__step--${step.status}`}
                   data-testid={`receipt-step-${step.id}`}
@@ -628,7 +765,7 @@
               {/each}
             </ol>
 
-            {#if receiptPreparationState.phase === 'error'}
+            {#if receiptPreparationState.phase === 'error' || receiptCommitState.phase === 'failed' || receiptCommitState.phase === 'invalidated'}
               <button
                 type="button"
                 class="app-button app-button--secondary add-transfer-form__action"
@@ -640,7 +777,7 @@
                 <span aria-hidden="true">📷</span>
                 {$_('addTransfer.receipt.freshAction')}
               </button>
-            {:else}
+            {:else if receiptPreparationState.phase === 'processing' || receiptPreparationState.phase === 'waiting_for_source' || receiptPreparationState.phase === 'ready_for_commit'}
               <div class="add-transfer-form__field receipt-source-account">
                 <label class="add-transfer-form__label" for="receipt-source-account">
                   {$_('addTransfer.receipt.sourceAccount')}
@@ -681,6 +818,89 @@
                   )}
                 </p>
               {/if}
+            {:else if receiptCommitState.phase === 'upload_failed'}
+              <button
+                type="button"
+                class="app-button app-button--primary add-transfer-form__action"
+                data-testid="receipt-upload-retry"
+                disabled={isOffline}
+                on:click={retryReceiptUpload}
+              >
+                {$_('addTransfer.receipt.commit.retryUpload')}
+              </button>
+            {:else if receiptCommitState.phase === 'conflict'}
+              <button
+                type="button"
+                class="app-button app-button--primary add-transfer-form__action"
+                data-testid="receipt-conflict-refresh"
+                disabled={isOffline}
+                on:click={resolveReceiptConflict}
+              >
+                {$_('addTransfer.receipt.commit.refreshConflict')}
+              </button>
+            {:else if receiptCommitState.phase === 'conflict_ready'}
+              <p class="add-transfer-form__status" role="status">
+                {$_('addTransfer.receipt.commit.conflictReady')}
+              </p>
+              <button
+                type="button"
+                class="app-button app-button--primary add-transfer-form__action"
+                data-testid="receipt-conflict-retry"
+                disabled={isOffline}
+                on:click={retryReceiptAfterConflict}
+              >
+                {$_('addTransfer.receipt.commit.retryAfterConflict')}
+              </button>
+            {:else if receiptCommitState.phase === 'local_commit_recovery_failed'}
+              <button
+                type="button"
+                class="app-button app-button--primary add-transfer-form__action"
+                data-testid="receipt-local-recovery-retry"
+                disabled={isOffline}
+                on:click={retryReceiptLocalCommitRecovery}
+              >
+                {$_('addTransfer.receipt.commit.retryLocalRecovery')}
+              </button>
+            {:else if receiptCommitState.phase === 'local_commit_syncing' || receiptCommitState.phase === 'conflict_syncing' || receiptCommitState.phase === 'remote_commit_syncing'}
+              <p class="add-transfer-form__status" role="status">
+                {$_(
+                  receiptCommitState.phase === 'local_commit_syncing'
+                    ? 'addTransfer.receipt.commit.recoveringLocalCommit'
+                    : receiptCommitState.phase === 'conflict_syncing'
+                      ? 'addTransfer.receipt.commit.refreshingConflict'
+                      : 'addTransfer.receipt.commit.reconcilingRemoteCommit',
+                )}
+              </p>
+              {#if receiptCommitState.recoveryProgress !== null}
+                <ProgressIndicator
+                  kind="download"
+                  loaded={receiptCommitState.recoveryProgress.loadedBytes}
+                  total={receiptCommitState.recoveryProgress.totalBytes}
+                />
+              {/if}
+            {:else if receiptCommitState.phase === 'uploading' && receiptCommitState.progress !== null}
+              <ProgressIndicator
+                kind="upload"
+                loaded={receiptCommitState.progress.loadedBytes}
+                total={receiptCommitState.progress.totalBytes}
+              />
+            {:else if receiptCommitState.phase === 'saved'}
+              <p
+                class="add-transfer-form__success"
+                role="status"
+                data-testid="receipt-commit-success"
+              >
+                {$_(
+                  receiptCommitState.createdCount === 1
+                    ? 'addTransfer.receipt.commit.successOne'
+                    : 'addTransfer.receipt.commit.successMany',
+                  { values: { count: receiptCommitState.createdCount } },
+                )}
+              </p>
+            {:else if receiptCommitState.phase === 'remote_commit_recovery_failed'}
+              <p class="add-transfer-form__error" role="alert" data-testid="receipt-remote-saved">
+                {$_('addTransfer.receipt.commit.remoteCommitRecoveryFailed')}
+              </p>
             {/if}
           {/if}
         </section>
@@ -852,7 +1072,7 @@
               type="button"
               class="app-button app-button--secondary add-transfer-form__action"
               data-testid="add-transfer-close"
-              disabled={isSubmitting || saveIsBusy}
+              disabled={isSubmitting || saveIsBusy || receiptCommitIsBusy}
               on:click={handleClose}
             >
               {$_('addTransfer.close')}
@@ -896,7 +1116,7 @@
               type="button"
               class="app-button app-button--secondary add-transfer-form__action"
               data-testid="add-transfer-close"
-              disabled={isSubmitting || saveIsBusy}
+              disabled={isSubmitting || saveIsBusy || receiptCommitIsBusy}
               on:click={handleClose}
             >
               {$_('addTransfer.close')}

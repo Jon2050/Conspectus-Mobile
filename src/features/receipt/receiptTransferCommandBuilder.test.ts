@@ -11,6 +11,7 @@ import type { ReceiptTransferDerivation } from './receiptAnalysisContracts';
 import {
   buildReceiptTransferCommands,
   listReceiptSourceAccountOptions,
+  validatePreparedReceiptTransferCommands,
 } from './receiptTransferCommandBuilder';
 
 const OPTIONS: AddTransferOptionsState = {
@@ -157,5 +158,50 @@ describe('receipt transfer command builder', () => {
         OPTIONS,
       ),
     ).toMatchObject({ ok: false, error: { code: 'total_mismatch' } });
+  });
+
+  it('revalidates an immutable prepared batch against current accounts and categories', () => {
+    const result = buildReceiptTransferCommands(DERIVATION, [0, 1, 2], 11, OPTIONS);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(validatePreparedReceiptTransferCommands(result.commands, OPTIONS)).toBeNull();
+    expect(
+      validatePreparedReceiptTransferCommands(result.commands, {
+        ...OPTIONS,
+        categoryOptions: OPTIONS.categoryOptions.filter((category) => category.categoryId !== 22),
+      }),
+    ).toEqual({ code: 'invalid_transfer', detail: null });
+    expect(
+      validatePreparedReceiptTransferCommands(result.commands, {
+        ...OPTIONS,
+        fromAccountOptions: OPTIONS.fromAccountOptions.filter(
+          (account) => account.accountId !== 11,
+        ),
+      }),
+    ).toEqual({ code: 'source_account_unavailable', detail: null });
+  });
+
+  it('rejects mutable, empty, or tampered prepared commands', () => {
+    expect(validatePreparedReceiptTransferCommands([], OPTIONS)).toEqual({
+      code: 'options_unavailable',
+      detail: null,
+    });
+    const mutable = [
+      {
+        bookingDateEpochDay: 20665,
+        name: 'Lebensmittel',
+        amountCents: 350,
+        transferTypeId: TRANSFER_TYPE_STD_EXPENSE,
+        fromAccountId: 11,
+        toAccountId: 2,
+        categoryIds: [20],
+        buyplace: 'Markt',
+      },
+    ];
+    expect(validatePreparedReceiptTransferCommands(mutable, OPTIONS)).toEqual({
+      code: 'options_unavailable',
+      detail: null,
+    });
   });
 });

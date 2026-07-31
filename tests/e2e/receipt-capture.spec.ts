@@ -220,25 +220,29 @@ test('exposes one native outward-camera image input without custom capture or ga
   expect(captureSectionSize.scrollWidth).toBeLessThanOrEqual(captureSectionSize.clientWidth);
 });
 
-test('runs the two isolated OpenRouter stages while account selection remains open and performs no write', async ({
+test('runs both OpenRouter stages and automatically commits one validated transfer', async ({
   page,
 }) => {
   await installReadyReceiptConfiguration(page);
   const requests = await installReceiptAnalysisRoutes(page, [EXTRACTION, DERIVATION]);
-  await installReadyAddTransferTestDb(page, {
-    fromAccountOptionRows: [
-      { accountId: 1, name: 'Primary Income', amountCents: 0, accountTypeId: 1 },
-      { accountId: 11, name: 'Checking', amountCents: 1000, accountTypeId: 3 },
-    ],
-    toAccountOptionRows: [
-      { accountId: 2, name: 'Primary Spendings', amountCents: 0, accountTypeId: 2 },
-      { accountId: 11, name: 'Checking', amountCents: 1000, accountTypeId: 3 },
-    ],
-    categoryRows: [
-      { categoryId: 20, name: 'Einkauf' },
-      { categoryId: 21, name: 'Lebensmittel' },
-    ],
-  });
+  await installReadyAddTransferTestDb(
+    page,
+    {
+      fromAccountOptionRows: [
+        { accountId: 1, name: 'Primary Income', amountCents: 0, accountTypeId: 1 },
+        { accountId: 11, name: 'Checking', amountCents: 1000, accountTypeId: 3 },
+      ],
+      toAccountOptionRows: [
+        { accountId: 2, name: 'Primary Spendings', amountCents: 0, accountTypeId: 2 },
+        { accountId: 11, name: 'Checking', amountCents: 1000, accountTypeId: 3 },
+      ],
+      categoryRows: [
+        { categoryId: 20, name: 'Einkauf' },
+        { categoryId: 21, name: 'Lebensmittel' },
+      ],
+    },
+    { uploadDelayMs: 400 },
+  );
   await page.goto(appPath('#/add'));
 
   await page.getByTestId('receipt-image-input').setInputFiles({
@@ -259,10 +263,10 @@ test('runs the two isolated OpenRouter stages while account selection remains op
   await expect(page.getByTestId('receipt-step-derivation')).toHaveAttribute('data-state', 'active');
   await expect(page.getByTestId('add-transfer-from-account')).toBeEnabled();
   await expect(page.getByTestId('add-transfer-from-account')).toHaveValue('11');
-  await expect(page.getByTestId('receipt-analysis-success')).toContainText(
-    'Transfer data for 1 transfer is ready.',
-  );
   await expect(page.getByTestId('receipt-step-creation')).toHaveAttribute('data-state', 'active');
+  await expect(page.getByTestId('add-transfer-close')).toBeDisabled();
+  await expect(page.getByTestId('receipt-commit-success')).toContainText('1 transfer created');
+  await expect(page.getByTestId('receipt-step-creation')).toHaveAttribute('data-state', 'complete');
 
   expect(requests.catalogRequests).toHaveLength(2);
   expect(requests.completionRequests).toHaveLength(2);
@@ -285,11 +289,17 @@ test('runs the two isolated OpenRouter stages while account selection remains op
     type: 'json_schema',
     json_schema: { strict: true },
   });
-  expect(await getLocalTransferWriteCallCount(page)).toBe(0);
-  expect(await getGraphUploadCallCount(page)).toBe(0);
+  expect(await getLocalTransferWriteCallCount(page)).toBe(1);
+  expect(await getGraphUploadCallCount(page)).toBe(1);
+
+  await page.getByTestId('add-transfer-close').click();
+  await page.locator('a[href="#/add"]').click();
+  await expect(page.getByTestId('receipt-commit-success')).toHaveCount(0);
+  await expect(page.getByTestId('receipt-photo-button')).toBeEnabled();
+  await expect(page.getByTestId('add-transfer-date')).toBeVisible();
 });
 
-test('waits for a deliberate late source selection and prepares a multi-transfer batch automatically', async ({
+test('waits for a deliberate late source selection and commits a multi-transfer batch once', async ({
   page,
 }) => {
   await installReadyReceiptConfiguration(page);
@@ -331,14 +341,63 @@ test('waits for a deliberate late source selection and prepares a multi-transfer
 
   await page.getByTestId('add-transfer-from-account').selectOption('11');
 
-  await expect(page.getByTestId('receipt-analysis-success')).toContainText(
-    'Transfer data for 2 transfers is ready.',
-  );
-  await expect(page.getByTestId('receipt-step-creation')).toHaveAttribute('data-state', 'active');
-  await expect(page.getByTestId('add-transfer-from-account')).toBeDisabled();
+  await expect(page.getByTestId('receipt-commit-success')).toContainText('2 transfers created');
+  await expect(page.getByTestId('receipt-step-creation')).toHaveAttribute('data-state', 'complete');
   await expect(page.locator('[data-testid*="receipt-review"]')).toHaveCount(0);
-  expect(await getLocalTransferWriteCallCount(page)).toBe(0);
-  expect(await getGraphUploadCallCount(page)).toBe(0);
+  expect(await getLocalTransferWriteCallCount(page)).toBe(1);
+  expect(await getGraphUploadCallCount(page)).toBe(1);
+  await page.evaluate(() => {
+    window.location.hash = '#/transfers';
+  });
+  if ((await page.getByTestId('transfers-month-label').textContent())?.includes('August 2026')) {
+    await page.getByTestId('transfers-month-previous-button').click();
+  }
+  await expect(page.getByTestId('route-transfers')).toContainText('Lebensmittel');
+  await expect(page.getByTestId('route-transfers')).toContainText('Haushaltsartikel');
+});
+
+test('clears completed receipt state when upload finishes after leaving Add', async ({ page }) => {
+  await installReadyReceiptConfiguration(page);
+  await installReceiptAnalysisRoutes(page, [EXTRACTION, DERIVATION]);
+  await installReadyAddTransferTestDb(
+    page,
+    {
+      fromAccountOptionRows: [
+        { accountId: 11, name: 'Checking', amountCents: 1000, accountTypeId: 3 },
+      ],
+      toAccountOptionRows: [
+        { accountId: 2, name: 'Primary Spendings', amountCents: 0, accountTypeId: 2 },
+      ],
+      categoryRows: [
+        { categoryId: 20, name: 'Einkauf' },
+        { categoryId: 21, name: 'Lebensmittel' },
+      ],
+    },
+    { uploadDelayMs: 800 },
+  );
+  await page.goto(appPath('#/add'));
+
+  await page.getByTestId('receipt-image-input').setInputFiles({
+    name: 'leave-during-upload.png',
+    mimeType: 'image/png',
+    buffer: RECEIPT_IMAGE,
+  });
+  await page.getByTestId('add-transfer-from-account').selectOption('11');
+  await expect(
+    page.locator('[data-testid="progress-indicator"][data-kind="upload"]'),
+  ).toBeVisible();
+  await page.evaluate(() => {
+    window.location.hash = '#/transfers';
+  });
+  await expect(page.getByTestId('route-transfers')).toBeVisible();
+  await expect(page.locator('.toast-container')).toContainText('1 transfer created');
+
+  await page.evaluate(() => {
+    window.location.hash = '#/add';
+  });
+  await expect(page.getByTestId('receipt-commit-success')).toHaveCount(0);
+  await expect(page.getByTestId('receipt-photo-button')).toBeEnabled();
+  await expect(page.getByTestId('add-transfer-date')).toBeVisible();
 });
 
 test('cancels an active run on route abandonment and never restores its source or results', async ({
@@ -366,7 +425,6 @@ test('cancels an active run on route abandonment and never restores its source o
     buffer: RECEIPT_IMAGE,
   });
   await expect(page.getByTestId('receipt-progress')).toBeVisible();
-  await page.getByTestId('add-transfer-from-account').selectOption('11');
   await page.getByTestId('add-transfer-close').click();
   await expect(page.getByTestId('route-transfers')).toBeVisible();
 
@@ -433,8 +491,186 @@ test('ends a model-declared failure and starts again only after a fresh file sel
   await input.setInputFiles({ name: 'second.png', mimeType: 'image/png', buffer: RECEIPT_IMAGE });
   await expect(page.getByTestId('add-transfer-from-account')).toBeEnabled();
   await page.getByTestId('add-transfer-from-account').selectOption('11');
-  await expect(page.getByTestId('receipt-analysis-success')).toBeVisible();
+  await expect(page.getByTestId('receipt-commit-success')).toContainText('1 transfer created');
   expect(requests.completionRequests).toHaveLength(3);
-  expect(await getLocalTransferWriteCallCount(page)).toBe(0);
-  expect(await getGraphUploadCallCount(page)).toBe(0);
+  expect(await getLocalTransferWriteCallCount(page)).toBe(1);
+  expect(await getGraphUploadCallCount(page)).toBe(1);
+});
+
+test('retries only exported bytes after a transport failure without another SQL or LLM run', async ({
+  page,
+}) => {
+  await installReadyReceiptConfiguration(page);
+  const requests = await installReceiptAnalysisRoutes(page, [EXTRACTION, DERIVATION]);
+  await installReadyAddTransferTestDb(
+    page,
+    {
+      fromAccountOptionRows: [
+        { accountId: 11, name: 'Checking', amountCents: 1000, accountTypeId: 3 },
+      ],
+      toAccountOptionRows: [
+        { accountId: 2, name: 'Primary Spendings', amountCents: 0, accountTypeId: 2 },
+      ],
+      categoryRows: [
+        { categoryId: 20, name: 'Einkauf' },
+        { categoryId: 21, name: 'Lebensmittel' },
+      ],
+    },
+    {
+      uploadErrorSequence: [
+        { code: 'network_error', message: 'Temporary network failure', status: 503 },
+      ],
+    },
+  );
+  await page.goto(appPath('#/add'));
+
+  await page.getByTestId('receipt-image-input').setInputFiles({
+    name: 'retry-receipt.png',
+    mimeType: 'image/png',
+    buffer: RECEIPT_IMAGE,
+  });
+  await page.getByTestId('add-transfer-from-account').selectOption('11');
+  await expect(page.getByTestId('receipt-upload-retry')).toBeVisible();
+  expect(await getLocalTransferWriteCallCount(page)).toBe(1);
+  expect(await getGraphUploadCallCount(page)).toBe(1);
+  expect(requests.completionRequests).toHaveLength(2);
+
+  await page.getByTestId('receipt-upload-retry').click();
+  await expect(page.getByTestId('receipt-commit-success')).toContainText('1 transfer created');
+  expect(await getLocalTransferWriteCallCount(page)).toBe(1);
+  expect(await getGraphUploadCallCount(page)).toBe(2);
+  expect(requests.completionRequests).toHaveLength(2);
+});
+
+test('keeps byte-only retry visible when connectivity is lost during upload', async ({ page }) => {
+  await installReadyReceiptConfiguration(page);
+  const requests = await installReceiptAnalysisRoutes(page, [EXTRACTION, DERIVATION]);
+  await installReadyAddTransferTestDb(
+    page,
+    {
+      fromAccountOptionRows: [
+        { accountId: 11, name: 'Checking', amountCents: 1000, accountTypeId: 3 },
+      ],
+      toAccountOptionRows: [
+        { accountId: 2, name: 'Primary Spendings', amountCents: 0, accountTypeId: 2 },
+      ],
+      categoryRows: [
+        { categoryId: 20, name: 'Einkauf' },
+        { categoryId: 21, name: 'Lebensmittel' },
+      ],
+    },
+    { uploadDelayMs: 800, failUploadWhenOfflineAfterDelay: true },
+  );
+  await page.goto(appPath('#/add'));
+
+  await page.getByTestId('receipt-image-input').setInputFiles({
+    name: 'offline-during-upload.png',
+    mimeType: 'image/png',
+    buffer: RECEIPT_IMAGE,
+  });
+  await page.getByTestId('add-transfer-from-account').selectOption('11');
+  await expect(
+    page.locator('[data-testid="progress-indicator"][data-kind="upload"]'),
+  ).toBeVisible();
+  await page.context().setOffline(true);
+
+  await expect(page.getByTestId('receipt-upload-retry')).toBeVisible();
+  await expect(page.getByTestId('receipt-upload-retry')).toBeDisabled();
+  expect(await getLocalTransferWriteCallCount(page)).toBe(1);
+  expect(await getGraphUploadCallCount(page)).toBe(1);
+  expect(requests.completionRequests).toHaveLength(2);
+
+  await page.context().setOffline(false);
+  await expect(page.getByTestId('receipt-upload-retry')).toBeEnabled();
+  await page.getByTestId('receipt-upload-retry').click();
+  await expect(page.getByTestId('receipt-commit-success')).toContainText('1 transfer created');
+  expect(await getLocalTransferWriteCallCount(page)).toBe(1);
+  expect(await getGraphUploadCallCount(page)).toBe(2);
+  expect(requests.completionRequests).toHaveLength(2);
+});
+
+test('refreshes an eTag conflict and waits for an explicit revalidated batch retry', async ({
+  page,
+}) => {
+  await installReadyReceiptConfiguration(page);
+  const requests = await installReceiptAnalysisRoutes(page, [EXTRACTION, DERIVATION]);
+  await installReadyAddTransferTestDb(
+    page,
+    {
+      fromAccountOptionRows: [
+        { accountId: 11, name: 'Checking', amountCents: 1000, accountTypeId: 3 },
+      ],
+      toAccountOptionRows: [
+        { accountId: 2, name: 'Primary Spendings', amountCents: 0, accountTypeId: 2 },
+      ],
+      categoryRows: [
+        { categoryId: 20, name: 'Einkauf' },
+        { categoryId: 21, name: 'Lebensmittel' },
+      ],
+    },
+    {
+      uploadErrorSequence: [{ code: 'conflict', message: 'Precondition failed', status: 412 }],
+    },
+  );
+  await page.goto(appPath('#/add'));
+
+  await page.getByTestId('receipt-image-input').setInputFiles({
+    name: 'conflict-receipt.png',
+    mimeType: 'image/png',
+    buffer: RECEIPT_IMAGE,
+  });
+  await page.getByTestId('add-transfer-from-account').selectOption('11');
+  await expect(page.getByTestId('receipt-conflict-refresh')).toBeVisible();
+  expect(await getGraphUploadCallCount(page)).toBe(1);
+
+  await page.getByTestId('receipt-conflict-refresh').click();
+  await expect(page.getByTestId('receipt-conflict-retry')).toBeVisible();
+  expect(await getGraphUploadCallCount(page)).toBe(1);
+  await expect(page.locator('[data-testid*="receipt-review"]')).toHaveCount(0);
+
+  await page.getByTestId('receipt-conflict-retry').click();
+  await expect(page.getByTestId('receipt-commit-success')).toContainText('1 transfer created');
+  expect(await getLocalTransferWriteCallCount(page)).toBe(2);
+  expect(await getGraphUploadCallCount(page)).toBe(2);
+  expect(requests.completionRequests).toHaveLength(2);
+});
+
+test('shows remote-save reconciliation failure without any write or upload retry', async ({
+  page,
+}) => {
+  await installReadyReceiptConfiguration(page);
+  await installReceiptAnalysisRoutes(page, [EXTRACTION, DERIVATION]);
+  await installReadyAddTransferTestDb(
+    page,
+    {
+      fromAccountOptionRows: [
+        { accountId: 11, name: 'Checking', amountCents: 1000, accountTypeId: 3 },
+      ],
+      toAccountOptionRows: [
+        { accountId: 2, name: 'Primary Spendings', amountCents: 0, accountTypeId: 2 },
+      ],
+      categoryRows: [
+        { categoryId: 20, name: 'Einkauf' },
+        { categoryId: 21, name: 'Lebensmittel' },
+      ],
+    },
+    {},
+    { writeSnapshotErrorSequence: [false, true, true] },
+  );
+  await page.goto(appPath('#/add'));
+
+  await page.getByTestId('receipt-image-input').setInputFiles({
+    name: 'remote-saved-receipt.png',
+    mimeType: 'image/png',
+    buffer: RECEIPT_IMAGE,
+  });
+  await page.getByTestId('add-transfer-from-account').selectOption('11');
+
+  await expect(page.getByTestId('receipt-remote-saved')).toContainText(
+    'saved to OneDrive, but local data could not be refreshed',
+  );
+  await expect(page.getByTestId('receipt-upload-retry')).toHaveCount(0);
+  await expect(page.getByTestId('receipt-conflict-retry')).toHaveCount(0);
+  expect(await getLocalTransferWriteCallCount(page)).toBe(1);
+  expect(await getGraphUploadCallCount(page)).toBe(1);
 });

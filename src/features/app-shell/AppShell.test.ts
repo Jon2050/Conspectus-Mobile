@@ -11,6 +11,10 @@ import type {
   AddTransferSaveController,
   AddTransferSaveState,
 } from './routes/addTransferSaveController';
+import type {
+  ReceiptTransferCommitController,
+  ReceiptTransferCommitState,
+} from './receiptTransferCommitController';
 
 const ROUTE_TEST_IDS: Record<AppRouteKey, string> = {
   accounts: 'route-accounts',
@@ -37,6 +41,23 @@ const createMockSaveController = (state: AddTransferSaveState): AddTransferSaveC
   submit: async () => ({ validationErrors: [] }),
   retry: async () => {},
   resolveConflict: async () => {},
+  reset: () => {},
+});
+
+const createMockReceiptCommitController = (
+  state: ReceiptTransferCommitState,
+): ReceiptTransferCommitController => ({
+  getState: () => state,
+  subscribe: (listener) => {
+    listener(state);
+    return () => {};
+  },
+  commit: async () => {},
+  retryUpload: async () => {},
+  resolveConflict: async () => {},
+  retryAfterConflict: async () => {},
+  retryLocalCommitRecovery: async () => {},
+  invalidate: () => {},
   reset: () => {},
 });
 
@@ -116,6 +137,26 @@ describe('AppShell component', () => {
     expect(body).toContain('data-testid="pending-transfer-review"');
     expect(body).toContain('data-testid="pending-transfer-retry"');
     expect(body).toContain('Transfersynchronisierung benötigt Aufmerksamkeit');
+  });
+
+  it('keeps duplicate-safe receipt recovery visible outside the Add Transfer route', () => {
+    const { body } = render(AppShell, {
+      props: {
+        routeStore: readable<AppRouteKey>('transfers'),
+        showLoadingPlaceholder: false,
+        receiptCommitController: createMockReceiptCommitController({
+          phase: 'upload_failed',
+          createdCount: 2,
+          error: { code: 'upload_failed', detail: null, preparationError: null },
+          progress: null,
+          recoveryProgress: null,
+        }),
+      },
+    });
+
+    expect(body).toContain('data-testid="pending-receipt-sync"');
+    expect(body).toContain('data-testid="pending-receipt-open"');
+    expect(body).toContain('Belegtransfer-Synchronisierung benötigt Aufmerksamkeit');
   });
 
   it('renders indeterminate progress throughout the startup metadata check', () => {

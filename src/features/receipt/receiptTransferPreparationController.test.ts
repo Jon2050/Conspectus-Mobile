@@ -213,4 +213,31 @@ describe('receipt transfer preparation controller', () => {
       readyForCommit: null,
     });
   });
+
+  it('hands the immutable batch off only once while retaining safe commit progress metadata', () => {
+    const controller = createReceiptTransferPreparationController();
+    controller.beginRun();
+    controller.selectSourceAccount(11, OPTIONS);
+    controller.handleAnalysisState(SUCCEEDED, OPTIONS);
+
+    const claimed = controller.claimReadyForCommit();
+    expect(claimed).toHaveLength(1);
+    expect(controller.claimReadyForCommit()).toBeNull();
+    expect(controller.getState()).toMatchObject({
+      phase: 'committing',
+      readyForCommit: null,
+      steps: [{ status: 'complete' }, { status: 'complete' }, { status: 'active' }],
+    });
+
+    controller.markCommitFailed();
+    expect(controller.getState()).toMatchObject({ phase: 'commit_failed' });
+    controller.markCommitActive();
+    controller.markCommitted();
+    expect(controller.getState()).toMatchObject({
+      phase: 'committed',
+      sourceAccountId: null,
+      readyForCommit: null,
+      steps: [{ status: 'complete' }, { status: 'complete' }, { status: 'complete' }],
+    });
+  });
 });

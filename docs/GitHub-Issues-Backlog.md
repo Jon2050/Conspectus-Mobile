@@ -177,7 +177,7 @@ Exit criteria:
 - Depends on: `M9-03`
 - GitHub: [#254](https://github.com/Jon2050/Conspectus-Mobile/issues/254)
 
-### :green_circle: M9-05 Automatically commit validated receipt transfers through OneDrive
+### :white_check_mark: M9-05 Automatically commit validated receipt transfers through OneDrive
 
 - Label: `feature`
 - Milestone: `M9 - Receipt Capture + OpenRouter`

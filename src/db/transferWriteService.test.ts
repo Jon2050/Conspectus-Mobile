@@ -126,6 +126,35 @@ describe('transfer write service', () => {
     runtime.close();
   });
 
+  it('creates a complete batch in one transaction with ordered IDs and exact balances', async () => {
+    const runtime = await createRuntimeFromTransferFixture();
+    const service = createTransferWriteService(runtime);
+    const fromBefore = getAccountSnapshot(runtime, 3);
+    const toBefore = getAccountSnapshot(runtime, 4);
+
+    const result = service.createTransfers([
+      createBaseInput('Batch first'),
+      { ...createBaseInput('Batch second'), amountCents: 566 },
+    ]);
+
+    expect(result.createdCount).toBe(2);
+    expect(result.transferIds).toHaveLength(2);
+    expect(result.transferIds[1]).toBe((result.transferIds[0] ?? 0) + 1);
+    expect(countTransfersByName(runtime, 'Batch first')).toBe(1);
+    expect(countTransfersByName(runtime, 'Batch second')).toBe(1);
+    expect(getAccountSnapshot(runtime, 3).amountCents).toBe(fromBefore.amountCents - 1800);
+    expect(getAccountSnapshot(runtime, 4).amountCents).toBe(toBefore.amountCents + 1800);
+    runtime.close();
+  });
+
+  it('rejects an empty batch without opening a transaction', async () => {
+    const runtime = await createRuntimeFromTransferFixture();
+    const service = createTransferWriteService(runtime);
+
+    expectDbQueryFailed(() => service.createTransfers([]));
+    runtime.close();
+  });
+
   it('persists nullable category and buyplace fields', async () => {
     const runtime = await createRuntimeFromTransferFixture();
     const service = createTransferWriteService(runtime);
@@ -223,6 +252,32 @@ describe('transfer write service', () => {
       toBefore,
       'Destination failure write',
     );
+    runtime.close();
+  });
+
+  it('rolls back every earlier transfer when a later batch statement fails', async () => {
+    const runtime = await createRuntimeFromTransferFixture();
+    runtime.exec(`
+      CREATE TRIGGER fail_second_batch_insert
+      BEFORE INSERT ON transfer
+      WHEN NEW.name = 'Batch failure'
+      BEGIN
+        SELECT RAISE(ABORT, 'later insert failed');
+      END;
+    `);
+    const service = createTransferWriteService(runtime);
+    const fromBefore = getAccountSnapshot(runtime, 3);
+    const toBefore = getAccountSnapshot(runtime, 4);
+
+    expectDbQueryFailed(() =>
+      service.createTransfers([
+        createBaseInput('Batch rolled back'),
+        createBaseInput('Batch failure'),
+      ]),
+    );
+
+    expectBalancesAndTransferCountUnchanged(runtime, fromBefore, toBefore, 'Batch rolled back');
+    expect(countTransfersByName(runtime, 'Batch failure')).toBe(0);
     runtime.close();
   });
 

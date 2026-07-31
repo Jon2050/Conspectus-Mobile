@@ -19,7 +19,8 @@ Expected public interfaces (`src/db/index.ts`):
 - `AccountRecord`: normalized account row shape for Accounts UI.
 - `createTransferMonthQueryService` + `getEpochDayMonthBounds`: inclusive epoch-day month filtering for transfer list reads.
 - `TransferRecord`: normalized transfer row shape for Transfers UI.
-- `CreateTransferInput` and `CreateTransferResult`: write-path contract.
+- `CreateTransferInput`, `CreateTransferResult`, and `CreateTransferBatchResult`: atomic write-path
+  contracts for manual and receipt-created transfers.
 
 Schema source of truth:
 

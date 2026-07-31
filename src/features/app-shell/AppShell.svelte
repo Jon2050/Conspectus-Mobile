@@ -73,6 +73,11 @@
     type AddTransferSaveController,
     type AddTransferSaveState,
   } from './routes/addTransferSaveController';
+  import {
+    createReceiptTransferCommitController,
+    type ReceiptTransferCommitController,
+    type ReceiptTransferCommitState,
+  } from './receiptTransferCommitController';
 
   export let routeStore: Readable<AppRouteKey> = createHashRouteStore();
   export let syncStateStore: SyncStateStore = appSyncStateStore;
@@ -85,6 +90,8 @@
   export let receiptAnalysisController: ReceiptAnalysisController | null = null;
   export let receiptPreparationController: ReceiptTransferPreparationController =
     createReceiptTransferPreparationController();
+  export let receiptCommitController: ReceiptTransferCommitController =
+    createReceiptTransferCommitController();
   export let loadingDelayMs = 160;
   export let showLoadingPlaceholder = true;
 
@@ -95,6 +102,7 @@
   let currentRoute: AppRouteKey = DEFAULT_ROUTE;
   let addTransferFields: AddTransferFormFields = createInitialFormFields();
   let addTransferSaveState: AddTransferSaveState = addTransferSaveController.getState();
+  let receiptCommitState: ReceiptTransferCommitState = receiptCommitController.getState();
   let selectedBinding: DriveItemBinding | null = get(appSelectedDriveItemBindingStore);
   let addTransferHasLoadedDatabase = false;
   let appContentElement: HTMLElement | null = null;
@@ -139,7 +147,11 @@
   const unsubscribe = routeStore.subscribe((route) => {
     if (currentRoute === 'add' && route !== 'add') {
       effectiveReceiptCaptureController?.cancel();
+      effectiveReceiptAnalysisController?.reset();
       receiptPreparationController.reset();
+      if (receiptCommitController.getState().phase === 'saved') {
+        receiptCommitController.reset();
+      }
     }
     currentRoute = route;
   });
@@ -150,6 +162,12 @@
       addTransferFields = createInitialFormFields();
     }
   });
+  const unsubscribeReceiptCommitController = receiptCommitController.subscribe((state) => {
+    receiptCommitState = state;
+    if (state.phase === 'saved' && currentRoute !== 'add') {
+      receiptCommitController.reset();
+    }
+  });
 
   $: pendingTransferNeedsAttention =
     addTransferSaveState.phase === 'upload_failed' ||
@@ -158,6 +176,14 @@
   $: pendingTransferIsConflict =
     addTransferSaveState.phase === 'conflict' || addTransferSaveState.phase === 'conflict_syncing';
   $: pendingTransferIsOffline = !$networkStateStore;
+  $: pendingReceiptNeedsAttention = [
+    'upload_failed',
+    'conflict',
+    'conflict_ready',
+    'local_commit_recovery_failed',
+    'remote_commit_recovery_failed',
+    'invalidated',
+  ].includes(receiptCommitState.phase);
   $: startupSyncIsActive = $syncStateStore.state === 'syncing' && $syncStateStore.branch === null;
   $: staleTokenRecoveryIsRequired =
     $syncStateStore.state === 'error' && $syncStateStore.branch === 'online_auth_expired';
@@ -175,6 +201,28 @@
     if (typeof window !== 'undefined') {
       window.location.hash = '#/add';
     }
+  };
+
+  const openPendingReceipt = (): void => {
+    if (typeof window !== 'undefined') {
+      window.location.hash = '#/add';
+    }
+  };
+
+  const resolveReceiptCommitIdentity = () => {
+    const session = resolveAppAuthClient().getSession();
+    const binding = get(appSelectedDriveItemBindingStore);
+    return {
+      isAuthenticated: session.isAuthenticated && session.account !== null,
+      isVerifiedCurrent:
+        binding !== null &&
+        get(syncStateStore).state === 'synced' &&
+        resolveAppDbRuntime().isOpen(),
+      contextKey:
+        session.account === null || binding === null
+          ? null
+          : `${session.account.homeAccountId}|${binding.driveId}|${binding.itemId}`,
+    };
   };
 
   const openMissingFileRecovery = (): void => {
@@ -248,7 +296,9 @@
     selectedBinding !== null && addTransferHasLoadedDatabase && $syncStateStore.state !== 'idle';
   $: if (!addTransferDatabaseIsReady) {
     effectiveReceiptCaptureController?.cancel();
+    effectiveReceiptAnalysisController?.reset();
     receiptPreparationController.reset();
+    receiptCommitController.invalidate();
   }
 
   const resolveNavIconUrl = (iconPath: string): string => `${navIconBaseUrl}${iconPath}`;
@@ -364,7 +414,9 @@
     }
 
     effectiveReceiptCaptureController?.cancel();
+    effectiveReceiptAnalysisController?.reset();
     receiptPreparationController.reset();
+    receiptCommitController.invalidate();
 
     if (bindingRepairPersistenceIsRunning) {
       return;
@@ -576,6 +628,7 @@
   onDestroy(() => {
     unsubscribe();
     unsubscribeAddTransferSaveController();
+    unsubscribeReceiptCommitController();
     unsubscribeSelectedBinding();
     unsubscribeQueuedForegroundSync();
     if (ownedReceiptCaptureController === null) {
@@ -692,6 +745,29 @@
     </section>
   {/if}
 
+  {#if pendingReceiptNeedsAttention}
+    <section class="pending-transfer-sync" role="alert" data-testid="pending-receipt-sync">
+      <div>
+        <h2>{$_('addTransfer.receipt.commit.pendingTitle')}</h2>
+        <p>
+          {$_(
+            receiptCommitState.phase === 'remote_commit_recovery_failed'
+              ? 'addTransfer.receipt.commit.pendingRemoteSavedDescription'
+              : 'addTransfer.receipt.commit.pendingDescription',
+          )}
+        </p>
+      </div>
+      <button
+        type="button"
+        class="app-button app-button--primary"
+        data-testid="pending-receipt-open"
+        on:click={openPendingReceipt}
+      >
+        {$_('addTransfer.receipt.commit.pendingAction')}
+      </button>
+    </section>
+  {/if}
+
   {#if startupSyncIsActive}
     <section class="startup-sync-progress" data-testid="startup-sync-progress">
       <ProgressIndicator
@@ -727,6 +803,8 @@
           receiptCaptureController={effectiveReceiptCaptureController}
           receiptAnalysisController={effectiveReceiptAnalysisController}
           {receiptPreparationController}
+          {receiptCommitController}
+          {resolveReceiptCommitIdentity}
           {networkStateStore}
           canOpenPanel={addTransferDatabaseIsReady}
         />

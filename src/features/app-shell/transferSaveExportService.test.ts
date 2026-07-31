@@ -18,6 +18,8 @@ import {
 } from '../../shared/testUtils/dbIntegration';
 import {
   createTransferSaveExportService,
+  TransferBatchExportRecoveryRequiredError,
+  TransferBatchUploadPendingError,
   TransferUploadPendingError,
   type DatabaseUploadHandoff,
 } from './transferSaveExportService';
@@ -70,6 +72,106 @@ describe('transfer save export service', () => {
     expect(uploadedByteSets[0]?.length).toBeGreaterThan(0);
     runtime.close();
   });
+
+  it('commits a batch, exports once, and uploads one full snapshot', async () => {
+    const runtime = await createRuntimeFromTransferFixture();
+    const writeService = createTransferWriteService(runtime);
+    const exportSpy = vi.spyOn(runtime, 'exportBytes');
+    const uploadHandoff: DatabaseUploadHandoff = {
+      uploadExportedDatabase: vi.fn(async () => {}),
+    };
+    const service = createTransferSaveExportService(writeService, runtime, uploadHandoff);
+
+    const result = await service.createTransferBatchAndExport([
+      createBaseInput('Batch export first'),
+      { ...createBaseInput('Batch export second'), amountCents: 566 },
+    ]);
+
+    expect(result.createdCount).toBe(2);
+    expect(exportSpy).toHaveBeenCalledOnce();
+    expect(uploadHandoff.uploadExportedDatabase).toHaveBeenCalledOnce();
+    expect(countTransfersByName(runtime, 'Batch export first')).toBe(1);
+    expect(countTransfersByName(runtime, 'Batch export second')).toBe(1);
+    runtime.close();
+  });
+
+  it('retries a failed batch upload with the same bytes and no second write or export', async () => {
+    const writeService = {
+      createTransfer: vi.fn(),
+      createTransfers: vi.fn(() => ({
+        transferIds: [41, 42],
+        createdCount: 2,
+        persistedAtIso: '2026-07-31T00:00:00.000Z',
+      })),
+    };
+    const runtime = { exportBytes: vi.fn(() => Uint8Array.from([4, 5, 6])) };
+    const uploadHandoff: DatabaseUploadHandoff = {
+      uploadExportedDatabase: vi
+        .fn()
+        .mockRejectedValueOnce(new Error('temporary upload failure'))
+        .mockResolvedValueOnce(undefined),
+    };
+    const service = createTransferSaveExportService(writeService, runtime, uploadHandoff);
+
+    const pendingError = await service
+      .createTransferBatchAndExport([
+        createBaseInput('Batch retry first'),
+        createBaseInput('Batch retry second'),
+      ])
+      .catch((error: unknown) => error);
+
+    expect(pendingError).toBeInstanceOf(TransferBatchUploadPendingError);
+    const bytes = (pendingError as TransferBatchUploadPendingError).pendingUpload.dbBytes;
+    await service.retryExportedDatabaseUpload(bytes);
+    expect(writeService.createTransfers).toHaveBeenCalledOnce();
+    expect(runtime.exportBytes).toHaveBeenCalledOnce();
+    expect(uploadHandoff.uploadExportedDatabase).toHaveBeenNthCalledWith(1, bytes, undefined);
+    expect(uploadHandoff.uploadExportedDatabase).toHaveBeenNthCalledWith(2, bytes, undefined);
+  });
+
+  it.each([
+    {
+      name: 'throws',
+      exportBytes: () => {
+        throw new DbRuntimeError('db_export_failed', 'export failed');
+      },
+    },
+    { name: 'returns empty bytes', exportBytes: () => new Uint8Array() },
+  ])(
+    'requires authoritative recovery when a committed batch export $name',
+    async ({ exportBytes }) => {
+      const batchResult = {
+        transferIds: [41],
+        createdCount: 1,
+        persistedAtIso: '2026-07-31T00:00:00.000Z',
+      };
+      const writeService = {
+        createTransfer: vi.fn(),
+        createTransfers: vi.fn(() => batchResult),
+      };
+      const uploadHandoff: DatabaseUploadHandoff = {
+        uploadExportedDatabase: vi.fn(async () => {}),
+      };
+      const service = createTransferSaveExportService(
+        writeService,
+        { exportBytes: vi.fn(exportBytes) },
+        uploadHandoff,
+      );
+
+      const error = await service
+        .createTransferBatchAndExport([createBaseInput('Committed before export')])
+        .catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(TransferBatchExportRecoveryRequiredError);
+      expect(error).toMatchObject({
+        name: 'TransferBatchExportRecoveryRequiredError',
+        batchResult,
+      });
+
+      expect(writeService.createTransfers).toHaveBeenCalledOnce();
+      expect(uploadHandoff.uploadExportedDatabase).not.toHaveBeenCalled();
+    },
+  );
 
   it('runs export and upload only after the local write succeeds', async () => {
     const calls: string[] = [];

@@ -3,7 +3,12 @@ import type { QueryExecResult, SqlValue } from 'sql.js';
 
 import { resolveAppBrowserDbRuntime } from './browserDbRuntime';
 import { DbRuntimeError, toDbRuntimeError } from './dbRuntimeErrors';
-import type { BrowserDbRuntime, CreateTransferInput, CreateTransferResult } from './types';
+import type {
+  BrowserDbRuntime,
+  CreateTransferBatchResult,
+  CreateTransferInput,
+  CreateTransferResult,
+} from './types';
 
 const INSERT_TRANSFER_SQL = `
   INSERT INTO transfer (
@@ -54,6 +59,7 @@ const readLastInsertRowId = (results: readonly QueryExecResult[]): number => {
 
 export interface TransferWriteService {
   createTransfer(input: CreateTransferInput): CreateTransferResult;
+  createTransfers(inputs: readonly CreateTransferInput[]): CreateTransferBatchResult;
 }
 
 type TransferWriteRuntime = Pick<BrowserDbRuntime, 'exec'>;
@@ -73,40 +79,48 @@ const rollbackOpenTransaction = (runtime: TransferWriteRuntime): void => {
 
 export const createTransferWriteService = (
   dbRuntime: TransferWriteRuntimeProvider,
-): TransferWriteService => ({
-  createTransfer(input: CreateTransferInput): CreateTransferResult {
+): TransferWriteService => {
+  const createTransfers = (inputs: readonly CreateTransferInput[]): CreateTransferBatchResult => {
+    if (inputs.length === 0) {
+      throw new DbRuntimeError('db_query_failed', 'Cannot create an empty transfer batch.');
+    }
+
     const runtime = resolveTransferWriteRuntime(dbRuntime);
     let transactionStarted = false;
     let transactionCommitted = false;
 
     try {
-      const [category1Id, category2Id, category3Id] = normalizeCategoryIds(input.categoryIds);
-      const buyplace = normalizeOptionalText(input.buyplace);
-      const insertParams: SqlValue[] = [
-        input.name,
-        input.fromAccountId,
-        input.toAccountId,
-        input.amountCents,
-        input.transferTypeId,
-        category1Id,
-        category2Id,
-        category3Id,
-        input.bookingDateEpochDay,
-        buyplace,
-      ];
-
       runtime.exec('BEGIN IMMEDIATE TRANSACTION;');
       transactionStarted = true;
 
-      runtime.exec(INSERT_TRANSFER_SQL, insertParams);
-      const transferId = readLastInsertRowId(runtime.exec(LAST_INSERT_ROW_ID_SQL));
-      runtime.exec(UPDATE_SOURCE_ACCOUNT_SQL, [input.amountCents, input.fromAccountId]);
-      runtime.exec(UPDATE_DESTINATION_ACCOUNT_SQL, [input.amountCents, input.toAccountId]);
+      const transferIds: number[] = [];
+      for (const input of inputs) {
+        const [category1Id, category2Id, category3Id] = normalizeCategoryIds(input.categoryIds);
+        const insertParams: SqlValue[] = [
+          input.name,
+          input.fromAccountId,
+          input.toAccountId,
+          input.amountCents,
+          input.transferTypeId,
+          category1Id,
+          category2Id,
+          category3Id,
+          input.bookingDateEpochDay,
+          normalizeOptionalText(input.buyplace),
+        ];
+
+        runtime.exec(INSERT_TRANSFER_SQL, insertParams);
+        transferIds.push(readLastInsertRowId(runtime.exec(LAST_INSERT_ROW_ID_SQL)));
+        runtime.exec(UPDATE_SOURCE_ACCOUNT_SQL, [input.amountCents, input.fromAccountId]);
+        runtime.exec(UPDATE_DESTINATION_ACCOUNT_SQL, [input.amountCents, input.toAccountId]);
+      }
+
       runtime.exec('COMMIT;');
       transactionCommitted = true;
 
       return {
-        transferId,
+        transferIds: Object.freeze(transferIds),
+        createdCount: transferIds.length,
         persistedAtIso: new Date().toISOString(),
       };
     } catch (error) {
@@ -120,7 +134,19 @@ export const createTransferWriteService = (
         'Failed to create transfer in the local SQLite database.',
       );
     }
-  },
-});
+  };
+
+  return {
+    createTransfer(input): CreateTransferResult {
+      const batchResult = createTransfers([input]);
+      const transferId = batchResult.transferIds[0];
+      if (transferId === undefined) {
+        throw new DbRuntimeError('db_query_failed', 'Transfer batch returned no inserted ID.');
+      }
+      return { transferId, persistedAtIso: batchResult.persistedAtIso };
+    },
+    createTransfers,
+  };
+};
 
 export const appTransferWriteService = createTransferWriteService(resolveAppBrowserDbRuntime);
