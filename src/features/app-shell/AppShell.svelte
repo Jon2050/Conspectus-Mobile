@@ -57,6 +57,15 @@
     type AddTransferFormFields,
   } from './routes/addTransferFormState';
   import {
+    browserReceiptImageCodec,
+    createReceiptCaptureController,
+    createReceiptImageNormalizer,
+    openRouterSettingsStore,
+    toStoredReadyOpenRouterReceiptConfiguration,
+    type ReceiptCaptureController,
+    type ReceiptStageOneStarter,
+  } from '../receipt';
+  import {
     createAddTransferSaveController,
     type AddTransferSaveController,
     type AddTransferSaveState,
@@ -69,6 +78,8 @@
     appServiceWorkerUpdateController;
   export let addTransferSaveController: AddTransferSaveController =
     createAddTransferSaveController();
+  export let receiptCaptureController: ReceiptCaptureController | null = null;
+  export let receiptStageOneStarter: ReceiptStageOneStarter | null = null;
   export let loadingDelayMs = 160;
   export let showLoadingPlaceholder = true;
 
@@ -96,8 +107,28 @@
   let authRecoveryError: string | null = null;
   let bindingRepairPersistenceIsRunning = false;
   let stopFooterVisibilityTracking = (): void => {};
+  const ownedReceiptCaptureController =
+    receiptCaptureController === null && receiptStageOneStarter !== null
+      ? createReceiptCaptureController({
+          normalizer: createReceiptImageNormalizer(browserReceiptImageCodec),
+          resolveConfiguration: () => {
+            const accountId = resolveAppAuthClient().getSession().account?.homeAccountId ?? null;
+            if (accountId === null) {
+              return null;
+            }
+            const settings = openRouterSettingsStore.read(accountId);
+            return settings === null ? null : toStoredReadyOpenRouterReceiptConfiguration(settings);
+          },
+          stageOneStarter: receiptStageOneStarter,
+        })
+      : null;
+  const effectiveReceiptCaptureController =
+    receiptCaptureController ?? ownedReceiptCaptureController;
   const navIconBaseUrl = import.meta.env.BASE_URL;
   const unsubscribe = routeStore.subscribe((route) => {
+    if (currentRoute === 'add' && route !== 'add') {
+      effectiveReceiptCaptureController?.cancel();
+    }
     currentRoute = route;
   });
   const unsubscribeAddTransferSaveController = addTransferSaveController.subscribe((state) => {
@@ -203,6 +234,9 @@
 
   $: addTransferDatabaseIsReady =
     selectedBinding !== null && addTransferHasLoadedDatabase && $syncStateStore.state !== 'idle';
+  $: if (!addTransferDatabaseIsReady) {
+    effectiveReceiptCaptureController?.cancel();
+  }
 
   const resolveNavIconUrl = (iconPath: string): string => `${navIconBaseUrl}${iconPath}`;
 
@@ -315,6 +349,8 @@
       selectedBindingHasEmitted = true;
       return;
     }
+
+    effectiveReceiptCaptureController?.cancel();
 
     if (bindingRepairPersistenceIsRunning) {
       return;
@@ -528,6 +564,11 @@
     unsubscribeAddTransferSaveController();
     unsubscribeSelectedBinding();
     unsubscribeQueuedForegroundSync();
+    if (ownedReceiptCaptureController === null) {
+      effectiveReceiptCaptureController?.cancel();
+    } else {
+      ownedReceiptCaptureController.dispose();
+    }
     resolveAppDbRuntime().close();
     disconnectFooterVisibilityTracking();
   });
@@ -663,6 +704,7 @@
         <AddRoute
           bind:fields={addTransferFields}
           saveController={addTransferSaveController}
+          receiptCaptureController={effectiveReceiptCaptureController}
           {networkStateStore}
           canOpenPanel={addTransferDatabaseIsReady}
         />

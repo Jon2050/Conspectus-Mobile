@@ -144,7 +144,7 @@ Exit criteria:
 - Depends on: `none`
 - GitHub: [#251](https://github.com/Jon2050/Conspectus-Mobile/issues/251)
 
-### :green_circle: M9-02 Capture receipts from New Transfer and start ephemeral extraction
+### :white_check_mark: M9-02 Capture receipts from New Transfer and start ephemeral extraction
 
 - Label: `feature`
 - Milestone: `M9 - Receipt Capture + OpenRouter`

@@ -6,6 +6,7 @@ export {
   reconcileOpenRouterModelSelections,
   resolveTransferDerivationPrompt,
   toReadyOpenRouterReceiptConfiguration,
+  toStoredReadyOpenRouterReceiptConfiguration,
 } from './openRouterReceiptConfiguration';
 export type {
   ReadyOpenRouterReceiptConfiguration,
@@ -16,3 +17,14 @@ export type {
   OpenRouterSettingsStorageAdapter,
   OpenRouterSettingsStore,
 } from './openRouterSettingsStore';
+export { browserReceiptImageCodec } from './browserReceiptImageCodec';
+export { createReceiptImageNormalizer } from './receiptImageNormalization';
+export { createReceiptCaptureController } from './receiptCaptureController';
+export type {
+  ReceiptCaptureController,
+  ReceiptCaptureErrorCode,
+  ReceiptCapturePhase,
+  ReceiptCaptureState,
+  ReceiptStageOneStarter,
+  ReceiptStageOneStartInput,
+} from './receiptCaptureController';

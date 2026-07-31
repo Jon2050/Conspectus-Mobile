@@ -70,6 +70,24 @@
     "submit": "Transfer speichern",
     "saving": "Transfer wird gespeichert...",
     "close": "Schließen",
+    "receipt": {
+      "heading": "Kassenbon erfassen",
+      "description": "Nimm ein Foto mit der Kameraauswahl deines Geräts auf.",
+      "action": "Kassenbon fotografieren",
+      "integrationPending": "Die Belegverarbeitung ist derzeit nicht verfügbar.",
+      "normalizing": "Foto wird sicher vorbereitet...",
+      "stageOne": "Foto auslesen",
+      "errors": {
+        "empty_file": "Das ausgewählte Bild ist leer. Nimm ein neues Foto auf.",
+        "source_too_large": "Das Foto ist zu groß. Nimm ein neues Foto mit höchstens 20 MB auf.",
+        "decode_failed": "Das Foto konnte nicht gelesen werden. Nimm ein neues, scharfes Foto auf.",
+        "invalid_dimensions": "Das Foto hat ungültige Abmessungen. Nimm ein neues Foto auf.",
+        "encode_failed": "Das Foto konnte nicht sicher vorbereitet werden. Nimm ein neues Foto auf.",
+        "output_too_large": "Das vorbereitete Foto ist weiterhin zu groß. Nimm ein neues Foto mit geringerer Auflösung auf.",
+        "configuration_unavailable": "Die Beleg-KI ist nicht vollständig eingerichtet. Prüfe API-Schlüssel und beide Modelle in den Einstellungen.",
+        "stage_one_failed": "Das Foto konnte nicht ausgelesen werden. Starte mit einem neuen Foto erneut."
+      }
+    },
     "save": {
       "localSave": "Transfer wird lokal gespeichert und der Datenbank-Upload vorbereitet...",
       "uploading": "Aktualisierte Datenbank wird auf OneDrive hochgeladen...",

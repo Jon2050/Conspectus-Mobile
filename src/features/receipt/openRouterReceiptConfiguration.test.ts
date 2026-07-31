@@ -6,6 +6,7 @@ import {
   reconcileOpenRouterModelSelections,
   resolveTransferDerivationPrompt,
   toReadyOpenRouterReceiptConfiguration,
+  toStoredReadyOpenRouterReceiptConfiguration,
   type StoredOpenRouterReceiptSettings,
 } from './openRouterReceiptConfiguration';
 import { DEFAULT_TRANSFER_DERIVATION_PROMPT } from './receiptPrompts';
@@ -51,6 +52,18 @@ describe('OpenRouter receipt configuration', () => {
       transferPrompt: DEFAULT_TRANSFER_DERIVATION_PROMPT.text,
       extractionPrompt: { version: 1 },
     });
+  });
+
+  it('resolves previously validated stored settings for the capture handoff', () => {
+    expect(toStoredReadyOpenRouterReceiptConfiguration(settings())).toMatchObject({
+      apiKey: 'secret-key',
+      visionModelId: 'shared-model',
+      transferModelId: 'shared-model',
+      extractionPrompt: { version: 1 },
+    });
+    expect(
+      toStoredReadyOpenRouterReceiptConfiguration(settings({ visionModelId: null })),
+    ).toBeNull();
   });
 
   it.each([
