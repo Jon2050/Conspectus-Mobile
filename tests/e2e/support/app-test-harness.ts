@@ -213,6 +213,9 @@ export type MockAuthClientOptions = {
   readonly startAuthenticated?: boolean;
   readonly resumeSessionOnInitialize?: boolean;
   readonly attemptSessionResumeResult?: boolean;
+  readonly accountHomeAccountId?: string;
+  readonly accountUsername?: string;
+  readonly accountDisplayName?: string;
 };
 
 export type MockGraphError = {
@@ -308,9 +311,9 @@ export const installMockAuthClient = async (
       });
 
     const account = {
-      homeAccountId: 'mock-home-account',
-      username: 'mock-user@example.com',
-      displayName: 'Mock User',
+      homeAccountId: mockOptions.accountHomeAccountId ?? 'mock-home-account',
+      username: mockOptions.accountUsername ?? 'mock-user@example.com',
+      displayName: mockOptions.accountDisplayName ?? 'Mock User',
     };
 
     let isInitialized = false;

@@ -120,7 +120,7 @@
   },
   "settings": {
     "title": "Settings",
-    "description": "Authentication controls for OneDrive account access.",
+    "description": "Manage OneDrive access, local data, and account-scoped receipt AI settings.",
     "safety": {
       "heading": "Protect your data",
       "warning": "Close the desktop app before using Conspectus Mobile. Never use both apps at the same time.",
@@ -142,6 +142,58 @@
       "name": "Name",
       "username": "Username",
       "unknown": "Unknown"
+    },
+    "openRouter": {
+      "heading": "Receipt AI with OpenRouter",
+      "description": "Use your own OpenRouter key and choose separate live models for receipt reading and transfer creation.",
+      "privacy": {
+        "heading": "Privacy and changing availability",
+        "localKey": "Your API key is stored only in this browser for the active Microsoft account. A browser-stored key is accessible to anyone or any malicious script with access to this browser profile; it is not protected like a server-held secret.",
+        "stageOne": "Stage 1 sends the receipt image to OpenRouter and a routed vision provider.",
+        "stageTwo": "Stage 2 sends only the extracted receipt data to OpenRouter and a routed text provider; it does not send the image again.",
+        "providerPolicies": "OpenRouter and routed-provider logging, retention, and training policies vary. Free models can disappear or become paid at any time.",
+        "routing": "Conspectus does not force Zero Data Retention or no-data-collection routing. Stricter privacy settings and guardrails configured in your OpenRouter account still apply.",
+        "catalogOnly": "Saving these settings or loading the catalog sends no receipt, extraction result, Conspectus database, accounts, categories, balances, or transfer history."
+      },
+      "key": {
+        "label": "OpenRouter API key",
+        "replaceLabel": "New OpenRouter API key",
+        "placeholder": "Enter your OpenRouter API key",
+        "help": "The key is sent only in the Authorization header. After validation it is never shown again in plaintext.",
+        "configured": "API key configured",
+        "save": "Save and validate key",
+        "replace": "Replace and validate key",
+        "validating": "Validating key...",
+        "delete": "Delete key and receipt AI settings"
+      },
+      "status": {
+        "keyNeeded": "Add and validate an API key to load current model choices.",
+        "keyRequired": "Enter an API key before validating.",
+        "loading": "Validating the key and loading the current OpenRouter model catalog...",
+        "validated": "The API key is valid and the current model catalog is loaded.",
+        "invalidKey": "OpenRouter rejected this API key. Enter a valid replacement or delete the saved configuration.",
+        "networkError": "The OpenRouter catalog could not be reached. Check the connection and retry.",
+        "providerError": "OpenRouter could not provide the model catalog. Retry later.",
+        "invalidResponse": "OpenRouter returned an unreadable model catalog. Retry later.",
+        "storageError": "The validated receipt AI settings could not be stored on this device.",
+        "retry": "Retry catalog validation"
+      },
+      "models": {
+        "visionLabel": "Receipt extraction model",
+        "transferLabel": "Transfer derivation model",
+        "placeholder": "Select a compatible free model",
+        "noVisionModels": "No current free image-input and text-output model is available for receipt extraction.",
+        "noTransferModels": "No current free text model with structured-output support is available for transfer derivation."
+      },
+      "prompt": {
+        "label": "Transfer derivation prompt",
+        "help": "This is one free-form prompt. Adapt the clearly marked group and category mappings to your Conspectus categories.",
+        "reset": "Reset to current default"
+      },
+      "configuration": {
+        "ready": "Receipt AI configuration is ready.",
+        "notReady": "Receipt AI configuration is not ready. Validate the key, select both models, and keep a non-empty derivation prompt."
+      }
     },
     "db": {
       "heading": "DB file",
@@ -175,7 +227,7 @@
     "reset": {
       "button": "Reset local app data",
       "title": "Reset local app data?",
-      "description": "This clears local DB file binding and cached app data on this device for the signed-in account.",
+      "description": "This clears the local DB file binding, cached app data, and OpenRouter receipt AI settings on this device. Your Microsoft sign-in is preserved.",
       "status": "Resetting local app data...",
       "cancel": "Cancel",
       "confirm": "Confirm reset"

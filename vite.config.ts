@@ -159,6 +159,7 @@ export default defineConfig(({ command, mode }) => {
         '@graph': fileURLToPath(new URL('./src/graph', import.meta.url)),
         '@db': fileURLToPath(new URL('./src/db', import.meta.url)),
         '@cache': fileURLToPath(new URL('./src/cache', import.meta.url)),
+        '@openrouter': fileURLToPath(new URL('./src/openrouter', import.meta.url)),
         '@features': fileURLToPath(new URL('./src/features', import.meta.url)),
         '@shared': fileURLToPath(new URL('./src/shared', import.meta.url)),
       },

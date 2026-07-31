@@ -32,6 +32,8 @@
   import { resolveSettingsCacheStore, type SettingsCacheStore } from './settingsCacheStoreResolver';
   import { resolveSettingsGraphClient } from './settingsGraphClientResolver';
   import { formatSettingsTimestampUtc } from './settingsInformation';
+  import SettingsOpenRouterSection from './SettingsOpenRouterSection.svelte';
+  import { createSettingsOpenRouterController } from './settingsOpenRouterController';
 
   export let authClient: AuthClient = resolveSettingsAuthClient();
   export let cacheStore: SettingsCacheStore = resolveSettingsCacheStore();
@@ -124,6 +126,7 @@
     items.filter((item) => item.kind === 'file');
 
   const authController = createSettingsAuthController(authClient);
+  const openRouterController = createSettingsOpenRouterController();
   const fileBindingController = createSettingsFileBindingController(graphClient, {
     onBindingChange: (binding) => {
       if (binding === null) {
@@ -138,6 +141,7 @@
     onLocalDataReset: () => {
       appSelectedDriveItemBindingStore.clear();
       fileBindingController.reset();
+      openRouterController.clearAfterLocalReset();
     },
   });
   const unsubscribe = authController.subscribe((nextState) => {
@@ -152,11 +156,13 @@
     if (nextState.session.isAuthenticated && previousAccountId !== nextAccountId) {
       appSelectedDriveItemBindingStore.setActiveAccountId(nextAccountId);
       fileBindingController.hydrateSelectedBinding(get(appSelectedDriveItemBindingStore));
+      void openRouterController.activateAccount(nextAccountId);
     }
 
     if (!nextState.session.isAuthenticated) {
       appSelectedDriveItemBindingStore.setActiveAccountId(null);
       localDataController.cancelReset();
+      void openRouterController.activateAccount(null);
     }
 
     if (wasAuthenticated && !nextState.session.isAuthenticated) {
@@ -307,6 +313,7 @@
     unsubscribeFileBinding();
     unsubscribeLocalDataReset();
     unsubscribeSyncState();
+    openRouterController.dispose();
   });
 </script>
 
@@ -357,6 +364,8 @@
         <dd>{state.session.account.username}</dd>
       </div>
     </dl>
+
+    <SettingsOpenRouterSection controller={openRouterController} />
 
     <h3 class="settings-screen__subheading">{$_('settings.db.heading')}</h3>
     <p

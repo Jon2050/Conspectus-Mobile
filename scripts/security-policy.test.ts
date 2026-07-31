@@ -39,6 +39,16 @@ describe('security policy helpers', () => {
     ).toThrow('does not match the canonical security policy');
   });
 
+  it('rejects a policy that blocks the OpenRouter API origin', () => {
+    expect(() =>
+      assertCspEquivalent(
+        DOCUMENT_CSP.replace(' https://openrouter.ai', ''),
+        DOCUMENT_CSP,
+        'Test policy',
+      ),
+    ).toThrow('does not match the canonical security policy');
+  });
+
   it('extracts the CSP meta value from HTML', () => {
     const html = `<meta http-equiv="Content-Security-Policy" content="${DOCUMENT_CSP}" />`;
 
