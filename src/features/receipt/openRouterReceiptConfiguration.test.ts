@@ -40,8 +40,13 @@ describe('OpenRouter receipt configuration', () => {
       DEFAULT_TRANSFER_DERIVATION_PROMPT.text,
     );
     expect(
-      resolveTransferDerivationPrompt(settings({ transferPromptOverride: 'Custom rules' })),
-    ).toBe('Custom rules');
+      resolveTransferDerivationPrompt(
+        settings({
+          transferPromptOverride:
+            'Custom rules\nTransfername "Custom"; categoryNames exakt ["Custom"].',
+        }),
+      ),
+    ).toBe('Custom rules\nTransfername "Custom"; categoryNames exakt ["Custom"].');
   });
 
   it('allows the same eligible model for both roles and returns both internal prompts', () => {
@@ -50,7 +55,7 @@ describe('OpenRouter receipt configuration', () => {
       visionModelId: 'shared-model',
       transferModelId: 'shared-model',
       transferPrompt: DEFAULT_TRANSFER_DERIVATION_PROMPT.text,
-      extractionPrompt: { version: 1 },
+      extractionPrompt: { version: 2 },
     });
   });
 
@@ -59,7 +64,7 @@ describe('OpenRouter receipt configuration', () => {
       apiKey: 'secret-key',
       visionModelId: 'shared-model',
       transferModelId: 'shared-model',
-      extractionPrompt: { version: 1 },
+      extractionPrompt: { version: 2 },
     });
     expect(
       toStoredReadyOpenRouterReceiptConfiguration(settings({ visionModelId: null })),
@@ -71,6 +76,17 @@ describe('OpenRouter receipt configuration', () => {
     settings({ visionModelId: null }),
     settings({ transferModelId: null }),
     settings({ transferPromptOverride: ' ' }),
+    settings({ transferPromptOverride: 'Custom rules without a mapping declaration' }),
+    settings({
+      transferPromptOverride:
+        'Transfername "Custom"; categoryNames exakt ["One"].\nTransfername "Custom"; categoryNames exakt ["Two"].',
+    }),
+    settings({
+      transferPromptOverride: 'Transfername " Custom"; categoryNames exakt ["Canonical category"].',
+    }),
+    settings({
+      transferPromptOverride: 'Transfername "Custom"; categoryNames exakt [" "].',
+    }),
   ])('is not ready when any required configuration value is missing', (candidate) => {
     expect(toReadyOpenRouterReceiptConfiguration(candidate, catalog())).toBeNull();
   });

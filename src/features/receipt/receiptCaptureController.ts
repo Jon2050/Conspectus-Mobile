@@ -26,6 +26,7 @@ export interface ReceiptStageOneStartInput {
 
 export interface ReceiptStageOneStarter {
   start(input: ReceiptStageOneStartInput, signal: AbortSignal): Promise<void>;
+  reset?(): void;
 }
 
 export interface ReceiptCaptureController {
@@ -72,6 +73,7 @@ export const createReceiptCaptureController = (
     activeAbortController = null;
     disposeNormalizedReceiptImage(activeNormalizedImage);
     activeNormalizedImage = null;
+    options.stageOneStarter.reset?.();
   };
 
   const reset = (): void => {
@@ -98,6 +100,8 @@ export const createReceiptCaptureController = (
       if (isDisposed || file === null || activeAbortController !== null) {
         return false;
       }
+
+      options.stageOneStarter.reset?.();
 
       const configuration = (() => {
         try {

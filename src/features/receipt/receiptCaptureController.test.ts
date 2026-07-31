@@ -95,6 +95,7 @@ describe('receipt capture controller', () => {
     const stage = deferred();
     const stageOneStarter: ReceiptStageOneStarter = {
       start: vi.fn().mockReturnValue(stage.promise),
+      reset: vi.fn(),
     };
     const controller = createReceiptCaptureController({
       normalizer,
@@ -109,6 +110,7 @@ describe('receipt capture controller', () => {
 
     expect(normalizer.normalize).toHaveBeenCalledOnce();
     expect(stageOneStarter.start).toHaveBeenCalledOnce();
+    expect(stageOneStarter.reset).toHaveBeenCalledTimes(2);
     expect(controller.getState()).toEqual({ phase: 'idle', errorCode: null });
     expect(image.bytes.every((byte) => byte === 0)).toBe(true);
 

@@ -128,7 +128,7 @@ test('validates a write-only key and configures both receipt roles from the live
     'Shared Free Model — provider/shared:free',
   ]);
   await expect(page.getByTestId('openrouter-transfer-prompt')).toHaveValue(
-    /GROUP AND CATEGORY MAPPINGS/u,
+    /VORLÄUFIGE TRANSFERGRUPPEN/u,
   );
 
   await visionSelect.selectOption('provider/shared:free');
@@ -140,7 +140,7 @@ test('validates a write-only key and configures both receipt roles from the live
   const prompt = page.getByTestId('openrouter-transfer-prompt');
   await prompt.fill('Custom group and category rules');
   await page.getByTestId('openrouter-reset-prompt-button').click();
-  await expect(prompt).toHaveValue(/GROUP AND CATEGORY MAPPINGS/u);
+  await expect(prompt).toHaveValue(/VORLÄUFIGE TRANSFERGRUPPEN/u);
 
   expect(capture.requests).toHaveLength(1);
   const catalogRequest = capture.requests[0];

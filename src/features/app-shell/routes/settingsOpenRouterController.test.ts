@@ -31,7 +31,7 @@ const storedSettings = (
   apiKey: 'saved-secret-key',
   visionModelId: 'shared-model',
   transferModelId: 'shared-model',
-  transferPromptOverride: 'Custom prompt',
+  transferPromptOverride: 'Custom prompt\nTransfername "Custom"; categoryNames exakt ["Custom"].',
   ...overrides,
 });
 
@@ -105,10 +105,12 @@ describe('createSettingsOpenRouterController', () => {
 
     controller.setTransferPrompt('  ');
     expect(controller.getState().configurationIsReady).toBe(false);
-    controller.setTransferPrompt('My groups and categories');
+    controller.setTransferPrompt(
+      'My groups and categories\nTransfername "Custom"; categoryNames exakt ["Custom"].',
+    );
     expect(controller.getState().configurationIsReady).toBe(true);
     expect(settingsStore.read('account-one')?.transferPromptOverride).toBe(
-      'My groups and categories',
+      'My groups and categories\nTransfername "Custom"; categoryNames exakt ["Custom"].',
     );
 
     controller.resetTransferPrompt();

@@ -12,6 +12,10 @@ import type {
   ReceiptCaptureController,
   ReceiptCaptureState,
 } from '../../receipt/receiptCaptureController';
+import type {
+  ReceiptAnalysisController,
+  ReceiptAnalysisState,
+} from '../../receipt/receiptAnalysisController';
 
 const READY_OPTIONS_STATE: AddTransferOptionsState = {
   operation: 'ready',
@@ -68,6 +72,19 @@ const createMockReceiptCaptureController = (
   dispose: () => {},
 });
 
+const createMockReceiptAnalysisController = (
+  state: ReceiptAnalysisState,
+): ReceiptAnalysisController => ({
+  getState: () => state,
+  subscribe: (listener) => {
+    listener(state);
+    return () => {};
+  },
+  start: async () => {},
+  reset: () => {},
+  dispose: () => {},
+});
+
 const renderAddRoute = (props: Record<string, unknown> = {}) =>
   render(AddRoute, {
     props: {
@@ -113,6 +130,8 @@ describe('AddRoute component', () => {
     expect(body).not.toContain('receipt-preview');
     expect(body).not.toContain('gallery');
     expect(body).not.toMatch(/data-testid="receipt-photo-button"[^>]*disabled/);
+    expect(body).toContain('data-testid="receipt-semantic-risk"');
+    expect(body).toContain('fachlich falsch sein');
   });
 
   it('disables capture when no stage-one consumer is composed', () => {
@@ -144,6 +163,141 @@ describe('AddRoute component', () => {
     expect(handedOff).toContain('data-testid="receipt-stage-one-status"');
     expect(handedOff).toContain('Foto auslesen');
     expect(handedOff).toMatch(/data-testid="receipt-photo-button"[^>]*disabled/);
+  });
+
+  it('shows stage-two progress and a validated analysis result without a review or retry action', () => {
+    const deriving = renderAddRoute({
+      receiptCaptureController: createMockReceiptCaptureController({
+        phase: 'handed_off',
+        errorCode: null,
+      }),
+      receiptAnalysisController: createMockReceiptAnalysisController({
+        phase: 'deriving',
+        stage: 'derivation',
+        errorCode: null,
+        errorReason: null,
+        derivation: null,
+      }),
+    }).body;
+    expect(deriving).toContain('data-testid="receipt-stage-two-status"');
+    expect(deriving).toContain('Transferdaten erstellen');
+    expect(deriving).toMatch(/data-testid="receipt-photo-button"[^>]*disabled/);
+    expect(deriving).not.toMatch(/data-testid="add-transfer-from-account"[^>]*disabled/);
+    expect(deriving).toMatch(/data-testid="add-transfer-date"[^>]*disabled/);
+
+    const succeeded = renderAddRoute({
+      receiptCaptureController: createMockReceiptCaptureController(),
+      receiptAnalysisController: createMockReceiptAnalysisController({
+        phase: 'succeeded',
+        stage: null,
+        errorCode: null,
+        errorReason: null,
+        derivation: {
+          status: 'ok',
+          errorReason: null,
+          receiptTotalCents: 500,
+          transfers: [
+            {
+              name: 'Lebensmittel',
+              amountCents: 500,
+              categoryNames: ['Einkauf'],
+              buyplace: 'Markt',
+              receiptDate: '2026-07-31',
+              sourceItemIndexes: [0],
+            },
+          ],
+        },
+      }),
+    }).body;
+    expect(succeeded).toContain('data-testid="receipt-analysis-success"');
+    expect(succeeded).toContain('Transferdaten für 1 Transfer wurden erstellt.');
+    expect(succeeded).not.toContain('receipt-analysis-retry');
+    expect(succeeded).not.toContain('receipt-review');
+  });
+
+  it('uses the plural success copy for multiple validated transfers', () => {
+    const { body } = renderAddRoute({
+      receiptCaptureController: createMockReceiptCaptureController(),
+      receiptAnalysisController: createMockReceiptAnalysisController({
+        phase: 'succeeded',
+        stage: null,
+        errorCode: null,
+        errorReason: null,
+        derivation: {
+          status: 'ok',
+          errorReason: null,
+          receiptTotalCents: 500,
+          transfers: [
+            {
+              name: 'Lebensmittel',
+              amountCents: 300,
+              categoryNames: ['Einkauf'],
+              buyplace: 'Markt',
+              receiptDate: '2026-07-31',
+              sourceItemIndexes: [0],
+            },
+            {
+              name: 'Haushalt',
+              amountCents: 200,
+              categoryNames: ['Haushalt'],
+              buyplace: 'Markt',
+              receiptDate: '2026-07-31',
+              sourceItemIndexes: [1],
+            },
+          ],
+        },
+      }),
+    });
+
+    expect(body).toContain('Transferdaten für 2 Transfers wurden erstellt.');
+  });
+
+  it('keeps source-account selection enabled throughout both analysis stages', () => {
+    const controller = createMockOptionsController({
+      ...READY_OPTIONS_STATE,
+      fromAccountOptions: [{ accountId: 11, name: 'Checking', accountTypeId: 3 }],
+    });
+    for (const phase of ['extracting', 'deriving'] as const) {
+      const { body } = renderAddRoute({
+        controller,
+        receiptCaptureController: createMockReceiptCaptureController({
+          phase: 'handed_off',
+          errorCode: null,
+        }),
+        receiptAnalysisController: createMockReceiptAnalysisController({
+          phase,
+          stage: phase === 'extracting' ? 'extraction' : 'derivation',
+          errorCode: null,
+          errorReason: null,
+          derivation: null,
+        }),
+      });
+
+      expect(body).not.toMatch(/data-testid="add-transfer-from-account"[^>]*disabled/);
+      expect(body).toMatch(/data-testid="add-transfer-name"[^>]*disabled/);
+      expect(body).toMatch(/data-testid="receipt-photo-button"[^>]*disabled/);
+    }
+  });
+
+  it('renders a localized analysis failure plus the bounded model reason for a fresh-photo restart', () => {
+    const { body } = renderAddRoute({
+      receiptCaptureController: createMockReceiptCaptureController({
+        phase: 'error',
+        errorCode: 'stage_one_failed',
+      }),
+      receiptAnalysisController: createMockReceiptAnalysisController({
+        phase: 'error',
+        stage: 'extraction',
+        errorCode: 'model_error',
+        errorReason: 'Der Gesamtbetrag ist unlesbar.',
+        derivation: null,
+      }),
+    });
+
+    expect(body).toContain('Das Modell konnte den Beleg nicht eindeutig verarbeiten:');
+    expect(body).toContain('Der Gesamtbetrag ist unlesbar.');
+    expect(body).not.toContain('receipt-analysis-retry');
+    expect(body).not.toMatch(/data-testid="receipt-photo-button"[^>]*disabled/);
   });
 
   it('renders actionable localized capture errors without source details', () => {

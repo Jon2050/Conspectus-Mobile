@@ -15,7 +15,12 @@
     type SyncStateStore,
     type NetworkStateStore,
   } from '@shared';
-  import type { ReceiptCaptureController, ReceiptCaptureState } from '../../receipt';
+  import type {
+    ReceiptAnalysisController,
+    ReceiptAnalysisState,
+    ReceiptCaptureController,
+    ReceiptCaptureState,
+  } from '../../receipt';
   import BottomSheet from '../components/BottomSheet.svelte';
   import ProgressIndicator from '../components/ProgressIndicator.svelte';
   import {
@@ -52,6 +57,7 @@
   export let networkStateStore: NetworkStateStore = appNetworkStateStore;
   export let canOpenPanel = true;
   export let receiptCaptureController: ReceiptCaptureController | null = null;
+  export let receiptAnalysisController: ReceiptAnalysisController | null = null;
 
   let isOpen = true;
   let componentHasMounted = false;
@@ -64,6 +70,13 @@
   let receiptCaptureState: ReceiptCaptureState = receiptCaptureController?.getState() ?? {
     phase: 'idle',
     errorCode: null,
+  };
+  let receiptAnalysisState: ReceiptAnalysisState = receiptAnalysisController?.getState() ?? {
+    phase: 'idle',
+    stage: null,
+    errorCode: null,
+    errorReason: null,
+    derivation: null,
   };
   let lastObservedSyncState: SyncState = 'idle';
   $: isOffline = !$networkStateStore;
@@ -82,11 +95,21 @@
   $: saveBlocksEditing =
     saveState.canRetry || conflictRecoveryIsRequired || remoteCommitRecoveryIsRequired;
   $: receiptCaptureIsBusy =
-    receiptCaptureState.phase === 'normalizing' || receiptCaptureState.phase === 'handed_off';
-  $: receiptCaptureError =
-    receiptCaptureState.errorCode === null
+    receiptCaptureState.phase === 'normalizing' ||
+    receiptCaptureState.phase === 'handed_off' ||
+    receiptAnalysisState.phase === 'extracting' ||
+    receiptAnalysisState.phase === 'deriving';
+  $: receiptAnalysisError =
+    receiptAnalysisState.phase !== 'error' || receiptAnalysisState.errorCode === null
       ? null
-      : $_(`addTransfer.receipt.errors.${receiptCaptureState.errorCode}`);
+      : receiptAnalysisState.errorReason === null
+        ? $_(`addTransfer.receipt.analysisErrors.${receiptAnalysisState.errorCode}`)
+        : `${$_(`addTransfer.receipt.analysisErrors.${receiptAnalysisState.errorCode}`)} ${receiptAnalysisState.errorReason}`;
+  $: receiptCaptureError =
+    receiptAnalysisError ??
+    (receiptCaptureState.errorCode === null
+      ? null
+      : $_(`addTransfer.receipt.errors.${receiptCaptureState.errorCode}`));
   $: effectiveFormError =
     formError ??
     receiptCaptureError ??
@@ -95,6 +118,7 @@
     null;
   $: controlsAreDisabled =
     isSubmitting || isOptionsLoading || saveIsBusy || saveBlocksEditing || receiptCaptureIsBusy;
+  $: sourceAccountIsDisabled = isSubmitting || isOptionsLoading || saveIsBusy || saveBlocksEditing;
   $: submitIsDisabled = controlsAreDisabled || isOffline || optionsState.operation !== 'ready';
   $: receiptCaptureIsDisabled =
     receiptCaptureController === null ||
@@ -238,6 +262,10 @@
     receiptCaptureController?.subscribe((nextState) => {
       receiptCaptureState = nextState;
     }) ?? (() => {});
+  const unsubscribeReceiptAnalysisController =
+    receiptAnalysisController?.subscribe((nextState) => {
+      receiptAnalysisState = nextState;
+    }) ?? (() => {});
   const unsubscribeSyncState = syncStateStore.subscribe((syncSnapshot) => {
     if (syncSnapshot.state === lastObservedSyncState) {
       return;
@@ -289,6 +317,7 @@
     unsubscribeController();
     unsubscribeSaveController();
     unsubscribeReceiptCaptureController();
+    unsubscribeReceiptAnalysisController();
     unsubscribeSyncState();
     receiptCaptureController?.cancel();
   });
@@ -466,6 +495,9 @@
             <p class="add-transfer-form__receipt-hint">
               {$_('addTransfer.receipt.description')}
             </p>
+            <p class="add-transfer-form__receipt-hint" data-testid="receipt-semantic-risk">
+              {$_('addTransfer.receipt.semanticRisk')}
+            </p>
           </div>
           <input
             bind:this={receiptFileInputElement}
@@ -502,13 +534,36 @@
             >
               {$_('addTransfer.receipt.normalizing')}
             </p>
-          {:else if receiptCaptureState.phase === 'handed_off'}
+          {:else if receiptAnalysisState.phase === 'extracting' || (receiptAnalysisController === null && receiptCaptureState.phase === 'handed_off')}
             <p
               class="add-transfer-form__status"
               role="status"
               data-testid="receipt-stage-one-status"
             >
               {$_('addTransfer.receipt.stageOne')}
+            </p>
+          {:else if receiptAnalysisState.phase === 'deriving'}
+            <p
+              class="add-transfer-form__status"
+              role="status"
+              data-testid="receipt-stage-two-status"
+            >
+              {$_('addTransfer.receipt.stageTwo')}
+            </p>
+          {:else if receiptAnalysisState.phase === 'succeeded' && receiptAnalysisState.derivation !== null}
+            <p
+              class="add-transfer-form__status"
+              role="status"
+              data-testid="receipt-analysis-success"
+            >
+              {$_(
+                receiptAnalysisState.derivation.transfers.length === 1
+                  ? 'addTransfer.receipt.analysisSuccessOne'
+                  : 'addTransfer.receipt.analysisSuccessMany',
+                {
+                  values: { count: receiptAnalysisState.derivation.transfers.length },
+                },
+              )}
             </p>
           {/if}
         </section>
@@ -590,7 +645,7 @@
             class="app-input"
             data-testid="add-transfer-from-account"
             bind:value={fields.fromAccountId}
-            disabled={controlsAreDisabled}
+            disabled={sourceAccountIsDisabled}
           >
             <option value={null}>{$_('addTransfer.fromAccountPlaceholder')}</option>
             {#each optionsState.fromAccountOptions as account (account.accountId)}

@@ -154,7 +154,7 @@ Exit criteria:
 - Depends on: `M9-01`
 - GitHub: [#252](https://github.com/Jon2050/Conspectus-Mobile/issues/252)
 
-### :green_circle: M9-03 Run two-stage OpenRouter receipt extraction and transfer derivation
+### :white_check_mark: M9-03 Run two-stage OpenRouter receipt extraction and transfer derivation
 
 - Label: `feature`
 - Milestone: `M9 - Receipt Capture + OpenRouter`

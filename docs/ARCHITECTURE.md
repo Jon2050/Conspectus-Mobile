@@ -161,6 +161,37 @@ written to IndexedDB, SQLite, OneDrive, service-worker caches, logs, diagnostics
 backups. Browser and operating-system internals may still use implementation-defined temporary file
 storage for native `File` and canvas APIs; the application neither requests nor retains such storage.
 
+Receipt analysis is an abortable, two-stage feature workflow behind typed OpenRouter interfaces:
+
+1. Immediately before stage 1, fetch the authenticated account-specific model catalog and verify
+   that the configured vision model is still free and image/text compatible. Only then send the
+   versioned app-owned extraction prompt and normalized JPEG to that exact model.
+2. Parse the non-streaming response as a complete EUR extraction. Integer-cent arithmetic must
+   prove that every signed receipt line is represented exactly once and sums to the receipt total;
+   malformed, partial, ambiguous, refused, or model-declared error output fails closed. Release the
+   normalized image bytes as soon as this stage no longer consumes them.
+3. Immediately before stage 2, fetch the catalog again and verify that the independently configured
+   text model remains free and advertises structured output. Send only the validated extraction and
+   editable derivation prompt, never the image or Microsoft account, Conspectus account, balance,
+   transfer-history, category-table, database, or OneDrive data.
+4. Require a strict app-owned JSON Schema and provider parameter support. Local validation proves
+   positive integer-cent transfer amounts, exact once-only source-line coverage, bounded ordered
+   category arrays, per-group arithmetic, and an exact receipt-total match. Machine-readable mapping
+   declarations in the active editable prompt bind every accepted transfer name to its exact ordered
+   category list; prompts without unambiguous declarations are not ready for capture. The validated
+   result remains transient for the later account/category-resolution and save workflow.
+
+Both calls use the explicitly selected model without model or provider fallback. They add no app
+owned ZDR or data-collection routing restriction, so stricter OpenRouter account preferences and
+guardrails remain effective. Any catalog, transport, model, parsing, validation, cancellation, or
+supersession failure aborts the whole run, clears transient extraction/derivation state, performs no
+SQLite, cache, Graph, or OneDrive mutation, and requires a fresh native photo selection. A completed
+older run cannot publish over a newer run or changed application context.
+
+These validations prove structural and arithmetic consistency, not that the model classified every
+receipt line into the semantically correct user-defined group. The capture UI discloses this residual
+risk before analysis; users maintain the grouping and category rules in Settings.
+
 M9-01 performs only catalog requests and sends no receipt, extracted result, database content,
 account/category data, balance, or transfer history. The receipt workflow privacy boundary disclosed
 before later use is that stage 1 sends the image to OpenRouter and a routed vision provider, while
