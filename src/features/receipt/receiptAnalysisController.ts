@@ -43,6 +43,7 @@ export interface ReceiptAnalysisState {
   readonly errorCode: ReceiptAnalysisErrorCode | null;
   readonly errorReason: string | null;
   readonly derivation: ReceiptTransferDerivation | null;
+  readonly extractedItemIndexes: readonly number[] | null;
 }
 
 class ReceiptAnalysisError extends Error {
@@ -74,6 +75,7 @@ const INITIAL_STATE: ReceiptAnalysisState = {
   errorCode: null,
   errorReason: null,
   derivation: null,
+  extractedItemIndexes: null,
 };
 
 const createAbortError = (): DOMException =>
@@ -190,6 +192,7 @@ export const createReceiptAnalysisController = (
       errorCode: error.code,
       errorReason: error.reason,
       derivation: null,
+      extractedItemIndexes: null,
     });
   };
 
@@ -350,6 +353,7 @@ export const createReceiptAnalysisController = (
           errorCode: null,
           errorReason: null,
           derivation: parsedDerivation.value,
+          extractedItemIndexes: Object.freeze(extraction.items.map((item) => item.index)),
         });
       } catch (error) {
         if (

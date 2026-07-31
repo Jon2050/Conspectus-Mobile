@@ -130,6 +130,7 @@ describe('receipt analysis controller', () => {
       phase: 'succeeded',
       errorCode: null,
       derivation: { status: 'ok', receiptTotalCents: 350 },
+      extractedItemIndexes: [0, 1, 2],
     });
   });
 
@@ -161,6 +162,7 @@ describe('receipt analysis controller', () => {
       stage: 'derivation',
       errorCode: 'invalid_prompt',
       derivation: null,
+      extractedItemIndexes: null,
     });
   });
 
@@ -332,6 +334,7 @@ describe('receipt analysis controller', () => {
       errorCode: null,
       errorReason: null,
       derivation: null,
+      extractedItemIndexes: null,
     });
   });
 });

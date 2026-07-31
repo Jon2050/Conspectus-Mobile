@@ -1,4 +1,4 @@
-// Exposes receipt AI settings contracts to feature-level Settings and future receipt workflows.
+// Exposes receipt AI settings, capture, analysis, and transfer-preparation feature contracts.
 export { DEFAULT_TRANSFER_DERIVATION_PROMPT } from './receiptPrompts';
 export type { VersionedReceiptPrompt } from './receiptPrompts';
 export { createReceiptAnalysisController } from './receiptAnalysisController';
@@ -9,6 +9,21 @@ export type {
   ReceiptAnalysisStage,
   ReceiptAnalysisState,
 } from './receiptAnalysisController';
+export { listReceiptSourceAccountOptions } from './receiptTransferCommandBuilder';
+export type {
+  ReceiptTransferCommandBuildResult,
+  ReceiptTransferPreparationError,
+  ReceiptTransferPreparationErrorCode,
+} from './receiptTransferCommandBuilder';
+export { createReceiptTransferPreparationController } from './receiptTransferPreparationController';
+export type {
+  ReceiptProcessingStep,
+  ReceiptProcessingStepId,
+  ReceiptProcessingStepStatus,
+  ReceiptTransferPreparationController,
+  ReceiptTransferPreparationPhase,
+  ReceiptTransferPreparationState,
+} from './receiptTransferPreparationController';
 export {
   createEmptyOpenRouterReceiptSettings,
   reconcileOpenRouterModelSelections,

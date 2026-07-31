@@ -61,10 +61,12 @@
     createReceiptAnalysisController,
     createReceiptCaptureController,
     createReceiptImageNormalizer,
+    createReceiptTransferPreparationController,
     openRouterSettingsStore,
     toStoredReadyOpenRouterReceiptConfiguration,
     type ReceiptAnalysisController,
     type ReceiptCaptureController,
+    type ReceiptTransferPreparationController,
   } from '../receipt';
   import {
     createAddTransferSaveController,
@@ -81,6 +83,8 @@
     createAddTransferSaveController();
   export let receiptCaptureController: ReceiptCaptureController | null = null;
   export let receiptAnalysisController: ReceiptAnalysisController | null = null;
+  export let receiptPreparationController: ReceiptTransferPreparationController =
+    createReceiptTransferPreparationController();
   export let loadingDelayMs = 160;
   export let showLoadingPlaceholder = true;
 
@@ -135,6 +139,7 @@
   const unsubscribe = routeStore.subscribe((route) => {
     if (currentRoute === 'add' && route !== 'add') {
       effectiveReceiptCaptureController?.cancel();
+      receiptPreparationController.reset();
     }
     currentRoute = route;
   });
@@ -243,6 +248,7 @@
     selectedBinding !== null && addTransferHasLoadedDatabase && $syncStateStore.state !== 'idle';
   $: if (!addTransferDatabaseIsReady) {
     effectiveReceiptCaptureController?.cancel();
+    receiptPreparationController.reset();
   }
 
   const resolveNavIconUrl = (iconPath: string): string => `${navIconBaseUrl}${iconPath}`;
@@ -358,6 +364,7 @@
     }
 
     effectiveReceiptCaptureController?.cancel();
+    receiptPreparationController.reset();
 
     if (bindingRepairPersistenceIsRunning) {
       return;
@@ -581,6 +588,7 @@
     } else {
       ownedReceiptAnalysisController.dispose();
     }
+    receiptPreparationController.reset();
     resolveAppDbRuntime().close();
     disconnectFooterVisibilityTracking();
   });
@@ -718,6 +726,7 @@
           saveController={addTransferSaveController}
           receiptCaptureController={effectiveReceiptCaptureController}
           receiptAnalysisController={effectiveReceiptAnalysisController}
+          {receiptPreparationController}
           {networkStateStore}
           canOpenPanel={addTransferDatabaseIsReady}
         />

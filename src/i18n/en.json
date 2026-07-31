@@ -79,8 +79,35 @@
       "normalizing": "Preparing the photo securely...",
       "stageOne": "Read photo",
       "stageTwo": "Create transfer data",
+      "freshAction": "Photograph a new receipt",
+      "sourceAccount": "Source account for all transfers",
+      "accountRequired": "Select a source account so the transfers can be created automatically.",
+      "progressLabel": "Receipt processing progress",
+      "steps": {
+        "extraction": "Read photo",
+        "derivation": "Create transfer data",
+        "creation": "Create transfers"
+      },
+      "stepStates": {
+        "pending": "Pending",
+        "active": "In progress",
+        "complete": "Complete",
+        "error": "Failed"
+      },
       "analysisSuccessOne": "Transfer data for 1 transfer is ready.",
       "analysisSuccessMany": "Transfer data for {count} transfers is ready.",
+      "preparationErrors": {
+        "options_unavailable": "Accounts and categories are no longer currently available. Start again with a new photo.",
+        "offline": "The internet connection was interrupted. Start online with a new photo.",
+        "source_account_unavailable": "The selected source account is no longer valid. Start again with a new photo.",
+        "primary_spendings_unavailable": "The primary spendings account is not uniquely available. Start again with a new photo.",
+        "category_not_found": "The category \"{detail}\" does not exist in the current database. Correct it, then start with a new photo.",
+        "category_ambiguous": "The category \"{detail}\" is ambiguous in the current database. Correct it, then start with a new photo.",
+        "invalid_transfer": "At least one transfer violates the local Conspectus rules: {detail} Start again with a new photo.",
+        "invalid_item_coverage": "Receipt items are not assigned to the transfers exactly once. Start again with a new photo.",
+        "non_positive_amount": "At least one transfer amount is not a positive safe cent value. Start again with a new photo.",
+        "total_mismatch": "The transfer total does not exactly match the receipt total. Start again with a new photo."
+      },
       "errors": {
         "empty_file": "The selected image is empty. Take a new photo.",
         "source_too_large": "The photo is too large. Take a new photo no larger than 20 MB.",
