@@ -8,11 +8,11 @@ import {
 } from '@openrouter';
 
 import {
-  DEFAULT_TRANSFER_DERIVATION_PROMPT,
+  DEFAULT_TRANSFER_DERIVATION_RULES,
   createEmptyOpenRouterReceiptSettings,
   openRouterSettingsStore,
   reconcileOpenRouterModelSelections,
-  resolveTransferDerivationPrompt,
+  resolveTransferDerivationRules,
   toReadyOpenRouterReceiptConfiguration,
   type OpenRouterSettingsStore,
   type ReadyOpenRouterReceiptConfiguration,
@@ -39,8 +39,8 @@ export interface SettingsOpenRouterState {
   readonly transferModels: readonly OpenRouterModelOption[];
   readonly selectedVisionModelId: string | null;
   readonly selectedTransferModelId: string | null;
-  readonly transferPrompt: string;
-  readonly transferPromptUsesDefault: boolean;
+  readonly transferRules: string;
+  readonly transferRulesUseDefault: boolean;
   readonly configurationIsReady: boolean;
 }
 
@@ -55,8 +55,8 @@ export interface SettingsOpenRouterController {
   deleteConfiguration(): void;
   selectVisionModel(modelId: string): void;
   selectTransferModel(modelId: string): void;
-  setTransferPrompt(prompt: string): void;
-  resetTransferPrompt(): void;
+  setTransferRules(rules: string): void;
+  resetTransferRules(): void;
   clearAfterLocalReset(): void;
   getReadyConfiguration(): ReadyOpenRouterReceiptConfiguration | null;
   dispose(): void;
@@ -75,8 +75,8 @@ const INITIAL_STATE: SettingsOpenRouterState = {
   transferModels: [],
   selectedVisionModelId: null,
   selectedTransferModelId: null,
-  transferPrompt: DEFAULT_TRANSFER_DERIVATION_PROMPT.text,
-  transferPromptUsesDefault: true,
+  transferRules: DEFAULT_TRANSFER_DERIVATION_RULES.text,
+  transferRulesUseDefault: true,
   configurationIsReady: false,
 };
 
@@ -115,10 +115,10 @@ export const createSettingsOpenRouterController = (
     actionError: SettingsOpenRouterActionError = null,
   ): void => {
     const readyCatalog = catalogStatus === 'ready' ? validatedCatalog : null;
-    const transferPrompt =
+    const transferRules =
       storedSettings === null
-        ? DEFAULT_TRANSFER_DERIVATION_PROMPT.text
-        : resolveTransferDerivationPrompt(storedSettings);
+        ? DEFAULT_TRANSFER_DERIVATION_RULES.text
+        : resolveTransferDerivationRules(storedSettings);
 
     state = {
       catalogStatus,
@@ -129,9 +129,9 @@ export const createSettingsOpenRouterController = (
       selectedVisionModelId: readyCatalog === null ? null : (storedSettings?.visionModelId ?? null),
       selectedTransferModelId:
         readyCatalog === null ? null : (storedSettings?.transferModelId ?? null),
-      transferPrompt,
-      transferPromptUsesDefault:
-        storedSettings === null || storedSettings.transferPromptOverride === null,
+      transferRules,
+      transferRulesUseDefault:
+        storedSettings === null || storedSettings.transferRulesOverride === null,
       configurationIsReady:
         readyCatalog !== null && storedSettings !== null
           ? toReadyOpenRouterReceiptConfiguration(storedSettings, readyCatalog) !== null
@@ -357,21 +357,20 @@ export const createSettingsOpenRouterController = (
       persistReadyUpdate({ ...storedSettings, transferModelId: normalizedModelId });
     },
 
-    setTransferPrompt(prompt): void {
+    setTransferRules(rules): void {
       if (storedSettings === null) {
         return;
       }
 
-      const transferPromptOverride =
-        prompt === DEFAULT_TRANSFER_DERIVATION_PROMPT.text ? null : prompt;
-      persistReadyUpdate({ ...storedSettings, transferPromptOverride });
+      const transferRulesOverride = rules === DEFAULT_TRANSFER_DERIVATION_RULES.text ? null : rules;
+      persistReadyUpdate({ ...storedSettings, transferRulesOverride });
     },
 
-    resetTransferPrompt(): void {
+    resetTransferRules(): void {
       if (storedSettings === null) {
         return;
       }
-      persistReadyUpdate({ ...storedSettings, transferPromptOverride: null });
+      persistReadyUpdate({ ...storedSettings, transferRulesOverride: null });
     },
 
     clearAfterLocalReset(): void {

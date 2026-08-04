@@ -1,6 +1,6 @@
 // Exposes receipt AI settings, capture, analysis, and transfer-preparation feature contracts.
-export { DEFAULT_TRANSFER_DERIVATION_PROMPT } from './receiptPrompts';
-export type { VersionedReceiptPrompt } from './receiptPrompts';
+export { DEFAULT_TRANSFER_DERIVATION_RULES } from './prompts';
+export type { VersionedReceiptPrompt } from './prompts';
 export { createReceiptAnalysisController } from './receiptAnalysisController';
 export type {
   ReceiptAnalysisController,
@@ -30,7 +30,7 @@ export type {
 export {
   createEmptyOpenRouterReceiptSettings,
   reconcileOpenRouterModelSelections,
-  resolveTransferDerivationPrompt,
+  resolveTransferDerivationRules,
   toReadyOpenRouterReceiptConfiguration,
   toStoredReadyOpenRouterReceiptConfiguration,
 } from './openRouterReceiptConfiguration';

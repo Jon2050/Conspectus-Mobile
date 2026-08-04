@@ -128,7 +128,6 @@
         "provider_error": "OpenRouter oder der ausgewählte Anbieter konnte die Beleganalyse nicht abschließen. Starte mit einem neuen Foto.",
         "invalid_response": "Das Modell hat keine vollständig prüfbaren Beleg- oder Transferdaten geliefert. Starte mit einem neuen Foto.",
         "output_limit": "Die Modellantwort war zu lang oder überschritt eine Verarbeitungsgrenze. Starte mit einem neuen Foto.",
-        "invalid_prompt": "Der Ableitungs-Prompt enthält keine eindeutig prüfbaren Gruppen- und Kategoriezuordnungen. Prüfe die Beleg-KI-Einstellungen und starte mit einem neuen Foto.",
         "model_error": "Das Modell konnte den Beleg nicht eindeutig verarbeiten:"
       },
       "commit": {
@@ -281,13 +280,13 @@
         "noTransferModels": "Derzeit ist kein kostenloses Textmodell mit Unterstützung für strukturierte Ausgaben zum Ableiten von Transfers verfügbar."
       },
       "prompt": {
-        "label": "Prompt zum Ableiten der Transfers",
-        "help": "Dies ist ein einzelner Freitext-Prompt. Passe die Gruppen an, aber behalte für jede Gruppe eine eigene Deklarationszeile im Format Transfername \"…\"; categoryNames exakt [\"…\"]. bei. Nur so kann Conspectus Namen, Kategorien und Reihenfolge lokal prüfen.",
+        "label": "Regeln zum Gruppieren der Bonpositionen",
+        "help": "Passe hier nur die fachlichen Gruppen an. Jede Aufzählungszeile beschreibt eine Transfergruppe; jedes Paar eckiger Klammern steht für genau einen vollständigen Kategorienamen. Kommas innerhalb derselben Klammern gehören zum Kategorienamen.",
         "reset": "Auf aktuellen Standard zurücksetzen"
       },
       "configuration": {
         "ready": "Die Beleg-KI-Konfiguration ist bereit.",
-        "notReady": "Die Beleg-KI-Konfiguration ist nicht bereit. Prüfe den Schlüssel, wähle beide Modelle und verwende gültige kanonische Gruppen- und Kategoriezuordnungen im Ableitungs-Prompt."
+        "notReady": "Die Beleg-KI-Konfiguration ist nicht bereit. Prüfe den Schlüssel, wähle beide Modelle und hinterlege Gruppierungsregeln."
       }
     },
     "db": {

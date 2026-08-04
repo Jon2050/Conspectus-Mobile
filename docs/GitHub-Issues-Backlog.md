@@ -65,16 +65,16 @@ without a review screen.
 
 Scope:
 
-- Store the OpenRouter API key, two independently selected model IDs, and one editable/resettable
-  transfer-derivation prompt locally per active Microsoft account; keep the extraction prompt
+- Store the OpenRouter API key, two independently selected model IDs, and editable/resettable
+  receipt-item grouping rules locally per active Microsoft account; keep both complete stage prompts
   app-owned and populate both model comboboxes from current OpenRouter catalog, pricing, modality,
   and structured-output metadata.
 - Keep both model comboboxes empty and disabled until the API key passes an authenticated catalog
   request; fetch a fresh catalog whenever Settings is opened and clear any saved role selection
   that a successful refresh proves no longer meets its free/capability criteria.
-- Offer no manual model-ID fallback; keep the derivation-prompt editor hidden until key validation
+- Offer no manual model-ID fallback; keep the grouping-rules editor hidden until key validation
   succeeds, expose it as one free-form multiline text field without a structured category editor,
-  and never display or allow editing of the app-owned extraction prompt.
+  and never display or allow editing of either complete app-owned stage prompt.
 - Add a photo button to New Transfer backed by the native iOS/Android image capture/picker rather
   than a custom in-PWA camera view; normalize the image, remove metadata, and keep it only in memory
   for the first OpenRouter call. Accept an existing gallery image only when the same operating-system
@@ -84,8 +84,9 @@ Scope:
   reason.
 - Use a separate free model to derive fixed-schema transfer JSON, group every extracted article
   exactly once according to the prompt-defined group/category rules, and preserve the receipt total
-  exactly without rounding; start it immediately after extraction without waiting for the account,
-  and allow the same compatible model in both roles.
+  exactly without rounding; pass the editable rules verbatim without app-side interpretation, start
+  it immediately after extraction without waiting for the account, and allow the same compatible
+  model in both roles.
 - Require the user to choose the source account for every run, resolve the prompt-produced category
   names against local data, validate the complete batch locally, and gate only local transfer
   construction/saving on that selection, without a transfer review or editing step.
@@ -116,7 +117,7 @@ Exit criteria:
 1. A user can configure their own OpenRouter key and, only after live validation, select compatible
    free models from two filtered comboboxes. Every Settings entry refreshes the catalog, invalid
    prior selections become empty without an automatic/manual replacement, the same eligible model
-   may fill both roles, and only the then-visible free-form derivation-prompt field is
+   may fill both roles, and only the then-visible free-form grouping-rules field is
    editable/resettable.
 2. A user can tap the photo button on New Transfer and capture a receipt on iOS or Android; the
    native system camera/picker returns a normalized, metadata-free image that begins extraction
@@ -139,7 +140,7 @@ Exit criteria:
 - Summary: Add account-scoped key and prompt settings plus separate live-filtered comboboxes for
   free vision and structured-output models. Model selection requires a validated key, refreshes on
   every Settings entry, clears newly invalid selections, has no manual-ID fallback, and permits one
-  compatible model in both roles; only one plain free-form derivation-prompt field is then
+  compatible model in both roles; only one plain free-form grouping-rules field is then
   visible/editable.
 - Depends on: `none`
 - GitHub: [#251](https://github.com/Jon2050/Conspectus-Mobile/issues/251)
@@ -159,10 +160,10 @@ Exit criteria:
 - Label: `feature`
 - Milestone: `M9 - Receipt Capture + OpenRouter`
 - Summary: Use the configured vision prompt to extract every article, store, date, and exact EUR
-  total, then use the second prompt and a fixed JSON Schema to group them with explicitly listed
-  category arrays into one or more exact transfers without waiting for account selection; only the
-  second prompt is user-editable, and every error aborts the run with a meaningful message and no
-  same-image retry.
+  total, then use the hidden second prompt, verbatim editable grouping rules, and a fixed JSON Schema
+  to create one or more exact transfers without waiting for account selection; only the grouping
+  rules are user-editable, and every error aborts the run with a meaningful message and no same-image
+  retry.
 - Depends on: `M9-01, M9-02`
 - GitHub: [#253](https://github.com/Jon2050/Conspectus-Mobile/issues/253)
 

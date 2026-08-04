@@ -1,17 +1,17 @@
 // Defines stored and currently validated OpenRouter receipt configuration contracts.
 import type { OpenRouterCompatibleModelCatalog } from '@openrouter';
 
-import { parseReceiptTransferCategoryMappings } from './receiptAnalysisContracts';
 import {
-  DEFAULT_TRANSFER_DERIVATION_PROMPT,
+  DEFAULT_TRANSFER_DERIVATION_RULES,
   RECEIPT_EXTRACTION_SYSTEM_PROMPT,
-} from './receiptPrompts';
+  TRANSFER_DERIVATION_SYSTEM_PROMPT,
+} from './prompts';
 
 export interface StoredOpenRouterReceiptSettings {
   readonly apiKey: string;
   readonly visionModelId: string | null;
   readonly transferModelId: string | null;
-  readonly transferPromptOverride: string | null;
+  readonly transferRulesOverride: string | null;
 }
 
 export interface ReadyOpenRouterReceiptConfiguration {
@@ -19,7 +19,8 @@ export interface ReadyOpenRouterReceiptConfiguration {
   readonly visionModelId: string;
   readonly transferModelId: string;
   readonly extractionPrompt: typeof RECEIPT_EXTRACTION_SYSTEM_PROMPT;
-  readonly transferPrompt: string;
+  readonly transferPrompt: typeof TRANSFER_DERIVATION_SYSTEM_PROMPT;
+  readonly transferRules: string;
 }
 
 export const createEmptyOpenRouterReceiptSettings = (
@@ -28,12 +29,11 @@ export const createEmptyOpenRouterReceiptSettings = (
   apiKey,
   visionModelId: null,
   transferModelId: null,
-  transferPromptOverride: null,
+  transferRulesOverride: null,
 });
 
-export const resolveTransferDerivationPrompt = (
-  settings: StoredOpenRouterReceiptSettings,
-): string => settings.transferPromptOverride ?? DEFAULT_TRANSFER_DERIVATION_PROMPT.text;
+export const resolveTransferDerivationRules = (settings: StoredOpenRouterReceiptSettings): string =>
+  settings.transferRulesOverride ?? DEFAULT_TRANSFER_DERIVATION_RULES.text;
 
 const includesModel = (
   models: OpenRouterCompatibleModelCatalog['visionModels'],
@@ -56,15 +56,14 @@ export const reconcileOpenRouterModelSelections = (
 export const toStoredReadyOpenRouterReceiptConfiguration = (
   settings: StoredOpenRouterReceiptSettings,
 ): ReadyOpenRouterReceiptConfiguration | null => {
-  const transferPrompt = resolveTransferDerivationPrompt(settings);
-  const transferMappings = parseReceiptTransferCategoryMappings(transferPrompt);
+  const transferRules = resolveTransferDerivationRules(settings);
   if (
     !settings.apiKey.trim() ||
     settings.visionModelId === null ||
     settings.transferModelId === null ||
     !RECEIPT_EXTRACTION_SYSTEM_PROMPT.text.trim() ||
-    !transferPrompt.trim() ||
-    !transferMappings.ok
+    !TRANSFER_DERIVATION_SYSTEM_PROMPT.text.trim() ||
+    !transferRules.trim()
   ) {
     return null;
   }
@@ -74,7 +73,8 @@ export const toStoredReadyOpenRouterReceiptConfiguration = (
     visionModelId: settings.visionModelId,
     transferModelId: settings.transferModelId,
     extractionPrompt: RECEIPT_EXTRACTION_SYSTEM_PROMPT,
-    transferPrompt,
+    transferPrompt: TRANSFER_DERIVATION_SYSTEM_PROMPT,
+    transferRules,
   };
 };
 

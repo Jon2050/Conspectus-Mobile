@@ -12,9 +12,10 @@ import { createReceiptAnalysisController } from './receiptAnalysisController';
 import type { ReadyOpenRouterReceiptConfiguration } from './openRouterReceiptConfiguration';
 import type { NormalizedReceiptImage } from './receiptImageNormalization';
 import {
-  DEFAULT_TRANSFER_DERIVATION_PROMPT,
+  DEFAULT_TRANSFER_DERIVATION_RULES,
   RECEIPT_EXTRACTION_SYSTEM_PROMPT,
-} from './receiptPrompts';
+  TRANSFER_DERIVATION_SYSTEM_PROMPT,
+} from './prompts';
 
 const EXTRACTION = JSON.stringify({
   status: 'ok',
@@ -54,7 +55,7 @@ const DERIVATION = JSON.stringify({
   receiptTotalCents: 350,
   transfers: [
     {
-      name: 'Lebensmittel',
+      name: 'Brot und Äpfel',
       amountCents: 350,
       categoryNames: ['Einkauf', 'Lebensmittel'],
       buyplace: 'Markt',
@@ -69,7 +70,8 @@ const CONFIGURATION: ReadyOpenRouterReceiptConfiguration = {
   visionModelId: 'shared-model',
   transferModelId: 'shared-model',
   extractionPrompt: RECEIPT_EXTRACTION_SYSTEM_PROMPT,
-  transferPrompt: DEFAULT_TRANSFER_DERIVATION_PROMPT.text,
+  transferPrompt: TRANSFER_DERIVATION_SYSTEM_PROMPT,
+  transferRules: DEFAULT_TRANSFER_DERIVATION_RULES.text,
 };
 
 const catalog = (overrides: Partial<OpenRouterCompatibleModelCatalog> = {}) => ({
@@ -104,8 +106,7 @@ describe('receipt analysis controller', () => {
     await controller.start(
       input(receiptImage, {
         ...CONFIGURATION,
-        transferPrompt:
-          'Transfername "Lebensmittel"; categoryNames exakt ["Einkauf", "Lebensmittel"].',
+        transferRules: '- Lebensmittel kommen in die Kategorien [Einkauf], [Lebensmittel].',
       }),
       new AbortController().signal,
     );
@@ -123,6 +124,10 @@ describe('receipt analysis controller', () => {
       model: 'shared-model',
       responseFormat: { name: 'receipt_transfer_derivation' },
     });
+    expect(JSON.stringify(secondRequest)).toContain('BENUTZERDEFINIERTE GRUPPIERUNGSREGELN');
+    expect(JSON.stringify(secondRequest)).toContain(
+      '- Lebensmittel kommen in die Kategorien [Einkauf], [Lebensmittel].',
+    );
     expect(JSON.stringify(secondRequest)).not.toContain('image/jpeg');
     expect(JSON.stringify(secondRequest)).not.toContain('accountId');
     expect(receiptImage.bytes.every((value) => value === 0)).toBe(true);
@@ -134,35 +139,34 @@ describe('receipt analysis controller', () => {
     });
   });
 
-  it('rejects an unverifiable custom mapping prompt before transmitting the receipt image', async () => {
+  it('passes opaque custom grouping rules to stage two without app-side interpretation', async () => {
     const catalogClient: OpenRouterModelCatalogClient = {
       load: vi.fn().mockResolvedValue(catalog()),
     };
     const completionClient: OpenRouterChatCompletionClient = {
-      complete: vi.fn(),
+      complete: vi.fn().mockResolvedValueOnce(EXTRACTION).mockResolvedValueOnce(DERIVATION),
     };
     const controller = createReceiptAnalysisController({ catalogClient, completionClient });
     const receiptImage = image();
 
-    await expect(
-      controller.start(
-        input(receiptImage, {
-          ...CONFIGURATION,
-          transferPrompt: 'Transfername " Lebensmittel "; categoryNames exakt ["Einkauf"].',
-        }),
-        new AbortController().signal,
-      ),
-    ).rejects.toThrow('Receipt derivation failed (invalid_prompt).');
+    const opaqueRules = 'Sort items however these free-form instructions describe.';
+    await controller.start(
+      input(receiptImage, {
+        ...CONFIGURATION,
+        transferRules: opaqueRules,
+      }),
+      new AbortController().signal,
+    );
 
-    expect(catalogClient.load).not.toHaveBeenCalled();
-    expect(completionClient.complete).not.toHaveBeenCalled();
+    expect(catalogClient.load).toHaveBeenCalledTimes(2);
+    expect(completionClient.complete).toHaveBeenCalledTimes(2);
+    const secondRequest = vi.mocked(completionClient.complete).mock.calls[1]?.[0];
+    expect(JSON.stringify(secondRequest)).toContain(opaqueRules);
     expect(receiptImage.bytes.every((value) => value === 0)).toBe(true);
     expect(controller.getState()).toMatchObject({
-      phase: 'error',
-      stage: 'derivation',
-      errorCode: 'invalid_prompt',
-      derivation: null,
-      extractedItemIndexes: null,
+      phase: 'succeeded',
+      errorCode: null,
+      derivation: { status: 'ok' },
     });
   });
 
@@ -296,8 +300,7 @@ describe('receipt analysis controller', () => {
     const second = controller.start(
       input(image(), {
         ...CONFIGURATION,
-        transferPrompt:
-          'Transfername "Lebensmittel"; categoryNames exakt ["Einkauf", "Lebensmittel"].',
+        transferRules: '- Lebensmittel kommen in die Kategorien [Einkauf], [Lebensmittel].',
       }),
       new AbortController().signal,
     );
@@ -320,8 +323,7 @@ describe('receipt analysis controller', () => {
     await controller.start(
       input(image(), {
         ...CONFIGURATION,
-        transferPrompt:
-          'Transfername "Lebensmittel"; categoryNames exakt ["Einkauf", "Lebensmittel"].',
+        transferRules: '- Lebensmittel kommen in die Kategorien [Einkauf], [Lebensmittel].',
       }),
       new AbortController().signal,
     );

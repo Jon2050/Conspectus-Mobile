@@ -15,9 +15,9 @@ Dependency boundaries:
 
 Receipt AI settings:
 
-- `receipt/` owns versioned prompt defaults and the schema-versioned per-Microsoft-account settings
-  record containing the user-owned OpenRouter key, two independent model IDs, and only a custom
-  transfer-prompt override.
+- `receipt/prompts/` owns the separate hidden stage prompts and versioned user-editable grouping-rule
+  default. The schema-versioned per-Microsoft-account settings record contains the user-owned
+  OpenRouter key, two independent model IDs, and only a custom grouping-rules override.
 - `app-shell/routes/settingsOpenRouterController.ts` validates that record against a fresh
   authenticated catalog on every Settings entry and never exposes the key in public UI state.
 - `receipt/receiptImageNormalization.ts` owns the testable capture limits and normalized JPEG
@@ -28,9 +28,9 @@ Receipt AI settings:
 - `receipt/receiptCaptureController.ts` owns a single in-memory capture while
   `receipt/receiptAnalysisController.ts` orchestrates the two OpenRouter stages. The analysis
   controller revalidates each selected model immediately before use, releases image bytes after
-  stage 1, parses the active prompt's canonical transfer/category declarations, and retains only a
-  structurally, arithmetically, and mapping-validated transient derivation plus its item-index
-  coverage proof for the later local-transfer workflow.
+  stage 1, passes the editable grouping rules verbatim to stage 2 without parsing them, and retains
+  only a structurally and arithmetically validated transient derivation plus its item-index coverage
+  proof for the later local-transfer workflow.
 - `receipt/receiptTransferPreparationController.ts` owns the deliberate per-run source selection,
   accessible three-step progress state, and immutable in-memory command handoff. Its pure command
   builder resolves exact current category names, targets the sole primary spendings account, and
