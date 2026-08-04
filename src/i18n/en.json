@@ -128,7 +128,6 @@
         "provider_error": "OpenRouter or the selected provider could not complete receipt analysis. Start with a new photo.",
         "invalid_response": "The model did not return fully verifiable receipt or transfer data. Start with a new photo.",
         "output_limit": "The model response was too long or exceeded a processing limit. Start with a new photo.",
-        "invalid_prompt": "The derivation prompt has no unambiguously verifiable group and category mappings. Check Receipt AI settings and start with a new photo.",
         "model_error": "The model could not process the receipt unambiguously:"
       },
       "commit": {
@@ -281,13 +280,13 @@
         "noTransferModels": "No current free text model with structured-output support is available for transfer derivation."
       },
       "prompt": {
-        "label": "Transfer derivation prompt",
-        "help": "This is one free-form prompt. Adapt the groups, but keep one declaration line per group in the form Transfername \"…\"; categoryNames exakt [\"…\"]. so Conspectus can validate names, categories, and ordering locally.",
+        "label": "Receipt-item grouping rules",
+        "help": "Edit only the business grouping rules here. Each bullet describes one transfer group; each pair of square brackets is exactly one complete category name. Commas inside the same brackets are part of that category name.",
         "reset": "Reset to current default"
       },
       "configuration": {
         "ready": "Receipt AI configuration is ready.",
-        "notReady": "Receipt AI configuration is not ready. Validate the key, select both models, and keep valid canonical group and category mappings in the derivation prompt."
+        "notReady": "Receipt AI configuration is not ready. Validate the key, select both models, and provide grouping rules."
       }
     },
     "db": {

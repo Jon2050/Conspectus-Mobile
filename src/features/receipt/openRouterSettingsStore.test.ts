@@ -23,7 +23,7 @@ const settings = (apiKey: string, modelId: string): StoredOpenRouterReceiptSetti
   apiKey,
   visionModelId: modelId,
   transferModelId: modelId,
-  transferPromptOverride: `Prompt for ${modelId}`,
+  transferRulesOverride: `- Rules for ${modelId} [Category]`,
 });
 
 describe('createOpenRouterSettingsStore', () => {

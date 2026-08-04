@@ -45,7 +45,7 @@ const isStoredSettings = (value: unknown): value is StoredOpenRouterReceiptSetti
   value.apiKey.trim().length > 0 &&
   isNullableNonEmptyString(value.visionModelId) &&
   isNullableNonEmptyString(value.transferModelId) &&
-  (value.transferPromptOverride === null || typeof value.transferPromptOverride === 'string');
+  (value.transferRulesOverride === null || typeof value.transferRulesOverride === 'string');
 
 const parsePayload = (value: unknown): OpenRouterSettingsPayload | null => {
   if (

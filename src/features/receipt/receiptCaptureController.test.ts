@@ -12,14 +12,19 @@ import {
   type NormalizedReceiptImage,
   type ReceiptImageNormalizer,
 } from './receiptImageNormalization';
-import { RECEIPT_EXTRACTION_SYSTEM_PROMPT } from './receiptPrompts';
+import {
+  DEFAULT_TRANSFER_DERIVATION_RULES,
+  RECEIPT_EXTRACTION_SYSTEM_PROMPT,
+  TRANSFER_DERIVATION_SYSTEM_PROMPT,
+} from './prompts';
 
 const CONFIGURATION: ReadyOpenRouterReceiptConfiguration = {
   apiKey: 'secret-key',
   visionModelId: 'vision-model',
   transferModelId: 'transfer-model',
   extractionPrompt: RECEIPT_EXTRACTION_SYSTEM_PROMPT,
-  transferPrompt: 'Transfer prompt',
+  transferPrompt: TRANSFER_DERIVATION_SYSTEM_PROMPT,
+  transferRules: DEFAULT_TRANSFER_DERIVATION_RULES.text,
 };
 
 const createFile = (): File => ({ size: 12, type: 'image/jpeg' }) as File;

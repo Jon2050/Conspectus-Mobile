@@ -51,6 +51,16 @@ work.
 Add or update focused tests beside changed behavior. Use shared fixtures and test utilities when
 they already cover the required setup.
 
+Localization and message constants:
+
+- Do not hardcode German user-facing, error, status, help, or other application message constants
+  in TypeScript or Svelte files. Put user-visible text in the locale files under `src/i18n/` and
+  resolve it through the established internationalization layer.
+- Keep non-user-facing error details, validation diagnostics, log messages, and exception messages
+  in English.
+- Purpose-built language-specific LLM prompt assets are prompt content rather than application
+  messages and may use the language required by their product contract.
+
 Choose verification according to the affected surface. The normal code gate is:
 
 ```sh

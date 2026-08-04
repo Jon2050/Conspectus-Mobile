@@ -2,15 +2,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  DEFAULT_RECEIPT_TRANSFER_CATEGORY_MAPPINGS,
   RECEIPT_ANALYSIS_LIMITS,
   RECEIPT_TRANSFER_DERIVATION_JSON_SCHEMA,
   parseReceiptExtractionResponse,
-  parseReceiptTransferCategoryMappings,
   parseReceiptTransferDerivationResponse,
 } from './receiptAnalysisContracts';
 import type { ReceiptExtraction } from './receiptAnalysisContracts';
-import { DEFAULT_TRANSFER_DERIVATION_PROMPT } from './receiptPrompts';
 
 const extractionJson = {
   status: 'ok',
@@ -212,43 +209,6 @@ describe('stage-one receipt extraction parser', () => {
   });
 });
 
-describe('editable transfer prompt mappings', () => {
-  it('parses every default mapping in declared order', () => {
-    expect(parseReceiptTransferCategoryMappings(DEFAULT_TRANSFER_DERIVATION_PROMPT.text)).toEqual({
-      ok: true,
-      value: DEFAULT_RECEIPT_TRANSFER_CATEGORY_MAPPINGS,
-    });
-  });
-
-  it('accepts bounded custom mappings using the canonical declaration format', () => {
-    expect(
-      parseReceiptTransferCategoryMappings(
-        'Eigene Regeln\nTransfername "Drogerie"; categoryNames exakt ["Einkauf", "Pflege"].',
-      ),
-    ).toEqual({
-      ok: true,
-      value: [{ transferName: 'Drogerie', categoryNames: ['Einkauf', 'Pflege'] }],
-    });
-  });
-
-  it.each([
-    ['keine Deklaration'],
-    ['Transfername "Drogerie"; categoryNames exact ["Pflege"].'],
-    [
-      'Transfername "Drogerie"; categoryNames exakt ["Pflege"].\nTransfername "Drogerie"; categoryNames exakt ["Haushalt"].',
-    ],
-    ['Transfername "Drogerie"; categoryNames exakt ["Pflege", "Pflege"].'],
-    ['Transfername " Drogerie"; categoryNames exakt ["Pflege"].'],
-    ['Transfername "Drogerie"; categoryNames exakt ["Pflege "].'],
-    ['Transfername "Drogerie"; categoryNames exakt [" "].'],
-  ])('rejects missing, malformed, or ambiguous mapping declarations', (prompt) => {
-    expect(parseReceiptTransferCategoryMappings(prompt)).toMatchObject({
-      ok: false,
-      error: { code: 'INVALID_PROMPT_MAPPING' },
-    });
-  });
-});
-
 describe('stage-two transfer derivation contract', () => {
   it('publishes a fixed strict and JSON-serializable schema', () => {
     expect(RECEIPT_TRANSFER_DERIVATION_JSON_SCHEMA).toMatchObject({
@@ -263,7 +223,6 @@ describe('stage-two transfer derivation contract', () => {
     const result = parseReceiptTransferDerivationResponse(
       JSON.stringify(derivationJson),
       validExtraction,
-      DEFAULT_RECEIPT_TRANSFER_CATEGORY_MAPPINGS,
     );
     expect(result).toMatchObject({
       ok: true,
@@ -271,7 +230,7 @@ describe('stage-two transfer derivation contract', () => {
     });
   });
 
-  it('accepts structurally valid custom prompt groups against parsed prompt mappings', () => {
+  it('accepts LLM-generated transfer names and categories without interpreting user rules', () => {
     const custom = {
       ...derivationJson,
       transfers: [
@@ -285,52 +244,12 @@ describe('stage-two transfer derivation contract', () => {
         },
       ],
     };
-    const mappings = parseReceiptTransferCategoryMappings(
-      'Transfername "Eigene Gruppe"; categoryNames exakt ["Benutzerdefiniert"].',
-    );
-    if (!mappings.ok) {
-      throw new Error('Custom mapping fixture must be valid.');
-    }
     expect(
-      parseReceiptTransferDerivationResponse(
-        JSON.stringify(custom),
-        validExtraction,
-        mappings.value,
-      ),
+      parseReceiptTransferDerivationResponse(JSON.stringify(custom), validExtraction),
     ).toMatchObject({
       ok: true,
       value: { status: 'ok' },
     });
-  });
-
-  it('rejects missing, unknown, or reordered categories against custom prompt mappings', () => {
-    const mappings = parseReceiptTransferCategoryMappings(
-      'Transfername "Eigene Gruppe"; categoryNames exakt ["Erste", "Zweite"].',
-    );
-    if (!mappings.ok) {
-      throw new Error('Custom mapping fixture must be valid.');
-    }
-    const custom = {
-      ...derivationJson,
-      transfers: [
-        {
-          name: 'Eigene Gruppe',
-          amountCents: 700,
-          categoryNames: ['Zweite', 'Erste'],
-          buyplace: 'Testmarkt',
-          receiptDate: '2024-02-29',
-          sourceItemIndexes: [0, 8, 12],
-        },
-      ],
-    };
-
-    expect(
-      parseReceiptTransferDerivationResponse(
-        JSON.stringify(custom),
-        validExtraction,
-        mappings.value,
-      ),
-    ).toMatchObject({ ok: false, error: { code: 'CATEGORY_MISMATCH' } });
   });
 
   it('rejects duplicate category names for custom prompt groups', () => {
@@ -353,7 +272,7 @@ describe('stage-two transfer derivation contract', () => {
     ).toMatchObject({ ok: false, error: { code: 'DUPLICATE_CATEGORY' } });
   });
 
-  it('enforces default category names, ordering, and known groups when explicitly requested', () => {
+  it('does not compare category names or ordering against app-owned mappings', () => {
     const reversed = derivationJson.transfers.map((transfer, index) =>
       index === 0
         ? { ...transfer, categoryNames: [...transfer.categoryNames].reverse() }
@@ -363,9 +282,8 @@ describe('stage-two transfer derivation contract', () => {
       parseReceiptTransferDerivationResponse(
         derivationWith({ transfers: reversed }),
         validExtraction,
-        DEFAULT_RECEIPT_TRANSFER_CATEGORY_MAPPINGS,
       ),
-    ).toMatchObject({ ok: false, error: { code: 'CATEGORY_MISMATCH' } });
+    ).toMatchObject({ ok: true });
 
     const renamed = derivationJson.transfers.map((transfer, index) =>
       index === 0 ? { ...transfer, name: 'Unbekannt' } : transfer,
@@ -374,9 +292,8 @@ describe('stage-two transfer derivation contract', () => {
       parseReceiptTransferDerivationResponse(
         derivationWith({ transfers: renamed }),
         validExtraction,
-        DEFAULT_RECEIPT_TRANSFER_CATEGORY_MAPPINGS,
       ),
-    ).toMatchObject({ ok: false, error: { code: 'UNKNOWN_TRANSFER_GROUP' } });
+    ).toMatchObject({ ok: true });
   });
 
   it('rejects duplicate, missing, and unknown source item indexes', () => {

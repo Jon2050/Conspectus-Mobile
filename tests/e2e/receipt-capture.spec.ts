@@ -50,7 +50,7 @@ const DERIVATION = {
   receiptTotalCents: 350,
   transfers: [
     {
-      name: 'Lebensmittel',
+      name: 'Brot',
       amountCents: 350,
       categoryNames: ['Einkauf', 'Lebensmittel'],
       buyplace: 'Markt',
@@ -74,7 +74,7 @@ const MULTI_DERIVATION = {
   receiptTotalCents: 500,
   transfers: [
     {
-      name: 'Lebensmittel',
+      name: 'Brot',
       amountCents: 300,
       categoryNames: ['Einkauf', 'Lebensmittel'],
       buyplace: 'Markt',
@@ -82,9 +82,9 @@ const MULTI_DERIVATION = {
       sourceItemIndexes: [0],
     },
     {
-      name: 'Haushaltsartikel',
+      name: 'Reiniger',
       amountCents: 200,
-      categoryNames: ['Einkauf', 'Haushalt'],
+      categoryNames: ['Einkauf', 'Haushalt, Verbrauchsgüter, Reinigung'],
       buyplace: 'Markt',
       receiptDate: '2026-07-31',
       sourceItemIndexes: [1],
@@ -103,7 +103,7 @@ const installReadyReceiptConfiguration = async (page: Page): Promise<void> => {
             apiKey: 'sk-or-e2e-secret',
             visionModelId: 'provider/shared:free',
             transferModelId: 'provider/shared:free',
-            transferPromptOverride: null,
+            transferRulesOverride: null,
           },
         },
       }),
@@ -315,7 +315,7 @@ test('waits for a deliberate late source selection and commits a multi-transfer 
     categoryRows: [
       { categoryId: 20, name: 'Einkauf' },
       { categoryId: 21, name: 'Lebensmittel' },
-      { categoryId: 22, name: 'Haushalt' },
+      { categoryId: 22, name: 'Haushalt, Verbrauchsgüter, Reinigung' },
     ],
   });
   await page.goto(appPath('#/add'));
@@ -352,8 +352,8 @@ test('waits for a deliberate late source selection and commits a multi-transfer 
   if ((await page.getByTestId('transfers-month-label').textContent())?.includes('August 2026')) {
     await page.getByTestId('transfers-month-previous-button').click();
   }
-  await expect(page.getByTestId('route-transfers')).toContainText('Lebensmittel');
-  await expect(page.getByTestId('route-transfers')).toContainText('Haushaltsartikel');
+  await expect(page.getByTestId('route-transfers')).toContainText('Brot');
+  await expect(page.getByTestId('route-transfers')).toContainText('Reiniger');
 });
 
 test('clears completed receipt state when upload finishes after leaving Add', async ({ page }) => {

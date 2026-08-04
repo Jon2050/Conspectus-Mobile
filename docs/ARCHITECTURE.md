@@ -120,9 +120,9 @@ identity.
 
 Receipt AI uses a user-owned OpenRouter API key stored only in the browser. The configuration record
 is schema-versioned and keyed by the active Microsoft `homeAccountId`; it contains the key, an
-independent model ID for each AI role, and only a user override of the transfer-derivation prompt.
-It is never synchronized to OneDrive. The extraction prompt and current default derivation prompt
-remain versioned application assets instead of persisted user data.
+independent model ID for each AI role, and only a user override of the receipt-item grouping rules.
+It is never synchronized to OneDrive. Both complete stage prompts and the current default grouping
+rules remain versioned application assets instead of persisted user data.
 
 The Settings catalog contract is:
 
@@ -172,14 +172,16 @@ Receipt analysis is an abortable, two-stage feature workflow behind typed OpenRo
    normalized image bytes as soon as this stage no longer consumes them.
 3. Immediately before stage 2, fetch the catalog again and verify that the independently configured
    text model remains free and advertises structured output. Send only the validated extraction and
-   editable derivation prompt, never the image or Microsoft account, Conspectus account, balance,
+   hidden app-owned derivation prompt plus the editable grouping rules, never the image or Microsoft
+   account, Conspectus account, balance,
    transfer-history, category-table, database, or OneDrive data.
-4. Require a strict app-owned JSON Schema and provider parameter support. Local validation proves
-   positive integer-cent transfer amounts, exact once-only source-line coverage, bounded ordered
-   category arrays, per-group arithmetic, and an exact receipt-total match. Machine-readable mapping
-   declarations in the active editable prompt bind every accepted transfer name to its exact ordered
-   category list; prompts without unambiguous declarations are not ready for capture. The validated
-   result and only its item-index coverage proof remain transient for local preparation.
+4. Require a strict app-owned JSON Schema and provider parameter support. The editable grouping
+   rules are opaque prompt text: the app sends them verbatim to stage 2 and does not parse, interpret,
+   or validate their transfer/category mapping. The second model creates the transfer names and
+   category arrays. Local validation proves bounded output structure, positive integer-cent transfer
+   amounts, exact once-only source-line coverage, per-group arithmetic, and an exact receipt-total
+   match. The validated result and only its item-index coverage proof remain transient for local
+   preparation.
 5. While both remote stages run, show the current valid source accounts without preselecting one.
    Stage 2 never waits for or receives that selection. Once both the validated derivation and a
    deliberate current-run source selection exist, resolve every category name by one exact current
@@ -303,7 +305,7 @@ reuse, and application operation:
 
 - schema-versioned selected-file bindings;
 - schema-versioned per-account OpenRouter receipt settings containing the user-owned API key, two
-  model IDs, and an optional derivation-prompt override;
+  model IDs, and an optional grouping-rules override;
 - cached database bytes and their matching eTag/sync metadata;
 - MSAL-managed authentication state;
 - the token-free authentication restoration hint described above;

@@ -4,18 +4,18 @@ import type { OpenRouterCompatibleModelCatalog } from '@openrouter';
 
 import {
   reconcileOpenRouterModelSelections,
-  resolveTransferDerivationPrompt,
+  resolveTransferDerivationRules,
   toReadyOpenRouterReceiptConfiguration,
   toStoredReadyOpenRouterReceiptConfiguration,
   type StoredOpenRouterReceiptSettings,
 } from './openRouterReceiptConfiguration';
-import { DEFAULT_TRANSFER_DERIVATION_PROMPT } from './receiptPrompts';
+import { DEFAULT_TRANSFER_DERIVATION_RULES } from './prompts';
 
 const settings = (overrides: Partial<StoredOpenRouterReceiptSettings> = {}) => ({
   apiKey: 'secret-key',
   visionModelId: 'shared-model',
   transferModelId: 'shared-model',
-  transferPromptOverride: null,
+  transferRulesOverride: null,
   ...overrides,
 });
 
@@ -36,17 +36,24 @@ describe('OpenRouter receipt configuration', () => {
   });
 
   it('uses the current default until a custom override is present', () => {
-    expect(resolveTransferDerivationPrompt(settings())).toBe(
-      DEFAULT_TRANSFER_DERIVATION_PROMPT.text,
-    );
+    expect(resolveTransferDerivationRules(settings())).toBe(DEFAULT_TRANSFER_DERIVATION_RULES.text);
     expect(
-      resolveTransferDerivationPrompt(
+      resolveTransferDerivationRules(
         settings({
-          transferPromptOverride:
-            'Custom rules\nTransfername "Custom"; categoryNames exakt ["Custom"].',
+          transferRulesOverride: '- Custom group with category [Custom].',
         }),
       ),
-    ).toBe('Custom rules\nTransfername "Custom"; categoryNames exakt ["Custom"].');
+    ).toBe('- Custom group with category [Custom].');
+  });
+
+  it('treats non-empty custom grouping rules as opaque prompt text', () => {
+    const opaqueRules = 'Free-form instructions without app-readable category declarations.';
+    expect(
+      toReadyOpenRouterReceiptConfiguration(
+        settings({ transferRulesOverride: opaqueRules }),
+        catalog(),
+      ),
+    ).toMatchObject({ transferRules: opaqueRules });
   });
 
   it('allows the same eligible model for both roles and returns both internal prompts', () => {
@@ -54,8 +61,9 @@ describe('OpenRouter receipt configuration', () => {
       apiKey: 'secret-key',
       visionModelId: 'shared-model',
       transferModelId: 'shared-model',
-      transferPrompt: DEFAULT_TRANSFER_DERIVATION_PROMPT.text,
-      extractionPrompt: { version: 2 },
+      transferPrompt: { version: 3 },
+      transferRules: DEFAULT_TRANSFER_DERIVATION_RULES.text,
+      extractionPrompt: { version: 3 },
     });
   });
 
@@ -64,7 +72,7 @@ describe('OpenRouter receipt configuration', () => {
       apiKey: 'secret-key',
       visionModelId: 'shared-model',
       transferModelId: 'shared-model',
-      extractionPrompt: { version: 2 },
+      extractionPrompt: { version: 3 },
     });
     expect(
       toStoredReadyOpenRouterReceiptConfiguration(settings({ visionModelId: null })),
@@ -75,18 +83,7 @@ describe('OpenRouter receipt configuration', () => {
     settings({ apiKey: ' ' }),
     settings({ visionModelId: null }),
     settings({ transferModelId: null }),
-    settings({ transferPromptOverride: ' ' }),
-    settings({ transferPromptOverride: 'Custom rules without a mapping declaration' }),
-    settings({
-      transferPromptOverride:
-        'Transfername "Custom"; categoryNames exakt ["One"].\nTransfername "Custom"; categoryNames exakt ["Two"].',
-    }),
-    settings({
-      transferPromptOverride: 'Transfername " Custom"; categoryNames exakt ["Canonical category"].',
-    }),
-    settings({
-      transferPromptOverride: 'Transfername "Custom"; categoryNames exakt [" "].',
-    }),
+    settings({ transferRulesOverride: ' ' }),
   ])('is not ready when any required configuration value is missing', (candidate) => {
     expect(toReadyOpenRouterReceiptConfiguration(candidate, catalog())).toBeNull();
   });

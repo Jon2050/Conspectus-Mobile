@@ -1,7 +1,6 @@
 // Defines strict, pure receipt-analysis result contracts independently from editable prompt text.
 export const RECEIPT_ANALYSIS_LIMITS = Object.freeze({
   responseCharacters: 65_536,
-  promptCharacters: 65_536,
   items: 500,
   transfers: 100,
   errorReasonCharacters: 500,
@@ -73,27 +72,6 @@ export type ReceiptTransferDerivationResult =
   | ReceiptTransferDerivation
   | ReceiptTransferDerivationError;
 
-export interface ReceiptTransferCategoryMapping {
-  readonly transferName: string;
-  readonly categoryNames: readonly string[];
-}
-
-export const DEFAULT_RECEIPT_TRANSFER_CATEGORY_MAPPINGS: readonly ReceiptTransferCategoryMapping[] =
-  Object.freeze([
-    Object.freeze({
-      transferName: 'Lebensmittel',
-      categoryNames: Object.freeze(['Einkauf', 'Lebensmittel']),
-    }),
-    Object.freeze({
-      transferName: 'Süßwaren',
-      categoryNames: Object.freeze(['Einkauf', 'Lebensmittel', 'Süßigkeiten']),
-    }),
-    Object.freeze({
-      transferName: 'Haushaltsartikel',
-      categoryNames: Object.freeze(['Einkauf', 'Haushalt']),
-    }),
-  ]);
-
 export type ReceiptAnalysisValidationErrorCode =
   | 'OUTPUT_TOO_LARGE'
   | 'MALFORMED_JSON'
@@ -111,10 +89,7 @@ export type ReceiptAnalysisValidationErrorCode =
   | 'ITEM_TOTAL_MISMATCH'
   | 'INVALID_TRANSFER_COUNT'
   | 'DUPLICATE_TRANSFER_GROUP'
-  | 'UNKNOWN_TRANSFER_GROUP'
-  | 'CATEGORY_MISMATCH'
   | 'DUPLICATE_CATEGORY'
-  | 'INVALID_PROMPT_MAPPING'
   | 'DUPLICATE_SOURCE_ITEM_INDEX'
   | 'UNKNOWN_SOURCE_ITEM_INDEX'
   | 'INCOMPLETE_SOURCE_COVERAGE'
@@ -231,107 +206,6 @@ function failure(
   return { ok: false, error: path === undefined ? { code, message } : { code, message, path } };
 }
 
-const TRANSFER_MAPPING_LINE =
-  /^\s*Transfername\s+("(?:[^"\\]|\\.)*")\s*;\s*categoryNames\s+exakt\s+(\[(?:[^\]\\]|\\.)*\])\s*\.\s*$/;
-
-/**
- * Reads the machine-checkable mapping declarations from the editable stage-two prompt.
- * Every line mentioning either declaration marker must use the complete canonical syntax.
- */
-export function parseReceiptTransferCategoryMappings(
-  prompt: string,
-): ReceiptAnalysisParseResult<readonly ReceiptTransferCategoryMapping[]> {
-  if (prompt.length === 0 || prompt.length > RECEIPT_ANALYSIS_LIMITS.promptCharacters) {
-    return failure(
-      'INVALID_PROMPT_MAPPING',
-      'Der Transfer-Prompt fehlt oder ist zu lang.',
-      'transferPrompt',
-    );
-  }
-
-  const declarationLines = prompt
-    .split(/\r?\n/)
-    .filter((line) => line.includes('Transfername') || /categoryNames\s+exakt/.test(line));
-  if (
-    declarationLines.length === 0 ||
-    declarationLines.length > RECEIPT_ANALYSIS_LIMITS.transfers
-  ) {
-    return failure(
-      'INVALID_PROMPT_MAPPING',
-      'Der Transfer-Prompt muss mindestens eine gültige Gruppenzuordnung enthalten.',
-      'transferPrompt',
-    );
-  }
-
-  const mappings: ReceiptTransferCategoryMapping[] = [];
-  for (const [index, line] of declarationLines.entries()) {
-    const match = TRANSFER_MAPPING_LINE.exec(line);
-    if (match === null) {
-      return failure(
-        'INVALID_PROMPT_MAPPING',
-        'Eine Gruppenzuordnung verwendet nicht das erforderliche kanonische Format.',
-        `transferPrompt.mapping[${index}]`,
-      );
-    }
-    const transferNameJson = match[1];
-    const categoryNamesJson = match[2];
-    if (transferNameJson === undefined || categoryNamesJson === undefined) {
-      return failure(
-        'INVALID_PROMPT_MAPPING',
-        'Eine Gruppenzuordnung ist unvollständig.',
-        `transferPrompt.mapping[${index}]`,
-      );
-    }
-
-    let transferName: unknown;
-    let categoryNames: unknown;
-    try {
-      transferName = JSON.parse(transferNameJson);
-      categoryNames = JSON.parse(categoryNamesJson);
-    } catch {
-      return failure(
-        'INVALID_PROMPT_MAPPING',
-        'Eine Gruppenzuordnung enthält ungültige JSON-Zeichenketten.',
-        `transferPrompt.mapping[${index}]`,
-      );
-    }
-
-    if (
-      typeof transferName !== 'string' ||
-      transferName.length === 0 ||
-      transferName !== transferName.trim() ||
-      transferName.length > RECEIPT_ANALYSIS_LIMITS.transferNameCharacters ||
-      !Array.isArray(categoryNames) ||
-      categoryNames.length > RECEIPT_ANALYSIS_LIMITS.categoriesPerTransfer ||
-      categoryNames.some(
-        (category) =>
-          typeof category !== 'string' ||
-          category.length === 0 ||
-          category !== category.trim() ||
-          category.length > RECEIPT_ANALYSIS_LIMITS.categoryNameCharacters,
-      ) ||
-      new Set(categoryNames).size !== categoryNames.length
-    ) {
-      return failure(
-        'INVALID_PROMPT_MAPPING',
-        'Transfername oder Kategorien der Gruppenzuordnung sind ungültig.',
-        `transferPrompt.mapping[${index}]`,
-      );
-    }
-    if (mappings.some((mapping) => mapping.transferName === transferName)) {
-      return failure(
-        'INVALID_PROMPT_MAPPING',
-        'Ein Transfername darf im Prompt nur einmal zugeordnet werden.',
-        `transferPrompt.mapping[${index}].transferName`,
-      );
-    }
-
-    mappings.push({ transferName, categoryNames: [...categoryNames] as string[] });
-  }
-
-  return { ok: true, value: mappings };
-}
-
 function isObject(value: unknown): value is JsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -350,7 +224,7 @@ function validateExactKeys(
   if (unknownKey !== undefined) {
     return {
       code: 'UNKNOWN_KEY',
-      message: `Das Feld ${path}.${unknownKey} ist nicht erlaubt.`,
+      message: `Field ${path}.${unknownKey} is not allowed.`,
       path: `${path}.${unknownKey}`,
     };
   }
@@ -360,7 +234,7 @@ function validateExactKeys(
     ? null
     : {
         code: 'INVALID_STRUCTURE',
-        message: `Das Pflichtfeld ${path}.${missingKey} fehlt.`,
+        message: `Required field ${path}.${missingKey} is missing.`,
         path: `${path}.${missingKey}`,
       };
 }
@@ -399,13 +273,13 @@ function safeCentSum(values: readonly number[]): number | null {
 
 function parseJson(raw: string): ReceiptAnalysisParseResult<unknown> {
   if (raw.length > RECEIPT_ANALYSIS_LIMITS.responseCharacters) {
-    return failure('OUTPUT_TOO_LARGE', 'Die Modellantwort überschreitet die erlaubte Größe.');
+    return failure('OUTPUT_TOO_LARGE', 'The model response exceeds the allowed size.');
   }
 
   try {
     return { ok: true, value: JSON.parse(raw) as unknown };
   } catch {
-    return failure('MALFORMED_JSON', 'Die Modellantwort enthält kein gültiges JSON.');
+    return failure('MALFORMED_JSON', 'The model response does not contain valid JSON.');
   }
 }
 
@@ -418,7 +292,7 @@ function parseModelError<T>(
   if (reason === null) {
     return failure(
       'INVALID_ERROR_REASON',
-      'Eine Fehlerantwort muss einen konkreten, begrenzten deutschen Grund enthalten.',
+      'An error response must contain a concrete, bounded reason.',
       '$.errorReason',
     );
   }
@@ -434,7 +308,7 @@ function parseModelError<T>(
     ) {
       return failure(
         'INVALID_STRUCTURE',
-        'Eine Extraktions-Fehlerantwort darf keine Teilergebnisse enthalten.',
+        'An extraction error response must not contain partial results.',
       );
     }
     return {
@@ -458,7 +332,7 @@ function parseModelError<T>(
   ) {
     return failure(
       'INVALID_STRUCTURE',
-      'Eine Ableitungs-Fehlerantwort darf keine Teiltransfers enthalten.',
+      'A derivation error response must not contain partial transfers.',
     );
   }
   return {
@@ -478,17 +352,13 @@ export function parseReceiptExtractionResponse(
   const parsed = parseJson(raw);
   if (!parsed.ok) return parsed;
   if (!isObject(parsed.value)) {
-    return failure('INVALID_STRUCTURE', 'Die Extraktionsantwort muss ein JSON-Objekt sein.', '$');
+    return failure('INVALID_STRUCTURE', 'The extraction response must be a JSON object.', '$');
   }
 
   const keysError = validateExactKeys(parsed.value, EXTRACTION_KEYS, '$');
   if (keysError !== null) return { ok: false, error: keysError };
   if (parsed.value.status !== 'ok' && parsed.value.status !== 'error') {
-    return failure(
-      'INVALID_STATUS',
-      'Der Extraktionsstatus muss "ok" oder "error" sein.',
-      '$.status',
-    );
+    return failure('INVALID_STATUS', 'The extraction status must be "ok" or "error".', '$.status');
   }
 
   const modelError = parseModelError<ReceiptExtractionResult>(parsed.value, 'extraction');
@@ -496,7 +366,7 @@ export function parseReceiptExtractionResponse(
   if (parsed.value.errorReason !== null) {
     return failure(
       'INVALID_ERROR_REASON',
-      'Eine erfolgreiche Extraktion darf keinen Fehlergrund enthalten.',
+      'A successful extraction must not contain an error reason.',
       '$.errorReason',
     );
   }
@@ -506,26 +376,22 @@ export function parseReceiptExtractionResponse(
     RECEIPT_ANALYSIS_LIMITS.storeNameCharacters,
   );
   if (storeName === null) {
-    return failure('INVALID_STRING', 'Der Geschäftsname fehlt oder ist zu lang.', '$.storeName');
+    return failure('INVALID_STRING', 'The store name is missing or too long.', '$.storeName');
   }
   if (!isRealIsoDate(parsed.value.receiptDate)) {
     return failure(
       'INVALID_DATE',
-      'Das Belegdatum ist kein echtes Datum im Format YYYY-MM-DD.',
+      'The receipt date is not a real date in YYYY-MM-DD format.',
       '$.receiptDate',
     );
   }
   if (parsed.value.currency !== 'EUR') {
-    return failure(
-      'INVALID_CURRENCY',
-      'Es werden ausschließlich EUR-Belege unterstützt.',
-      '$.currency',
-    );
+    return failure('INVALID_CURRENCY', 'Only EUR receipts are supported.', '$.currency');
   }
   if (!isSafeInteger(parsed.value.receiptTotalCents) || parsed.value.receiptTotalCents <= 0) {
     return failure(
       'INVALID_CENTS',
-      'Der Belegbetrag muss ein positiver sicherer Centwert sein.',
+      'The receipt total must be a positive safe integer-cent value.',
       '$.receiptTotalCents',
     );
   }
@@ -534,7 +400,7 @@ export function parseReceiptExtractionResponse(
     parsed.value.items.length === 0 ||
     parsed.value.items.length > RECEIPT_ANALYSIS_LIMITS.items
   ) {
-    return failure('INVALID_ITEM_COUNT', 'Die Anzahl der Bonpositionen ist ungültig.', '$.items');
+    return failure('INVALID_ITEM_COUNT', 'The receipt item count is invalid.', '$.items');
   }
 
   const indexes = new Set<number>();
@@ -542,27 +408,27 @@ export function parseReceiptExtractionResponse(
   for (const [position, candidate] of parsed.value.items.entries()) {
     const path = `$.items[${position}]`;
     if (!isObject(candidate)) {
-      return failure('INVALID_STRUCTURE', 'Jede Bonposition muss ein Objekt sein.', path);
+      return failure('INVALID_STRUCTURE', 'Each receipt item must be an object.', path);
     }
     const itemKeysError = validateExactKeys(candidate, EXTRACTION_ITEM_KEYS, path);
     if (itemKeysError !== null) return { ok: false, error: itemKeysError };
     if (!isSafeInteger(candidate.index) || candidate.index < 0) {
       return failure(
         'INVALID_STRUCTURE',
-        'Der Positionsindex muss eine sichere nichtnegative Ganzzahl sein.',
+        'The item index must be a safe non-negative integer.',
         `${path}.index`,
       );
     }
     if (indexes.has(candidate.index)) {
       return failure(
         'DUPLICATE_ITEM_INDEX',
-        'Jeder Positionsindex darf nur einmal vorkommen.',
+        'Each item index may occur only once.',
         `${path}.index`,
       );
     }
     const name = boundedString(candidate.name, RECEIPT_ANALYSIS_LIMITS.itemNameCharacters);
     if (name === null) {
-      return failure('INVALID_STRING', 'Der Positionsname fehlt oder ist zu lang.', `${path}.name`);
+      return failure('INVALID_STRING', 'The item name is missing or too long.', `${path}.name`);
     }
     const quantityText =
       candidate.quantityText === null
@@ -571,14 +437,14 @@ export function parseReceiptExtractionResponse(
     if (candidate.quantityText !== null && quantityText === null) {
       return failure(
         'INVALID_STRING',
-        'Die Mengenangabe ist leer oder zu lang.',
+        'The quantity text is empty or too long.',
         `${path}.quantityText`,
       );
     }
     if (!isSafeInteger(candidate.lineTotalCents)) {
       return failure(
         'INVALID_CENTS',
-        'Der Zeilenbetrag muss ein sicherer vorzeichenbehafteter Centwert sein.',
+        'The line total must be a safe signed integer-cent value.',
         `${path}.lineTotalCents`,
       );
     }
@@ -586,7 +452,7 @@ export function parseReceiptExtractionResponse(
       typeof candidate.kind !== 'string' ||
       !ITEM_KINDS.includes(candidate.kind as ReceiptItemKind)
     ) {
-      return failure('INVALID_STRUCTURE', 'Die Positionsart ist ungültig.', `${path}.kind`);
+      return failure('INVALID_STRUCTURE', 'The item kind is invalid.', `${path}.kind`);
     }
 
     indexes.add(candidate.index);
@@ -603,14 +469,14 @@ export function parseReceiptExtractionResponse(
   if (itemTotal === null) {
     return failure(
       'ARITHMETIC_OVERFLOW',
-      'Die Summe der Bonpositionen überschreitet sichere Centgrenzen.',
+      'The receipt item sum exceeds safe integer-cent bounds.',
       '$.items',
     );
   }
   if (itemTotal !== parsed.value.receiptTotalCents) {
     return failure(
       'ITEM_TOTAL_MISMATCH',
-      'Die Summe der Bonpositionen entspricht nicht dem Belegbetrag.',
+      'The receipt item sum does not match the receipt total.',
       '$.items',
     );
   }
@@ -632,22 +498,17 @@ export function parseReceiptExtractionResponse(
 export function parseReceiptTransferDerivationResponse(
   raw: string,
   extraction: ReceiptExtraction,
-  categoryMappings?: readonly ReceiptTransferCategoryMapping[],
 ): ReceiptAnalysisParseResult<ReceiptTransferDerivationResult> {
   const parsed = parseJson(raw);
   if (!parsed.ok) return parsed;
   if (!isObject(parsed.value)) {
-    return failure('INVALID_STRUCTURE', 'Die Transferantwort muss ein JSON-Objekt sein.', '$');
+    return failure('INVALID_STRUCTURE', 'The transfer response must be a JSON object.', '$');
   }
 
   const keysError = validateExactKeys(parsed.value, DERIVATION_KEYS, '$');
   if (keysError !== null) return { ok: false, error: keysError };
   if (parsed.value.status !== 'ok' && parsed.value.status !== 'error') {
-    return failure(
-      'INVALID_STATUS',
-      'Der Ableitungsstatus muss "ok" oder "error" sein.',
-      '$.status',
-    );
+    return failure('INVALID_STATUS', 'The derivation status must be "ok" or "error".', '$.status');
   }
 
   const modelError = parseModelError<ReceiptTransferDerivationResult>(parsed.value, 'derivation');
@@ -655,21 +516,21 @@ export function parseReceiptTransferDerivationResponse(
   if (parsed.value.errorReason !== null) {
     return failure(
       'INVALID_ERROR_REASON',
-      'Eine erfolgreiche Ableitung darf keinen Fehlergrund enthalten.',
+      'A successful derivation must not contain an error reason.',
       '$.errorReason',
     );
   }
   if (!isSafeInteger(parsed.value.receiptTotalCents) || parsed.value.receiptTotalCents <= 0) {
     return failure(
       'INVALID_CENTS',
-      'Der Transfer-Gesamtbetrag muss ein positiver sicherer Centwert sein.',
+      'The derived receipt total must be a positive safe integer-cent value.',
       '$.receiptTotalCents',
     );
   }
   if (parsed.value.receiptTotalCents !== extraction.receiptTotalCents) {
     return failure(
       'RECEIPT_TOTAL_MISMATCH',
-      'Der abgeleitete Gesamtbetrag weicht vom Beleg ab.',
+      'The derived receipt total does not match the extraction.',
       '$.receiptTotalCents',
     );
   }
@@ -680,7 +541,7 @@ export function parseReceiptTransferDerivationResponse(
   ) {
     return failure(
       'INVALID_TRANSFER_COUNT',
-      'Die Anzahl der abgeleiteten Transfers ist ungültig.',
+      'The number of derived transfers is invalid.',
       '$.transfers',
     );
   }
@@ -688,42 +549,30 @@ export function parseReceiptTransferDerivationResponse(
   const itemByIndex = new Map(extraction.items.map((item) => [item.index, item]));
   const coveredIndexes = new Set<number>();
   const usedGroups = new Set<string>();
-  const mappingByName =
-    categoryMappings === undefined
-      ? null
-      : new Map(categoryMappings.map((mapping) => [mapping.transferName, mapping]));
   const transfers: ReceiptDerivedTransfer[] = [];
 
   for (const [position, candidate] of parsed.value.transfers.entries()) {
     const path = `$.transfers[${position}]`;
     if (!isObject(candidate)) {
-      return failure('INVALID_STRUCTURE', 'Jeder Transfer muss ein Objekt sein.', path);
+      return failure('INVALID_STRUCTURE', 'Each transfer must be an object.', path);
     }
     const transferKeysError = validateExactKeys(candidate, TRANSFER_KEYS, path);
     if (transferKeysError !== null) return { ok: false, error: transferKeysError };
     const name = boundedString(candidate.name, RECEIPT_ANALYSIS_LIMITS.transferNameCharacters);
     if (name === null) {
-      return failure('INVALID_STRING', 'Der Transfername fehlt oder ist zu lang.', `${path}.name`);
+      return failure('INVALID_STRING', 'The transfer name is missing or too long.', `${path}.name`);
     }
     if (usedGroups.has(name)) {
       return failure(
         'DUPLICATE_TRANSFER_GROUP',
-        'Jede Transfergruppe darf nur einmal vorkommen.',
-        `${path}.name`,
-      );
-    }
-    const mapping = mappingByName?.get(name);
-    if (mappingByName !== null && mapping === undefined) {
-      return failure(
-        'UNKNOWN_TRANSFER_GROUP',
-        'Die Transfergruppe ist in den erlaubten Zuordnungen nicht enthalten.',
+        'Each transfer name may occur only once.',
         `${path}.name`,
       );
     }
     if (!isSafeInteger(candidate.amountCents) || candidate.amountCents <= 0) {
       return failure(
         'INVALID_CENTS',
-        'Jeder Transferbetrag muss ein positiver sicherer Centwert sein.',
+        'Each transfer amount must be a positive safe integer-cent value.',
         `${path}.amountCents`,
       );
     }
@@ -737,27 +586,14 @@ export function parseReceiptTransferDerivationResponse(
     ) {
       return failure(
         'INVALID_STRUCTURE',
-        'Die Kategorienliste ist ungültig oder überschreitet drei Einträge.',
+        'The category list is invalid or exceeds three entries.',
         `${path}.categoryNames`,
       );
     }
     if (new Set(candidate.categoryNames).size !== candidate.categoryNames.length) {
       return failure(
         'DUPLICATE_CATEGORY',
-        'Eine Kategorie darf pro Transfer nur einmal vorkommen.',
-        `${path}.categoryNames`,
-      );
-    }
-    if (
-      mapping !== undefined &&
-      (candidate.categoryNames.length !== mapping.categoryNames.length ||
-        candidate.categoryNames.some(
-          (category, index) => category !== mapping.categoryNames[index],
-        ))
-    ) {
-      return failure(
-        'CATEGORY_MISMATCH',
-        'Die Kategorien müssen exakt und geordnet zur Transfergruppe passen.',
+        'A category may occur only once per transfer.',
         `${path}.categoryNames`,
       );
     }
@@ -765,14 +601,14 @@ export function parseReceiptTransferDerivationResponse(
     if (buyplace === null || buyplace !== extraction.storeName) {
       return failure(
         'INVALID_STRING',
-        'Der Einkaufsort muss exakt dem extrahierten Geschäft entsprechen.',
+        'The purchase location must exactly match the extracted store name.',
         `${path}.buyplace`,
       );
     }
     if (!isRealIsoDate(candidate.receiptDate) || candidate.receiptDate !== extraction.receiptDate) {
       return failure(
         'INVALID_DATE',
-        'Das Transferdatum muss exakt dem echten Belegdatum entsprechen.',
+        'The transfer date must exactly match the validated receipt date.',
         `${path}.receiptDate`,
       );
     }
@@ -783,7 +619,7 @@ export function parseReceiptTransferDerivationResponse(
     ) {
       return failure(
         'INVALID_STRUCTURE',
-        'Ein Transfer muss mindestens einen gültigen Quellindex enthalten.',
+        'A transfer must contain at least one valid source item index.',
         `${path}.sourceItemIndexes`,
       );
     }
@@ -795,14 +631,14 @@ export function parseReceiptTransferDerivationResponse(
       if (!isSafeInteger(sourceIndex) || sourceIndex < 0) {
         return failure(
           'INVALID_STRUCTURE',
-          'Ein Quellindex muss eine sichere nichtnegative Ganzzahl sein.',
+          'A source item index must be a safe non-negative integer.',
           sourcePath,
         );
       }
       if (localIndexes.has(sourceIndex) || coveredIndexes.has(sourceIndex)) {
         return failure(
           'DUPLICATE_SOURCE_ITEM_INDEX',
-          'Jeder Bonpositionsindex darf nur einmal zugeordnet werden.',
+          'Each receipt item index may be assigned only once.',
           sourcePath,
         );
       }
@@ -810,7 +646,7 @@ export function parseReceiptTransferDerivationResponse(
       if (sourceItem === undefined) {
         return failure(
           'UNKNOWN_SOURCE_ITEM_INDEX',
-          'Der Quellindex existiert nicht in der Extraktion.',
+          'The source item index does not exist in the extraction.',
           sourcePath,
         );
       }
@@ -822,14 +658,14 @@ export function parseReceiptTransferDerivationResponse(
     if (sourceTotal === null) {
       return failure(
         'ARITHMETIC_OVERFLOW',
-        'Die Gruppensumme überschreitet sichere Centgrenzen.',
+        'The transfer source-item sum exceeds safe integer-cent bounds.',
         `${path}.sourceItemIndexes`,
       );
     }
     if (sourceTotal !== candidate.amountCents) {
       return failure(
         'TRANSFER_ITEM_TOTAL_MISMATCH',
-        'Der Transferbetrag entspricht nicht der Summe seiner Bonpositionen.',
+        'The transfer amount does not match the sum of its source items.',
         `${path}.amountCents`,
       );
     }
@@ -849,7 +685,7 @@ export function parseReceiptTransferDerivationResponse(
   if (coveredIndexes.size !== itemByIndex.size) {
     return failure(
       'INCOMPLETE_SOURCE_COVERAGE',
-      'Nicht jede Bonposition wurde genau einmal zugeordnet.',
+      'Not every receipt item was assigned exactly once.',
       '$.transfers',
     );
   }
@@ -857,14 +693,14 @@ export function parseReceiptTransferDerivationResponse(
   if (transferTotal === null) {
     return failure(
       'ARITHMETIC_OVERFLOW',
-      'Die Transfersumme überschreitet sichere Centgrenzen.',
+      'The transfer sum exceeds safe integer-cent bounds.',
       '$.transfers',
     );
   }
   if (transferTotal !== extraction.receiptTotalCents) {
     return failure(
       'RECEIPT_TOTAL_MISMATCH',
-      'Die Summe aller Transfers entspricht nicht dem Belegbetrag.',
+      'The sum of all transfers does not match the receipt total.',
       '$.transfers',
     );
   }

@@ -32,8 +32,8 @@
     controller.selectTransferModel((event.currentTarget as HTMLSelectElement).value);
   };
 
-  const handleTransferPromptInput = (event: Event): void => {
-    controller.setTransferPrompt((event.currentTarget as HTMLTextAreaElement).value);
+  const handleTransferRulesInput = (event: Event): void => {
+    controller.setTransferRules((event.currentTarget as HTMLTextAreaElement).value);
   };
 
   const catalogErrorTranslationKey = (
@@ -231,8 +231,8 @@
         class="app-input openrouter-settings__prompt"
         data-testid="openrouter-transfer-prompt"
         rows="14"
-        value={state.transferPrompt}
-        on:input={handleTransferPromptInput}
+        value={state.transferRules}
+        on:input={handleTransferRulesInput}
         aria-describedby="openrouter-prompt-help"
       ></textarea>
       <p id="openrouter-prompt-help" class="openrouter-settings__help">
@@ -242,8 +242,8 @@
         class="app-button app-button--secondary openrouter-settings__reset-prompt"
         type="button"
         data-testid="openrouter-reset-prompt-button"
-        disabled={state.transferPromptUsesDefault}
-        on:click={() => controller.resetTransferPrompt()}
+        disabled={state.transferRulesUseDefault}
+        on:click={() => controller.resetTransferRules()}
       >
         {$_('settings.openRouter.prompt.reset')}
       </button>

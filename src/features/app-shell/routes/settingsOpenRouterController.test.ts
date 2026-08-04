@@ -31,7 +31,7 @@ const storedSettings = (
   apiKey: 'saved-secret-key',
   visionModelId: 'shared-model',
   transferModelId: 'shared-model',
-  transferPromptOverride: 'Custom prompt\nTransfername "Custom"; categoryNames exakt ["Custom"].',
+  transferRulesOverride: '- Custom group with category [Custom].',
   ...overrides,
 });
 
@@ -86,7 +86,7 @@ describe('createSettingsOpenRouterController', () => {
     expect(settingsStore.read('account-one')).toMatchObject({ apiKey: 'new-secret-key' });
   });
 
-  it('supports the same model in both roles plus custom and reset prompt readiness', async () => {
+  it('supports the same model in both roles plus custom and reset rule readiness', async () => {
     const settingsStore = createStore();
     const controller = createSettingsOpenRouterController({
       settingsStore,
@@ -103,22 +103,20 @@ describe('createSettingsOpenRouterController', () => {
       transferModelId: 'shared-model',
     });
 
-    controller.setTransferPrompt('  ');
+    controller.setTransferRules('  ');
     expect(controller.getState().configurationIsReady).toBe(false);
-    controller.setTransferPrompt(
-      'My groups and categories\nTransfername "Custom"; categoryNames exakt ["Custom"].',
-    );
+    controller.setTransferRules('- My custom group uses [Custom].');
     expect(controller.getState().configurationIsReady).toBe(true);
-    expect(settingsStore.read('account-one')?.transferPromptOverride).toBe(
-      'My groups and categories\nTransfername "Custom"; categoryNames exakt ["Custom"].',
+    expect(settingsStore.read('account-one')?.transferRulesOverride).toBe(
+      '- My custom group uses [Custom].',
     );
 
-    controller.resetTransferPrompt();
+    controller.resetTransferRules();
     expect(controller.getState()).toMatchObject({
-      transferPromptUsesDefault: true,
+      transferRulesUseDefault: true,
       configurationIsReady: true,
     });
-    expect(settingsStore.read('account-one')?.transferPromptOverride).toBeNull();
+    expect(settingsStore.read('account-one')?.transferRulesOverride).toBeNull();
   });
 
   it('starts a fresh saved-key catalog request for each new Settings controller', async () => {
