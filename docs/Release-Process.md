@@ -24,8 +24,9 @@ history, and the strict `Quality Gate` status check. It currently requires zero 
 reviews, so the human release-owner sign-off below is an explicit procedural gate recorded in the
 release pull request. The reviewer-agent result is supporting engineering review, not a substitute
 for that human decision. The release-branch gate performs the complete static, unit, build, Chromium,
-and Pixel 5 suite. After the protected rebase merge, the main gate verifies the exact merged build
-artifact and Chromium critical journeys without repeating the complete, already-current branch gate.
+Pixel 5, and iPhone WebKit suites. After the protected rebase merge, the main gate verifies the exact
+merged build artifact, Chromium critical journeys and the full WebKit suite. Physical-device and
+provider qualification remain mandatory even when the automated gate passes.
 
 The non-main preview URL is a shared slot. Coordinate a release-candidate test window so no other
 non-main branch deploys to `/previews/test/` during physical-device QA. If the slot is overwritten,
@@ -80,7 +81,7 @@ comment. Do not maintain a second release checklist elsewhere.
       branch.
 - [ ] Record the resulting full `main` SHA and confirm that the version in `package.json` still
       matches the planned tag.
-- [ ] Confirm the post-merge `Quality Gate` exact-SHA build/Chromium smoke and `Deploy Preview`
+- [ ] Confirm the post-merge `Quality Gate` exact-SHA build/Chromium smoke/WebKit gate and `Deploy Preview`
       three-run Lighthouse gate succeed for that exact `main` SHA; keep the full release-branch
       `Quality Gate` linked as the pre-merge evidence.
 - [ ] Confirm the main preview exposes the expected version/build identity and release content.

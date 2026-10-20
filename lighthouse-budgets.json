@@ -19,7 +19,7 @@
       "label": "HTTPS",
       "minimumScore": 1
     },
-    "viewport": {
+    "viewport-insight": {
       "label": "Mobile viewport",
       "minimumScore": 1
     }
