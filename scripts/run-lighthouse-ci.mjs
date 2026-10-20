@@ -127,7 +127,7 @@ export const readBudgetConfig = (configPath) => {
 
   for (const [sectionName, requiredKeys] of [
     ['categories', LIGHTHOUSE_CATEGORIES],
-    ['audits', ['is-on-https', 'viewport']],
+    ['audits', ['is-on-https', 'viewport-insight']],
   ]) {
     for (const key of requiredKeys) {
       const definition = config?.[sectionName]?.[key];

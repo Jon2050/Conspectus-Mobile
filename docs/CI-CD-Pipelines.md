@@ -77,12 +77,12 @@ flowchart TD
   - `Format, Lint, Typecheck, and Dead Code`, `Unit Tests`, and `Build App (Preview)` fan out after
     change detection
   - bundle and channel verification run inside the build job before its artifact is uploaded
-  - isolated Chromium and Pixel 5 E2E jobs fan out after the verified build
+  - isolated Chromium, Pixel 5 and iPhone WebKit E2E jobs fan out after the verified build
   - `Quality Gate` joins every result
 - Protected `main` merge graph:
   - dependency audit and change detection
   - exact-SHA preview build with bundle and channel verification
-  - Chromium critical-user-journey smoke
+  - Chromium critical-user-journey smoke and the full iPhone WebKit suite, including offline reload
   - `Quality Gate`
 - Depends on: none
 - Downstream dependencies:
@@ -92,14 +92,17 @@ flowchart TD
   - if any quality job, including the dependency audit, fails, no downstream preview deployment or manual production deployment can proceed for that commit
   - branches whose effective diff is docs-only skip the heavy jobs and therefore do not emit deployable artifacts
 - Notes:
-  - uses `actions/setup-node` npm cache and Playwright browser cache
+  - uses `actions/setup-node` npm cache and Playwright browser cache keyed by locked Playwright
+    version and project; each job installs the matching Chromium or WebKit binary and OS libraries
   - cancels in-progress runs for the same ref via workflow concurrency
   - the build job checks `dist` against the JS/CSS bundle budgets before validating base-path
     correctness, manifest `start_url` and `scope`, install icons, service worker scope, document CSP,
     artifact-owned Apache security headers, and root-path leakage, then uploads the verified artifact
   - the active no-bypass, strict, rebase-only main ruleset requires the full branch `Quality Gate` to
     be current before merging; the lighter main run therefore verifies the exact merged build and
-    critical runtime path without repeating every pre-merge check
+    critical runtime path; WebKit repeats its full suite on the merged artifact. The default local
+    Playwright configuration also includes WebKit, with no environment opt-in. No extra retries or
+    skips mask offline reload failures. Physical Safari/PWA QA remains a separate required gate.
   - `Quality Gate` is the single branch-protection check that should be required on `main`
 
 #### Bundle size budgets
@@ -271,13 +274,13 @@ measurement variance. The high-churn shared non-main preview runs the same check
 feedback; main and production retain the release-grade three-run evidence. Deterministic audits must
 pass in every collected run.
 
-| Check           | Minimum | Main/production | Non-main preview |
-| --------------- | ------: | --------------- | ---------------- |
-| Performance     |     80% | Median          | Single run       |
-| Accessibility   |     90% | Median          | Single run       |
-| Best Practices  |     90% | Median          | Single run       |
-| HTTPS           |    100% | Every run       | Every run        |
-| Mobile viewport |    100% | Every run       | Every run        |
+| Check                                                 | Minimum | Main/production | Non-main preview |
+| ----------------------------------------------------- | ------: | --------------- | ---------------- |
+| Performance                                           |     80% | Median          | Single run       |
+| Accessibility                                         |     90% | Median          | Single run       |
+| Best Practices                                        |     90% | Median          | Single run       |
+| HTTPS                                                 |    100% | Every run       | Every run        |
+| Mobile viewport (`viewport-insight` in Lighthouse 13) |    100% | Every run       | Every run        |
 
 The release runner also checks the deployed same-origin PWA manifest, route-correct `start_url` and
 scope, browser-confirmed service-worker registration/scope, and required 192px/512px install icons.

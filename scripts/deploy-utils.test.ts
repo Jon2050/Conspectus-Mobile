@@ -168,7 +168,15 @@ describe('quality workflow contract', () => {
       /e2e-tests:\n(?:.*\n)*?\s+needs:\n\s+- detect-code-changes\n\s+- build/,
     );
     expect(workflowSource).toContain('project: ${{ fromJSON(');
-    expect(workflowSource).toContain('["chromium", "pixel-5"]');
+    expect(workflowSource).toContain('["chromium", "pixel-5", "iphone-13-safari"]');
+    expect(workflowSource).toContain('["chromium", "iphone-13-safari"]');
+    expect(workflowSource).toContain(
+      "matrix.project == 'iphone-13-safari' && 'webkit' || 'chromium'",
+    );
+    expect(workflowSource).toContain('[ "${{ matrix.project }}" = \'chromium\' ]');
+    expect(workflowSource).toContain(
+      'key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}-${{ matrix.project }}',
+    );
     expect(workflowSource).toContain('tests/e2e/critical-user-journeys.spec.ts');
     expect(workflowSource).toContain('quality-gate:');
     expect(workflowSource).toMatch(
@@ -183,7 +191,7 @@ describe('quality workflow contract', () => {
     );
     expect(workflowSource).toContain('PLAYWRIGHT_APP_BASE_PATH:');
     expect(workflowSource).toContain(
-      'Protected main merge completed the exact-SHA build verification and Chromium critical-journey smoke.',
+      'Protected main merge completed the exact-SHA build verification, Chromium smoke and WebKit gate.',
     );
     expect(workflowSource).toContain('github.ref_name != github.event.repository.default_branch');
   });

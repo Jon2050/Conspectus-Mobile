@@ -74,8 +74,9 @@ separately; supplemental results do not replace `IOS` or `ANDROID`.
 
 ## Required Scenarios
 
-Run `QA-01` through `QA-08` in order on each required platform. Restore the fixture baseline and
-clear the app's site data before starting the second platform.
+Run `QA-01` through `QA-11` in order on each required platform, in both browser and installed PWA
+modes. Record mode-specific results; a platform result is PASS only when both modes pass.
+Restore the fixture baseline and clear the app's site data before each platform/mode pass.
 
 ### QA-01 Install and standalone relaunch
 
@@ -243,6 +244,77 @@ Expected results:
 Evidence: force-refresh completion, post-reset signed-in but unbound state, and rebound file/current
 data.
 
+### QA-09 Receipt capture, cancellation and lifecycle
+
+1. Configure a user-owned QA OpenRouter key and two currently eligible models. Record model IDs
+   and the shipped prompt/rule versions, never the key. Use the independently reviewed synthetic
+   corpus from [`tests/fixtures/receipts`](../tests/fixtures/receipts/README.md) and anonymized camera
+   photographs with separately checked expected dates, merchant names, groups and cent totals.
+2. Open the camera, cancel without taking a photo, then take a portrait and an EXIF-rotated photo.
+   Try actual HEIC input, a long narrow receipt, unreadable print and a large 12/48 MP photo.
+3. During extraction and again during derivation, switch to another app, lock/unlock the phone,
+   and return. Repeat with a photo returned while the unchanged foreground freshness check runs.
+4. Repeat while changing the account/bound file or resetting; never reuse the old analysis on a
+   new target. Open the keyboard and rotate during source selection.
+
+Expected results:
+
+- Camera cancellation leaves the original view usable. Supported images preserve orientation;
+  unsupported formats, size limits and decode failures produce understandable errors before saving.
+- An unchanged online check preserves the capture/analysis. A real session replacement cancels it
+  and clears transient image/results. No receipt image is persisted by the application.
+- The keyboard, safe areas and rotation leave source selection and progress reachable. Record
+  normalization dimensions, process termination/memory pressure, outcome and elapsed time.
+- Compare actual extraction/grouping with independent gold. A plausible total alone is insufficient;
+  record every unsafe acceptance, false rejection and provider failure separately. Feed complete
+  model-pair recordings to the corpus evaluator described in its README.
+
+Evidence: device/mode and candidate identity, model/prompt/rule versions, per-image expected/actual
+results and redacted screenshots. Synthetic gold replay is supplemental, not provider qualification.
+
+### QA-10 Receipt errors, uncertain upload and correction
+
+1. Exercise an unavailable model, provider rate limit and network loss during each analysis stage.
+2. Save a supported receipt with a deliberate source account and verify the post-save summary.
+   Interrupt upload; separately exercise a changed remote eTag and an acknowledged upload with
+   local cache reconciliation failure using disposable test infrastructure where available.
+3. Close/reopen and recover using only the offered action. Reload online and count transfers and
+   balances. Photograph the same receipt again only deliberately, observing the duplicate warning.
+4. For a wrong recognized item/category, open the database in Conspectus Desktop after closing
+   Mobile, correct the created transfer, close Desktop and refresh Mobile.
+
+Expected results:
+
+- Analysis failures never automatically rerun model calls or save partial batches. A fresh capture
+  is deliberate; transient validated results are not silently reused after cancellation.
+- Retry sends the original bytes/eTag without another SQL commit. Conflicts require authoritative
+  refresh and explicit save-again. Unknown remote outcomes are identified as uncertain; inspect the
+  refreshed database before taking a new photo or saving again. Confirmed remote success followed
+  by cache failure offers reconciliation without another PUT.
+- Each successful batch appears exactly once with correct account balances. The summary and
+  duplicate warning explain the supported correction path; a repeated photo is not silently deduped.
+- Desktop correction is visible after online refresh and causes no concurrent database use.
+
+Evidence: failure/recovery messages, request counts when available, final database counts and
+balances, corrected transfer. Mark unavailable fault injection BLOCKED rather than claiming a pass.
+
+### QA-11 Service-worker update with an active draft or pending upload
+
+1. Keep a manual draft or receipt operation open while a new candidate worker becomes available.
+2. Observe the update prompt; do not activate it while the operation is pending. Finish or recover
+   the operation, inspect persisted data, then activate the update deliberately.
+3. Relaunch online and repeat offline startup/recovery from QA-06 in both modes.
+
+Expected results:
+
+- No unsolicited reload loses a draft or pending context. The worker activates only through the
+  existing explicit update action. Record transient draft loss on deliberate reload as such.
+- Offline launch serves the app shell and fails closed for financial reads/writes; reconnecting
+  restores current data. No internal browser error, blank page or silent duplicate write occurs.
+- The new footer identity matches the explicitly activated candidate. Record both worker versions.
+
+Evidence: prompt with active operation, post-update identity and offline/online recovery recording.
+
 ## Release Pull Request Evidence
 
 Copy the following block into the release pull request body or a dedicated release pull request
@@ -270,26 +342,29 @@ unlinked issue do not satisfy the gate.
 
 ### Results
 
-| Scenario                                              | IOS     | ANDROID | Evidence / defect links |
-| ----------------------------------------------------- | ------- | ------- | ----------------------- |
-| QA-01 Install and standalone relaunch                 | NOT RUN | NOT RUN |                         |
-| QA-02 Sign in, bind, and initial read                 | NOT RUN | NOT RUN |                         |
-| QA-03 Month navigation and mobile layout              | NOT RUN | NOT RUN |                         |
-| QA-04 Successful transfer write and persistence       | NOT RUN | NOT RUN |                         |
-| QA-05 Network loss during upload and retry            | NOT RUN | NOT RUN |                         |
-| QA-06 Offline startup and write protection            | NOT RUN | NOT RUN |                         |
-| QA-07 Expired-session recovery and route preservation | NOT RUN | NOT RUN |                         |
-| QA-08 Settings force refresh, reset, and rebind       | NOT RUN | NOT RUN |                         |
+| Scenario                                              | IOS Safari | IOS PWA | Android Chrome | Android PWA | Evidence / defect links |
+| ----------------------------------------------------- | ---------- | ------- | -------------- | ----------- | ----------------------- |
+| QA-01 Install and standalone relaunch                 | NOT RUN    | NOT RUN | NOT RUN        | NOT RUN     |                         |
+| QA-02 Sign in, bind, and initial read                 | NOT RUN    | NOT RUN | NOT RUN        | NOT RUN     |                         |
+| QA-03 Month navigation and mobile layout              | NOT RUN    | NOT RUN | NOT RUN        | NOT RUN     |                         |
+| QA-04 Successful transfer write and persistence       | NOT RUN    | NOT RUN | NOT RUN        | NOT RUN     |                         |
+| QA-05 Network loss during upload and retry            | NOT RUN    | NOT RUN | NOT RUN        | NOT RUN     |                         |
+| QA-06 Offline startup and write protection            | NOT RUN    | NOT RUN | NOT RUN        | NOT RUN     |                         |
+| QA-07 Expired-session recovery and route preservation | NOT RUN    | NOT RUN | NOT RUN        | NOT RUN     |                         |
+| QA-08 Settings force refresh, reset, and rebind       | NOT RUN    | NOT RUN | NOT RUN        | NOT RUN     |                         |
+| QA-09 Receipt capture, cancellation and lifecycle     | NOT RUN    | NOT RUN | NOT RUN        | NOT RUN     |                         |
+| QA-10 Receipt errors, uncertain upload and correction | NOT RUN    | NOT RUN | NOT RUN        | NOT RUN     |                         |
+| QA-11 Service-worker update with active work          | NOT RUN    | NOT RUN | NOT RUN        | NOT RUN     |                         |
 
 ### Reruns
 
-| Date/time | Platform | Scenario | Candidate commit | Previous result | New result | Evidence / defect |
-| --------- | -------- | -------- | ---------------- | --------------- | ---------- | ----------------- |
-|           |          |          |                  |                 |            |                   |
+| Date/time | Platform / mode | Scenario | Candidate commit | Previous result | New result | Evidence / defect |
+| --------- | --------------- | -------- | ---------------- | --------------- | ---------- | ----------------- |
+|           |                 |          |                  |                 |            |                   |
 
 ### Final Gate
 
-- [ ] Every QA-01 through QA-08 result is PASS on IOS and ANDROID.
+- [ ] Every QA-01 through QA-11 result is PASS on IOS and ANDROID in both required modes.
 - [ ] Every failure is linked to a defect and its affected scenario has a passing rerun.
 - [ ] Evidence is attached to or durably linked from this release pull request.
 - Final status: BLOCKED / PASS

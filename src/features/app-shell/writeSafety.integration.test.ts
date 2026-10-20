@@ -400,4 +400,92 @@ describe('shared write safety with real SQLite', () => {
     await saving;
     expect(count(tab.runtime, 'Manual in flight')).toBe(1);
   });
+
+  it('Q3: retries an actual receipt batch byte-for-byte without repeating SQL or balance changes', async () => {
+    const h = await harness();
+    const tab = await h.tab();
+    const commands = Object.freeze([command('Receipt bread'), command('Receipt soap')]);
+    h.setUploadFailure(true);
+    await tab.receipt.commit(commands, tab.context(), t);
+    expect(tab.receipt.getState().phase).toBe('upload_failed');
+    const balancesAfterCommit = tab.runtime.exec(
+      'SELECT account_id, amount FROM account ORDER BY account_id',
+    );
+    const firstUpload = vi.mocked(h.graph.uploadFile).mock.calls[0]!;
+    h.setUploadFailure(false);
+    await tab.receipt.retryUpload(tab.context(), t);
+    expect(tab.receipt.getState()).toMatchObject({ phase: 'saved', createdCount: 2 });
+    const secondUpload = vi.mocked(h.graph.uploadFile).mock.calls[1]!;
+    expect(secondUpload[1]).toEqual(firstUpload[1]);
+    expect(secondUpload[2]).toBe('v1');
+    const remote = await h.remoteRuntime();
+    for (const input of commands) expect(count(remote, input.name)).toBe(1);
+    expect(remote.exec('SELECT account_id, amount FROM account ORDER BY account_id')).toEqual(
+      balancesAfterCommit,
+    );
+    expect(remote.exec('PRAGMA foreign_key_check')).toEqual([]);
+  });
+
+  it.each(['cache_version', 'binding'] as const)(
+    'Q3: a retained receipt batch cannot cross a changed %s boundary',
+    async (change) => {
+      const h = await harness();
+      const tab = await h.tab();
+      h.setUploadFailure(true);
+      await tab.receipt.commit(Object.freeze([command('Retained receipt')]), tab.context(), t);
+      expect(tab.receipt.getState().phase).toBe('upload_failed');
+      if (change === 'cache_version') h.advanceCache();
+      else h.setIdentity({ accountId: 'account-A', binding: { ...binding, itemId: 'file-B' } });
+      h.setUploadFailure(false);
+      await tab.receipt.retryUpload(tab.context(), t);
+      expect(h.graph.uploadFile).toHaveBeenCalledTimes(1);
+      expect(tab.receipt.getState().phase).not.toBe('upload_failed');
+      expect(count(await h.remoteRuntime(), 'Retained receipt')).toBe(0);
+    },
+  );
+
+  it('Q3: receipt export failure restores real authoritative bytes before an explicit new save', async () => {
+    const h = await harness();
+    const tab = await h.tab();
+    const commands = Object.freeze([command('Receipt after export failure')]);
+    vi.spyOn(tab.runtime, 'exportBytes').mockImplementationOnce(() => {
+      throw new Error('Injected receipt export failure');
+    });
+    await tab.receipt.commit(commands, tab.context(), t);
+    expect(h.graph.uploadFile).not.toHaveBeenCalled();
+    expect(count(tab.runtime, commands[0]!.name)).toBe(0);
+    tab.receipt.reset();
+    await tab.receipt.commit(commands, tab.context(), t);
+    expect(tab.receipt.getState().phase).toBe('saved');
+    expect(count(await h.remoteRuntime(), commands[0]!.name)).toBe(1);
+  });
+
+  it.each(['first', 'retry'] as const)(
+    'Q3: a receipt accepted remotely on %s with failed cache reconciles without another PUT',
+    async (attempt) => {
+      const h = await harness();
+      const tab = await h.tab();
+      const commands = Object.freeze([command('Remote receipt')]);
+      if (attempt === 'retry') {
+        h.setUploadFailure(true);
+        await tab.receipt.commit(commands, tab.context(), t);
+        h.setUploadFailure(false);
+      }
+      h.setCacheFailure(true);
+      if (attempt === 'first') await tab.receipt.commit(commands, tab.context(), t);
+      else await tab.receipt.retryUpload(tab.context(), t);
+      expect(tab.receipt.getState()).toMatchObject({
+        phase: 'remote_commit_recovery_failed',
+      });
+      const uploads = vi.mocked(h.graph.uploadFile).mock.calls.length;
+      await tab.receipt.retryUpload(tab.context(), t);
+      await tab.receipt.commit(commands, tab.context(), t);
+      expect(h.graph.uploadFile).toHaveBeenCalledTimes(uploads);
+      h.setCacheFailure(false);
+      await tab.recovery.syncLatestDatabase();
+      expect(count(tab.runtime, 'Remote receipt')).toBe(1);
+      expect(count(await h.remoteRuntime(), 'Remote receipt')).toBe(1);
+      expect(h.graph.uploadFile).toHaveBeenCalledTimes(uploads);
+    },
+  );
 });

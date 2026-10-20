@@ -19,8 +19,6 @@ const webServerCommand =
   process.env.PLAYWRIGHT_WEB_SERVER_BUILD === '0'
     ? 'node scripts/serve-static-dist.mjs'
     : 'npm run build && node scripts/serve-static-dist.mjs';
-const includeIosWebkitProject = process.env.PLAYWRIGHT_INCLUDE_IOS_WEBKIT === '1';
-
 const projects = [
   {
     name: 'chromium',
@@ -30,14 +28,11 @@ const projects = [
     name: 'pixel-5',
     use: { ...devices['Pixel 5'] },
   },
-];
-
-if (includeIosWebkitProject) {
-  projects.push({
+  {
     name: 'iphone-13-safari',
     use: { ...devices['iPhone 13'] },
-  });
-}
+  },
+];
 
 export default defineConfig({
   testDir: './tests/e2e',

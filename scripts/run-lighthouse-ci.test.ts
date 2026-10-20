@@ -21,7 +21,7 @@ const budgetConfig = {
   },
   audits: {
     'is-on-https': { label: 'HTTPS', minimumScore: 1 },
-    viewport: { label: 'Mobile viewport', minimumScore: 1 },
+    'viewport-insight': { label: 'Mobile viewport', minimumScore: 1 },
   },
 };
 
@@ -33,7 +33,7 @@ const createReport = (performance: number, accessibility = 0.95, bestPractices =
   },
   audits: {
     'is-on-https': { score: 1 },
-    viewport: { score: 1 },
+    'viewport-insight': { score: 1 },
   },
 });
 
@@ -68,6 +68,13 @@ afterEach(() => {
 });
 
 describe('Lighthouse CI runner', () => {
+  it('uses audit IDs supported by the installed Lighthouse release', async () => {
+    const { getAuditList } = await import('lighthouse');
+    const auditIds = getAuditList().map((file: string) => path.basename(file, '.js'));
+    const committed = readBudgetConfig(path.resolve('lighthouse-budgets.json'));
+    for (const id of Object.keys(committed.audits)) expect(auditIds).toContain(id);
+  });
+
   it('normalizes an HTTPS target and rejects non-HTTPS targets', () => {
     expect(parseArgs(['https://example.com/app', 'reports/custom']).url.toString()).toBe(
       'https://example.com/app/',
@@ -127,17 +134,19 @@ describe('Lighthouse CI runner', () => {
     });
 
     const failingViewportReport = createReport(0.9);
-    failingViewportReport.audits.viewport.score = 0;
+    failingViewportReport.audits['viewport-insight'].score = 0;
     const failingEvaluation = evaluateReports(
       [createReport(0.9), failingViewportReport, createReport(0.9)],
       budgetConfig,
       pwaContract,
     );
     expect(failingEvaluation.passed).toBe(false);
-    expect(failingEvaluation.checks.find((check) => check.id === 'viewport')).toMatchObject({
-      observedScore: 0,
-      passed: false,
-    });
+    expect(failingEvaluation.checks.find((check) => check.id === 'viewport-insight')).toMatchObject(
+      {
+        observedScore: 0,
+        passed: false,
+      },
+    );
   });
 
   it('renders thresholds and the PWA contract in the report summary', () => {

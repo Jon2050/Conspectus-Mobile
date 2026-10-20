@@ -34,7 +34,7 @@ Provide fast mobile access to a personal Conspectus SQLite database stored in On
 
 ## Getting Started
 
-Use Node `>=22`.
+Use Node `>=22.19` (required by the Lighthouse security update).
 
 1. Install dependencies with `npm install`.
 2. Create `.env` from `.env.example`.
@@ -173,9 +173,12 @@ Playwright release-gate policy:
   fixed at its root cause instead of increasing retries.
 
 The `Quality` workflow runs on every push to non-`gh-pages` branches. Code-bearing non-main branches
-run full checks with Chromium and Pixel 5 E2E jobs in parallel. Protected `main` merges reuse the
-strict, up-to-date branch gate and run the exact-SHA build verification plus a Chromium critical-
-journey smoke. Branches whose effective diff is docs-only skip the heavy jobs.
+run full checks with Chromium, Pixel 5 and iPhone WebKit E2E jobs in parallel. Protected `main`
+merges reuse the strict, up-to-date branch gate and run the exact-SHA build verification plus a
+Chromium critical-journey smoke and the full WebKit gate. WebKit is also included in the default
+local `npm run test:e2e`; install the locked browsers with `npx playwright install chromium webkit`.
+Browser emulation supplements the required physical-device QA. Branches whose effective diff is
+docs-only skip the heavy jobs.
 
 CI test report view in GitHub:
 

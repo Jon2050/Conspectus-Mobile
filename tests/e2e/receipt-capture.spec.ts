@@ -271,7 +271,6 @@ const installReceiptAnalysisRoutes = async (
     completionRequests.push(request);
     if (completionRequests.length === 1) await firstStageGate;
     const response = completionBodies[completionRequests.length - 1] ?? completionBodies.at(-1);
-    await new Promise((resolve) => setTimeout(resolve, 250));
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -343,7 +342,15 @@ test('runs both OpenRouter stages and automatically commits one validated transf
   page,
 }) => {
   await installReadyReceiptConfiguration(page);
-  const requests = await installReceiptAnalysisRoutes(page, [EXTRACTION, DERIVATION]);
+  let releaseExtraction!: () => void;
+  const extractionGate = new Promise<void>((resolve) => {
+    releaseExtraction = resolve;
+  });
+  const requests = await installReceiptAnalysisRoutes(
+    page,
+    [EXTRACTION, DERIVATION],
+    extractionGate,
+  );
   await installReadyAddTransferTestDb(
     page,
     {
@@ -383,6 +390,7 @@ test('runs both OpenRouter stages and automatically commits one validated transf
   await expect(page.getByTestId('add-transfer-submit')).toHaveCount(0);
   await expect(page.getByTestId('receipt-progress')).not.toContainText('%');
   await page.getByTestId('add-transfer-from-account').selectOption('11');
+  releaseExtraction();
   // The source selector disappears as soon as the prepared commands are handed off.
   // Assert the durable result instead of racing that transition.
   await expect(page.getByTestId('receipt-commit-success')).toContainText('1 transfer created');
@@ -480,9 +488,7 @@ test('waits for a deliberate late source selection and commits a multi-transfer 
   await page.evaluate(() => {
     window.location.hash = '#/transfers';
   });
-  if ((await page.getByTestId('transfers-month-label').textContent())?.includes('August 2026')) {
-    await page.getByTestId('transfers-month-previous-button').click();
-  }
+  await expect(page.getByTestId('transfers-month-label')).toHaveText('July 2026');
   await expect(page.getByTestId('route-transfers')).toContainText('Brot');
   await expect(page.getByTestId('route-transfers')).toContainText('Reiniger');
 });
@@ -859,6 +865,8 @@ for (const pickerReturnsDuringRefresh of [false, true]) {
       ],
     });
     await page.goto(appPath('#/add'));
+    // A foreground check must start after bootstrap, as with a previously opened native picker.
+    await expect(page.getByTestId('receipt-photo-button')).toBeEnabled();
     const photo = { name: 'receipt.png', mimeType: 'image/png', buffer: RECEIPT_IMAGE };
     if (!pickerReturnsDuringRefresh) {
       await page.getByTestId('receipt-image-input').setInputFiles(photo);
