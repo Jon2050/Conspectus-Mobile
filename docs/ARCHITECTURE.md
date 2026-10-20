@@ -264,11 +264,25 @@ application's business and database behavior:
 4. In one SQLite transaction, insert the transfer or every transfer in the batch and apply every
    matching source/destination balance change. Any statement failure rolls back the entire action.
 5. Export a new full SQLite byte snapshot.
-6. Upload the full file to OneDrive with `If-Match` using the current eTag.
+6. Upload the full file to OneDrive with `If-Match` using the opened runtime's original eTag.
 7. After remote success, persist the uploaded bytes and returned eTag and refresh visible data.
 
 Safety invariants:
 
+- Manual entry and receipt batches use `transferCommitController`; their adapters own input
+  validation and presentation, while the common controller owns commit, retry and recovery.
+- `databaseSession` binds a verified runtime to an immutable account, drive, item, base eTag and
+  generation. A new transaction requires a verified, clean session; byte-only retry requires the
+  original session. Identity is checked again after asynchronous cache and token work, before PUT.
+- A write owns the session until its upload attempt finishes. Refresh is deferred during that
+  interval; starting refresh revokes write permission until a matching snapshot is opened.
+  Failed replacement opens cannot leave the previous runtime authorized for writing. Reset and
+  sign-out revoke the session before their asynchronous work begins.
+- Tabs keep independent runtime provenance even though IndexedDB is shared. Each PUT retains its
+  own base eTag; a newer cached eTag causes a conflict before PUT, and `If-Match` arbitrates
+  concurrent server writes. Cache metadata never advances an older runtime's base version.
+- Every sql.js export restores and checks required connection PRAGMAs, including on export
+  failure. If restoration fails, the runtime closes and loses its generation.
 - A failed SQL statement rolls back the entire local transaction.
 - Success is not shown before OneDrive accepts the upload.
 - A retryable transport failure retries the already exported bytes; it does not repeat the local
@@ -280,6 +294,9 @@ Safety invariants:
   authoritative restore path; the locally changed runtime is never left available for a later
   unrelated export.
 - A cache failure after remote success is a reconciliation problem, not a retryable remote write.
+- A lost response or server failure can leave the remote outcome unknown. The UI identifies that
+  uncertainty; only the original bytes and eTag may be retried. A subsequent conflict discards
+  those bytes and refreshes without replaying commands or claiming the transfer was not saved.
 - An eTag conflict discards stale pending bytes, closes the current sql.js runtime, downloads and
   validates the latest OneDrive snapshot, and reopens the runtime. Manual entry then allows review
   and resubmission of its draft; receipt creation revalidates immutable commands and requires an

@@ -1,3 +1,4 @@
+import { appDatabaseSession } from '../databaseSession';
 // Manages confirmation and execution state for destructive local app data reset actions in Settings.
 import type { CacheStore } from '@cache';
 
@@ -107,6 +108,7 @@ export const createSettingsLocalDataController = (
       });
 
       try {
+        appDatabaseSession.invalidate();
         await cacheStore.clearAll();
         options.onLocalDataReset();
         updateState(INITIAL_STATE);

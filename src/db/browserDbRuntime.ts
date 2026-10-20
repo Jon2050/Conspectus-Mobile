@@ -62,6 +62,7 @@ export const createBrowserDbRuntime = (
 ): BrowserDbRuntime => {
   let sqlJsRuntime: SqlJsStatic | null = null;
   let database: Database | null = null;
+  let generation = 0;
 
   const requireOpenDatabase = (): Database => {
     if (database === null) {
@@ -126,6 +127,7 @@ export const createBrowserDbRuntime = (
 
         const previousDatabase = database;
         database = nextDatabase;
+        generation += 1;
         nextDatabase = null;
         previousDatabase?.close();
       } catch (error) {
@@ -147,12 +149,15 @@ export const createBrowserDbRuntime = (
       if (database !== null) {
         database.close();
         database = null;
+        generation += 1;
       }
     },
 
     isOpen(): boolean {
       return database !== null;
     },
+
+    getGeneration: () => generation,
 
     exec(sql: string, params?: BindParams): readonly QueryExecResult[] {
       try {
@@ -168,7 +173,25 @@ export const createBrowserDbRuntime = (
 
     exportBytes(): Uint8Array {
       try {
-        return requireOpenDatabase().export();
+        const current = requireOpenDatabase();
+        let exportedBytes: Uint8Array | undefined;
+        let exportFailure: unknown;
+        try {
+          exportedBytes = current.export();
+        } catch (error) {
+          exportFailure = error;
+        }
+        // sql.js reopens its connection during export, including some failure paths.
+        try {
+          applyRequiredPragmas(current);
+        } catch (error) {
+          current.close();
+          database = null;
+          generation += 1;
+          throw error;
+        }
+        if (exportedBytes === undefined) throw exportFailure;
+        return exportedBytes;
       } catch (error) {
         if (error instanceof DbRuntimeError) {
           throw error;

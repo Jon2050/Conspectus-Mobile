@@ -70,6 +70,7 @@
   export let syncStateStore: SyncStateStore = appSyncStateStore;
   export let networkStateStore: NetworkStateStore = appNetworkStateStore;
   export let canOpenPanel = true;
+  export let canCreateTransfer = true;
   export let receiptCaptureController: ReceiptCaptureController | null = null;
   export let receiptAnalysisController: ReceiptAnalysisController | null = null;
   export let receiptPreparationController: ReceiptTransferPreparationController =
@@ -112,7 +113,8 @@
     saveState.phase === 'local_save' ||
     saveState.phase === 'uploading' ||
     saveState.phase === 'conflict_syncing' ||
-    saveState.phase === 'remote_commit_syncing';
+    saveState.phase === 'remote_commit_syncing' ||
+    saveState.phase === 'local_commit_syncing';
   $: conflictRecoveryIsRequired =
     saveState.phase === 'conflict' || saveState.phase === 'conflict_syncing';
   $: remoteCommitRecoveryIsRequired =
@@ -120,7 +122,12 @@
     saveState.phase === 'remote_commit_recovered' ||
     saveState.phase === 'remote_commit_recovery_failed';
   $: saveBlocksEditing =
-    saveState.canRetry || conflictRecoveryIsRequired || remoteCommitRecoveryIsRequired;
+    saveState.canRetry ||
+    conflictRecoveryIsRequired ||
+    remoteCommitRecoveryIsRequired ||
+    saveState.phase === 'local_commit_syncing' ||
+    saveState.phase === 'local_commit_recovery_failed' ||
+    saveState.phase === 'invalidated';
   $: receiptCaptureIsBusy =
     receiptCaptureState.phase === 'normalizing' ||
     receiptCaptureState.phase === 'handed_off' ||
@@ -199,8 +206,10 @@
     saveBlocksEditing ||
     receiptCaptureIsBusy;
   $: sourceAccountIsDisabled = isSubmitting || isOptionsLoading || saveIsBusy || saveBlocksEditing;
-  $: submitIsDisabled = controlsAreDisabled || isOffline || optionsState.operation !== 'ready';
+  $: submitIsDisabled =
+    !canCreateTransfer || controlsAreDisabled || isOffline || optionsState.operation !== 'ready';
   $: receiptCaptureIsDisabled =
+    !canCreateTransfer ||
     receiptCaptureController === null ||
     controlsAreDisabled ||
     isOffline ||
@@ -649,6 +658,12 @@
           </section>
         {/if}
 
+        {#if saveState.phase === 'local_commit_syncing'}
+          <p class="status-text" role="status" data-testid="add-transfer-local-recovery-status">
+            {$_('addTransfer.receipt.commit.recoveringLocalCommit')}
+          </p>
+        {/if}
+
         {#if saveState.phase === 'local_save'}
           <p class="add-transfer-form__status" data-testid="add-transfer-local-save-status">
             {$_('addTransfer.save.localSave')}
@@ -1087,7 +1102,7 @@
               >
                 {$_('addTransfer.save.retry')}
               </button>
-            {:else if saveState.phase === 'conflict' || saveState.phase === 'conflict_syncing'}
+            {:else if saveState.phase === 'conflict' || saveState.phase === 'conflict_syncing' || saveState.phase === 'local_commit_recovery_failed'}
               <button
                 type="button"
                 class="app-button app-button--primary add-transfer-form__action"

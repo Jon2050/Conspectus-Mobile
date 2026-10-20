@@ -11,6 +11,7 @@
     type NetworkStateStore,
     type SyncStateStore,
   } from '@shared';
+  import { appDatabaseSession, sameDatabaseIdentity } from './databaseSession';
   import LoadingPlaceholder from './components/LoadingPlaceholder.svelte';
   import DeploymentInfoFooter from './components/DeploymentInfoFooter.svelte';
   import ProgressIndicator from './components/ProgressIndicator.svelte';
@@ -214,10 +215,7 @@
     const binding = get(appSelectedDriveItemBindingStore);
     return {
       isAuthenticated: session.isAuthenticated && session.account !== null,
-      isVerifiedCurrent:
-        binding !== null &&
-        get(syncStateStore).state === 'synced' &&
-        resolveAppDbRuntime().isOpen(),
+      isVerifiedCurrent: binding !== null && appDatabaseSession.isWritable(),
       contextKey:
         session.account === null || binding === null
           ? null
@@ -303,11 +301,38 @@
 
   const resolveNavIconUrl = (iconPath: string): string => `${navIconBaseUrl}${iconPath}`;
 
+  let queuedSessionSync: {
+    binding: DriveItemBinding | null;
+    isInitialSync: boolean;
+    mode: 'reuse_if_current' | 'force_download';
+  } | null = null;
+  const unsubscribeSessionIdle = appDatabaseSession.subscribeIdle(() => {
+    const queued = queuedSessionSync;
+    queuedSessionSync = null;
+    if (queued !== null)
+      queueMicrotask(() => {
+        if (appShellIsMounted) void performSync(queued.binding, queued.isInitialSync, queued.mode);
+      });
+  });
+
   const performSync = async (
     binding: DriveItemBinding | null,
     isInitialSync = false,
     mode: 'reuse_if_current' | 'force_download' = 'reuse_if_current',
   ): Promise<void> => {
+    const sessionToken = appDatabaseSession.beginRefresh();
+    if (sessionToken === null) {
+      queuedSessionSync = { binding, isInitialSync, mode };
+      return;
+    }
+    const expectedIdentity = appDatabaseSession.identity();
+    const syncIsCurrent = () =>
+      appShellIsMounted &&
+      syncId === currentSyncId &&
+      appDatabaseSession.isGeneration(sessionToken) &&
+      (expectedIdentity === null
+        ? appDatabaseSession.identity() === null
+        : sameDatabaseIdentity(expectedIdentity, appDatabaseSession.identity()));
     const syncId = ++currentSyncId;
     dataRoutesAwaitInitialSync = isInitialSync;
     syncStateStore.reset();
@@ -340,26 +365,29 @@
         binding,
         startupIsOnline,
         (loadedBytes, totalBytes) => {
-          if (syncId === currentSyncId) {
+          if (syncIsCurrent()) {
             updateStartupSyncProgress(syncStateStore, loadedBytes, totalBytes);
           }
         },
         mode,
       );
 
-      if (!appShellIsMounted || syncId !== currentSyncId) {
+      if (!syncIsCurrent()) {
         return;
       }
 
       try {
         const dbSyncResult = await syncDbRuntimeForStartupDecision(dbRuntime, decision, () => {
-          return appShellIsMounted && syncId === currentSyncId;
+          return syncIsCurrent();
         });
 
         if (dbSyncResult === 'superseded') {
           return;
         }
       } catch (error) {
+        if (!syncIsCurrent()) return;
+        dbRuntime.close();
+        appDatabaseSession.invalidate();
         console.warn('Opening cached OneDrive database snapshot failed.', error);
         applyStartupDbRuntimeError(syncStateStore, error);
         return;
@@ -374,13 +402,19 @@
         }
       }
 
+      if (decision.kind === 'ready' && expectedIdentity !== null) {
+        appDatabaseSession.adopt(
+          { ...expectedIdentity, binding: decision.snapshot.binding },
+          decision.snapshot.metadata.eTag,
+        );
+      }
       applyStartupFreshnessDecision(syncStateStore, decision);
       logStartupFreshnessDecision(decision, binding?.name ?? null);
       if (decision.kind === 'error' && decision.branch === 'online_auth_expired') {
         void attemptAutomaticTokenRecovery();
       }
     } catch (error) {
-      if (!appShellIsMounted || syncId !== currentSyncId) {
+      if (!syncIsCurrent()) {
         return;
       }
 
@@ -417,10 +451,11 @@
     effectiveReceiptAnalysisController?.reset();
     receiptPreparationController.reset();
     receiptCommitController.invalidate();
-
+    addTransferSaveController.invalidate?.();
     if (bindingRepairPersistenceIsRunning) {
       return;
     }
+    appDatabaseSession.invalidate();
 
     if (hasPerformedInitialSync) {
       void performSync(binding);
@@ -631,6 +666,7 @@
     unsubscribeReceiptCommitController();
     unsubscribeSelectedBinding();
     unsubscribeQueuedForegroundSync();
+    unsubscribeSessionIdle();
     if (ownedReceiptCaptureController === null) {
       effectiveReceiptCaptureController?.cancel();
     } else {
@@ -642,6 +678,7 @@
       ownedReceiptAnalysisController.dispose();
     }
     receiptPreparationController.reset();
+    appDatabaseSession.invalidate();
     resolveAppDbRuntime().close();
     disconnectFooterVisibilityTracking();
   });
@@ -807,6 +844,7 @@
           {resolveReceiptCommitIdentity}
           {networkStateStore}
           canOpenPanel={addTransferDatabaseIsReady}
+          canCreateTransfer={$syncStateStore.state === 'synced' && appDatabaseSession.isWritable()}
         />
       {:else}
         <SettingsRoute {syncStateStore} onForceRefresh={requestForceRefresh} />

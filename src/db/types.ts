@@ -14,6 +14,8 @@ export interface BrowserDbRuntime {
   isOpen(): boolean;
   exec(sql: string, params?: BindParams): readonly QueryExecResult[];
   exportBytes(): Uint8Array;
+  /** Changes whenever the underlying SQLite connection is replaced or closed. */
+  getGeneration?(): number;
 }
 
 export interface BrowserDbRuntimeOpenOptions {

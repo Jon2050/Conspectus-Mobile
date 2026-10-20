@@ -54,10 +54,6 @@ const context = (
 });
 
 const saveService = (): TransferBatchSaveExportService => ({
-  createTransferAndExport: vi.fn(async () => ({
-    transferId: 40,
-    persistedAtIso: '2026-07-31T00:00:00.000Z',
-  })),
   createTransferBatchAndExport: vi.fn(async (inputs: readonly CreateTransferInput[], options) => {
     options?.onUploadStart?.();
     options?.onProgress?.({ loadedBytes: 5, totalBytes: 10 });

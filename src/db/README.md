@@ -15,6 +15,8 @@ Expected public interfaces (`src/db/index.ts`):
 
 - `createSqlJsLoader` and `appSqlJsLoader`: cached sql.js runtime loader with Vite WASM asset resolution.
 - `createBrowserDbRuntime` and `appBrowserDbRuntime`: open/close/exec/export lifecycle over snapshot bytes.
+  Export restores and verifies required connection PRAGMAs even when export fails. Failed pragma
+  restoration closes the runtime; `getGeneration()` identifies connection replacement or closure.
 - `DbRuntimeError` + `DbRuntimeErrorCode`: deterministic runtime/open failure codes for startup handling.
 - `AccountRecord`: normalized account row shape for Accounts UI.
 - `createTransferMonthQueryService` + `getEpochDayMonthBounds`: inclusive epoch-day month filtering for transfer list reads.

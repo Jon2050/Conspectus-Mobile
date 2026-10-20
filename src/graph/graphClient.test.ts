@@ -50,6 +50,47 @@ const getFetchCall = (
   (fetchFn.mock.calls[0] as [string, RequestInit | undefined]) ?? ['', undefined];
 
 describe('createGraphClient', () => {
+  it('preserves confirmed HTTP acceptance when upload response validation fails', async () => {
+    const graph = createGraphClient({
+      authClient: createAuthClient(),
+      fetchFn: vi.fn(async () => createJsonResponse({ invalid: true }, 200)),
+    });
+    await expect(
+      graph.uploadFile(DRIVE_ITEM_BINDING, Uint8Array.of(1), 'v1'),
+    ).rejects.toMatchObject({ code: 'unknown', status: 200 });
+  });
+  it.each([false, true])(
+    'checks upload identity after token acquisition (XHR=%s)',
+    async (withProgress) => {
+      const authClient = createAuthClient();
+      let release!: (token: string) => void;
+      authClient.getAccessToken.mockImplementationOnce(
+        () =>
+          new Promise<string>((resolve) => {
+            release = resolve;
+          }),
+      );
+      const fetchFn = vi.fn();
+      const createXhrFn = vi.fn();
+      const graph = createGraphClient({ authClient, fetchFn, createXhrFn });
+      const guard = vi.fn(() => {
+        throw new Error('Account changed while acquiring the token');
+      });
+      const uploading = graph.uploadFile(
+        DRIVE_ITEM_BINDING,
+        Uint8Array.of(1),
+        'v1',
+        withProgress ? () => {} : undefined,
+        guard,
+      );
+      release('token-for-new-account');
+      await expect(uploading).rejects.toThrow('Account changed');
+      expect(guard).toHaveBeenCalledOnce();
+      expect(fetchFn).not.toHaveBeenCalled();
+      expect(createXhrFn).not.toHaveBeenCalled();
+    },
+  );
+
   it('lists root drive children with normalized browse item details', async () => {
     const authClient = createAuthClient();
     const fetchFn = vi.fn(async () =>

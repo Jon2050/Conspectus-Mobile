@@ -6,11 +6,18 @@ import {
   type BrowserDbRuntime,
   type CreateTransferBatchResult,
   type CreateTransferInput,
-  type CreateTransferResult,
   type TransferWriteService,
 } from '@db';
 
-import { createAppDatabaseUploadHandoffService } from './databaseUploadHandoffService';
+import {
+  appDatabaseSession,
+  type DatabaseSession,
+  type DatabaseWriteContext,
+} from './databaseSession';
+import {
+  createAppDatabaseUploadHandoffService,
+  DatabaseUploadError,
+} from './databaseUploadHandoffService';
 
 export interface DatabaseUploadHandoff {
   uploadExportedDatabase(dbBytes: Uint8Array, options?: DatabaseUploadOptions): Promise<void>;
@@ -25,45 +32,21 @@ export interface DatabaseUploadOptions {
   readonly onUploadStart?: () => void;
   readonly onProgress?: (progress: DatabaseUploadProgress) => void;
   readonly expectedETag?: string;
+  readonly context?: DatabaseWriteContext;
 }
 
-export interface TransferSaveExportService {
-  createTransferAndExport(
-    input: CreateTransferInput,
-    options?: DatabaseUploadOptions,
-  ): Promise<CreateTransferResult>;
-  retryExportedDatabaseUpload(dbBytes: Uint8Array, options?: DatabaseUploadOptions): Promise<void>;
-}
-
-export interface TransferBatchSaveExportService extends TransferSaveExportService {
+export interface TransferBatchSaveExportService {
   createTransferBatchAndExport(
     inputs: readonly CreateTransferInput[],
     options?: DatabaseUploadOptions,
   ): Promise<CreateTransferBatchResult>;
-}
-
-export interface PendingTransferUpload {
-  readonly transferResult: CreateTransferResult;
-  readonly dbBytes: Uint8Array;
+  retryExportedDatabaseUpload(dbBytes: Uint8Array, options?: DatabaseUploadOptions): Promise<void>;
 }
 
 export interface PendingTransferBatchUpload {
   readonly batchResult: CreateTransferBatchResult;
   readonly dbBytes: Uint8Array;
-}
-
-export class TransferUploadPendingError extends Error {
-  readonly pendingUpload: PendingTransferUpload;
-  readonly cause?: unknown;
-
-  constructor(pendingUpload: PendingTransferUpload, cause: unknown) {
-    super(cause instanceof Error ? cause.message : 'Uploading the transfer failed.');
-    this.name = 'TransferUploadPendingError';
-    this.pendingUpload = pendingUpload;
-    if (cause !== undefined) {
-      this.cause = cause;
-    }
-  }
+  readonly context?: DatabaseWriteContext;
 }
 
 export class TransferBatchUploadPendingError extends Error {
@@ -94,8 +77,7 @@ export class TransferBatchExportRecoveryRequiredError extends Error {
   }
 }
 
-type TransferWriteOperations = Pick<TransferWriteService, 'createTransfer'> &
-  Partial<Pick<TransferWriteService, 'createTransfers'>>;
+type TransferWriteOperations = Pick<TransferWriteService, 'createTransfers'>;
 
 type TransferExportRuntime = Pick<BrowserDbRuntime, 'exportBytes'>;
 type TransferExportRuntimeProvider = TransferExportRuntime | (() => TransferExportRuntime);
@@ -119,73 +101,67 @@ export const createTransferSaveExportService = (
   transferWriteService: TransferWriteOperations,
   dbRuntime: TransferExportRuntimeProvider,
   uploadHandoff: DatabaseUploadHandoff,
-): TransferBatchSaveExportService => ({
-  async createTransferAndExport(
-    input: CreateTransferInput,
-    options?: DatabaseUploadOptions,
-  ): Promise<CreateTransferResult> {
-    const transferResult = transferWriteService.createTransfer(input);
-    const exportedBytes = cloneExportedBytes(resolveTransferExportRuntime(dbRuntime).exportBytes());
-
-    try {
-      options?.onUploadStart?.();
-      await uploadHandoff.uploadExportedDatabase(exportedBytes, options);
-    } catch (error) {
-      throw new TransferUploadPendingError(
-        {
-          transferResult,
-          dbBytes: exportedBytes,
-        },
-        error,
-      );
-    }
-
-    return transferResult;
-  },
-
-  async createTransferBatchAndExport(
+  session?: DatabaseSession,
+): TransferBatchSaveExportService => {
+  const createTransferBatchAndExport = async (
     inputs: readonly CreateTransferInput[],
     options?: DatabaseUploadOptions,
-  ): Promise<CreateTransferBatchResult> {
-    if (transferWriteService.createTransfers === undefined) {
-      throw new DbRuntimeError('db_query_failed', 'Batch transfer writes are unavailable.');
-    }
-    const batchResult = transferWriteService.createTransfers(inputs);
-    let exportedBytes: Uint8Array;
+  ): Promise<CreateTransferBatchResult> => {
+    const context = session?.acquire();
+    const uploadOptions =
+      context === undefined ? options : { ...options, context, expectedETag: context.baseETag };
     try {
-      exportedBytes = cloneExportedBytes(resolveTransferExportRuntime(dbRuntime).exportBytes());
-    } catch (error) {
-      throw new TransferBatchExportRecoveryRequiredError(batchResult, error);
+      const batchResult = transferWriteService.createTransfers(inputs);
+      session?.markDirty();
+      let exportedBytes: Uint8Array;
+      try {
+        exportedBytes = cloneExportedBytes(resolveTransferExportRuntime(dbRuntime).exportBytes());
+      } catch (error) {
+        throw new TransferBatchExportRecoveryRequiredError(batchResult, error);
+      }
+      try {
+        uploadOptions?.onUploadStart?.();
+        await uploadHandoff.uploadExportedDatabase(exportedBytes, uploadOptions);
+      } catch (error) {
+        throw new TransferBatchUploadPendingError(
+          { batchResult, dbBytes: exportedBytes, ...(context === undefined ? {} : { context }) },
+          error,
+        );
+      }
+      return batchResult;
+    } finally {
+      if (context !== undefined) session?.release();
     }
-
-    try {
-      options?.onUploadStart?.();
-      await uploadHandoff.uploadExportedDatabase(exportedBytes, options);
-    } catch (error) {
-      throw new TransferBatchUploadPendingError(
-        {
-          batchResult,
-          dbBytes: exportedBytes,
-        },
-        error,
-      );
-    }
-
-    return batchResult;
-  },
-
-  async retryExportedDatabaseUpload(
-    dbBytes: Uint8Array,
-    options?: DatabaseUploadOptions,
-  ): Promise<void> {
-    options?.onUploadStart?.();
-    await uploadHandoff.uploadExportedDatabase(dbBytes, options);
-  },
-});
+  };
+  return {
+    createTransferBatchAndExport,
+    async retryExportedDatabaseUpload(dbBytes, options) {
+      if (session !== undefined && options?.context === undefined)
+        throw new Error('Upload context is required.');
+      let context: DatabaseWriteContext | undefined;
+      try {
+        context = session?.acquire(options?.context);
+      } catch (error) {
+        throw new DatabaseUploadError(
+          'context_changed',
+          'The pending database session changed.',
+          error,
+        );
+      }
+      try {
+        options?.onUploadStart?.();
+        await uploadHandoff.uploadExportedDatabase(dbBytes, options);
+      } finally {
+        if (context !== undefined) session?.release();
+      }
+    },
+  };
+};
 
 export const createAppTransferSaveExportService = (): TransferBatchSaveExportService =>
   createTransferSaveExportService(
     appTransferWriteService,
     resolveAppBrowserDbRuntime,
     createAppDatabaseUploadHandoffService(),
+    appDatabaseSession,
   );

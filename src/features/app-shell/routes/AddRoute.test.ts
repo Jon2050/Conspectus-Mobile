@@ -148,6 +148,15 @@ const renderAddRoute = (props: Record<string, unknown> = {}) =>
   });
 
 describe('AddRoute component', () => {
+  it('keeps the draft visible but disables saving and capture without a verified write session', () => {
+    const { body } = renderAddRoute({
+      canCreateTransfer: false,
+      receiptCaptureController: createMockReceiptCaptureController(),
+    });
+    expect(body).toContain('data-testid="add-transfer-name"');
+    expect(body).toMatch(/data-testid="add-transfer-submit"[^>]*disabled/);
+    expect(body).toMatch(/data-testid="receipt-photo-button"[^>]*disabled/);
+  });
   it('renders the route container with the add route testid', () => {
     const { body } = renderAddRoute();
 

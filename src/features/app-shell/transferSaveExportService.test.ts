@@ -8,7 +8,7 @@ import {
   TRANSFER_TYPE_INTERN_TRANSFER,
   type BrowserDbRuntime,
   type CreateTransferInput,
-  type CreateTransferResult,
+  type CreateTransferBatchResult,
 } from '@db';
 
 import { toEpochDay } from '../../shared/testUtils/dateUtils';
@@ -20,7 +20,6 @@ import {
   createTransferSaveExportService,
   TransferBatchExportRecoveryRequiredError,
   TransferBatchUploadPendingError,
-  TransferUploadPendingError,
   type DatabaseUploadHandoff,
 } from './transferSaveExportService';
 
@@ -53,6 +52,48 @@ const countTransfersByName = (runtime: Pick<BrowserDbRuntime, 'exec'>, name: str
 };
 
 describe('transfer save export service', () => {
+  it('keeps foreign keys active across repeated write/export cycles', async () => {
+    const runtime = await createRuntimeFromTransferFixture();
+    const writes = createTransferWriteService(runtime);
+    try {
+      for (let cycle = 0; cycle < 3; cycle += 1) {
+        writes.createTransfer(createBaseInput(`Valid cycle ${cycle}`));
+        runtime.exportBytes();
+        expect(runtime.exec('PRAGMA foreign_keys;')[0]?.values).toEqual([[1]]);
+        for (const invalid of [{ fromAccountId: 999999 }, { categoryIds: [999999] }]) {
+          expect(() =>
+            writes.createTransfer({ ...createBaseInput('Invalid reference'), ...invalid }),
+          ).toThrow();
+          expect(countTransfersByName(runtime, 'Invalid reference')).toBe(0);
+        }
+        expect(runtime.exec('PRAGMA foreign_key_check;')).toEqual([]);
+      }
+    } finally {
+      runtime.close();
+    }
+  });
+
+  it('classifies a manual export failure as a committed local write requiring recovery', async () => {
+    const runtime = await createRuntimeFromTransferFixture();
+    const service = createTransferSaveExportService(
+      createTransferWriteService(runtime),
+      {
+        exportBytes: () => {
+          throw new Error('Injected export failure');
+        },
+      },
+      { uploadExportedDatabase: vi.fn() },
+    );
+    try {
+      await expect(
+        service.createTransferBatchAndExport([createBaseInput('Unexported manual')]),
+      ).rejects.toBeInstanceOf(TransferBatchExportRecoveryRequiredError);
+      expect(countTransfersByName(runtime, 'Unexported manual')).toBe(1);
+    } finally {
+      runtime.close();
+    }
+  });
+
   it('writes locally, exports non-empty bytes, and hands them to upload', async () => {
     const runtime = await createRuntimeFromTransferFixture();
     const writeService = createTransferWriteService(runtime);
@@ -64,9 +105,9 @@ describe('transfer save export service', () => {
     };
     const service = createTransferSaveExportService(writeService, runtime, uploadHandoff);
 
-    const result = await service.createTransferAndExport(createBaseInput('Exported write'));
+    const result = await service.createTransferBatchAndExport([createBaseInput('Exported write')]);
 
-    expect(result.transferId).toBeGreaterThan(3);
+    expect(result.transferIds[0]!).toBeGreaterThan(3);
     expect(uploadHandoff.uploadExportedDatabase).toHaveBeenCalledOnce();
     expect(uploadedByteSets[0]).toBeInstanceOf(Uint8Array);
     expect(uploadedByteSets[0]?.length).toBeGreaterThan(0);
@@ -97,7 +138,6 @@ describe('transfer save export service', () => {
 
   it('retries a failed batch upload with the same bytes and no second write or export', async () => {
     const writeService = {
-      createTransfer: vi.fn(),
       createTransfers: vi.fn(() => ({
         transferIds: [41, 42],
         createdCount: 2,
@@ -146,7 +186,6 @@ describe('transfer save export service', () => {
         persistedAtIso: '2026-07-31T00:00:00.000Z',
       };
       const writeService = {
-        createTransfer: vi.fn(),
         createTransfers: vi.fn(() => batchResult),
       };
       const uploadHandoff: DatabaseUploadHandoff = {
@@ -176,10 +215,12 @@ describe('transfer save export service', () => {
   it('runs export and upload only after the local write succeeds', async () => {
     const calls: string[] = [];
     const writeService = {
-      createTransfer: vi.fn((input: CreateTransferInput): CreateTransferResult => {
-        calls.push(`write:${input.name}`);
-        return { transferId: 42, persistedAtIso: '2026-06-25T00:00:00.000Z' };
-      }),
+      createTransfers: vi.fn(
+        (inputs: readonly CreateTransferInput[]): CreateTransferBatchResult => {
+          calls.push(`write:${inputs[0]?.name}`);
+          return { transferIds: [42], createdCount: 1, persistedAtIso: '2026-06-25T00:00:00.000Z' };
+        },
+      ),
     };
     const runtime = {
       exportBytes: vi.fn(() => {
@@ -195,9 +236,10 @@ describe('transfer save export service', () => {
     const service = createTransferSaveExportService(writeService, runtime, uploadHandoff);
 
     await expect(
-      service.createTransferAndExport(createBaseInput('Ordered write')),
+      service.createTransferBatchAndExport([createBaseInput('Ordered write')]),
     ).resolves.toEqual({
-      transferId: 42,
+      transferIds: [42],
+      createdCount: 1,
       persistedAtIso: '2026-06-25T00:00:00.000Z',
     });
     expect(calls).toEqual(['write:Ordered write', 'export', 'upload']);
@@ -205,8 +247,9 @@ describe('transfer save export service', () => {
 
   it('passes upload progress options to the upload handoff', async () => {
     const writeService = {
-      createTransfer: vi.fn(() => ({
-        transferId: 42,
+      createTransfers: vi.fn(() => ({
+        transferIds: [42],
+        createdCount: 1,
         persistedAtIso: '2026-06-25T00:00:00.000Z',
       })),
     };
@@ -222,7 +265,7 @@ describe('transfer save export service', () => {
     const onUploadStart = vi.fn();
     const service = createTransferSaveExportService(writeService, runtime, uploadHandoff);
 
-    await service.createTransferAndExport(createBaseInput('Progress write'), {
+    await service.createTransferBatchAndExport([createBaseInput('Progress write')], {
       onUploadStart,
       onProgress,
     });
@@ -238,8 +281,9 @@ describe('transfer save export service', () => {
   it('preserves committed exported bytes when upload fails so retry does not write again', async () => {
     const uploadError = new Error('temporary upload failure');
     const writeService = {
-      createTransfer: vi.fn(() => ({
-        transferId: 42,
+      createTransfers: vi.fn(() => ({
+        transferIds: [42],
+        createdCount: 1,
         persistedAtIso: '2026-06-25T00:00:00.000Z',
       })),
     };
@@ -255,15 +299,16 @@ describe('transfer save export service', () => {
     const service = createTransferSaveExportService(writeService, runtime, uploadHandoff);
 
     const pendingError = await service
-      .createTransferAndExport(createBaseInput('Retry upload write'))
+      .createTransferBatchAndExport([createBaseInput('Retry upload write')])
       .catch((error: unknown) => error);
 
-    expect(pendingError).toBeInstanceOf(TransferUploadPendingError);
-    const retryError = pendingError as TransferUploadPendingError;
+    expect(pendingError).toBeInstanceOf(TransferBatchUploadPendingError);
+    const retryError = pendingError as TransferBatchUploadPendingError;
     expect(pendingError).toMatchObject({
       pendingUpload: {
-        transferResult: {
-          transferId: 42,
+        batchResult: {
+          transferIds: [42],
+          createdCount: 1,
           persistedAtIso: '2026-06-25T00:00:00.000Z',
         },
         dbBytes: Uint8Array.from([1, 2, 3]),
@@ -272,7 +317,7 @@ describe('transfer save export service', () => {
     });
     await service.retryExportedDatabaseUpload(retryError.pendingUpload.dbBytes);
 
-    expect(writeService.createTransfer).toHaveBeenCalledOnce();
+    expect(writeService.createTransfers).toHaveBeenCalledOnce();
     expect(runtime.exportBytes).toHaveBeenCalledOnce();
     expect(uploadHandoff.uploadExportedDatabase).toHaveBeenLastCalledWith(
       Uint8Array.from([1, 2, 3]),
@@ -283,7 +328,7 @@ describe('transfer save export service', () => {
   it('does not export or upload when the local write fails', async () => {
     const writeError = new DbRuntimeError('db_query_failed', 'write failed');
     const writeService = {
-      createTransfer: vi.fn(() => {
+      createTransfers: vi.fn(() => {
         throw writeError;
       }),
     };
@@ -295,9 +340,9 @@ describe('transfer save export service', () => {
     };
     const service = createTransferSaveExportService(writeService, runtime, uploadHandoff);
 
-    await expect(service.createTransferAndExport(createBaseInput('Failed write'))).rejects.toBe(
-      writeError,
-    );
+    await expect(
+      service.createTransferBatchAndExport([createBaseInput('Failed write')]),
+    ).rejects.toBe(writeError);
     expect(runtime.exportBytes).not.toHaveBeenCalled();
     expect(uploadHandoff.uploadExportedDatabase).not.toHaveBeenCalled();
   });
@@ -305,8 +350,9 @@ describe('transfer save export service', () => {
   it('does not upload when export fails', async () => {
     const exportError = new DbRuntimeError('db_export_failed', 'export failed');
     const writeService = {
-      createTransfer: vi.fn(() => ({
-        transferId: 42,
+      createTransfers: vi.fn(() => ({
+        transferIds: [42],
+        createdCount: 1,
         persistedAtIso: '2026-06-25T00:00:00.000Z',
       })),
     };
@@ -320,16 +366,20 @@ describe('transfer save export service', () => {
     };
     const service = createTransferSaveExportService(writeService, runtime, uploadHandoff);
 
-    await expect(service.createTransferAndExport(createBaseInput('Failed export'))).rejects.toBe(
-      exportError,
-    );
+    await expect(
+      service.createTransferBatchAndExport([createBaseInput('Failed export')]),
+    ).rejects.toMatchObject({
+      name: 'TransferBatchExportRecoveryRequiredError',
+      cause: exportError,
+    });
     expect(uploadHandoff.uploadExportedDatabase).not.toHaveBeenCalled();
   });
 
   it('rejects an empty export before upload handoff', async () => {
     const writeService = {
-      createTransfer: vi.fn(() => ({
-        transferId: 42,
+      createTransfers: vi.fn(() => ({
+        transferIds: [42],
+        createdCount: 1,
         persistedAtIso: '2026-06-25T00:00:00.000Z',
       })),
     };
@@ -342,10 +392,10 @@ describe('transfer save export service', () => {
     const service = createTransferSaveExportService(writeService, runtime, uploadHandoff);
 
     await expect(
-      service.createTransferAndExport(createBaseInput('Empty export')),
+      service.createTransferBatchAndExport([createBaseInput('Empty export')]),
     ).rejects.toMatchObject({
-      name: 'DbRuntimeError',
-      code: 'db_export_failed',
+      name: 'TransferBatchExportRecoveryRequiredError',
+      cause: { code: 'db_export_failed' },
     });
     expect(uploadHandoff.uploadExportedDatabase).not.toHaveBeenCalled();
   });
@@ -361,7 +411,7 @@ describe('transfer save export service', () => {
     };
     const service = createTransferSaveExportService(writeService, sourceRuntime, uploadHandoff);
 
-    await service.createTransferAndExport(createBaseInput('Reopen exported write'));
+    await service.createTransferBatchAndExport([createBaseInput('Reopen exported write')]);
 
     expect(uploadedBytes).not.toBeNull();
     const reopenedRuntime = createBrowserDbRuntime(createNodeSqlJsRuntimeLoader());
