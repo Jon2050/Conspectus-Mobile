@@ -7,6 +7,7 @@
   let {
     receiptFileInputElement = $bindable(null),
     receiptCaptureIsDisabled,
+    receiptFileSelectionIsDisabled,
     receiptWorkflowIsActive,
     receiptPreparationState,
     receiptCaptureController,
@@ -20,6 +21,7 @@
   }: {
     receiptFileInputElement?: HTMLInputElement | null;
     receiptCaptureIsDisabled: boolean;
+    receiptFileSelectionIsDisabled: boolean;
     receiptWorkflowIsActive: boolean;
     receiptPreparationState: ReceiptTransferPreparationState;
     receiptCaptureController: ReceiptCaptureController | null;
@@ -40,10 +42,16 @@
   <details class="receipt-capture-details">
     <summary id="receipt-capture-heading">{$_('addTransfer.receipt.heading')}</summary>
     <p class="add-transfer-form__receipt-hint">{$_('addTransfer.receipt.description')}</p>
+    <p class="add-transfer-form__receipt-hint">{$_('addTransfer.receipt.imageGuidance')}</p>
     <p class="add-transfer-form__receipt-hint" data-testid="receipt-semantic-risk">
       {$_('addTransfer.receipt.semanticRisk')}
     </p>
   </details>
+  {#if !receiptWorkflowIsActive}
+    <p class="add-transfer-form__receipt-hint" data-testid="receipt-duplicate-warning">
+      {$_('addTransfer.receipt.duplicateWarning')}
+    </p>
+  {/if}
   <input
     bind:this={receiptFileInputElement}
     id="receipt-image-capture"
@@ -52,7 +60,7 @@
     accept="image/*"
     capture="environment"
     hidden
-    disabled={receiptCaptureIsDisabled ||
+    disabled={receiptFileSelectionIsDisabled ||
       (receiptWorkflowIsActive && receiptPreparationState.phase !== 'error')}
     onchange={handleReceiptFileChange}
     oncancel={handleReceiptFileCancel}

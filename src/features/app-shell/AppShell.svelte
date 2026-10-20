@@ -681,6 +681,13 @@
           bind:fields={addTransferFields}
           saveController={addTransferSaveController}
           receiptCaptureController={effectiveReceiptCaptureController}
+          resolveReceiptRules={() => {
+            const accountId = resolveAppAuthClient().getSession().account?.homeAccountId;
+            const settings = accountId ? openRouterSettingsStore.read(accountId) : null;
+            return settings === null
+              ? null
+              : (toStoredReadyOpenRouterReceiptConfiguration(settings)?.transferRules ?? null);
+          }}
           receiptAnalysisController={effectiveReceiptAnalysisController}
           {receiptPreparationController}
           {receiptCommitController}

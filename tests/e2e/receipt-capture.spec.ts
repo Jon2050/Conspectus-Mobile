@@ -1,5 +1,6 @@
 // Verifies the browser-visible native receipt capture boundary without simulating OS camera UI.
 import { expect, test, type Page, type Request } from '@playwright/test';
+import fs from 'node:fs';
 
 import {
   appPath,
@@ -25,6 +26,118 @@ const MODEL = {
   pricing: { prompt: '0', completion: '0', request: '0', image: '0' },
   supported_parameters: ['structured_outputs'],
 };
+
+const READY_RECEIPT_DB = {
+  fromAccountOptionRows: [{ accountId: 11, name: 'Checking', amountCents: 1000, accountTypeId: 3 }],
+  toAccountOptionRows: [{ accountId: 2, name: 'Spendings', amountCents: 0, accountTypeId: 2 }],
+  categoryRows: [
+    'Einkauf',
+    'Lebensmittel',
+    'Haushalt, Verbrauchsgüter, Reinigung',
+    'Süßigkeiten',
+    'Restaurant, Bar, Bäcker',
+  ].map((name, index) => ({ categoryId: 20 + index, name })),
+};
+
+for (const failure of ['missing_destination', 'missing_category', 'ambiguous_category'] as const) {
+  test(`rejects receipt setup before remote calls: ${failure}`, async ({ page }) => {
+    await installReadyReceiptConfiguration(page);
+    const requests = await installReceiptAnalysisRoutes(page, [EXTRACTION, DERIVATION]);
+    await installReadyAddTransferTestDb(page, {
+      ...READY_RECEIPT_DB,
+      ...(failure === 'missing_destination' ? { toAccountOptionRows: [] } : {}),
+      categoryRows:
+        failure === 'missing_category'
+          ? []
+          : failure === 'ambiguous_category'
+            ? [...READY_RECEIPT_DB.categoryRows, { categoryId: 40, name: 'Einkauf' }]
+            : READY_RECEIPT_DB.categoryRows,
+    });
+    await page.goto(appPath('#/add'));
+    await expect(page.getByTestId('receipt-photo-button')).toBeEnabled();
+    await page.getByTestId('receipt-photo-button').click();
+    await expect(page.getByTestId('add-transfer-form-error')).toContainText(
+      failure === 'missing_destination' ? 'primary spendings account' : 'category "Einkauf"',
+    );
+    // Native picker return is checked again, independently of the button path.
+    await page
+      .getByTestId('receipt-image-input')
+      .setInputFiles({ name: 'receipt.png', mimeType: 'image/png', buffer: RECEIPT_IMAGE });
+    expect(requests.catalogRequests).toHaveLength(0);
+    expect(requests.completionRequests).toHaveLength(0);
+    expect(await getLocalTransferWriteCallCount(page)).toBe(0);
+    expect(await getGraphUploadCallCount(page)).toBe(0);
+  });
+}
+
+for (const limitedStage of [1, 2]) {
+  test(`explains catalog rate limiting at stage ${limitedStage} without automatic retry`, async ({
+    page,
+  }) => {
+    await installReadyReceiptConfiguration(page);
+    const requests = await installReceiptAnalysisRoutes(page, [EXTRACTION, DERIVATION]);
+    let catalogCalls = 0;
+    await page.route('https://openrouter.ai/api/v1/models/user', async (route) => {
+      catalogCalls++;
+      await route.fulfill({
+        status: catalogCalls === limitedStage ? 429 : 200,
+        headers: { 'Access-Control-Allow-Origin': '*' },
+        contentType: 'application/json',
+        body: JSON.stringify({ data: [MODEL] }),
+      });
+    });
+    await installReadyAddTransferTestDb(page, READY_RECEIPT_DB);
+    await page.goto(appPath('#/add'));
+    await page
+      .getByTestId('receipt-image-input')
+      .setInputFiles({ name: 'receipt.png', mimeType: 'image/png', buffer: RECEIPT_IMAGE });
+    await expect(page.getByTestId('add-transfer-form-error')).toContainText('rate limiting');
+    await expect(page.getByTestId('receipt-photo-button')).toBeEnabled();
+    await page.waitForTimeout(350);
+    expect(catalogCalls).toBe(limitedStage);
+    expect(requests.completionRequests).toHaveLength(limitedStage - 1);
+    expect(await getGraphUploadCallCount(page)).toBe(0);
+  });
+}
+
+test('normalizes the long synthetic receipt to a bounded JPEG before provider handoff', async ({
+  page,
+}) => {
+  // Exercise the actual image-element fallback under both document and response-header CSP.
+  await page.addInitScript(() => {
+    window.createImageBitmap = async () => {
+      throw new Error('Exercise native image fallback');
+    };
+  });
+  await installReadyReceiptConfiguration(page);
+  const requests = await installReceiptAnalysisRoutes(page, [EXTRACTION, DERIVATION]);
+  await installReadyAddTransferTestDb(page, READY_RECEIPT_DB);
+  await page.goto(appPath('#/add'));
+  const image = fs.readFileSync('tests/fixtures/receipts/long-receipt.svg');
+  await page
+    .getByTestId('receipt-image-input')
+    .setInputFiles({ name: 'long-receipt.svg', mimeType: 'image/svg+xml', buffer: image });
+  await expect.poll(() => requests.completionRequests.length).toBeGreaterThan(0);
+  const body = requests.completionRequests[0]!.postDataJSON();
+  const dataUrl = body.messages[1].content[1].image_url.url as string;
+  const dimensions = await page.evaluate(async (url) => {
+    const image = new Image();
+    image.src = url;
+    await image.decode();
+    return {
+      width: image.naturalWidth,
+      height: image.naturalHeight,
+      size: atob(url.split(',')[1]!).length,
+      type: url.split(';')[0]!.slice(5),
+    };
+  }, dataUrl);
+  expect(dimensions.height).toBe(2560);
+  expect(dimensions.width).toBeGreaterThan(0);
+  expect(dimensions.width).toBeLessThan(720);
+  expect(dimensions.type).toBe('image/jpeg');
+  expect(dimensions.size).toBeLessThanOrEqual(4 * 1024 * 1024);
+  // Provider responses are mocks; this asserts transport normalization, not OCR legibility.
+});
 
 const EXTRACTION = {
   status: 'ok',
@@ -192,6 +305,10 @@ test('exposes one native outward-camera image input without custom capture or ga
     categoryRows: [
       { categoryId: 20, name: 'Einkauf' },
       { categoryId: 21, name: 'Lebensmittel' },
+
+      { categoryId: 22, name: 'Haushalt, Verbrauchsgüter, Reinigung' },
+      { categoryId: 23, name: 'Süßigkeiten' },
+      { categoryId: 24, name: 'Restaurant, Bar, Bäcker' },
     ],
   });
 
@@ -241,6 +358,10 @@ test('runs both OpenRouter stages and automatically commits one validated transf
       categoryRows: [
         { categoryId: 20, name: 'Einkauf' },
         { categoryId: 21, name: 'Lebensmittel' },
+
+        { categoryId: 22, name: 'Haushalt, Verbrauchsgüter, Reinigung' },
+        { categoryId: 23, name: 'Süßigkeiten' },
+        { categoryId: 24, name: 'Restaurant, Bar, Bäcker' },
       ],
     },
     { uploadDelayMs: 400 },
@@ -266,6 +387,13 @@ test('runs both OpenRouter stages and automatically commits one validated transf
   // Assert the durable result instead of racing that transition.
   await expect(page.getByTestId('receipt-commit-success')).toContainText('1 transfer created');
   await expect(page.getByTestId('receipt-step-creation')).toHaveAttribute('data-state', 'complete');
+  await expect(page.getByTestId('receipt-saved-summary')).toContainText('Brot');
+  await expect(page.getByTestId('receipt-saved-summary')).toContainText('Conspectus Desktop');
+  const summarySize = await page
+    .getByTestId('receipt-saved-summary')
+    .evaluate((element) => ({ width: element.clientWidth, scrollWidth: element.scrollWidth }));
+  expect(summarySize.scrollWidth).toBeLessThanOrEqual(summarySize.width);
+  await page.screenshot({ path: `output/ap4/receipt-summary-${test.info().project.name}.png` });
 
   expect(requests.catalogRequests).toHaveLength(2);
   expect(requests.completionRequests).toHaveLength(2);
@@ -316,6 +444,9 @@ test('waits for a deliberate late source selection and commits a multi-transfer 
       { categoryId: 20, name: 'Einkauf' },
       { categoryId: 21, name: 'Lebensmittel' },
       { categoryId: 22, name: 'Haushalt, Verbrauchsgüter, Reinigung' },
+
+      { categoryId: 23, name: 'Süßigkeiten' },
+      { categoryId: 24, name: 'Restaurant, Bar, Bäcker' },
     ],
   });
   await page.goto(appPath('#/add'));
@@ -371,6 +502,10 @@ test('clears completed receipt state when upload finishes after leaving Add', as
       categoryRows: [
         { categoryId: 20, name: 'Einkauf' },
         { categoryId: 21, name: 'Lebensmittel' },
+
+        { categoryId: 22, name: 'Haushalt, Verbrauchsgüter, Reinigung' },
+        { categoryId: 23, name: 'Süßigkeiten' },
+        { categoryId: 24, name: 'Restaurant, Bar, Bäcker' },
       ],
     },
     { uploadDelayMs: 800 },
@@ -415,6 +550,10 @@ test('cancels an active run on route abandonment and never restores its source o
     categoryRows: [
       { categoryId: 20, name: 'Einkauf' },
       { categoryId: 21, name: 'Lebensmittel' },
+
+      { categoryId: 22, name: 'Haushalt, Verbrauchsgüter, Reinigung' },
+      { categoryId: 23, name: 'Süßigkeiten' },
+      { categoryId: 24, name: 'Restaurant, Bar, Bäcker' },
     ],
   });
   await page.goto(appPath('#/add'));
@@ -468,6 +607,10 @@ test('ends a model-declared failure and starts again only after a fresh file sel
     categoryRows: [
       { categoryId: 20, name: 'Einkauf' },
       { categoryId: 21, name: 'Lebensmittel' },
+
+      { categoryId: 22, name: 'Haushalt, Verbrauchsgüter, Reinigung' },
+      { categoryId: 23, name: 'Süßigkeiten' },
+      { categoryId: 24, name: 'Restaurant, Bar, Bäcker' },
     ],
   });
   await page.goto(appPath('#/add'));
@@ -514,6 +657,10 @@ test('retries only exported bytes after a transport failure without another SQL 
       categoryRows: [
         { categoryId: 20, name: 'Einkauf' },
         { categoryId: 21, name: 'Lebensmittel' },
+
+        { categoryId: 22, name: 'Haushalt, Verbrauchsgüter, Reinigung' },
+        { categoryId: 23, name: 'Süßigkeiten' },
+        { categoryId: 24, name: 'Restaurant, Bar, Bäcker' },
       ],
     },
     {
@@ -557,6 +704,10 @@ test('keeps byte-only retry visible when connectivity is lost during upload', as
       categoryRows: [
         { categoryId: 20, name: 'Einkauf' },
         { categoryId: 21, name: 'Lebensmittel' },
+
+        { categoryId: 22, name: 'Haushalt, Verbrauchsgüter, Reinigung' },
+        { categoryId: 23, name: 'Süßigkeiten' },
+        { categoryId: 24, name: 'Restaurant, Bar, Bäcker' },
       ],
     },
     { uploadDelayMs: 800, failUploadWhenOfflineAfterDelay: true },
@@ -606,6 +757,10 @@ test('refreshes an eTag conflict and waits for an explicit revalidated batch ret
       categoryRows: [
         { categoryId: 20, name: 'Einkauf' },
         { categoryId: 21, name: 'Lebensmittel' },
+
+        { categoryId: 22, name: 'Haushalt, Verbrauchsgüter, Reinigung' },
+        { categoryId: 23, name: 'Süßigkeiten' },
+        { categoryId: 24, name: 'Restaurant, Bar, Bäcker' },
       ],
     },
     {
@@ -652,6 +807,10 @@ test('shows remote-save reconciliation failure without any write or upload retry
       categoryRows: [
         { categoryId: 20, name: 'Einkauf' },
         { categoryId: 21, name: 'Lebensmittel' },
+
+        { categoryId: 22, name: 'Haushalt, Verbrauchsgüter, Reinigung' },
+        { categoryId: 23, name: 'Süßigkeiten' },
+        { categoryId: 24, name: 'Restaurant, Bar, Bäcker' },
       ],
     },
     {},
@@ -675,62 +834,77 @@ test('shows remote-save reconciliation failure without any write or upload retry
   expect(await getGraphUploadCallCount(page)).toBe(1);
 });
 
-test('keeps an in-flight receipt analysis through an unchanged foreground check', async ({
-  page,
-}) => {
-  let release!: () => void;
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  await installReadyReceiptConfiguration(page);
-  const requests = await installReceiptAnalysisRoutes(page, [EXTRACTION, DERIVATION], gate);
-  await installReadyAddTransferTestDb(page, {
-    fromAccountOptionRows: [
-      { accountId: 11, name: 'Checking', amountCents: 1000, accountTypeId: 3 },
-    ],
-    toAccountOptionRows: [{ accountId: 2, name: 'Spendings', amountCents: 0, accountTypeId: 2 }],
-    categoryRows: [
-      { categoryId: 20, name: 'Einkauf' },
-      { categoryId: 21, name: 'Lebensmittel' },
-    ],
-  });
-  await page.goto(appPath('#/add'));
-  await page
-    .getByTestId('receipt-image-input')
-    .setInputFiles({ name: 'receipt.png', mimeType: 'image/png', buffer: RECEIPT_IMAGE });
-  await expect.poll(() => requests.completionRequests.length).toBe(1);
-  await page.evaluate(() => {
-    const state = window as typeof window & {
-      __CONSPECTUS_GRAPH_CLIENT__: {
-        getFileMetadata: (...args: unknown[]) => Promise<unknown>;
+for (const pickerReturnsDuringRefresh of [false, true]) {
+  test(`keeps receipt processing through an unchanged foreground check (picker returns during refresh: ${pickerReturnsDuringRefresh})`, async ({
+    page,
+  }) => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await installReadyReceiptConfiguration(page);
+    const requests = await installReceiptAnalysisRoutes(page, [EXTRACTION, DERIVATION], gate);
+    await installReadyAddTransferTestDb(page, {
+      fromAccountOptionRows: [
+        { accountId: 11, name: 'Checking', amountCents: 1000, accountTypeId: 3 },
+      ],
+      toAccountOptionRows: [{ accountId: 2, name: 'Spendings', amountCents: 0, accountTypeId: 2 }],
+      categoryRows: [
+        { categoryId: 20, name: 'Einkauf' },
+        { categoryId: 21, name: 'Lebensmittel' },
+
+        { categoryId: 22, name: 'Haushalt, Verbrauchsgüter, Reinigung' },
+        { categoryId: 23, name: 'Süßigkeiten' },
+        { categoryId: 24, name: 'Restaurant, Bar, Bäcker' },
+      ],
+    });
+    await page.goto(appPath('#/add'));
+    const photo = { name: 'receipt.png', mimeType: 'image/png', buffer: RECEIPT_IMAGE };
+    if (!pickerReturnsDuringRefresh) {
+      await page.getByTestId('receipt-image-input').setInputFiles(photo);
+      await expect.poll(() => requests.completionRequests.length).toBe(1);
+    }
+    await page.evaluate(() => {
+      const state = window as typeof window & {
+        __CONSPECTUS_GRAPH_CLIENT__: {
+          getFileMetadata: (...args: unknown[]) => Promise<unknown>;
+        };
+        releaseFreshness?: () => void;
       };
-      releaseFreshness?: () => void;
-    };
-    const graph = state.__CONSPECTUS_GRAPH_CLIENT__;
-    const original = graph.getFileMetadata;
-    graph.getFileMetadata = async (...args) => {
-      graph.getFileMetadata = original;
-      await new Promise<void>((resolve) => {
-        state.releaseFreshness = resolve;
-      });
-      return original(...args);
-    };
-    document.dispatchEvent(new Event('visibilitychange'));
+      const graph = state.__CONSPECTUS_GRAPH_CLIENT__;
+      const original = graph.getFileMetadata;
+      graph.getFileMetadata = async (...args) => {
+        graph.getFileMetadata = original;
+        await new Promise<void>((resolve) => {
+          state.releaseFreshness = resolve;
+        });
+        return original(...args);
+      };
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await page.waitForFunction(() => 'releaseFreshness' in window);
+    await expect(page.getByTestId('startup-sync-progress')).toBeVisible();
+    if (pickerReturnsDuringRefresh) {
+      await expect(page.getByTestId('receipt-image-input')).toBeEnabled();
+      await page.getByTestId('receipt-image-input').setInputFiles(photo);
+      await expect.poll(() => requests.completionRequests.length).toBe(1);
+    }
+    await expect(page.getByTestId('receipt-step-extraction')).toHaveAttribute(
+      'data-state',
+      'active',
+    );
+    await page.getByTestId('add-transfer-from-account').selectOption('11');
+    release();
+    await expect(page.getByTestId('receipt-step-derivation')).toHaveAttribute(
+      'data-state',
+      'complete',
+    );
+    expect(await getGraphUploadCallCount(page)).toBe(0);
+    await page.evaluate(() =>
+      (window as typeof window & { releaseFreshness: () => void }).releaseFreshness(),
+    );
+    await expect(page.getByTestId('receipt-commit-success')).toContainText('1 transfer created');
+    expect(requests.completionRequests).toHaveLength(2);
+    expect(await getGraphUploadCallCount(page)).toBe(1);
   });
-  await page.waitForFunction(() => 'releaseFreshness' in window);
-  await expect(page.getByTestId('startup-sync-progress')).toBeVisible();
-  await expect(page.getByTestId('receipt-step-extraction')).toHaveAttribute('data-state', 'active');
-  await page.getByTestId('add-transfer-from-account').selectOption('11');
-  release();
-  await expect(page.getByTestId('receipt-step-derivation')).toHaveAttribute(
-    'data-state',
-    'complete',
-  );
-  expect(await getGraphUploadCallCount(page)).toBe(0);
-  await page.evaluate(() =>
-    (window as typeof window & { releaseFreshness: () => void }).releaseFreshness(),
-  );
-  await expect(page.getByTestId('receipt-commit-success')).toContainText('1 transfer created');
-  expect(requests.completionRequests).toHaveLength(2);
-  expect(await getGraphUploadCallCount(page)).toBe(1);
-});
+}

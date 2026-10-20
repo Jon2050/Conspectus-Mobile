@@ -3,7 +3,7 @@ export const DOCUMENT_CSP = [
   "default-src 'self'",
   "script-src 'self' 'wasm-unsafe-eval'",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-  "img-src 'self' data:",
+  "img-src 'self' data: blob:",
   "font-src 'self' https://fonts.gstatic.com",
   "connect-src 'self' https://login.microsoftonline.com https://graph.microsoft.com https://*.1drv.com https://*.microsoftpersonalcontent.com https://openrouter.ai",
   "frame-src 'self' https://login.microsoftonline.com",

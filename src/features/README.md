@@ -50,3 +50,9 @@ Receipt AI settings:
   Settings loads on demand. The common commit controller retains remote-outcome ownership.
 - Cancellation, account/file context changes, and supersession clear selection, coverage proof,
   derivation, and prepared commands; public UI state never exposes raw or normalized image bytes.
+- `receipt/receiptSetupValidation.ts` checks topology and the known default category metadata before
+  remote work without interpreting custom rules. Same-context loading suspends preparation; terminal
+  errors invalidate it. The Add route retains only commands for its transient post-save summary.
+- The synthetic receipt gold corpus and recorded-response evaluator distinguish parser consistency
+  from actual provider semantics; qualification gaps are recorded in
+  `docs/reviews/2026-10-20-ap4-receipt-qualification.md`.

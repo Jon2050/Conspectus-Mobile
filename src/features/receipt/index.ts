@@ -1,5 +1,6 @@
 // Exposes receipt AI settings, capture, analysis, and transfer-preparation feature contracts.
 export { DEFAULT_TRANSFER_DERIVATION_RULES } from './prompts';
+export { validateReceiptSetup } from './receiptSetupValidation';
 export type { VersionedReceiptPrompt } from './prompts';
 export { createReceiptAnalysisController } from './receiptAnalysisController';
 export type {

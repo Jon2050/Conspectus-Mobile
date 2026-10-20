@@ -568,7 +568,7 @@ describe('AddRoute component', () => {
     });
 
     expect(body).toContain('data-testid="add-transfer-form-error"');
-    expect(body).toContain('Das Foto konnte nicht gelesen werden');
+    expect(body).toContain('Der Browser konnte dieses Foto nicht lesen');
     expect(body).not.toContain('.heic');
     expect(body).not.toContain('EXIF');
   });

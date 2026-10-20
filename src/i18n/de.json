@@ -111,7 +111,7 @@
       "errors": {
         "empty_file": "Das ausgewählte Bild ist leer. Nimm ein neues Foto auf.",
         "source_too_large": "Das Foto ist zu groß. Nimm ein neues Foto mit höchstens 20 MB auf.",
-        "decode_failed": "Das Foto konnte nicht gelesen werden. Nimm ein neues, scharfes Foto auf.",
+        "decode_failed": "Der Browser konnte dieses Foto nicht lesen. Wähle ein JPEG oder nimm ein neues, scharfes Foto auf.",
         "invalid_dimensions": "Das Foto hat ungültige Abmessungen. Nimm ein neues Foto auf.",
         "encode_failed": "Das Foto konnte nicht sicher vorbereitet werden. Nimm ein neues Foto auf.",
         "output_too_large": "Das vorbereitete Foto ist weiterhin zu groß. Nimm ein neues Foto mit geringerer Auflösung auf.",
@@ -163,7 +163,10 @@
           "conflict_sync_failed": "Die aktuelle OneDrive-Datenbank konnte nicht geladen und geprüft werden.",
           "remote_commit_recovery_failed": "Die Transfers sind in OneDrive gespeichert, aber die geprüfte lokale Aktualisierung ist fehlgeschlagen. Speichere sie nicht erneut."
         }
-      }
+      },
+      "duplicateWarning": "Nach der Kontowahl werden Transfers automatisch gespeichert. Prüfe vor einer weiteren Aufnahme, ob dieser Beleg bereits gebucht wurde. Wiederholte Fotos können Duplikate erzeugen.",
+      "correction": "Prüfe Datum, Händler, Beträge und Kategorien. Zur Korrektur schließe die Mobile-App, bearbeite die Datenbank in Conspectus Desktop und öffne und aktualisiere danach die Mobile-App. Nutze beide Apps nicht gleichzeitig mit dieser Datenbank.",
+      "imageGuidance": "Fotografiere den gesamten Beleg scharf mit lesbarem Datum und Gesamtbetrag. Bei HEIC-Leseproblemen wähle stattdessen ein JPEG. Sehr lange Bons und hochauflösende Fotos können unlesbar sein oder den Gerätespeicher überfordern."
     },
     "save": {
       "localSave": "Transfer wird lokal gespeichert und der Datenbank-Upload vorbereitet...",
