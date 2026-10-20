@@ -830,6 +830,7 @@ describe('AddRoute component', () => {
     expect(body).toMatch(/data-testid="add-transfer-name"[^>]*disabled/);
     expect(body).toMatch(/data-testid="add-transfer-buyplace"[^>]*disabled/);
     expect(body).toMatch(/data-testid="add-transfer-close"[^>]*disabled/);
+    expect(body).toMatch(/data-testid="bottom-sheet-close"[^>]*disabled/);
   });
 
   it('renders local save status and disables controls while the local write/export runs', () => {
@@ -845,6 +846,7 @@ describe('AddRoute component', () => {
     expect(body).toContain('aria-busy="true"');
     expect(body).toMatch(/data-testid="add-transfer-submit"[^>]*disabled/);
     expect(body).toMatch(/data-testid="add-transfer-close"[^>]*disabled/);
+    expect(body).toMatch(/data-testid="bottom-sheet-close"[^>]*disabled/);
   });
 
   it('renders determinate upload progress while the database upload runs', () => {

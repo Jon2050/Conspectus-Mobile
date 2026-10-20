@@ -1,6 +1,15 @@
 // Guards the SettingsRoute theme contract for destructive/error surfaces in light and dark mode.
 import { describe, expect, it } from 'vitest';
-import settingsRouteSource from './SettingsRoute.svelte?raw';
+import routeSource from './SettingsRoute.svelte?raw';
+import safetySource from './SettingsSafetySection.svelte?raw';
+import buildSource from './SettingsBuildInformation.svelte?raw';
+import { readFileSync } from 'node:fs';
+const styles = readFileSync(new URL('./settings.css', import.meta.url), 'utf8');
+
+const settingsRouteSource =
+  routeSource
+    .replace('<SettingsSafetySection />', safetySource)
+    .replace('<SettingsBuildInformation {buildInfo} />', buildSource) + styles;
 import openRouterSectionSource from './SettingsOpenRouterSection.svelte?raw';
 
 describe('SettingsRoute styling', () => {
