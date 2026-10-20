@@ -93,6 +93,7 @@ export const createDatabaseConflictRecoveryService = (
     async syncLatestDatabase(recoveryOptions?: DatabaseConflictRecoveryOptions): Promise<void> {
       const token = options.session?.beginRefresh();
       if (token === null) throw new Error('A database write is still active.');
+      const signal = options.session?.refreshSignal();
       const expectedIdentity = options.session?.identity();
       const binding = resolveBinding(bindingProvider);
       const canApply = () => {
@@ -119,7 +120,7 @@ export const createDatabaseConflictRecoveryService = (
       dbRuntime.close();
 
       try {
-        const metadata = await graphClient.getFileMetadata(binding);
+        const metadata = await graphClient.getFileMetadata(binding, signal);
         const snapshot = await snapshotService.downloadAndCacheSnapshot(
           binding,
           metadata,
@@ -128,6 +129,7 @@ export const createDatabaseConflictRecoveryService = (
             syncStateStore.updateProgress(loadedBytes, totalBytes, 'download');
             recoveryOptions?.onProgress?.({ loadedBytes, totalBytes });
           },
+          signal,
         );
 
         if (!canApply()) throw new Error('Database recovery was superseded.');

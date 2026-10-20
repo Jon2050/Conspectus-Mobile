@@ -170,7 +170,7 @@ export const createSettingsOpenRouterController = (
     if (error.code === 'invalid_key') {
       return 'invalid_key';
     }
-    if (error.code === 'network_error') {
+    if (error.code === 'network_error' || error.code === 'timeout') {
       return 'network_error';
     }
     if (error.code === 'provider_error') {

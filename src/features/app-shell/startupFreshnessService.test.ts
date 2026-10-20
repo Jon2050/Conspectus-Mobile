@@ -100,6 +100,68 @@ const createGraphError = (
 });
 
 describe('startup freshness service', () => {
+  it('recovers a corrupt matching entry with a targeted clear and download', async () => {
+    const cache = { ...createCacheStore(createSnapshot()), clearSnapshot: vi.fn(async () => {}) };
+    const snapshots = createSnapshotService(createSnapshot());
+    const service = createStartupFreshnessService(
+      createGraphClient(createMetadata()),
+      cache,
+      snapshots,
+      {
+        validateCachedSnapshot: async () => {
+          throw new Error('Invalid cached SQLite');
+        },
+      },
+    );
+    expect((await service.resolve(DRIVE_ITEM_BINDING, true)).kind).toBe('ready');
+    expect(cache.clearSnapshot).toHaveBeenCalledWith(DRIVE_ITEM_BINDING);
+    expect(snapshots.downloadAndCacheSnapshot).toHaveBeenCalledOnce();
+  });
+  it('uses metadata alone to skip stale cache bytes', async () => {
+    const cache = {
+      ...createCacheStore(createSnapshot()),
+      readMetadata: vi.fn(async () => ({ eTag: 'old', lastSyncAtIso: '' })),
+    };
+    const service = createStartupFreshnessService(
+      createGraphClient(createMetadata()),
+      cache,
+      createSnapshotService(createSnapshot()),
+    );
+    await service.resolve(DRIVE_ITEM_BINDING, true);
+    expect(cache.readSnapshot).not.toHaveBeenCalled();
+  });
+  it('honors Retry-After before its bounded retry', async () => {
+    const waitFor = vi.fn(async () => {});
+    const service = createStartupFreshnessService(
+      createGraphClient(
+        { ...createGraphError('network_error', 'rate limited', 429), retryAfterMs: 5000 },
+        createMetadata(),
+      ),
+      createCacheStore(createSnapshot()),
+      createSnapshotService(createSnapshot()),
+      { retry: { waitFor } },
+    );
+    await service.resolve(DRIVE_ITEM_BINDING, true);
+    expect(waitFor).toHaveBeenCalledWith(5000);
+  });
+  it('force download bypasses even an unreadable cache', async () => {
+    const cache = {
+      readSnapshot: vi.fn(async () => {
+        throw new Error('IndexedDB unavailable');
+      }),
+    };
+    const snapshots = createSnapshotService(createSnapshot());
+    const service = createStartupFreshnessService(
+      createGraphClient(createMetadata()),
+      cache,
+      snapshots,
+    );
+    expect(
+      (await service.resolve(DRIVE_ITEM_BINDING, true, undefined, 'force_download')).kind,
+    ).toBe('ready');
+    expect(cache.readSnapshot).not.toHaveBeenCalled();
+    expect(snapshots.downloadAndCacheSnapshot).toHaveBeenCalledOnce();
+  });
   it('skips startup freshness work when no binding is selected', async () => {
     const graphClient = createGraphClient(createMetadata());
     const cacheStore = createCacheStore(null);
@@ -170,13 +232,18 @@ describe('startup freshness service', () => {
       recoveredBinding: RECOVERED_DRIVE_ITEM_BINDING,
     });
 
-    expect(recover).toHaveBeenCalledWith(DRIVE_ITEM_BINDING);
-    expect(graphClient.getFileMetadata).toHaveBeenNthCalledWith(1, DRIVE_ITEM_BINDING);
-    expect(graphClient.getFileMetadata).toHaveBeenNthCalledWith(2, RECOVERED_DRIVE_ITEM_BINDING);
+    expect(recover).toHaveBeenCalledWith(DRIVE_ITEM_BINDING, undefined);
+    expect(graphClient.getFileMetadata).toHaveBeenNthCalledWith(1, DRIVE_ITEM_BINDING, undefined);
+    expect(graphClient.getFileMetadata).toHaveBeenNthCalledWith(
+      2,
+      RECOVERED_DRIVE_ITEM_BINDING,
+      undefined,
+    );
     expect(cacheStore.readSnapshot).toHaveBeenCalledWith(RECOVERED_DRIVE_ITEM_BINDING);
     expect(snapshotService.downloadAndCacheSnapshot).toHaveBeenCalledWith(
       RECOVERED_DRIVE_ITEM_BINDING,
       metadata,
+      undefined,
       undefined,
     );
   });
@@ -292,6 +359,7 @@ describe('startup freshness service', () => {
       DRIVE_ITEM_BINDING,
       metadata,
       undefined,
+      undefined,
     );
   });
 
@@ -352,6 +420,7 @@ describe('startup freshness service', () => {
     expect(snapshotService.downloadAndCacheSnapshot).toHaveBeenCalledWith(
       DRIVE_ITEM_BINDING,
       metadata,
+      undefined,
       undefined,
     );
   });
@@ -731,11 +800,11 @@ describe('startup freshness service', () => {
 
     await expect(service.resolve(DRIVE_ITEM_BINDING, true)).resolves.toMatchObject({
       kind: 'error',
-      branch: 'online_download_failed',
+      branch: 'permission_denied',
       syncState: 'error',
       snapshot: null,
       failure: {
-        code: 'snapshot_download_failed',
+        code: 'permission_denied',
         message: 'The app does not have permission to download the selected OneDrive file.',
       },
     });
@@ -842,11 +911,11 @@ describe('startup freshness service', () => {
 
     await expect(service.resolve(DRIVE_ITEM_BINDING, true)).resolves.toMatchObject({
       kind: 'error',
-      branch: 'online_metadata_failed',
+      branch: 'permission_denied',
       syncState: 'error',
       snapshot: null,
       failure: {
-        code: 'metadata_fetch_failed',
+        code: 'permission_denied',
         message: 'The app does not have permission to access the selected OneDrive file.',
       },
     });

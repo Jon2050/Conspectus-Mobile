@@ -83,7 +83,7 @@ test('critical journey: signs in, binds a OneDrive DB, and reads accounts and tr
   await expect(page.getByTestId('selected-db-file-summary')).toContainText('budget.db');
   await expect(page.getByTestId('selected-db-file-summary')).toContainText('/Finance');
   await expect(page.getByText('Downloaded the latest DB from OneDrive.')).toBeVisible();
-  await expect.poll(() => getGraphMetadataCallCount(page)).toBe(1);
+  await expect.poll(() => getGraphMetadataCallCount(page)).toBe(2);
   await expect.poll(() => getGraphDownloadCallCount(page)).toBe(1);
 
   await page.getByRole('link', { name: 'Accounts' }).click();
@@ -179,8 +179,8 @@ test('critical journey: offline startup fails closed without cached account or t
 
   await page.goto(appPath('#/accounts'));
 
-  await expect(page.getByTestId('accounts-route-status')).toContainText(
-    'Connection is required to load the database.',
+  await expect(page.getByTestId('database-recovery')).toContainText(
+    'An internet connection is required to load the database.',
   );
   await expect(page.getByTestId('accounts-route-cards')).toHaveCount(0);
   expect(await getCacheReadSnapshotCallCount(page)).toBe(0);
@@ -188,8 +188,8 @@ test('critical journey: offline startup fails closed without cached account or t
   expect(await getGraphDownloadCallCount(page)).toBe(0);
 
   await page.getByRole('link', { name: 'Transfers' }).click();
-  await expect(page.getByTestId('transfers-route-status')).toContainText(
-    'Connection is required to load the database.',
+  await expect(page.getByTestId('database-recovery')).toContainText(
+    'An internet connection is required to load the database.',
   );
   await expect(page.getByTestId('transfers-route-cards')).toHaveCount(0);
 

@@ -24,6 +24,24 @@ const catalogResponse = (): Response =>
   );
 
 describe('createOpenRouterModelCatalogClient', () => {
+  it('bounds stalled response bodies and aborts the fetch signal without retry', async () => {
+    vi.useFakeTimers();
+    try {
+      const response = new Response();
+      vi.spyOn(response, 'json').mockImplementation(() => new Promise(() => {}));
+      const fetchMock = vi.fn<typeof fetch>(async () => response);
+      const request = createOpenRouterModelCatalogClient({ fetch: fetchMock, timeoutMs: 100 }).load(
+        'secret',
+      );
+      const assertion = expect(request).rejects.toMatchObject({ code: 'timeout' });
+      await vi.advanceTimersByTimeAsync(100);
+      await assertion;
+      expect(fetchMock.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
+      expect(fetchMock).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it('sends a bodyless authenticated GET without caching or credentials', async () => {
     const fetchMock = vi.fn<typeof fetch>(async () => catalogResponse());
     const client = createOpenRouterModelCatalogClient({ fetch: fetchMock });

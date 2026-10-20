@@ -1,5 +1,6 @@
 // Implements the typed Microsoft Graph client used for OneDrive browse, read, and upload flows.
 import { GRAPH_ONEDRIVE_FILE_SCOPES, type AuthClient } from '@auth';
+import { withRequestDeadline } from '@shared';
 
 import type {
   DriveItemBinding,
@@ -14,7 +15,7 @@ import type {
 const GRAPH_API_BASE_URL = 'https://graph.microsoft.com/v1.0';
 const CHILDREN_FIELDS = 'id,name,parentReference,file,folder';
 const FILE_BINDING_FIELDS = 'id,name,parentReference,file,folder';
-const METADATA_FIELDS = 'eTag,size,lastModifiedDateTime';
+const METADATA_FIELDS = 'eTag,size,lastModifiedDateTime,@microsoft.graph.downloadUrl';
 const DOWNLOAD_URL_FIELDS = 'id,@microsoft.graph.downloadUrl';
 
 type FetchFn = (input: string, init?: RequestInit) => Promise<Response>;
@@ -53,12 +54,15 @@ interface CreateGraphClientOptions {
   readonly authClient: AuthClient;
   readonly fetchFn?: FetchFn;
   readonly createXhrFn?: () => XMLHttpRequest;
+  readonly readTimeoutMs?: number;
+  readonly downloadTimeoutMs?: number;
 }
 
 class GraphClientError extends Error {
   readonly code: GraphErrorCode;
   readonly status?: number;
   readonly cause?: unknown;
+  retryAfterMs?: number;
 
   constructor(code: GraphErrorCode, message: string, status?: number, cause?: unknown) {
     super(message);
@@ -262,7 +266,14 @@ const normalizeHttpError = async (response: Response): Promise<GraphClientError>
       ? (getGraphErrorMessage(payload) ?? getDefaultErrorMessage(code))
       : getDefaultErrorMessage(code);
 
-  return new GraphClientError(code, message, response.status, payload);
+  const error = new GraphClientError(code, message, response.status, payload);
+  const retryAfter = response.headers.get('Retry-After');
+  if (retryAfter !== null) {
+    const seconds = Number(retryAfter);
+    const delay = Number.isFinite(seconds) ? seconds * 1000 : Date.parse(retryAfter) - Date.now();
+    if (Number.isFinite(delay)) error.retryAfterMs = Math.min(60_000, Math.max(0, delay));
+  }
+  return error;
 };
 
 const normalizeXhrError = (xhr: XMLHttpRequest): GraphClientError => {
@@ -357,6 +368,9 @@ const normalizeGraphItemBase = (
     eTag: payload.eTag,
     sizeBytes: payload.size,
     lastModifiedDateTime: payload.lastModifiedDateTime,
+    ...(isNonEmptyString(payload['@microsoft.graph.downloadUrl'])
+      ? { downloadUrl: payload['@microsoft.graph.downloadUrl'] }
+      : {}),
   };
 };
 
@@ -413,6 +427,19 @@ const normalizeChildrenPayload = (
 
 export const createGraphClient = (options: CreateGraphClientOptions): GraphClient => {
   const fetchFn = options.fetchFn ?? fetch;
+  const boundedRead = async <T>(
+    operation: (signal: AbortSignal) => Promise<T>,
+    timeoutMs: number,
+    signal?: AbortSignal,
+  ): Promise<T> => {
+    try {
+      return await withRequestDeadline(operation, timeoutMs, signal);
+    } catch (error) {
+      signal?.throwIfAborted();
+      if (error instanceof GraphClientError) throw error;
+      throw normalizeNetworkError(error);
+    }
+  };
   const createXhrFn = options.createXhrFn ?? (() => new XMLHttpRequest());
   const toRequestBody = (bytes: Uint8Array): Blob =>
     new Blob([Uint8Array.from(bytes).buffer], { type: 'application/octet-stream' });
@@ -431,6 +458,7 @@ export const createGraphClient = (options: CreateGraphClientOptions): GraphClien
     }
 
     assertContext?.();
+    init?.signal?.throwIfAborted();
     const requestInit: RequestInit = {
       ...init,
       headers: createAuthorizedHeaders(accessToken, init?.headers),
@@ -453,136 +481,163 @@ export const createGraphClient = (options: CreateGraphClientOptions): GraphClien
 
   return {
     async listChildren(folder): Promise<readonly GraphDriveItem[]> {
-      const invalidChildrenResponseMessage =
-        'Microsoft Graph children response did not include the required file fields.';
-      const items: GraphDriveItem[] = [];
-      let nextUrl: string | null =
-        `${buildFolderChildrenUrl(folder)}?$select=${encodeURIComponent(CHILDREN_FIELDS)}`;
+      return boundedRead(async (requestSignal) => {
+        const invalidChildrenResponseMessage =
+          'Microsoft Graph children response did not include the required file fields.';
+        const items: GraphDriveItem[] = [];
+        let nextUrl: string | null =
+          `${buildFolderChildrenUrl(folder)}?$select=${encodeURIComponent(CHILDREN_FIELDS)}`;
 
-      while (nextUrl !== null) {
-        const response = await executeRequest(nextUrl);
-        const payload = await readJsonPayload(response, invalidChildrenResponseMessage);
-        const page = normalizeChildrenPayload(payload, invalidChildrenResponseMessage);
-        items.push(...page.items);
-        nextUrl = page.nextLink;
-      }
-
-      return items.sort((left, right) => {
-        if (left.kind !== right.kind) {
-          return left.kind === 'folder' ? -1 : 1;
+        while (nextUrl !== null) {
+          const response = await executeRequest(nextUrl, { signal: requestSignal });
+          const payload = await readJsonPayload(response, invalidChildrenResponseMessage);
+          const page = normalizeChildrenPayload(payload, invalidChildrenResponseMessage);
+          items.push(...page.items);
+          nextUrl = page.nextLink;
         }
 
-        return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
-      });
+        return items.sort((left, right) => {
+          if (left.kind !== right.kind) {
+            return left.kind === 'folder' ? -1 : 1;
+          }
+
+          return left.name.localeCompare(right.name, undefined, { sensitivity: 'base' });
+        });
+      }, options.readTimeoutMs ?? 30_000);
     },
 
-    async resolveFileByPath(binding): Promise<DriveItemBinding> {
-      const pathUrl = `${buildDriveItemPathUrl(binding)}?$select=${encodeURIComponent(FILE_BINDING_FIELDS)}`;
-      const response = await executeRequest(pathUrl);
-      const invalidResponseMessage =
-        'Microsoft Graph path lookup response did not include the required file fields.';
-      const payload = await readJsonPayload(response, invalidResponseMessage);
-      const item = normalizeDriveItem(payload, invalidResponseMessage);
+    async resolveFileByPath(binding, signal?: AbortSignal): Promise<DriveItemBinding> {
+      return boundedRead(
+        async (requestSignal) => {
+          const pathUrl = `${buildDriveItemPathUrl(binding)}?$select=${encodeURIComponent(FILE_BINDING_FIELDS)}`;
+          const response = await executeRequest(pathUrl, { signal: requestSignal });
+          const invalidResponseMessage =
+            'Microsoft Graph path lookup response did not include the required file fields.';
+          const payload = await readJsonPayload(response, invalidResponseMessage);
+          const item = normalizeDriveItem(payload, invalidResponseMessage);
 
-      if (item?.kind === 'folder') {
-        throw new GraphClientError(
-          'not_found',
-          getDefaultErrorMessage('not_found'),
-          undefined,
-          payload,
-        );
-      }
+          if (item?.kind === 'folder') {
+            throw new GraphClientError(
+              'not_found',
+              getDefaultErrorMessage('not_found'),
+              undefined,
+              payload,
+            );
+          }
 
-      if (item === null) {
-        throw new GraphClientError('unknown', invalidResponseMessage, response.status, payload);
-      }
+          if (item === null) {
+            throw new GraphClientError('unknown', invalidResponseMessage, response.status, payload);
+          }
 
-      return {
-        driveId: item.driveId,
-        itemId: item.itemId,
-        name: item.name,
-        parentPath: item.parentPath,
-      };
-    },
-
-    async getFileMetadata(binding): Promise<GraphFileMetadata> {
-      const metadataUrl = `${buildDriveItemUrl(binding)}?$select=${encodeURIComponent(METADATA_FIELDS)}`;
-      const response = await executeRequest(metadataUrl);
-      const payload = await readJsonPayload(
-        response,
-        'Microsoft Graph metadata response did not include the required file fields.',
-      );
-
-      return normalizeGraphItemBase(
-        payload,
-        'Microsoft Graph metadata response did not include the required file fields.',
+          return {
+            driveId: item.driveId,
+            itemId: item.itemId,
+            name: item.name,
+            parentPath: item.parentPath,
+          };
+        },
+        options.readTimeoutMs ?? 30_000,
+        signal,
       );
     },
 
-    async getFileDownloadUrl(binding): Promise<string> {
-      const downloadUrlRequest = `${buildDriveItemUrl(binding)}?select=${encodeURIComponent(DOWNLOAD_URL_FIELDS)}`;
-      const response = await executeRequest(downloadUrlRequest);
-      const invalidResponseMessage =
-        'Microsoft Graph response did not include a download URL for the selected file.';
-      const payload = await readJsonPayload(response, invalidResponseMessage);
+    async getFileMetadata(binding, signal?: AbortSignal): Promise<GraphFileMetadata> {
+      return boundedRead(
+        async (requestSignal) => {
+          const metadataUrl = `${buildDriveItemUrl(binding)}?$select=${encodeURIComponent(METADATA_FIELDS)}`;
+          const response = await executeRequest(metadataUrl, { signal: requestSignal });
+          const payload = await readJsonPayload(
+            response,
+            'Microsoft Graph metadata response did not include the required file fields.',
+          );
 
-      return normalizeDownloadUrl(payload, invalidResponseMessage);
+          return normalizeGraphItemBase(
+            payload,
+            'Microsoft Graph metadata response did not include the required file fields.',
+          );
+        },
+        options.readTimeoutMs ?? 30_000,
+        signal,
+      );
+    },
+
+    async getFileDownloadUrl(binding, signal?: AbortSignal): Promise<string> {
+      return boundedRead(
+        async (requestSignal) => {
+          const downloadUrlRequest = `${buildDriveItemUrl(binding)}?select=${encodeURIComponent(DOWNLOAD_URL_FIELDS)}`;
+          const response = await executeRequest(downloadUrlRequest, { signal: requestSignal });
+          const invalidResponseMessage =
+            'Microsoft Graph response did not include a download URL for the selected file.';
+          const payload = await readJsonPayload(response, invalidResponseMessage);
+
+          return normalizeDownloadUrl(payload, invalidResponseMessage);
+        },
+        options.readTimeoutMs ?? 30_000,
+        signal,
+      );
     },
 
     async downloadFile(
       downloadUrl,
       onProgress?: (loadedBytes: number, totalBytes: number | null) => void,
+      signal?: AbortSignal,
     ): Promise<Uint8Array> {
-      let response: Response;
+      return boundedRead(
+        async (requestSignal) => {
+          let response: Response;
 
-      try {
-        response = await fetchFn(downloadUrl);
-      } catch (error) {
-        throw normalizeNetworkError(error);
-      }
-
-      if (!response.ok) {
-        throw await normalizeHttpError(response);
-      }
-
-      try {
-        const contentLength = response.headers.get('Content-Length');
-        const totalBytes = contentLength !== null ? parseInt(contentLength, 10) : null;
-
-        if (onProgress && response.body !== null) {
-          const reader = response.body.getReader();
-          let loadedBytes = 0;
-          const chunks: Uint8Array[] = [];
-
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
-              break;
-            }
-            if (value) {
-              chunks.push(value);
-              loadedBytes += value.length;
-              onProgress(loadedBytes, totalBytes);
-            }
+          try {
+            response = await fetchFn(downloadUrl, { signal: requestSignal });
+          } catch (error) {
+            throw normalizeNetworkError(error);
           }
 
-          const arrayBuffer = new Uint8Array(loadedBytes);
-          let offset = 0;
-          for (const chunk of chunks) {
-            arrayBuffer.set(chunk, offset);
-            offset += chunk.length;
+          if (!response.ok) {
+            throw await normalizeHttpError(response);
           }
-          return arrayBuffer;
-        }
 
-        const arrayBuffer = await response.arrayBuffer();
-        if (onProgress) {
-          onProgress(arrayBuffer.byteLength, totalBytes);
-        }
-        return new Uint8Array(arrayBuffer);
-      } catch (error) {
-        throw normalizeNetworkError(error);
-      }
+          try {
+            const contentLength = response.headers.get('Content-Length');
+            const totalBytes = contentLength !== null ? parseInt(contentLength, 10) : null;
+
+            if (onProgress && response.body !== null) {
+              const reader = response.body.getReader();
+              let loadedBytes = 0;
+              const chunks: Uint8Array[] = [];
+
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) {
+                  break;
+                }
+                if (value) {
+                  chunks.push(value);
+                  loadedBytes += value.length;
+                  onProgress(loadedBytes, totalBytes);
+                }
+              }
+
+              const arrayBuffer = new Uint8Array(loadedBytes);
+              let offset = 0;
+              for (const chunk of chunks) {
+                arrayBuffer.set(chunk, offset);
+                offset += chunk.length;
+              }
+              return arrayBuffer;
+            }
+
+            const arrayBuffer = await response.arrayBuffer();
+            if (onProgress) {
+              onProgress(arrayBuffer.byteLength, totalBytes);
+            }
+            return new Uint8Array(arrayBuffer);
+          } catch (error) {
+            throw normalizeNetworkError(error);
+          }
+        },
+        options.downloadTimeoutMs ?? 120_000,
+        signal,
+      );
     },
 
     async uploadFile(

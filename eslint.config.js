@@ -13,6 +13,7 @@ export default tseslint.config(
   prettierConfig,
   {
     languageOptions: {
+      parserOptions: { tsconfigRootDir: import.meta.dirname },
       globals: {
         ...globals.browser,
         ...globals.node,
@@ -206,6 +207,7 @@ export default tseslint.config(
   },
   {
     ignores: [
+      'output/**',
       'dist',
       'coverage',
       'node_modules',

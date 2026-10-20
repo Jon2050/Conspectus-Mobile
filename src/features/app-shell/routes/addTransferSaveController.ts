@@ -22,11 +22,11 @@ import {
   NO_CATEGORY_SELECTED,
   type AddTransferAccountOption,
   type AddTransferFormFields,
-} from './addTransferFormState';
-import { parseAmountInputCents } from './addTransferAmountInput';
+} from '../../transfers/addTransferFormState';
+import { parseAmountInputCents } from '../../transfers/addTransferAmountInput';
 import type { AddTransferOptionsState } from './addTransferOptionsController';
-import { validateAddTransfer } from './addTransferValidation';
-import { deriveTransferType } from './transferTypeDerivation';
+import { validateAddTransfer } from '../../transfers/addTransferValidation';
+import { deriveTransferType } from '../../transfers/transferTypeDerivation';
 
 export type AddTransferSavePhase =
   | 'idle'

@@ -28,8 +28,11 @@ export const createSqlJsLoader = (options: CreateSqlJsLoaderOptions = {}): SqlJs
     async load(): Promise<SqlJsStatic> {
       if (runtimePromise === null) {
         const wasmAssetUrl = resolveWasmAssetUrl();
+        const start = performance.now();
         runtimePromise = initSqlJsFactory({
           locateFile: createLocateFileResolver(wasmAssetUrl),
+        }).finally(() => {
+          performance.measure('conspectus:wasm', { start, end: performance.now() });
         });
       }
 

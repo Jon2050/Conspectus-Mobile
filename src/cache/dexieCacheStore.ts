@@ -63,6 +63,13 @@ export const createDexieCacheStore = (
   };
 
   return {
+    async readMetadata(binding) {
+      await ensureDatabaseOpen();
+      const metadata = await database.syncMetadata.get(toBindingKey(binding));
+      return metadata === undefined
+        ? null
+        : { eTag: metadata.eTag, lastSyncAtIso: metadata.lastSyncAtIso };
+    },
     async readSnapshot(binding): Promise<CachedDatabaseSnapshot | null> {
       await ensureDatabaseOpen();
       const bindingKey = toBindingKey(binding);

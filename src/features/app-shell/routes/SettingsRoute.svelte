@@ -19,6 +19,7 @@
     type SettingsAuthOperation,
     type SettingsAuthState,
   } from './settingsAuthController';
+  import { presentOperationFailure } from '../failurePresentation';
   import SettingsDatabaseBrowser from './SettingsDatabaseBrowser.svelte';
   import SettingsSafetySection from './SettingsSafetySection.svelte';
   import SettingsBuildInformation from './SettingsBuildInformation.svelte';
@@ -90,7 +91,7 @@
     }
 
     if (nextState.error !== null) {
-      return `${$_('settings.status.errorPrefix')} ${nextState.error.message}`;
+      return $_(presentOperationFailure(nextState.error).messageKey);
     }
 
     return nextState.session.isAuthenticated
@@ -108,7 +109,7 @@
     }
 
     if (nextState.error !== null) {
-      return `${$_('settings.db.status.errorPrefix')} ${nextState.error.message}`;
+      return $_(presentOperationFailure(nextState.error).messageKey);
     }
 
     if (nextState.selectedBinding !== null) {
@@ -265,9 +266,12 @@
     }
     const requestId = ++syncMetadataRequestId;
     try {
-      const snapshot = await cacheStore.readSnapshot(binding);
+      const metadata =
+        cacheStore.readMetadata !== undefined
+          ? await cacheStore.readMetadata(binding)
+          : ((await cacheStore.readSnapshot(binding))?.metadata ?? null);
       if (requestId === syncMetadataRequestId) {
-        lastSyncAtIso = snapshot?.metadata.lastSyncAtIso ?? null;
+        lastSyncAtIso = metadata?.lastSyncAtIso ?? null;
       }
     } catch {
       if (requestId === syncMetadataRequestId) {
@@ -320,15 +324,14 @@
 
   <SettingsSafetySection />
 
-  <p class="settings-screen__auth-status" data-testid="auth-status-message" aria-live="polite">
+  <p
+    class="settings-screen__auth-status"
+    data-testid="auth-status-message"
+    aria-live="polite"
+    role={state.error === null ? undefined : 'alert'}
+  >
     {authStatusMessage}
   </p>
-
-  {#if state.error !== null}
-    <p class="settings-screen__auth-error" role="alert">
-      {state.error.message}
-    </p>
-  {/if}
 
   {#if state.session.isAuthenticated && state.session.account !== null}
     <h3 class="settings-screen__subheading">{$_('settings.account.heading')}</h3>
@@ -349,16 +352,11 @@
     <p
       class="settings-screen__binding-status"
       data-testid="binding-status-message"
+      role={bindingState.error === null ? undefined : 'alert'}
       aria-live="polite"
     >
       {bindingStatusMessage}
     </p>
-
-    {#if bindingState.error !== null}
-      <p class="settings-screen__binding-error" role="alert">
-        {bindingState.error.message}
-      </p>
-    {/if}
 
     <h4 class="settings-screen__action-heading">{$_('settings.actions.standard')}</h4>
     <div class="settings-screen__actions" data-testid="standard-settings-actions">
@@ -447,7 +445,7 @@
 
       {#if localDataResetState.error !== null}
         <p class="settings-screen__confirmation-error" role="alert">
-          {localDataResetState.error.message}
+          {$_('sync.failure.cache')}
         </p>
       {/if}
 

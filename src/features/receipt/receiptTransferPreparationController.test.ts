@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID } from '@db';
 
-import type { AddTransferOptionsState } from '../app-shell/routes/addTransferOptionsController';
+import type { AddTransferOptionsState } from '../transfers/transferOptions';
 import type { ReceiptAnalysisState } from './receiptAnalysisController';
 import { createReceiptTransferPreparationController } from './receiptTransferPreparationController';
 

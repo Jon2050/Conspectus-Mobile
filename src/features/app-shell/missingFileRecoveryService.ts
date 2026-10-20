@@ -16,7 +16,7 @@ export class MissingFileRecoveryError extends Error {
 }
 
 export interface MissingFileRecoveryService {
-  recover(binding: DriveItemBinding): Promise<DriveItemBinding>;
+  recover(binding: DriveItemBinding, signal?: AbortSignal): Promise<DriveItemBinding>;
 }
 
 const isGraphError = (error: unknown): error is GraphError =>
@@ -44,11 +44,11 @@ export const isMissingFileRecoveryError = (error: unknown): error is MissingFile
 export const createMissingFileRecoveryService = (
   graphClient: Pick<GraphClient, 'resolveFileByPath'>,
 ): MissingFileRecoveryService => ({
-  async recover(binding): Promise<DriveItemBinding> {
+  async recover(binding, signal): Promise<DriveItemBinding> {
     let candidateBinding: DriveItemBinding;
 
     try {
-      candidateBinding = await graphClient.resolveFileByPath(binding);
+      candidateBinding = await graphClient.resolveFileByPath(binding, signal);
     } catch (error) {
       if (isGraphError(error) && error.code === 'not_found') {
         throw new MissingFileRecoveryError(

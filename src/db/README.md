@@ -18,6 +18,10 @@ Expected public interfaces (`src/db/index.ts`):
   Export restores and verifies required connection PRAGMAs even when export fails. Failed pragma
   restoration closes the runtime; `getGeneration()` identifies connection replacement or closure.
 - `DbRuntimeError` + `DbRuntimeErrorCode`: deterministic runtime/open failure codes for startup handling.
+- `createSqliteSnapshotValidator` and `createWorkerSnapshotValidator`: import compatibility checks
+  against required desktop columns/primary keys, primary-account topology, lookup rows, integrity
+  and foreign/logical references. Production validates snapshots of at least 1 MiB in a disposable,
+  cancellable worker; validation never changes the schema. WASM loads emit local performance entries.
 - `AccountRecord`: normalized account row shape for Accounts UI.
 - `createTransferMonthQueryService` + `getEpochDayMonthBounds`: inclusive epoch-day month filtering for transfer list reads.
 - `TransferRecord`: normalized transfer row shape for Transfers UI.

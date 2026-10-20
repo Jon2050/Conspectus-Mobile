@@ -17,6 +17,7 @@
     appCategoryQueryService,
     appTransferMonthQueryService,
   } from '@db';
+  import { presentOperationFailure } from '../failurePresentation';
   import SkeletonCard from '../components/SkeletonCard.svelte';
   import {
     createTransfersRouteController,
@@ -215,7 +216,9 @@
       {#if state.operation === 'loading'}
         {$_('transfers.loading')}
       {:else if state.operation === 'error'}
-        {state.error?.message ?? $_('transfers.errorDefault')}
+        {state.error?.cause
+          ? $_(presentOperationFailure(state.error.cause).messageKey)
+          : (state.error?.message ?? $_('transfers.errorDefault'))}
       {:else if state.operation === 'empty'}
         {$_('transfers.emptyStatus')}
       {:else if state.operation === 'ready'}

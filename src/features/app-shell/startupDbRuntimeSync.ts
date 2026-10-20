@@ -1,3 +1,4 @@
+import { measurePhase } from '@shared';
 // Keeps app-shell startup DB runtime application deterministic across overlapping sync operations.
 import type { BrowserDbRuntime } from '@db';
 
@@ -23,9 +24,13 @@ export const syncDbRuntimeForStartupDecision = async (
     return 'superseded';
   }
 
-  await dbRuntime.open(decision.snapshot.dbBytes, {
-    canApply: shouldApply,
-  });
+  if (decision.reuseRuntime === true) return 'applied';
+
+  await measurePhase('runtime-open', () =>
+    dbRuntime.open(decision.snapshot.dbBytes, {
+      canApply: shouldApply,
+    }),
+  );
 
   return shouldApply() ? 'applied' : 'superseded';
 };

@@ -50,3 +50,9 @@ export {
   type DbRuntimeErrorCode,
 } from './dbRuntimeErrors';
 export { appSqlJsLoader, createSqlJsLoader, type SqlJsLoader } from './sqlJsLoader';
+export { createWorkerSnapshotValidator } from './workerSnapshotValidator';
+export {
+  createSqliteSnapshotValidator,
+  validateOpenedConspectusDatabase,
+  type CachedDatabaseSnapshotValidator,
+} from './snapshotValidation';

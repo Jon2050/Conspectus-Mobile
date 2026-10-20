@@ -39,7 +39,7 @@ describe('missing file recovery service', () => {
     const { service, resolveFileByPath } = createService(replacement);
 
     await expect(service.recover(BINDING)).resolves.toEqual(replacement);
-    expect(resolveFileByPath).toHaveBeenCalledWith(BINDING);
+    expect(resolveFileByPath).toHaveBeenCalledWith(BINDING, undefined);
   });
 
   it.each([

@@ -1,3 +1,4 @@
+import { presentOperationFailure } from './failurePresentation';
 // Applies startup freshness outcomes to the app sync-state store and emits completion feedback.
 import { isDbRuntimeError, type DbRuntimeErrorCode } from '@db';
 import { appToastStore, type SyncStateStore, type ToastType } from '@shared';
@@ -23,21 +24,14 @@ const STARTUP_DB_RUNTIME_FAILURE_MESSAGES: Record<DbRuntimeErrorCode, string> = 
 };
 
 const buildStartupSyncMessage = (decision: StartupFreshnessDecision): string | null => {
-  switch (decision.branch) {
-    case 'no_binding':
-      return null;
-    case 'online_unchanged':
-      return get(_)('sync.startup.onlineUnchanged');
-    case 'online_changed':
-      return get(_)('sync.startup.onlineChanged');
-    case 'online_file_missing':
-      return get(_)('sync.startup.fileMissing');
-    case 'online_auth_expired':
-    case 'offline_unsupported':
-    case 'online_metadata_failed':
-    case 'online_download_failed':
-      return decision.failure.message;
-  }
+  if (decision.kind === 'error')
+    return get(_)(presentOperationFailure(decision.failure).messageKey);
+  if (decision.kind === 'skipped') return null;
+  return get(_)(
+    decision.branch === 'online_unchanged'
+      ? 'sync.startup.onlineUnchanged'
+      : 'sync.startup.onlineChanged',
+  );
 };
 
 const showDecisionToast = (
@@ -51,7 +45,6 @@ const showDecisionToast = (
 
   switch (decision.branch) {
     case 'online_unchanged':
-      toastStore.show(message, 'success', 3200);
       return;
     case 'online_changed':
       toastStore.show(message, 'success', 3200);

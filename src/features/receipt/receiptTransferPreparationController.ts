@@ -1,7 +1,7 @@
 // Owns transient source selection, staged progress, validation, and the M9-05 command handoff.
 import type { CreateTransferInput } from '@db';
 
-import type { AddTransferOptionsState } from '../app-shell/routes/addTransferOptionsController';
+import type { AddTransferOptionsState } from '../transfers/transferOptions';
 import type { ReceiptAnalysisState } from './receiptAnalysisController';
 import {
   buildReceiptTransferCommands,

@@ -3,7 +3,7 @@
   import { _ } from 'svelte-i18n';
   import type { ReceiptCaptureController, ReceiptTransferPreparationState } from '../../receipt';
   import type { ReceiptTransferCommitState } from '../receiptTransferCommitController';
-  import type { AddTransferAccountOption } from './addTransferFormState';
+  import type { AddTransferAccountOption } from '../../transfers/addTransferFormState';
   let {
     receiptFileInputElement = $bindable(null),
     receiptCaptureIsDisabled,

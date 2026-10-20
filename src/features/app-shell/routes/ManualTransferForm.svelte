@@ -3,13 +3,16 @@
   import { tick } from 'svelte';
   import { _ } from 'svelte-i18n';
   import { PRIMARY_INCOME_ACCOUNT_TYPE_ID, PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID } from '@db';
-  import { NO_CATEGORY_SELECTED, type AddTransferFormFields } from './addTransferFormState';
+  import {
+    NO_CATEGORY_SELECTED,
+    type AddTransferFormFields,
+  } from '../../transfers/addTransferFormState';
   import type { AddTransferOptionsState } from './addTransferOptionsController';
   import {
     appendAmountInputDigit,
     formatAmountInputValue,
     removeLastAmountInputDigit,
-  } from './addTransferAmountInput';
+  } from '../../transfers/addTransferAmountInput';
   let {
     fields = $bindable(),
     optionsState,

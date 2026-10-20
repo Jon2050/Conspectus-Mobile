@@ -36,11 +36,15 @@ export const createDatabaseSession = (
   let current: DatabaseWriteContext | null = null;
   let busy = false;
   let dirty = false;
+  let refreshing = false;
+  let refreshAbort = new AbortController();
   const idleListeners = new Set<() => void>();
 
   const invalidate = (): void => {
+    refreshAbort.abort();
     generation += 1;
     current = null;
+    refreshing = false;
   };
   const isCurrent = (context: DatabaseWriteContext): boolean =>
     current !== null &&
@@ -53,11 +57,23 @@ export const createDatabaseSession = (
   return {
     identity,
     isBusy: () => busy,
+    hasRuntime: () => current !== null && isCurrent(current),
+    isReadable: () => current !== null && !dirty && isCurrent(current),
+    activeSnapshot: () =>
+      current !== null && !dirty && isCurrent(current)
+        ? {
+            binding: current.binding,
+            metadata: { eTag: current.baseETag, lastSyncAtIso: '' },
+          }
+        : undefined,
     invalidate,
+    refreshSignal: () => refreshAbort.signal,
     beginRefresh(): number | null {
       if (busy) return null;
-      invalidate();
-      return generation;
+      refreshAbort.abort();
+      refreshAbort = new AbortController();
+      refreshing = true;
+      return ++generation;
     },
     isGeneration: (token: number) => token === generation,
     adopt(expectedIdentity: DatabaseIdentity, baseETag: string): void {
@@ -73,12 +89,15 @@ export const createDatabaseSession = (
         runtimeGeneration: runtime().getGeneration?.(),
       });
       dirty = false;
+      refreshing = false;
     },
-    isWritable: () => current !== null && !busy && !dirty && canWrite() && isCurrent(current),
+    isWritable: () =>
+      current !== null && !busy && !dirty && !refreshing && canWrite() && isCurrent(current),
     acquire(expected?: DatabaseWriteContext): DatabaseWriteContext {
       const context = expected ?? current;
       if (
         busy ||
+        refreshing ||
         context === null ||
         (expected === undefined && !canWrite()) ||
         !isCurrent(context) ||

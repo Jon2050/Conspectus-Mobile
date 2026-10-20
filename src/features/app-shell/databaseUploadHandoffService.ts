@@ -93,7 +93,7 @@ const toUploadError = (
 
 export const createDatabaseUploadHandoffService = (
   graphClient: Pick<GraphClient, 'uploadFile'>,
-  cacheStore: Pick<CacheStore, 'readSnapshot' | 'writeSnapshot'>,
+  cacheStore: Pick<CacheStore, 'readSnapshot' | 'writeSnapshot'> & Pick<CacheStore, 'readMetadata'>,
   bindingProvider: BindingProvider,
   syncStateStore: SyncStateStore = appSyncStateStore,
   options: CreateDatabaseUploadHandoffServiceOptions = {},
@@ -166,19 +166,22 @@ export const createDatabaseUploadHandoffService = (
       let expectedETag = context?.baseETag ?? uploadOptions?.expectedETag ?? null;
 
       try {
-        const currentSnapshot = await cacheStore.readSnapshot(binding);
-        if (currentSnapshot === null) {
+        const currentMetadata =
+          cacheStore.readMetadata !== undefined
+            ? await cacheStore.readMetadata(binding)
+            : ((await cacheStore.readSnapshot(binding))?.metadata ?? null);
+        if (currentMetadata === null) {
           throw new DatabaseUploadError(
             'missing_cached_snapshot',
             'Cannot upload the database because no cached OneDrive metadata is available.',
           );
         }
 
-        if (expectedETag !== null && currentSnapshot.metadata.eTag !== expectedETag) {
+        if (expectedETag !== null && currentMetadata.eTag !== expectedETag) {
           throw new DatabaseUploadError('conflict', conflictMessage, undefined, expectedETag);
         }
 
-        expectedETag ??= currentSnapshot.metadata.eTag;
+        expectedETag ??= currentMetadata.eTag;
         assertContext();
 
         uploadWasInvoked = true;

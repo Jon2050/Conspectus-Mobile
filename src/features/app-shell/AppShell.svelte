@@ -1,24 +1,27 @@
 <!-- Coordinates shell routing, startup auth hydration, and shared end-of-page deployment footer behavior. -->
 <script lang="ts">
-  import { afterUpdate, onDestroy, onMount } from 'svelte';
+  import { afterUpdate, onDestroy, onMount, tick } from 'svelte';
   import { get, type Readable } from 'svelte/store';
   import { _ } from 'svelte-i18n';
   import type { DriveItemBinding } from '@graph';
   import {
+    measurePhase,
     appSelectedDriveItemBindingStore,
     appNetworkStateStore,
     appSyncStateStore,
     type NetworkStateStore,
     type SyncStateStore,
   } from '@shared';
-  import { appDatabaseSession, sameDatabaseIdentity } from './databaseSession';
+  import { appDatabaseSession } from './databaseSession';
+  import { createDatabaseRefreshController } from './databaseRefreshController';
+  import { presentOperationFailure } from './failurePresentation';
   import LoadingPlaceholder from './components/LoadingPlaceholder.svelte';
   import DeploymentInfoFooter from './components/DeploymentInfoFooter.svelte';
   import ProgressIndicator from './components/ProgressIndicator.svelte';
   import AccountsRoute from './routes/AccountsRoute.svelte';
   import TransfersRoute from './routes/TransfersRoute.svelte';
   import AddRoute from './routes/AddRoute.svelte';
-  import SettingsRoute from './routes/SettingsRoute.svelte';
+  import type SettingsRoute from './routes/SettingsRoute.svelte';
   import ToastContainer from './components/ToastContainer.svelte';
   import ServiceWorkerUpdateBanner from './components/ServiceWorkerUpdateBanner.svelte';
   import {
@@ -44,11 +47,9 @@
   import {
     applyStartupFreshnessDecision,
     applyStartupDbRuntimeError,
-    applyUnexpectedStartupSyncError,
     beginStartupSync,
     updateStartupSyncProgress,
   } from './startupSyncStateController';
-  import { syncDbRuntimeForStartupDecision } from './startupDbRuntimeSync';
   import { resolveAppStartupIsOnline } from './startupNetworkStateResolver';
   import { syncSelectedDriveItemBindingStoreAtStartup } from './startupBindingSync';
   import { resolveAppSnapshotValidator } from './snapshotValidatorResolver';
@@ -56,7 +57,7 @@
   import {
     createInitialFormFields,
     type AddTransferFormFields,
-  } from './routes/addTransferFormState';
+  } from '../transfers/addTransferFormState';
   import {
     browserReceiptImageCodec,
     createReceiptAnalysisController,
@@ -80,6 +81,21 @@
     type ReceiptTransferCommitState,
   } from './receiptTransferCommitController';
 
+  let SettingsComponent: typeof SettingsRoute | null = null;
+  let settingsLoad: Promise<void> | null = null;
+  let settingsLoadFailed = false;
+  const loadSettings = (): void => {
+    settingsLoadFailed = false;
+    settingsLoad = import('./routes/SettingsRoute.svelte')
+      .then((module) => {
+        SettingsComponent = module.default;
+      })
+      .catch(() => {
+        settingsLoadFailed = true;
+        settingsLoad = null;
+      });
+  };
+
   export let routeStore: Readable<AppRouteKey> = createHashRouteStore();
   export let syncStateStore: SyncStateStore = appSyncStateStore;
   export let networkStateStore: NetworkStateStore = appNetworkStateStore;
@@ -93,7 +109,6 @@
     createReceiptTransferPreparationController();
   export let receiptCommitController: ReceiptTransferCommitController =
     createReceiptTransferCommitController();
-  export let loadingDelayMs = 160;
   export let showLoadingPlaceholder = true;
 
   let currentRoute: AppRouteKey = DEFAULT_ROUTE;
@@ -101,13 +116,10 @@
   let addTransferSaveState: AddTransferSaveState = addTransferSaveController.getState();
   let receiptCommitState: ReceiptTransferCommitState = receiptCommitController.getState();
   let selectedBinding: DriveItemBinding | null = get(appSelectedDriveItemBindingStore);
-  let addTransferHasLoadedDatabase = false;
   let appContentElement: HTMLElement | null = null;
   let appShellIsMounted = false;
   let selectedBindingHasEmitted = false;
   let hasPerformedInitialSync = false;
-  let dataRoutesAwaitInitialSync = false;
-  let currentSyncId = 0;
   let lastRenderedRoute: AppRouteKey | null = null;
   let forceRefreshIsRunning = false;
   let authRecoveryIsPending = false;
@@ -147,6 +159,13 @@
       }
     }
     currentRoute = route;
+    if (
+      route === 'settings' &&
+      SettingsComponent === null &&
+      settingsLoad === null &&
+      !settingsLoadFailed
+    )
+      loadSettings();
   });
   const unsubscribeAddTransferSaveController = addTransferSaveController.subscribe((state) => {
     const wasSaved = addTransferSaveState.phase === 'saved';
@@ -182,14 +201,23 @@
     $syncStateStore.state === 'error' && $syncStateStore.branch === 'online_auth_expired';
   $: missingFileRecoveryIsRequired =
     $syncStateStore.state === 'error' && $syncStateStore.branch === 'online_file_missing';
+  $: refreshHasFailed =
+    $syncStateStore.state === 'error' &&
+    [
+      'offline_unsupported',
+      'online_metadata_failed',
+      'online_download_failed',
+      'online_auth_expired',
+      'online_file_missing',
+      'cache_unavailable',
+      'database_invalid',
+      'database_changed',
+      'permission_denied',
+      'db_runtime_open_failed',
+    ].includes($syncStateStore.branch ?? '');
   $: if (!staleTokenRecoveryIsRequired && authRecoveryError !== null) {
     authRecoveryError = null;
   }
-  $: startupSyncBlocksDataRoute =
-    dataRoutesAwaitInitialSync &&
-    startupSyncIsActive &&
-    (currentRoute === 'accounts' || currentRoute === 'transfers');
-
   const openPendingTransfer = (): void => {
     if (typeof window !== 'undefined') {
       window.location.hash = '#/add';
@@ -221,16 +249,8 @@
     }
   };
 
-  const toRecoveryErrorMessage = (error: unknown): string => {
-    if (typeof error === 'object' && error !== null) {
-      const message = (error as { message?: unknown }).message;
-      if (typeof message === 'string' && message.trim().length > 0) {
-        return message;
-      }
-    }
-
-    return $_('appShell.reauthenticationFailed');
-  };
+  const toRecoveryErrorMessage = (error: unknown): string =>
+    $_(presentOperationFailure(error).messageKey);
 
   const requestStaleTokenRecovery = async (): Promise<void> => {
     if (authRecoveryIsPending) {
@@ -276,148 +296,64 @@
     void addTransferSaveController.resolveConflict($_, pendingTransferIsOffline);
   };
 
-  $: if (selectedBinding === null || $syncStateStore.state === 'idle') {
-    addTransferHasLoadedDatabase = false;
-  } else if (resolveAppDbRuntime().isOpen()) {
-    addTransferHasLoadedDatabase = true;
-  }
-
   $: addTransferDatabaseIsReady =
-    selectedBinding !== null && addTransferHasLoadedDatabase && $syncStateStore.state !== 'idle';
-  $: if (!addTransferDatabaseIsReady) {
+    selectedBinding !== null &&
+    $syncStateStore.state !== 'idle' &&
+    !refreshHasFailed &&
+    (appDatabaseSession.hasRuntime() ||
+      !['idle', 'invalidated'].includes(addTransferSaveState.phase) ||
+      !['idle', 'invalidated'].includes(receiptCommitState.phase));
+
+  const abandonReceiptContext = (): void => {
     effectiveReceiptCaptureController?.cancel();
     effectiveReceiptAnalysisController?.reset();
     receiptPreparationController.reset();
     receiptCommitController.invalidate();
-  }
-
-  const resolveNavIconUrl = (iconPath: string): string => `${navIconBaseUrl}${iconPath}`;
-
-  let queuedSessionSync: {
-    binding: DriveItemBinding | null;
-    isInitialSync: boolean;
-    mode: 'reuse_if_current' | 'force_download';
-  } | null = null;
-  const unsubscribeSessionIdle = appDatabaseSession.subscribeIdle(() => {
-    const queued = queuedSessionSync;
-    queuedSessionSync = null;
-    if (queued !== null)
-      queueMicrotask(() => {
-        if (appShellIsMounted) void performSync(queued.binding, queued.isInitialSync, queued.mode);
-      });
-  });
-
-  const performSync = async (
-    binding: DriveItemBinding | null,
-    isInitialSync = false,
-    mode: 'reuse_if_current' | 'force_download' = 'reuse_if_current',
-  ): Promise<void> => {
-    const sessionToken = appDatabaseSession.beginRefresh();
-    if (sessionToken === null) {
-      queuedSessionSync = { binding, isInitialSync, mode };
-      return;
-    }
-    const expectedIdentity = appDatabaseSession.identity();
-    const syncIsCurrent = () =>
-      appShellIsMounted &&
-      syncId === currentSyncId &&
-      appDatabaseSession.isGeneration(sessionToken) &&
-      (expectedIdentity === null
-        ? appDatabaseSession.identity() === null
-        : sameDatabaseIdentity(expectedIdentity, appDatabaseSession.identity()));
-    const syncId = ++currentSyncId;
-    dataRoutesAwaitInitialSync = isInitialSync;
-    syncStateStore.reset();
-    const dbRuntime = resolveAppDbRuntime();
-
-    if (binding === null) {
-      dbRuntime.close();
-      return;
-    }
-
-    const startupIsOnline = resolveAppStartupIsOnline();
-    if (startupIsOnline) {
-      beginStartupSync(syncStateStore);
-    }
-
-    try {
-      const graphClient = resolveAppGraphClient();
-      const cacheStore = resolveAppCacheStore();
-      const startupFreshnessService = createStartupFreshnessService(
-        graphClient,
-        cacheStore,
-        createCachedDatabaseSnapshotService(graphClient, cacheStore, {
-          snapshotValidator: resolveAppSnapshotValidator(),
-        }),
-        {
-          missingFileRecovery: createMissingFileRecoveryService(graphClient),
-        },
-      );
-      const decision = await startupFreshnessService.resolve(
-        binding,
-        startupIsOnline,
-        (loadedBytes, totalBytes) => {
-          if (syncIsCurrent()) {
-            updateStartupSyncProgress(syncStateStore, loadedBytes, totalBytes);
-          }
-        },
-        mode,
-      );
-
-      if (!syncIsCurrent()) {
-        return;
-      }
-
-      try {
-        const dbSyncResult = await syncDbRuntimeForStartupDecision(dbRuntime, decision, () => {
-          return syncIsCurrent();
-        });
-
-        if (dbSyncResult === 'superseded') {
-          return;
-        }
-      } catch (error) {
-        if (!syncIsCurrent()) return;
-        dbRuntime.close();
-        appDatabaseSession.invalidate();
-        console.warn('Opening cached OneDrive database snapshot failed.', error);
-        applyStartupDbRuntimeError(syncStateStore, error);
-        return;
-      }
-
-      if (decision.kind === 'ready' && decision.recoveredBinding !== undefined) {
-        bindingRepairPersistenceIsRunning = true;
-        try {
-          appSelectedDriveItemBindingStore.setBinding(decision.recoveredBinding);
-        } finally {
-          bindingRepairPersistenceIsRunning = false;
-        }
-      }
-
-      if (decision.kind === 'ready' && expectedIdentity !== null) {
-        appDatabaseSession.adopt(
-          { ...expectedIdentity, binding: decision.snapshot.binding },
-          decision.snapshot.metadata.eTag,
-        );
-      }
-      applyStartupFreshnessDecision(syncStateStore, decision);
-      logStartupFreshnessDecision(decision, binding?.name ?? null);
-      if (decision.kind === 'error' && decision.branch === 'online_auth_expired') {
-        void attemptAutomaticTokenRecovery();
-      }
-    } catch (error) {
-      if (!syncIsCurrent()) {
-        return;
-      }
-
-      console.warn('Startup freshness resolution failed unexpectedly.', error);
-      dbRuntime.close();
-      applyUnexpectedStartupSyncError(
-        syncStateStore,
-        'Startup sync failed unexpectedly. Check the browser console and retry.',
-      );
-    }
   };
+  const resolveNavIconUrl = (iconPath: string): string => `${navIconBaseUrl}${iconPath}`;
+  const refreshController = createDatabaseRefreshController({
+    session: appDatabaseSession,
+    runtime: resolveAppDbRuntime,
+    isOnline: resolveAppStartupIsOnline,
+    freshness: () => {
+      const graph = resolveAppGraphClient();
+      const cache = resolveAppCacheStore();
+      const validator = resolveAppSnapshotValidator();
+      return createStartupFreshnessService(
+        graph,
+        cache,
+        createCachedDatabaseSnapshotService(graph, cache, { snapshotValidator: validator }),
+        {
+          missingFileRecovery: createMissingFileRecoveryService(graph),
+          validateCachedSnapshot: (bytes, signal) => validator.validate(bytes, signal),
+        },
+      );
+    },
+    onStart: () => beginStartupSync(syncStateStore),
+    onProgress: (loaded, total) => updateStartupSyncProgress(syncStateStore, loaded, total),
+    onReplace: abandonReceiptContext,
+    onRecoveredBinding: (binding) => {
+      bindingRepairPersistenceIsRunning = true;
+      try {
+        appSelectedDriveItemBindingStore.setBinding(binding);
+      } finally {
+        bindingRepairPersistenceIsRunning = false;
+      }
+    },
+    onDecision: (decision) => {
+      applyStartupFreshnessDecision(syncStateStore, decision);
+      logStartupFreshnessDecision(decision, selectedBinding?.name ?? null);
+      if (decision.branch === 'online_auth_expired') void attemptAutomaticTokenRecovery();
+    },
+    onError: (error) => {
+      console.warn('Database refresh failed.', error);
+      applyStartupDbRuntimeError(syncStateStore, error);
+    },
+  });
+  const performSync = (
+    binding: DriveItemBinding | null,
+    mode: 'reuse_if_current' | 'force_download' = 'reuse_if_current',
+  ) => refreshController.refresh(binding, mode);
 
   const requestForceRefresh = async (): Promise<void> => {
     if (forceRefreshIsRunning || get(syncStateStore).state === 'syncing') {
@@ -426,7 +362,7 @@
 
     forceRefreshIsRunning = true;
     try {
-      await performSync(get(appSelectedDriveItemBindingStore), false, 'force_download');
+      await performSync(get(appSelectedDriveItemBindingStore), 'force_download');
     } finally {
       forceRefreshIsRunning = false;
     }
@@ -439,14 +375,10 @@
       return;
     }
 
-    effectiveReceiptCaptureController?.cancel();
-    effectiveReceiptAnalysisController?.reset();
-    receiptPreparationController.reset();
-    receiptCommitController.invalidate();
+    if (bindingRepairPersistenceIsRunning) return;
+    refreshController.cancel();
+    abandonReceiptContext();
     addTransferSaveController.invalidate?.();
-    if (bindingRepairPersistenceIsRunning) {
-      return;
-    }
     appDatabaseSession.invalidate();
 
     if (hasPerformedInitialSync) {
@@ -456,48 +388,10 @@
     }
   });
 
-  let foregroundSyncIsQueued = false;
-
-  const flushQueuedForegroundSync = (): void => {
-    foregroundSyncIsQueued = false;
-
-    queueMicrotask(() => {
-      if (
-        !appShellIsMounted ||
-        document.visibilityState !== 'visible' ||
-        get(syncStateStore).state === 'syncing'
-      ) {
-        return;
-      }
-
-      void performSync(get(appSelectedDriveItemBindingStore));
-    });
-  };
-
-  const unsubscribeQueuedForegroundSync = syncStateStore.subscribe((syncSnapshot) => {
-    if (!foregroundSyncIsQueued || syncSnapshot.state === 'syncing') {
-      return;
-    }
-
-    if (syncSnapshot.state === 'synced') {
-      flushQueuedForegroundSync();
-      return;
-    }
-
-    foregroundSyncIsQueued = false;
-  });
-
   const handleDocumentVisibilityChange = (): void => {
-    if (!hasPerformedInitialSync || document.visibilityState !== 'visible') {
-      return;
+    if (hasPerformedInitialSync && document.visibilityState === 'visible') {
+      void performSync(get(appSelectedDriveItemBindingStore));
     }
-
-    if (get(syncStateStore).state === 'syncing') {
-      foregroundSyncIsQueued = true;
-      return;
-    }
-
-    void performSync(get(appSelectedDriveItemBindingStore));
   };
 
   const logStartupFreshnessDecision = (
@@ -527,17 +421,24 @@
   onMount(() => {
     appShellIsMounted = true;
     let isMounted = true;
+    showLoadingPlaceholder = true;
     syncStateStore.reset();
     document.addEventListener('visibilitychange', handleDocumentVisibilityChange);
 
     void (async () => {
+      const startupStart = performance.now();
       try {
-        await initializeAppAuthClient();
+        await measurePhase('auth', initializeAppAuthClient);
+        if (!isMounted) return;
         const authSession = resolveAppAuthClient().getSession();
         syncSelectedDriveItemBindingStoreAtStartup(authSession, appSelectedDriveItemBindingStore);
       } catch (error) {
         console.warn('Auth bootstrap initialization failed at app-shell startup.', error);
+        if (!isMounted) return;
         appSelectedDriveItemBindingStore.setActiveAccountId(null);
+        syncStateStore.setError($_('sync.failure.auth'), { branch: 'online_auth_expired' });
+        showLoadingPlaceholder = false;
+        return;
       }
 
       if (!isMounted) {
@@ -546,23 +447,31 @@
 
       hasPerformedInitialSync = true;
       const binding = get(appSelectedDriveItemBindingStore);
-      void performSync(binding, true);
-    })();
-
-    let timerId: number | null = null;
-    if (!showLoadingPlaceholder || loadingDelayMs <= 0) {
-      showLoadingPlaceholder = false;
-    } else {
-      timerId = window.setTimeout(() => {
+      await performSync(binding);
+      if (isMounted) {
         showLoadingPlaceholder = false;
-      }, loadingDelayMs);
-    }
+        await tick();
+        performance.measure('conspectus:first-data-decision', {
+          start: startupStart,
+          end: performance.now(),
+        });
+        if (
+          get(syncStateStore).state === 'synced' &&
+          ['accounts', 'transfers'].includes(currentRoute)
+        ) {
+          requestAnimationFrame(() => {
+            if (isMounted)
+              performance.measure('conspectus:first-data-frame', {
+                start: startupStart,
+                end: performance.now(),
+              });
+          });
+        }
+      }
+    })();
 
     return () => {
       isMounted = false;
-      if (timerId !== null) {
-        window.clearTimeout(timerId);
-      }
       document.removeEventListener('visibilitychange', handleDocumentVisibilityChange);
     };
   });
@@ -580,8 +489,8 @@
     unsubscribeAddTransferSaveController();
     unsubscribeReceiptCommitController();
     unsubscribeSelectedBinding();
-    unsubscribeQueuedForegroundSync();
-    unsubscribeSessionIdle();
+    appShellIsMounted = false;
+    refreshController.dispose();
     if (ownedReceiptCaptureController === null) {
       effectiveReceiptCaptureController?.cancel();
     } else {
@@ -739,14 +648,34 @@
     <div class="app-content__page">
       {#if showLoadingPlaceholder}
         <LoadingPlaceholder />
+      {:else if refreshHasFailed && currentRoute !== 'settings'}
+        {#if !staleTokenRecoveryIsRequired && !missingFileRecoveryIsRequired}
+          <section role="alert" data-testid="database-recovery">
+            <p>{$syncStateStore.message}</p>
+            {#if ['database_invalid', 'permission_denied'].includes($syncStateStore.branch ?? '')}
+              <button
+                type="button"
+                class="app-button app-button--primary"
+                on:click={openMissingFileRecovery}
+              >
+                {$_('appShell.selectAnotherFile')}
+              </button>
+            {:else}
+              <button
+                type="button"
+                class="app-button app-button--primary"
+                disabled={!$networkStateStore || forceRefreshIsRunning}
+                on:click={() => void requestForceRefresh()}
+              >
+                {$_('sync.failure.retry')}
+              </button>
+            {/if}
+          </section>
+        {/if}
       {:else if currentRoute === 'accounts'}
-        {#if !startupSyncBlocksDataRoute}
-          <AccountsRoute {syncStateStore} />
-        {/if}
+        <AccountsRoute {syncStateStore} />
       {:else if currentRoute === 'transfers'}
-        {#if !startupSyncBlocksDataRoute}
-          <TransfersRoute {syncStateStore} />
-        {/if}
+        <TransfersRoute {syncStateStore} />
       {:else if currentRoute === 'add'}
         <AddRoute
           bind:fields={addTransferFields}
@@ -760,8 +689,19 @@
           canOpenPanel={addTransferDatabaseIsReady}
           canCreateTransfer={$syncStateStore.state === 'synced' && appDatabaseSession.isWritable()}
         />
+      {:else if SettingsComponent !== null}
+        <svelte:component
+          this={SettingsComponent}
+          {syncStateStore}
+          onForceRefresh={requestForceRefresh}
+        />
+      {:else if settingsLoadFailed}
+        <p role="alert">{$_('sync.failure.view')}</p>
+        <button type="button" class="app-button" on:click={loadSettings}
+          >{$_('sync.failure.retryView')}</button
+        >
       {:else}
-        <SettingsRoute {syncStateStore} onForceRefresh={requestForceRefresh} />
+        <div data-testid="route-settings"><LoadingPlaceholder /></div>
       {/if}
       {#if !showLoadingPlaceholder}<DeploymentInfoFooter />{/if}
     </div>

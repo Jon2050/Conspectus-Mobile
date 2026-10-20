@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 // Verifies downloaded OneDrive DB snapshots are validated before they can replace the cached offline snapshot.
 import 'fake-indexeddb/auto';
 
@@ -30,10 +31,11 @@ const createValidSqliteSnapshotBytes = async (): Promise<Uint8Array> => {
   }).load();
   const database = new sqlJsRuntime.Database();
 
+  database.exec(fs.readFileSync('docs/reference/conspectus-live-schema.sql', 'utf8'));
   database.exec(`
-    CREATE TABLE account (account_id INTEGER PRIMARY KEY);
-    CREATE TABLE category (category_id INTEGER PRIMARY KEY);
-    CREATE TABLE transfer (transfer_id INTEGER PRIMARY KEY);
+    INSERT INTO account_type VALUES (1, 'Income'), (2, 'Spendings');
+    INSERT INTO account (account_id, name, ac_type_id) VALUES (1, 'Income', 1), (2, 'Spendings', 2);
+    INSERT INTO transfer_type VALUES (1, 'Expense'), (2, 'Income'), (3, 'Internal');
   `);
   const bytes = database.export();
   database.close();
@@ -69,6 +71,41 @@ const deleteDatabase = async (databaseName: string): Promise<void> => {
 };
 
 describe('cached database snapshot service', () => {
+  it('does not promote bytes if the remote version changes during download', async () => {
+    const bytes = createSqliteBytes();
+    const graph = {
+      getFileDownloadUrl: vi.fn(async () => DOWNLOAD_URL),
+      downloadFile: vi.fn(async () => bytes),
+      getFileMetadata: vi.fn(async () => createMetadata({ eTag: 'new-version' }, bytes)),
+    };
+    const cache = { writeSnapshot: vi.fn(async () => {}) };
+    const validator = createMockSnapshotValidator();
+    const service = createCachedDatabaseSnapshotService(graph, cache, {
+      snapshotValidator: validator,
+    });
+    await expect(
+      service.downloadAndCacheSnapshot(DRIVE_ITEM_BINDING, createMetadata({}, bytes)),
+    ).rejects.toMatchObject({ name: 'SnapshotVersionError' });
+    expect(cache.writeSnapshot).not.toHaveBeenCalled();
+    expect(validator.validate).not.toHaveBeenCalled();
+  });
+  it('uses the transient URL from the metadata response', async () => {
+    const bytes = createSqliteBytes();
+    const graph = {
+      getFileDownloadUrl: vi.fn(async () => DOWNLOAD_URL),
+      downloadFile: vi.fn(async () => bytes),
+    };
+    const service = createCachedDatabaseSnapshotService(
+      graph,
+      { writeSnapshot: vi.fn(async () => {}) },
+      { snapshotValidator: createMockSnapshotValidator() },
+    );
+    await service.downloadAndCacheSnapshot(DRIVE_ITEM_BINDING, {
+      ...createMetadata({}, bytes),
+      downloadUrl: DOWNLOAD_URL,
+    });
+    expect(graph.getFileDownloadUrl).not.toHaveBeenCalled();
+  });
   it('downloads a fresh OneDrive DB and persists the validated snapshot', async () => {
     const dbBytes = createSqliteBytes([9, 8, 7]);
     const graphClient: Pick<GraphClient, 'getFileDownloadUrl' | 'downloadFile'> = {
@@ -88,8 +125,8 @@ describe('cached database snapshot service', () => {
 
     const snapshot = await service.downloadAndCacheSnapshot(DRIVE_ITEM_BINDING, metadata);
 
-    expect(graphClient.getFileDownloadUrl).toHaveBeenCalledWith(DRIVE_ITEM_BINDING);
-    expect(graphClient.downloadFile).toHaveBeenCalledWith(DOWNLOAD_URL, undefined);
+    expect(graphClient.getFileDownloadUrl).toHaveBeenCalledWith(DRIVE_ITEM_BINDING, undefined);
+    expect(graphClient.downloadFile).toHaveBeenCalledWith(DOWNLOAD_URL, undefined, undefined);
     expect(snapshot).toEqual<CachedDatabaseSnapshot>({
       binding: DRIVE_ITEM_BINDING,
       metadata: {
@@ -98,7 +135,7 @@ describe('cached database snapshot service', () => {
       },
       dbBytes,
     });
-    expect(snapshotValidator.validate).toHaveBeenCalledWith(dbBytes);
+    expect(snapshotValidator.validate).toHaveBeenCalledWith(dbBytes, undefined);
     expect(cacheStore.writeSnapshot).toHaveBeenCalledWith(snapshot);
   });
 

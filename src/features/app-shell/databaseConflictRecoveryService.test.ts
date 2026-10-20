@@ -81,10 +81,11 @@ describe('database conflict recovery service', () => {
       onProgress: (progress) => progressUpdates.push(progress),
     });
 
-    expect(graphClient.getFileMetadata).toHaveBeenCalledWith(DRIVE_ITEM_BINDING);
+    expect(graphClient.getFileMetadata).toHaveBeenCalledWith(DRIVE_ITEM_BINDING, undefined);
     expect(graphClient.downloadFile).toHaveBeenCalledWith(
       'https://download.example.com/conspectus.db',
       expect.any(Function),
+      undefined,
     );
     expect(cacheStore.writeSnapshot).toHaveBeenCalledWith({
       binding: DRIVE_ITEM_BINDING,

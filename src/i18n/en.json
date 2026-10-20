@@ -359,6 +359,20 @@
       "queryFailed": "The local SQLite database query failed unexpectedly.",
       "exportFailed": "Failed to export local SQLite bytes.",
       "fallback": "Failed to open the local SQLite database snapshot. Retry sync from settings."
+    },
+    "failure": {
+      "auth": "Your session has expired. Sign in again.",
+      "offline": "An internet connection is required to load the database.",
+      "connection": "The connection could not be established in time. Check your connection and try again.",
+      "cache": "The local database cache is unavailable. Try loading the database from OneDrive again. Your settings are retained.",
+      "database": "This file is not a usable Conspectus database. Select a compatible database.",
+      "retry": "Load from OneDrive again",
+      "view": "The view could not be loaded. Try again.",
+      "retryView": "Reload view",
+      "changed": "The database changed during download. Load the current version again.",
+      "permission": "Access to this OneDrive file was denied. Select a database you can access.",
+      "query": "The database could not be read. Load it from OneDrive again.",
+      "unexpected": "The operation could not be completed. Try again."
     }
   }
 }

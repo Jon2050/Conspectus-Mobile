@@ -6,7 +6,7 @@ import {
   TRANSFER_TYPE_STD_EXPENSE,
 } from '@db';
 
-import type { AddTransferOptionsState } from '../app-shell/routes/addTransferOptionsController';
+import type { AddTransferOptionsState } from '../transfers/transferOptions';
 import type { ReceiptTransferDerivation } from './receiptAnalysisContracts';
 import {
   buildReceiptTransferCommands,
