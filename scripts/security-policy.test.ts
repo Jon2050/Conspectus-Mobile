@@ -9,6 +9,13 @@ import {
 } from './security-policy.mjs';
 
 describe('security policy helpers', () => {
+  it('permits ephemeral receipt blob images without enabling blob scripts', () => {
+    expect(DOCUMENT_CSP).toContain("img-src 'self' data: blob:");
+    expect(DOCUMENT_CSP).not.toMatch(/script-src[^;]*blob:/u);
+    expect(() =>
+      assertCspEquivalent(DOCUMENT_CSP.replace(' blob:', ''), DOCUMENT_CSP, 'Receipt fallback'),
+    ).toThrow('does not match');
+  });
   it('treats directive and source ordering as equivalent', () => {
     expect(() =>
       assertCspEquivalent(

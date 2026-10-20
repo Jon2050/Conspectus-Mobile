@@ -3,7 +3,7 @@
   import { onDestroy, onMount, tick } from 'svelte';
   import { get } from 'svelte/store';
   import { _ } from 'svelte-i18n';
-  import { appAccountQueryService, appCategoryQueryService } from '@db';
+  import { appAccountQueryService, appCategoryQueryService, type CreateTransferInput } from '@db';
   import {
     appSyncStateStore,
     appNetworkStateStore,
@@ -14,6 +14,8 @@
   import {
     createReceiptTransferPreparationController,
     listReceiptSourceAccountOptions,
+    validateReceiptSetup,
+    DEFAULT_TRANSFER_DERIVATION_RULES,
   } from '../../receipt';
   import type {
     ReceiptAnalysisController,
@@ -64,6 +66,7 @@
   export let networkStateStore: NetworkStateStore = appNetworkStateStore;
   export let canOpenPanel = true;
   export let canCreateTransfer = true;
+  export let resolveReceiptRules: () => string | null = () => null;
   export let receiptCaptureController: ReceiptCaptureController | null = null;
   export let receiptAnalysisController: ReceiptAnalysisController | null = null;
   export let receiptPreparationController: ReceiptTransferPreparationController =
@@ -81,6 +84,8 @@
   let hasRequestedOptionsLoad = false;
   let formElement: HTMLFormElement | null = null;
   let receiptFileInputElement: HTMLInputElement | null = null;
+  let receiptSetupError: ReceiptTransferPreparationError | null = null;
+  let receiptSummary: readonly CreateTransferInput[] = [];
   let optionsState: AddTransferOptionsState = controller.getState();
   let saveState: AddTransferSaveState = saveController.getState();
   let receiptCaptureState: ReceiptCaptureState = receiptCaptureController?.getState() ?? {
@@ -178,6 +183,7 @@
         ? $_(`addTransfer.receipt.analysisErrors.${receiptAnalysisState.errorCode}`)
         : `${$_(`addTransfer.receipt.analysisErrors.${receiptAnalysisState.errorCode}`)} ${receiptAnalysisState.errorReason}`;
   $: receiptCaptureError =
+    translateReceiptPreparationError(receiptSetupError) ??
     receiptCommitError ??
     receiptPreparationError ??
     receiptAnalysisError ??
@@ -202,12 +208,15 @@
   $: sourceAccountIsDisabled = isSubmitting || isOptionsLoading || saveIsBusy || saveBlocksEditing;
   $: submitIsDisabled =
     !canCreateTransfer || controlsAreDisabled || isOffline || optionsState.operation !== 'ready';
-  $: receiptCaptureIsDisabled =
-    !canCreateTransfer ||
+  // A native picker can return while an unchanged foreground check temporarily revokes writes.
+  // Accept its image under the still-open context; the commit remains gated by current verification.
+  $: receiptFileSelectionIsDisabled =
+    !canOpenPanel ||
     receiptCaptureController === null ||
     controlsAreDisabled ||
     isOffline ||
     optionsState.operation !== 'ready';
+  $: receiptCaptureIsDisabled = !canCreateTransfer || receiptFileSelectionIsDisabled;
 
   let validationErrors: string[] = [];
   const clearValidation = (): void => {
@@ -255,8 +264,16 @@
     await saveController.resolveConflict($_, isOffline);
   };
 
+  const checkReceiptSetup = (): boolean => {
+    receiptSetupError = validateReceiptSetup(
+      optionsState,
+      resolveReceiptRules() === DEFAULT_TRANSFER_DERIVATION_RULES.text,
+    );
+    return receiptSetupError === null;
+  };
+
   const openReceiptCapture = (): void => {
-    if (!receiptCaptureIsDisabled) {
+    if (!receiptCaptureIsDisabled && checkReceiptSetup()) {
       receiptFileInputElement?.click();
     }
   };
@@ -265,11 +282,17 @@
     const input = event.currentTarget as HTMLInputElement;
     const file = input.files?.item(0) ?? null;
     input.value = '';
-    if (file === null || receiptCaptureController === null) {
+    if (
+      file === null ||
+      receiptCaptureController === null ||
+      receiptFileSelectionIsDisabled ||
+      !checkReceiptSetup()
+    ) {
       return;
     }
 
     clearValidation();
+    receiptSummary = [];
     receiptCommitController.reset();
     receiptPreparationController.beginRun();
     void receiptCaptureController.capture(file);
@@ -450,6 +473,7 @@
   ) {
     const commands = receiptPreparationController.claimReadyForCommit();
     if (commands !== null) {
+      receiptSummary = commands;
       receiptCaptureController?.reset();
       receiptAnalysisController?.reset();
       void receiptCommitController.commit(commands, createReceiptCommitContext(), $_);
@@ -522,6 +546,8 @@
           {remoteCommitRecoveryIsRequired}
           {validationErrors}
           {receiptCommitState}
+          {receiptSummary}
+          {optionsState}
           {retryReceiptUpload}
           {resolveReceiptConflict}
           {retryReceiptAfterConflict}
@@ -531,6 +557,7 @@
         <ReceiptCapturePanel
           bind:receiptFileInputElement
           {receiptCaptureIsDisabled}
+          {receiptFileSelectionIsDisabled}
           {receiptWorkflowIsActive}
           {receiptPreparationState}
           {receiptCaptureController}

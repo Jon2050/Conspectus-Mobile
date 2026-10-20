@@ -219,6 +219,22 @@ These validations prove structural and arithmetic consistency, not that the mode
 receipt line into the semantically correct user-defined group. The capture UI discloses this residual
 risk before analysis; users maintain the grouping and category rules in Settings.
 
+Receipt derivation copies the extracted merchant name exactly. The shipped default rules reject
+unsupported or ambiguous items rather than guessing; grocery deposits/returns belong to normal
+food, and the whole-receipt restaurant rule takes precedence. Discounts/returns reduce only their
+identifiable group. Nonpositive receipts or groups fail closed. Custom rules remain opaque prompt
+text. Before capture and again on picker return, local preflight requires valid account topology;
+the default rules additionally require all five referenced category names to exist uniquely.
+Temporary same-context options loading suspends preparation, while session replacement or terminal
+options errors invalidate it. Catalog and completion rate limits require an explicit fresh capture.
+
+Automatic saving remains deliberate through source selection. A transient post-save summary shows
+the booked fields and directs corrections to Desktop with Mobile closed. A visible warning asks
+users to check existing transfers before a repeated photo; no cross-run duplicate detector or
+persistent receipt fingerprint is claimed. The image limits bound source/output bytes and output
+dimensions, not peak decoder memory or OCR legibility. Provider and physical-device qualification
+are tracked separately in [the AP4 evidence record](reviews/2026-10-20-ap4-receipt-qualification.md).
+
 M9-01 performs only catalog requests and sends no receipt, extracted result, database content,
 account/category data, balance, or transfer history. The receipt workflow privacy boundary disclosed
 before later use is that stage 1 sends the image to OpenRouter and a routed vision provider, while

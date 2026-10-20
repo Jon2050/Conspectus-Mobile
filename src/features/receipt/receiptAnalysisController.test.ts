@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   OpenRouterChatCompletionError,
+  OpenRouterCatalogError,
   type OpenRouterChatCompletionErrorCode,
   type OpenRouterChatCompletionClient,
   type OpenRouterCompatibleModelCatalog,
@@ -93,6 +94,20 @@ const input = (
 ) => ({ image: receiptImage, configuration });
 
 describe('receipt analysis controller', () => {
+  it('reports catalog rate limiting without retrying or sending the image', async () => {
+    const catalogClient = {
+      load: vi.fn().mockRejectedValue(new OpenRouterCatalogError('provider_error', 429)),
+    };
+    const completionClient = { complete: vi.fn() };
+    const controller = createReceiptAnalysisController({ catalogClient, completionClient });
+    const photo = image();
+    await expect(
+      controller.start(input(photo), new AbortController().signal),
+    ).rejects.toMatchObject({ code: 'rate_limited' });
+    expect(catalogClient.load).toHaveBeenCalledOnce();
+    expect(completionClient.complete).not.toHaveBeenCalled();
+    expect(photo.bytes.every((byte) => byte === 0)).toBe(true);
+  });
   it('rechecks each role, sends the image only to stage one, and retains only validated derivation', async () => {
     const catalogClient: OpenRouterModelCatalogClient = {
       load: vi.fn().mockResolvedValue(catalog()),

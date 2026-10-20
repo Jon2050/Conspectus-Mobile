@@ -1,0 +1,942 @@
+[
+  {
+    "id": "mixed-discount",
+    "image": "mixed-discount.svg",
+    "note": "Mixed basket, discount and deposit priority",
+    "extraction": {
+      "status": "ok",
+      "errorReason": null,
+      "storeName": "REWE Maik Seiler",
+      "receiptDate": "2026-10-20",
+      "currency": "EUR",
+      "receiptTotalCents": 575,
+      "items": [
+        {
+          "index": 0,
+          "name": "Brot",
+          "quantityText": null,
+          "lineTotalCents": 300,
+          "kind": "item"
+        },
+        {
+          "index": 1,
+          "name": "Cola",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 2,
+          "name": "Pfand",
+          "quantityText": null,
+          "lineTotalCents": 25,
+          "kind": "deposit"
+        },
+        {
+          "index": 3,
+          "name": "Reiniger",
+          "quantityText": null,
+          "lineTotalCents": 200,
+          "kind": "item"
+        },
+        {
+          "index": 4,
+          "name": "Rabatt Brot",
+          "quantityText": null,
+          "lineTotalCents": -50,
+          "kind": "discount"
+        }
+      ]
+    },
+    "derivation": {
+      "status": "ok",
+      "errorReason": null,
+      "receiptTotalCents": 575,
+      "transfers": [
+        {
+          "name": "Brot und Pfand",
+          "amountCents": 275,
+          "categoryNames": ["Einkauf", "Lebensmittel"],
+          "buyplace": "REWE Maik Seiler",
+          "receiptDate": "2026-10-20",
+          "sourceItemIndexes": [0, 2, 4]
+        },
+        {
+          "name": "Cola",
+          "amountCents": 100,
+          "categoryNames": ["Einkauf", "Lebensmittel", "Süßigkeiten"],
+          "buyplace": "REWE Maik Seiler",
+          "receiptDate": "2026-10-20",
+          "sourceItemIndexes": [1]
+        },
+        {
+          "name": "Reiniger",
+          "amountCents": 200,
+          "categoryNames": ["Einkauf", "Haushalt, Verbrauchsgüter, Reinigung"],
+          "buyplace": "REWE Maik Seiler",
+          "receiptDate": "2026-10-20",
+          "sourceItemIndexes": [3]
+        }
+      ]
+    }
+  },
+  {
+    "id": "deposit-return",
+    "image": "deposit-return.svg",
+    "note": "A negative line may reduce a positive group",
+    "extraction": {
+      "status": "ok",
+      "errorReason": null,
+      "storeName": "Markt",
+      "receiptDate": "2026-10-20",
+      "currency": "EUR",
+      "receiptTotalCents": 275,
+      "items": [
+        {
+          "index": 0,
+          "name": "Brot",
+          "quantityText": null,
+          "lineTotalCents": 300,
+          "kind": "item"
+        },
+        {
+          "index": 1,
+          "name": "Pfandrückgabe",
+          "quantityText": null,
+          "lineTotalCents": -25,
+          "kind": "deposit"
+        }
+      ]
+    },
+    "derivation": {
+      "status": "ok",
+      "errorReason": null,
+      "receiptTotalCents": 275,
+      "transfers": [
+        {
+          "name": "Brot und Pfandrückgabe",
+          "amountCents": 275,
+          "categoryNames": ["Einkauf", "Lebensmittel"],
+          "buyplace": "Markt",
+          "receiptDate": "2026-10-20",
+          "sourceItemIndexes": [0, 1]
+        }
+      ]
+    }
+  },
+  {
+    "id": "cafe-priority",
+    "image": "cafe-priority.svg",
+    "note": "Restaurant rule takes precedence including deposits",
+    "extraction": {
+      "status": "ok",
+      "errorReason": null,
+      "storeName": "Cafe Beispiel",
+      "receiptDate": "2026-10-20",
+      "currency": "EUR",
+      "receiptTotalCents": 650,
+      "items": [
+        {
+          "index": 0,
+          "name": "Kaffee",
+          "quantityText": null,
+          "lineTotalCents": 300,
+          "kind": "item"
+        },
+        {
+          "index": 1,
+          "name": "Kuchen",
+          "quantityText": null,
+          "lineTotalCents": 400,
+          "kind": "item"
+        },
+        {
+          "index": 2,
+          "name": "Pfand",
+          "quantityText": null,
+          "lineTotalCents": 50,
+          "kind": "deposit"
+        },
+        {
+          "index": 3,
+          "name": "Rabatt",
+          "quantityText": null,
+          "lineTotalCents": -100,
+          "kind": "discount"
+        }
+      ]
+    },
+    "derivation": {
+      "status": "ok",
+      "errorReason": null,
+      "receiptTotalCents": 650,
+      "transfers": [
+        {
+          "name": "Kaffee und Kuchen",
+          "amountCents": 650,
+          "categoryNames": ["Restaurant, Bar, Bäcker"],
+          "buyplace": "Cafe Beispiel",
+          "receiptDate": "2026-10-20",
+          "sourceItemIndexes": [0, 1, 2, 3]
+        }
+      ]
+    }
+  },
+  {
+    "id": "quantity-tax",
+    "image": "quantity-tax.svg",
+    "note": "Unit prices, tax and payment are not extra items",
+    "extraction": {
+      "status": "ok",
+      "errorReason": null,
+      "storeName": "Markt",
+      "receiptDate": "2026-10-20",
+      "currency": "EUR",
+      "receiptTotalCents": 360,
+      "items": [
+        {
+          "index": 0,
+          "name": "3 x Milch 1,20",
+          "quantityText": "3 x 1,20",
+          "lineTotalCents": 360,
+          "kind": "item"
+        }
+      ]
+    },
+    "derivation": {
+      "status": "ok",
+      "errorReason": null,
+      "receiptTotalCents": 360,
+      "transfers": [
+        {
+          "name": "Milch",
+          "amountCents": 360,
+          "categoryNames": ["Einkauf", "Lebensmittel"],
+          "buyplace": "Markt",
+          "receiptDate": "2026-10-20",
+          "sourceItemIndexes": [0]
+        }
+      ]
+    }
+  },
+  {
+    "id": "merchant-name",
+    "image": "merchant-name.svg",
+    "note": "Merchant suffix is copied exactly",
+    "extraction": {
+      "status": "ok",
+      "errorReason": null,
+      "storeName": "Bauhaus GmbH",
+      "receiptDate": "2026-10-20",
+      "currency": "EUR",
+      "receiptTotalCents": 250,
+      "items": [
+        {
+          "index": 0,
+          "name": "Schwamm",
+          "quantityText": null,
+          "lineTotalCents": 250,
+          "kind": "item"
+        }
+      ]
+    },
+    "derivation": {
+      "status": "ok",
+      "errorReason": null,
+      "receiptTotalCents": 250,
+      "transfers": [
+        {
+          "name": "Schwamm",
+          "amountCents": 250,
+          "categoryNames": ["Einkauf", "Haushalt, Verbrauchsgüter, Reinigung"],
+          "buyplace": "Bauhaus GmbH",
+          "receiptDate": "2026-10-20",
+          "sourceItemIndexes": [0]
+        }
+      ]
+    }
+  },
+  {
+    "id": "unsupported",
+    "image": "unsupported.svg",
+    "note": "No default rule for pharmacy purchases",
+    "extraction": {
+      "status": "ok",
+      "errorReason": null,
+      "storeName": "Apotheke Beispiel",
+      "receiptDate": "2026-10-20",
+      "currency": "EUR",
+      "receiptTotalCents": 500,
+      "items": [
+        {
+          "index": 0,
+          "name": "Medikament",
+          "quantityText": null,
+          "lineTotalCents": 500,
+          "kind": "item"
+        }
+      ]
+    },
+    "derivation": {
+      "status": "error",
+      "errorReason": "No default rule for pharmacy purchases",
+      "receiptTotalCents": null,
+      "transfers": []
+    }
+  },
+  {
+    "id": "ambiguous",
+    "image": "ambiguous.svg",
+    "note": "Ambiguous article must not be guessed",
+    "extraction": {
+      "status": "ok",
+      "errorReason": null,
+      "storeName": "Markt",
+      "receiptDate": "2026-10-20",
+      "currency": "EUR",
+      "receiptTotalCents": 500,
+      "items": [
+        {
+          "index": 0,
+          "name": "ART 4711",
+          "quantityText": null,
+          "lineTotalCents": 500,
+          "kind": "item"
+        }
+      ]
+    },
+    "derivation": {
+      "status": "error",
+      "errorReason": "Ambiguous article must not be guessed",
+      "receiptTotalCents": null,
+      "transfers": []
+    }
+  },
+  {
+    "id": "return-only",
+    "image": "return-only.svg",
+    "note": "Negative receipt total",
+    "extraction": {
+      "status": "error",
+      "errorReason": "Negative receipt total",
+      "storeName": null,
+      "receiptDate": null,
+      "currency": null,
+      "receiptTotalCents": null,
+      "items": []
+    },
+    "derivation": null
+  },
+  {
+    "id": "zero-total",
+    "image": "zero-total.svg",
+    "note": "Zero receipt total",
+    "extraction": {
+      "status": "error",
+      "errorReason": "Zero receipt total",
+      "storeName": null,
+      "receiptDate": null,
+      "currency": null,
+      "receiptTotalCents": null,
+      "items": []
+    },
+    "derivation": null
+  },
+  {
+    "id": "negative-group",
+    "image": "negative-group.svg",
+    "note": "Positive total cannot hide a nonpositive food group",
+    "extraction": {
+      "status": "ok",
+      "errorReason": null,
+      "storeName": "Markt",
+      "receiptDate": "2026-10-20",
+      "currency": "EUR",
+      "receiptTotalCents": 200,
+      "items": [
+        {
+          "index": 0,
+          "name": "Brot",
+          "quantityText": null,
+          "lineTotalCents": 300,
+          "kind": "item"
+        },
+        {
+          "index": 1,
+          "name": "Pfandrückgabe",
+          "quantityText": null,
+          "lineTotalCents": -500,
+          "kind": "deposit"
+        },
+        {
+          "index": 2,
+          "name": "Cola",
+          "quantityText": null,
+          "lineTotalCents": 400,
+          "kind": "item"
+        }
+      ]
+    },
+    "derivation": {
+      "status": "error",
+      "errorReason": "Positive total cannot hide a nonpositive food group",
+      "receiptTotalCents": null,
+      "transfers": []
+    }
+  },
+  {
+    "id": "long-receipt",
+    "image": "long-receipt.svg",
+    "note": "Long receipt exercises item coverage; image legibility requires real OCR",
+    "extraction": {
+      "status": "ok",
+      "errorReason": null,
+      "storeName": "Markt",
+      "receiptDate": "2026-10-20",
+      "currency": "EUR",
+      "receiptTotalCents": 7000,
+      "items": [
+        {
+          "index": 0,
+          "name": "Brot 1",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 1,
+          "name": "Brot 2",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 2,
+          "name": "Brot 3",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 3,
+          "name": "Brot 4",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 4,
+          "name": "Brot 5",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 5,
+          "name": "Brot 6",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 6,
+          "name": "Brot 7",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 7,
+          "name": "Brot 8",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 8,
+          "name": "Brot 9",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 9,
+          "name": "Brot 10",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 10,
+          "name": "Brot 11",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 11,
+          "name": "Brot 12",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 12,
+          "name": "Brot 13",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 13,
+          "name": "Brot 14",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 14,
+          "name": "Brot 15",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 15,
+          "name": "Brot 16",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 16,
+          "name": "Brot 17",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 17,
+          "name": "Brot 18",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 18,
+          "name": "Brot 19",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 19,
+          "name": "Brot 20",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 20,
+          "name": "Brot 21",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 21,
+          "name": "Brot 22",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 22,
+          "name": "Brot 23",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 23,
+          "name": "Brot 24",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 24,
+          "name": "Brot 25",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 25,
+          "name": "Brot 26",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 26,
+          "name": "Brot 27",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 27,
+          "name": "Brot 28",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 28,
+          "name": "Brot 29",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 29,
+          "name": "Brot 30",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 30,
+          "name": "Brot 31",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 31,
+          "name": "Brot 32",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 32,
+          "name": "Brot 33",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 33,
+          "name": "Brot 34",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 34,
+          "name": "Brot 35",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 35,
+          "name": "Brot 36",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 36,
+          "name": "Brot 37",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 37,
+          "name": "Brot 38",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 38,
+          "name": "Brot 39",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 39,
+          "name": "Brot 40",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 40,
+          "name": "Brot 41",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 41,
+          "name": "Brot 42",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 42,
+          "name": "Brot 43",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 43,
+          "name": "Brot 44",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 44,
+          "name": "Brot 45",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 45,
+          "name": "Brot 46",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 46,
+          "name": "Brot 47",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 47,
+          "name": "Brot 48",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 48,
+          "name": "Brot 49",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 49,
+          "name": "Brot 50",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 50,
+          "name": "Brot 51",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 51,
+          "name": "Brot 52",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 52,
+          "name": "Brot 53",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 53,
+          "name": "Brot 54",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 54,
+          "name": "Brot 55",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 55,
+          "name": "Brot 56",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 56,
+          "name": "Brot 57",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 57,
+          "name": "Brot 58",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 58,
+          "name": "Brot 59",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 59,
+          "name": "Brot 60",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 60,
+          "name": "Brot 61",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 61,
+          "name": "Brot 62",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 62,
+          "name": "Brot 63",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 63,
+          "name": "Brot 64",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 64,
+          "name": "Brot 65",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 65,
+          "name": "Brot 66",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 66,
+          "name": "Brot 67",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 67,
+          "name": "Brot 68",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 68,
+          "name": "Brot 69",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        },
+        {
+          "index": 69,
+          "name": "Brot 70",
+          "quantityText": null,
+          "lineTotalCents": 100,
+          "kind": "item"
+        }
+      ]
+    },
+    "derivation": {
+      "status": "ok",
+      "errorReason": null,
+      "receiptTotalCents": 7000,
+      "transfers": [
+        {
+          "name": "Brot",
+          "amountCents": 7000,
+          "categoryNames": ["Einkauf", "Lebensmittel"],
+          "buyplace": "Markt",
+          "receiptDate": "2026-10-20",
+          "sourceItemIndexes": [
+            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+            24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45,
+            46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67,
+            68, 69
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "id": "unreadable",
+    "image": "unreadable.svg",
+    "note": "Unreadable date and total",
+    "extraction": {
+      "status": "error",
+      "errorReason": "Unreadable date and total",
+      "storeName": null,
+      "receiptDate": null,
+      "currency": null,
+      "receiptTotalCents": null,
+      "items": []
+    },
+    "derivation": null
+  },
+  {
+    "id": "foreign-currency",
+    "image": "foreign-currency.svg",
+    "note": "Unsupported currency",
+    "extraction": {
+      "status": "error",
+      "errorReason": "Unsupported currency",
+      "storeName": null,
+      "receiptDate": null,
+      "currency": null,
+      "receiptTotalCents": null,
+      "items": []
+    },
+    "derivation": null
+  }
+]

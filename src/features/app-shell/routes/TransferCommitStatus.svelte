@@ -1,7 +1,10 @@
 <!-- Shared save/error feedback; producer controllers remain owned above this view. -->
 <script lang="ts">
-  import { _ } from 'svelte-i18n';
+  import { _, locale } from 'svelte-i18n';
   import type { ReceiptTransferCommitState } from '../receiptTransferCommitController';
+  import type { CreateTransferInput } from '@db';
+  import { formatAmountDisplay, formatEpochDayToDate } from '@shared';
+  import type { AddTransferOptionsState } from '../../transfers/transferOptions';
   import type { AddTransferSaveState } from './addTransferSaveController';
   import ProgressIndicator from '../components/ProgressIndicator.svelte';
   let {
@@ -12,6 +15,8 @@
     remoteCommitRecoveryIsRequired,
     validationErrors,
     receiptCommitState,
+    receiptSummary = [],
+    optionsState,
     retryReceiptUpload,
     resolveReceiptConflict,
     retryReceiptAfterConflict,
@@ -24,6 +29,8 @@
     remoteCommitRecoveryIsRequired: boolean;
     validationErrors: readonly string[];
     receiptCommitState: ReceiptTransferCommitState;
+    receiptSummary?: readonly CreateTransferInput[];
+    optionsState?: AddTransferOptionsState;
     retryReceiptUpload: () => void;
     resolveReceiptConflict: () => void;
     retryReceiptAfterConflict: () => void;
@@ -223,8 +230,44 @@
       { values: { count: receiptCommitState.createdCount } },
     )}
   </p>
+  {#if receiptSummary.length > 0}
+    <div
+      class="add-transfer-form__status receipt-saved-summary"
+      data-testid="receipt-saved-summary"
+    >
+      <ul>
+        {#each receiptSummary as command (command)}
+          <li>
+            {formatEpochDayToDate(command.bookingDateEpochDay, $locale)}:
+            {command.buyplace} — {command.name}, {formatAmountDisplay(
+              command.amountCents,
+              'neutral',
+              $locale,
+            )}
+            — {optionsState?.fromAccountOptions.find(
+              (account) => account.accountId === command.fromAccountId,
+            )?.name}
+            ({command.categoryIds
+              .map(
+                (id) =>
+                  optionsState?.categoryOptions.find((category) => category.categoryId === id)
+                    ?.name ?? String(id),
+              )
+              .join(' / ')})
+          </li>
+        {/each}
+      </ul>
+      <p>{$_('addTransfer.receipt.correction')}</p>
+    </div>
+  {/if}
 {:else if receiptCommitState.phase === 'remote_commit_recovery_failed'}
   <p class="add-transfer-form__error" role="alert" data-testid="receipt-remote-saved">
     {$_('addTransfer.receipt.commit.remoteCommitRecoveryFailed')}
   </p>
 {/if}
+
+<style>
+  .receipt-saved-summary {
+    overflow-wrap: anywhere;
+  }
+</style>

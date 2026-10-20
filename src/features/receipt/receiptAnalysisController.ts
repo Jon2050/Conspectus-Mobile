@@ -113,7 +113,10 @@ const toCatalogAnalysisError = (
     case 'invalid_response':
       return new ReceiptAnalysisError('invalid_response', stage);
     case 'provider_error':
-      return new ReceiptAnalysisError('provider_error', stage);
+      return new ReceiptAnalysisError(
+        error.status === 429 ? 'rate_limited' : 'provider_error',
+        stage,
+      );
     case 'aborted':
       throw createAbortError();
   }

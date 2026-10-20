@@ -123,6 +123,9 @@ export const createReceiptTransferPreparationController =
       ) {
         return;
       }
+      // A same-context options refresh suspends preparation, not the remote analysis.
+      // Identity/version replacement is cancelled by the session owner before this point.
+      if (optionsState.operation === 'loading') return;
 
       const result = buildReceiptTransferCommands(
         derivation,
@@ -210,6 +213,7 @@ export const createReceiptTransferPreparationController =
         ) {
           derivation = analysisState.derivation;
           expectedItemIndexes = Object.freeze([...analysisState.extractedItemIndexes]);
+          if (optionsState.operation === 'loading') return;
           if (state.sourceAccountId === null) {
             const topologyError = validateReceiptSourceAccountTopology(optionsState);
             if (topologyError !== null) {
@@ -256,6 +260,7 @@ export const createReceiptTransferPreparationController =
         if (isDisposed || !['processing', 'waiting_for_source'].includes(state.phase)) {
           return;
         }
+        if (optionsState.operation === 'loading') return;
         if (optionsState.operation !== 'ready') {
           fail(activeStep(), { code: 'options_unavailable', detail: null });
           return;
@@ -264,6 +269,12 @@ export const createReceiptTransferPreparationController =
           const topologyError = validateReceiptSourceAccountTopology(optionsState);
           if (topologyError !== null) {
             fail('creation', topologyError);
+          } else {
+            publish({
+              ...state,
+              phase: 'waiting_for_source',
+              steps: steps('complete', 'complete', 'pending'),
+            });
           }
           return;
         }

@@ -111,7 +111,7 @@
       "errors": {
         "empty_file": "The selected image is empty. Take a new photo.",
         "source_too_large": "The photo is too large. Take a new photo no larger than 20 MB.",
-        "decode_failed": "The photo could not be read. Take a new, clear photo.",
+        "decode_failed": "The browser could not read this photo. Select a JPEG or take a new, clear photo.",
         "invalid_dimensions": "The photo has invalid dimensions. Take a new photo.",
         "encode_failed": "The photo could not be prepared safely. Take a new photo.",
         "output_too_large": "The prepared photo is still too large. Take a new photo at a lower resolution.",
@@ -163,7 +163,10 @@
           "conflict_sync_failed": "The latest OneDrive database could not be downloaded and verified.",
           "remote_commit_recovery_failed": "The transfers are saved to OneDrive, but the verified local refresh failed. Do not save them again."
         }
-      }
+      },
+      "duplicateWarning": "Transfers are saved automatically after account selection. Before taking another photo, check whether this receipt has already been booked. Repeated photos can create duplicates.",
+      "correction": "Check the date, merchant, amounts and categories. To correct a booking, close the mobile app, edit the database in Conspectus Desktop, then reopen and refresh the mobile app. Do not use both apps on this database at the same time.",
+      "imageGuidance": "Use a sharp photo of the entire receipt with a readable date and total. For HEIC decoding problems, select a JPEG instead. Very long receipts and high-resolution photos may be unreadable or exceed device memory."
     },
     "save": {
       "localSave": "Saving transfer locally and preparing the database upload...",

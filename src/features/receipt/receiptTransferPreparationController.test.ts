@@ -49,6 +49,39 @@ const DERIVING: ReceiptAnalysisState = {
 };
 
 describe('receipt transfer preparation controller', () => {
+  it.each([true, false])(
+    'retains results completed during transient loading (source already selected: %s)',
+    (selectEarly) => {
+      const controller = createReceiptTransferPreparationController();
+      controller.beginRun();
+      if (selectEarly) controller.selectSourceAccount(11, OPTIONS);
+      controller.handleAnalysisState(DERIVING, OPTIONS);
+      const loading = { ...OPTIONS, operation: 'loading' as const };
+      controller.refreshOptions(loading);
+      controller.handleAnalysisState(SUCCEEDED, loading);
+      expect(controller.getState().phase).toBe('processing');
+      expect(controller.claimReadyForCommit()).toBeNull();
+      controller.refreshOptions(OPTIONS);
+      expect(controller.getState().phase).toBe(
+        selectEarly ? 'ready_for_commit' : 'waiting_for_source',
+      );
+      if (!selectEarly) controller.selectSourceAccount(11, OPTIONS);
+      expect(controller.claimReadyForCommit()).toHaveLength(1);
+    },
+  );
+
+  it('still discards results on a terminal options error or explicit context reset', () => {
+    const controller = createReceiptTransferPreparationController();
+    controller.beginRun();
+    controller.handleAnalysisState(SUCCEEDED, { ...OPTIONS, operation: 'loading' });
+    controller.refreshOptions({ ...OPTIONS, operation: 'error' });
+    expect(controller.getState().error?.code).toBe('options_unavailable');
+    controller.refreshOptions(OPTIONS);
+    expect(controller.claimReadyForCommit()).toBeNull();
+    controller.reset();
+    controller.handleAnalysisState(SUCCEEDED, OPTIONS);
+    expect(controller.getState().phase).toBe('idle');
+  });
   it('starts with no source and lets analysis reach stage two independently', () => {
     const controller = createReceiptTransferPreparationController();
 
