@@ -14,7 +14,7 @@ import {
 } from './databaseUploadHandoffService';
 import {
   createTransferSaveExportService,
-  TransferUploadPendingError,
+  TransferBatchUploadPendingError,
 } from './transferSaveExportService';
 import { createSyncStateStore } from '../../shared/state/syncStateStore';
 import type { CacheStore, CachedDatabaseSnapshot } from '@cache';
@@ -77,14 +77,14 @@ describe('TransferSaveExportService Integration', () => {
       buyplace: 'Supermarket',
     };
 
-    const result = await exportService.createTransferAndExport(input);
+    const result = await exportService.createTransferBatchAndExport([input]);
 
-    expect(result.transferId).toBeGreaterThan(0);
+    expect(result.transferIds[0]!).toBeGreaterThan(0);
 
     // Verify SQL transaction behavior
     const queryService = createTransferMonthQueryService(dbRuntime);
     const transfers = queryService.listTransfersByMonth(19500);
-    const inserted = transfers.find((t) => t.transferId === result.transferId);
+    const inserted = transfers.find((t) => t.transferId === result.transferIds[0]!);
     expect(inserted).toBeDefined();
     expect(inserted?.name).toBe('Integration Test Transfer');
 
@@ -146,14 +146,14 @@ describe('TransferSaveExportService Integration', () => {
 
     let error: unknown;
     try {
-      await exportService.createTransferAndExport(input);
+      await exportService.createTransferBatchAndExport([input]);
     } catch (e) {
       error = e;
     }
 
-    expect(error).toBeInstanceOf(TransferUploadPendingError);
-    expect((error as TransferUploadPendingError).cause).toBeInstanceOf(DatabaseUploadError);
-    expect(((error as TransferUploadPendingError).cause as DatabaseUploadError).code).toBe(
+    expect(error).toBeInstanceOf(TransferBatchUploadPendingError);
+    expect((error as TransferBatchUploadPendingError).cause).toBeInstanceOf(DatabaseUploadError);
+    expect(((error as TransferBatchUploadPendingError).cause as DatabaseUploadError).code).toBe(
       'conflict',
     );
 

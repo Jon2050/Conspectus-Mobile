@@ -9,6 +9,7 @@ import {
   createCachedDatabaseSnapshotService,
   type CachedDatabaseSnapshotValidator,
 } from './cachedDatabaseSnapshotService';
+import { appDatabaseSession, type DatabaseSession, sameDatabaseIdentity } from './databaseSession';
 import { resolveAppCacheStore } from './cacheStoreResolver';
 import { resolveAppDbRuntime } from './dbRuntimeResolver';
 import { resolveAppGraphClient } from './graphClientResolver';
@@ -30,6 +31,7 @@ export interface DatabaseConflictRecoveryService {
 
 export interface CreateDatabaseConflictRecoveryServiceOptions {
   readonly now?: () => Date;
+  readonly session?: DatabaseSession;
   readonly downloadingMessage?: string;
   readonly recoveredMessage?: string;
   readonly failureMessage?: string;
@@ -84,11 +86,28 @@ export const createDatabaseConflictRecoveryService = (
 
   return {
     discardStaleRuntime(): void {
+      options.session?.invalidate();
       dbRuntime.close();
     },
 
     async syncLatestDatabase(recoveryOptions?: DatabaseConflictRecoveryOptions): Promise<void> {
+      const token = options.session?.beginRefresh();
+      if (token === null) throw new Error('A database write is still active.');
+      const expectedIdentity = options.session?.identity();
       const binding = resolveBinding(bindingProvider);
+      const canApply = () => {
+        const selected = resolveBinding(bindingProvider);
+        return (
+          selected !== null &&
+          binding !== null &&
+          selected.driveId === binding.driveId &&
+          selected.itemId === binding.itemId &&
+          (options.session === undefined ||
+            (token !== undefined &&
+              options.session.isGeneration(token) &&
+              sameDatabaseIdentity(expectedIdentity ?? null, options.session.identity())))
+        );
+      };
 
       if (binding === null) {
         dbRuntime.close();
@@ -105,15 +124,23 @@ export const createDatabaseConflictRecoveryService = (
           binding,
           metadata,
           (loadedBytes, totalBytes) => {
+            if (!canApply()) return;
             syncStateStore.updateProgress(loadedBytes, totalBytes, 'download');
             recoveryOptions?.onProgress?.({ loadedBytes, totalBytes });
           },
         );
 
+        if (!canApply()) throw new Error('Database recovery was superseded.');
         dbRuntime.close();
-        await dbRuntime.open(snapshot.dbBytes);
+        await dbRuntime.open(snapshot.dbBytes, { canApply });
+        if (!canApply()) throw new Error('Database recovery was superseded.');
+        if (expectedIdentity !== undefined && expectedIdentity !== null) {
+          options.session?.adopt(expectedIdentity, snapshot.metadata.eTag);
+        }
         syncStateStore.setSynced(recoveredMessage, { branch: DEFAULT_CONFLICT_RECOVERY_BRANCH });
       } catch (error) {
+        if (!canApply()) throw error;
+        options.session?.invalidate();
         dbRuntime.close();
         const message = toErrorMessage(error, failureMessage);
         setRecoveryError(message);
@@ -130,5 +157,5 @@ export const createAppDatabaseConflictRecoveryService = (): DatabaseConflictReco
     appSelectedDriveItemBindingStore,
     resolveAppDbRuntime(),
     appSyncStateStore,
-    { snapshotValidator: resolveAppSnapshotValidator() },
+    { snapshotValidator: resolveAppSnapshotValidator(), session: appDatabaseSession },
   );

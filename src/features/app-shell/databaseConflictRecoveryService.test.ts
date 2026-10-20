@@ -94,7 +94,7 @@ describe('database conflict recovery service', () => {
       },
       dbBytes,
     });
-    expect(dbRuntime.open).toHaveBeenCalledWith(dbBytes);
+    expect(dbRuntime.open).toHaveBeenCalledWith(dbBytes, { canApply: expect.any(Function) });
     expect(calls).toEqual(['close', 'close', 'open']);
     expect(progressUpdates).toEqual([
       { loadedBytes: 5, totalBytes: dbBytes.length },

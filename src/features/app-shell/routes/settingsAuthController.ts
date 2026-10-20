@@ -1,3 +1,4 @@
+import { appDatabaseSession } from '../databaseSession';
 import type { AuthClient, AuthError, AuthSession } from '@auth';
 
 export type SettingsAuthOperation = 'initializing' | 'idle' | 'signing_in' | 'signing_out';
@@ -202,6 +203,7 @@ export const createSettingsAuthController = (authClient: AuthClient): SettingsAu
       });
 
       try {
+        appDatabaseSession.invalidate();
         await authClient.signOut();
         refreshSession();
         updateState({

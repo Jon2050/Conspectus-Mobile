@@ -63,6 +63,7 @@ export interface GraphClient {
     bytes: Uint8Array,
     expectedETag: string,
     onProgress?: (loadedBytes: number, totalBytes: number | null) => void,
+    assertContext?: () => void,
   ): Promise<GraphUploadResult>;
 }
 

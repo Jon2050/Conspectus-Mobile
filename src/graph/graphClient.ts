@@ -417,7 +417,11 @@ export const createGraphClient = (options: CreateGraphClientOptions): GraphClien
   const toRequestBody = (bytes: Uint8Array): Blob =>
     new Blob([Uint8Array.from(bytes).buffer], { type: 'application/octet-stream' });
 
-  const executeRequest = async (url: string, init?: RequestInit): Promise<Response> => {
+  const executeRequest = async (
+    url: string,
+    init?: RequestInit,
+    assertContext?: () => void,
+  ): Promise<Response> => {
     let accessToken: string;
 
     try {
@@ -426,6 +430,7 @@ export const createGraphClient = (options: CreateGraphClientOptions): GraphClien
       throw normalizeAuthError(error);
     }
 
+    assertContext?.();
     const requestInit: RequestInit = {
       ...init,
       headers: createAuthorizedHeaders(accessToken, init?.headers),
@@ -585,6 +590,7 @@ export const createGraphClient = (options: CreateGraphClientOptions): GraphClien
       bytes,
       expectedETag,
       onProgress?: (loadedBytes: number, totalBytes: number | null) => void,
+      assertContext?: () => void,
     ): Promise<GraphUploadResult> {
       const url = buildDriveItemUrl(binding, '/content');
 
@@ -596,6 +602,7 @@ export const createGraphClient = (options: CreateGraphClientOptions): GraphClien
           throw normalizeAuthError(error);
         }
 
+        assertContext?.();
         return new Promise((resolve, reject) => {
           const xhr = createXhrFn();
           xhr.open('PUT', url, true);
@@ -670,23 +677,37 @@ export const createGraphClient = (options: CreateGraphClientOptions): GraphClien
         });
       }
 
-      const response = await executeRequest(url, {
-        method: 'PUT',
-        body: toRequestBody(bytes),
-        headers: {
-          'Content-Type': 'application/octet-stream',
-          'If-Match': expectedETag,
+      const response = await executeRequest(
+        url,
+        {
+          method: 'PUT',
+          body: toRequestBody(bytes),
+          headers: {
+            'Content-Type': 'application/octet-stream',
+            'If-Match': expectedETag,
+          },
         },
-      });
-      const payload = await readJsonPayload(
-        response,
-        'Microsoft Graph upload response did not include the required file fields.',
+        assertContext,
       );
-
-      return normalizeUploadResult(
-        payload,
-        'Microsoft Graph upload response did not include the required file fields.',
-      );
+      try {
+        const payload = await readJsonPayload(
+          response,
+          'Microsoft Graph upload response did not include the required file fields.',
+        );
+        return normalizeUploadResult(
+          payload,
+          'Microsoft Graph upload response did not include the required file fields.',
+        );
+      } catch (error) {
+        // The successful HTTP status already confirms remote acceptance, even if
+        // reading or validating the response fails. Callers must reconcile, not PUT again.
+        throw new GraphClientError(
+          'unknown',
+          'Microsoft Graph upload response did not include the required file fields.',
+          response.status,
+          error,
+        );
+      }
     },
   };
 };

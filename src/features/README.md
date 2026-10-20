@@ -35,9 +35,11 @@ Receipt AI settings:
   accessible three-step progress state, and immutable in-memory command handoff. Its pure command
   builder resolves exact current category names, targets the sole primary spendings account, and
   reuses Add Transfer validation and type derivation without writing SQLite or OneDrive.
-- `app-shell/receiptTransferCommitController.ts` owns the app-shell-lifetime automatic batch commit,
-  original-eTag-bound byte-only transport retry, post-export authoritative recovery, explicit
-  conflict reapplication, and remote-commit reconciliation states so navigation cannot repeat a
-  local transaction or lose duplicate-safety context.
+- `app-shell/transferCommitController.ts` owns the common transaction/export/upload, byte-only
+  retry, conflict and reconciliation state machine. The manual save adapter supplies one immutable
+  command; the receipt adapter supplies its validated batch. Neither duplicates persistence recovery.
+- `app-shell/databaseSession.ts` binds write permission to the opened runtime's account, file,
+  original eTag and generation, excludes refresh during upload, and revokes permission on refresh,
+  reset or sign-out. Shared IndexedDB metadata cannot update another tab's runtime provenance.
 - Cancellation, account/file context changes, and supersession clear selection, coverage proof,
   derivation, and prepared commands; public UI state never exposes raw or normalized image bytes.

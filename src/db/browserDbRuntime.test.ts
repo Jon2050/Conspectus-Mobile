@@ -1,7 +1,7 @@
 // Verifies browser DB runtime open/close lifecycle, pragma setup, and deterministic failure normalization.
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { SqlJsStatic } from 'sql.js';
+import type { Database, SqlJsStatic } from 'sql.js';
 
 import {
   appBrowserDbRuntime,
@@ -65,6 +65,54 @@ describe('browser db runtime', () => {
     expect(pragmaResult[0]?.values).toEqual([[1]]);
     expect(sampleRows[0]?.values).toEqual([['alpha']]);
     expect(runtime.exportBytes().length).toBeGreaterThan(0);
+  });
+
+  it('restores foreign keys even when export throws after reopening the sql.js connection', async () => {
+    const sql = await createNodeSqlJsRuntimeLoader().load();
+    const runtime = createBrowserDbRuntime({ load: async () => sql });
+    await runtime.open(await createFixtureSnapshotBytes('export failure'));
+    const originalExport = sql.Database.prototype.export;
+    const spy = vi.spyOn(sql.Database.prototype, 'export').mockImplementationOnce(function (
+      this: Database,
+    ) {
+      originalExport.call(this);
+      throw new Error('Injected export failure after reopen');
+    });
+    try {
+      expect(() => runtime.exportBytes()).toThrow(
+        expect.objectContaining({ code: 'db_export_failed' }),
+      );
+      expect(runtime.exec('PRAGMA foreign_keys;')[0]?.values).toEqual([[1]]);
+    } finally {
+      spy.mockRestore();
+      runtime.close();
+    }
+  });
+
+  it('closes the runtime if required pragmas cannot be restored after export', async () => {
+    const sql = await createNodeSqlJsRuntimeLoader().load();
+    const runtime = createBrowserDbRuntime({ load: async () => sql });
+    await runtime.open(await createFixtureSnapshotBytes('pragma failure'));
+    const generation = runtime.getGeneration?.();
+    const originalExec = sql.Database.prototype.exec;
+    const spy = vi.spyOn(sql.Database.prototype, 'exec').mockImplementation(function (
+      this: Database,
+      statement,
+      params,
+    ) {
+      if (statement === 'PRAGMA foreign_keys = ON;') throw new Error('Injected pragma failure');
+      return originalExec.call(this, statement, params);
+    });
+    try {
+      expect(() => runtime.exportBytes()).toThrow(
+        expect.objectContaining({ code: 'db_pragma_failed' }),
+      );
+      expect(runtime.isOpen()).toBe(false);
+      expect(runtime.getGeneration?.()).not.toBe(generation);
+    } finally {
+      spy.mockRestore();
+      runtime.close();
+    }
   });
 
   it('closes old state before reopening with new snapshot bytes', async () => {

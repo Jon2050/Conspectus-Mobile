@@ -1,21 +1,22 @@
-// Orchestrates Add Transfer submit, upload progress, retry state, and user feedback.
-import { DatabaseUploadError } from '../databaseUploadHandoffService';
+// Adapts validated manual form input to the shared transfer commit controller.
+import type { CreateTransferInput } from '@db';
+import { appToastStore, type ToastStore } from '@shared';
 import {
-  createAppDatabaseConflictRecoveryService,
-  type DatabaseConflictRecoveryProgress,
-  type DatabaseConflictRecoveryService,
-} from '../databaseConflictRecoveryService';
+  createTransferCommitController,
+  type TransferCommitState,
+  type TransferCommitContext,
+} from '../transferCommitController';
 import {
   createAppTransferSaveExportService,
-  TransferUploadPendingError,
+  type TransferBatchSaveExportService,
   type DatabaseUploadProgress,
-  type PendingTransferUpload,
-  type TransferSaveExportService,
 } from '../transferSaveExportService';
-import type { ToastStore } from '@shared';
-import { appToastStore } from '@shared';
-import type { CreateTransferInput } from '@db';
-
+import {
+  createAppDatabaseConflictRecoveryService,
+  type DatabaseConflictRecoveryService,
+  type DatabaseConflictRecoveryProgress,
+} from '../databaseConflictRecoveryService';
+import { appDatabaseSession } from '../databaseSession';
 import {
   isoDateToEpochDay,
   NO_CATEGORY_SELECTED,
@@ -29,6 +30,9 @@ import { deriveTransferType } from './transferTypeDerivation';
 
 export type AddTransferSavePhase =
   | 'idle'
+  | 'local_commit_syncing'
+  | 'local_commit_recovery_failed'
+  | 'invalidated'
   | 'local_save'
   | 'uploading'
   | 'upload_failed'
@@ -67,29 +71,9 @@ export interface AddTransferSaveController {
   ): Promise<AddTransferSubmitResult>;
   retry(t: AddTransferTranslator, isOffline?: boolean): Promise<void>;
   resolveConflict(t: AddTransferTranslator, isOffline?: boolean): Promise<void>;
+  invalidate?(): void;
   reset(): void;
 }
-
-const INITIAL_STATE: AddTransferSaveState = {
-  phase: 'idle',
-  errorMessage: null,
-  progress: null,
-  recoveryProgress: null,
-  canRetry: false,
-};
-
-const isBusyPhase = (phase: AddTransferSavePhase): boolean =>
-  phase === 'local_save' ||
-  phase === 'uploading' ||
-  phase === 'conflict_syncing' ||
-  phase === 'remote_commit_syncing';
-
-const blocksNewSubmit = (phase: AddTransferSavePhase): boolean =>
-  isBusyPhase(phase) ||
-  phase === 'conflict' ||
-  phase === 'remote_commit_syncing' ||
-  phase === 'remote_commit_recovered' ||
-  phase === 'remote_commit_recovery_failed';
 
 const selectedCategoryIds = (fields: AddTransferFormFields): readonly number[] =>
   [fields.category1Id, fields.category2Id, fields.category3Id].filter(
@@ -130,311 +114,123 @@ const toCreateTransferInput = (
   };
 };
 
-const isRetryableUploadError = (error: TransferUploadPendingError): boolean =>
-  error.cause instanceof DatabaseUploadError ? error.cause.code === 'upload_failed' : true;
-
-const isRemoteCommitCacheFailure = (error: TransferUploadPendingError): boolean =>
-  error.cause instanceof DatabaseUploadError && error.cause.code === 'remote_commit_cache_failed';
-
-const toLocalErrorMessage = (error: unknown, fallbackMessage: string): string =>
-  error instanceof Error && error.message.trim().length > 0 ? error.message : fallbackMessage;
-
-const toUploadErrorMessage = (
-  error: TransferUploadPendingError,
-  fallbackMessage: string,
-): string =>
-  error.cause instanceof Error && error.cause.message.trim().length > 0
-    ? error.cause.message
-    : fallbackMessage;
+const phases: Partial<Record<TransferCommitState['phase'], AddTransferSavePhase>> = {
+  validating: 'local_save',
+  failed: 'local_failed',
+  conflict_ready: 'conflict_resolved',
+};
 
 export const createAddTransferSaveController = (
-  saveService: TransferSaveExportService = createAppTransferSaveExportService(),
+  saveService: TransferBatchSaveExportService = createAppTransferSaveExportService(),
   toastStore: Pick<ToastStore, 'show'> = appToastStore,
   conflictRecoveryService: DatabaseConflictRecoveryService = createAppDatabaseConflictRecoveryService(),
+  resolveIdentity: () => Pick<
+    TransferCommitContext,
+    'isAuthenticated' | 'isVerifiedCurrent' | 'contextKey'
+  > = () => {
+    const identity = appDatabaseSession.identity();
+    return {
+      isAuthenticated: identity !== null,
+      isVerifiedCurrent: appDatabaseSession.isWritable(),
+      contextKey:
+        identity === null
+          ? null
+          : JSON.stringify([identity.accountId, identity.binding.driveId, identity.binding.itemId]),
+    };
+  },
 ): AddTransferSaveController => {
-  let state = INITIAL_STATE;
-  let pendingUpload: PendingTransferUpload | null = null;
-  const listeners = new Set<AddTransferSaveStateListener>();
-
-  const emitState = (): void => {
-    for (const listener of listeners) {
-      listener(state);
-    }
+  let translator: AddTransferTranslator = (key) => key;
+  let optionsState: AddTransferOptionsState = {
+    operation: 'loading',
+    fromAccountOptions: [],
+    toAccountOptions: [],
+    categoryOptions: [],
+    error: null,
   };
-
-  const updateState = (patch: Partial<AddTransferSaveState>): void => {
-    state = { ...state, ...patch };
-    emitState();
-  };
-
-  const setUploadStarted = (): void => {
-    updateState({
-      phase: 'uploading',
-      errorMessage: null,
-      progress: null,
-      recoveryProgress: null,
-      canRetry: false,
-    });
-  };
-
-  const setUploadProgress = (progress: DatabaseUploadProgress): void => {
-    updateState({
-      phase: 'uploading',
-      progress,
-      recoveryProgress: null,
-    });
-  };
-
-  const setSaved = (t: AddTransferTranslator): void => {
-    pendingUpload = null;
-    updateState({
-      phase: 'saved',
-      errorMessage: null,
-      progress: null,
-      recoveryProgress: null,
-      canRetry: false,
-    });
-    toastStore.show(t('addTransfer.save.successToast'), 'success');
-  };
-
-  const setUploadFailure = (error: TransferUploadPendingError, t: AddTransferTranslator): void => {
-    if (isRemoteCommitCacheFailure(error)) {
-      pendingUpload = null;
-      void recoverRemoteCommit(t);
-      return;
-    }
-
-    const canRetry = isRetryableUploadError(error);
-    const phase: AddTransferSavePhase = canRetry ? 'upload_failed' : 'conflict';
-    const message = canRetry
-      ? toUploadErrorMessage(error, t('addTransfer.save.uploadFailed'))
-      : t('addTransfer.save.conflictMessage');
-
-    pendingUpload = canRetry ? error.pendingUpload : null;
-    if (!canRetry) {
-      conflictRecoveryService.discardStaleRuntime();
-    }
-
-    updateState({
-      phase,
-      errorMessage: message,
-      progress: null,
-      recoveryProgress: null,
-      canRetry,
-    });
-
-    toastStore.show(
-      canRetry ? t('addTransfer.save.uploadFailedToast') : t('addTransfer.save.conflictToast'),
-      'error',
-    );
-  };
-
-  const recoverRemoteCommit = async (t: AddTransferTranslator): Promise<void> => {
-    updateState({
-      phase: 'remote_commit_syncing',
-      errorMessage: null,
-      progress: null,
-      recoveryProgress: null,
-      canRetry: false,
-    });
-
-    try {
-      await conflictRecoveryService.syncLatestDatabase({
-        onProgress: (recoveryProgress) => {
-          updateState({
-            phase: 'remote_commit_syncing',
-            errorMessage: null,
-            progress: null,
-            recoveryProgress,
-            canRetry: false,
-          });
-        },
-      });
-      updateState({
-        phase: 'remote_commit_recovered',
-        errorMessage: null,
-        progress: null,
-        recoveryProgress: null,
-        canRetry: false,
-      });
-      toastStore.show(t('addTransfer.save.remoteCommitRecoveredToast'), 'success');
-    } catch (error) {
-      updateState({
-        phase: 'remote_commit_recovery_failed',
-        errorMessage: toLocalErrorMessage(error, t('addTransfer.save.remoteCommitRecoveryFailed')),
-        progress: null,
-        recoveryProgress: null,
-        canRetry: false,
-      });
-      toastStore.show(t('addTransfer.save.remoteCommitRecoveryFailedToast'), 'error');
-    }
-  };
-
+  const core = createTransferCommitController(
+    saveService,
+    conflictRecoveryService,
+    toastStore,
+    (commands, options) => {
+      const command = commands[0];
+      if (commands.length !== 1 || command === undefined || options.operation !== 'ready')
+        return { code: 'invalid_transfer', detail: null };
+      const source = findAccount(options.fromAccountOptions, command.fromAccountId);
+      const destination = findAccount(options.toAccountOptions, command.toAccountId);
+      return source === null ||
+        destination === null ||
+        deriveTransferType(source.accountTypeId, destination.accountTypeId) !==
+          command.transferTypeId ||
+        command.categoryIds.some(
+          (id) => !options.categoryOptions.some((category) => category.categoryId === id),
+        )
+        ? { code: 'invalid_transfer', detail: null }
+        : null;
+    },
+  );
+  const context = (isOffline: boolean): TransferCommitContext => ({
+    ...resolveIdentity(),
+    isOnline: !isOffline,
+    optionsState,
+  });
+  const adapt = (state: TransferCommitState): AddTransferSaveState => ({
+    phase: phases[state.phase] ?? (state.phase as AddTransferSavePhase),
+    errorMessage:
+      state.error === null
+        ? null
+        : translator(`addTransfer.receipt.commit.errors.${state.error.code}`),
+    progress: state.progress,
+    recoveryProgress: state.recoveryProgress,
+    canRetry: state.phase === 'upload_failed',
+  });
+  const translate =
+    (t: AddTransferTranslator) =>
+    (key: string): string =>
+      t(key === 'addTransfer.receipt.commit.successOne' ? 'addTransfer.save.successToast' : key);
   return {
-    getState(): AddTransferSaveState {
-      return state;
+    getState: () => adapt(core.getState()),
+    subscribe(listener) {
+      return core.subscribe((state) => listener(adapt(state)));
     },
-
-    subscribe(listener: AddTransferSaveStateListener): () => void {
-      listeners.add(listener);
-      listener(state);
-
-      return () => {
-        listeners.delete(listener);
-      };
-    },
-
-    async submit(
-      fields: AddTransferFormFields,
-      optionsState: AddTransferOptionsState,
-      t: AddTransferTranslator,
-      isOffline: boolean = false,
-    ): Promise<AddTransferSubmitResult> {
-      if (isOffline) {
+    async submit(fields, options, t, isOffline = false) {
+      if (isOffline) return { validationErrors: [] };
+      const phase = core.getState().phase;
+      if (!['idle', 'failed', 'conflict_ready', 'saved'].includes(phase))
         return { validationErrors: [] };
-      }
-
-      if (blocksNewSubmit(state.phase)) {
-        return { validationErrors: [] };
-      }
-
-      if (optionsState.operation !== 'ready') {
+      if (options.operation !== 'ready')
         return { validationErrors: [t('addTransfer.validation.optionsUnavailable')] };
-      }
-
       const validationErrors = validateAddTransfer(
         fields,
-        optionsState.fromAccountOptions,
-        optionsState.toAccountOptions,
+        options.fromAccountOptions,
+        options.toAccountOptions,
         t,
       );
-      if (validationErrors.length > 0) {
-        return { validationErrors };
-      }
-
-      pendingUpload = null;
-      updateState({
-        phase: 'local_save',
-        errorMessage: null,
-        progress: null,
-        recoveryProgress: null,
-        canRetry: false,
-      });
-
-      try {
-        await saveService.createTransferAndExport(toCreateTransferInput(fields, optionsState), {
-          onUploadStart: setUploadStarted,
-          onProgress: setUploadProgress,
-        });
-        setSaved(t);
-      } catch (error) {
-        if (error instanceof TransferUploadPendingError) {
-          setUploadFailure(error, t);
-        } else {
-          updateState({
-            phase: 'local_failed',
-            errorMessage: toLocalErrorMessage(error, t('addTransfer.save.localFailed')),
-            progress: null,
-            recoveryProgress: null,
-            canRetry: false,
-          });
-          toastStore.show(t('addTransfer.save.localFailedToast'), 'error');
-        }
-      }
-
+      if (validationErrors.length > 0) return { validationErrors };
+      translator = t;
+      optionsState = options;
+      core.reset();
+      const command = toCreateTransferInput(fields, options);
+      await core.commit(
+        Object.freeze([
+          Object.freeze({ ...command, categoryIds: Object.freeze([...command.categoryIds]) }),
+        ]),
+        context(isOffline),
+        translate(t),
+      );
       return { validationErrors: [] };
     },
-
-    async retry(t: AddTransferTranslator, isOffline: boolean = false): Promise<void> {
-      if (isOffline) {
-        return;
-      }
-
-      if (isBusyPhase(state.phase) || pendingUpload === null || !state.canRetry) {
-        return;
-      }
-
-      try {
-        await saveService.retryExportedDatabaseUpload(pendingUpload.dbBytes, {
-          onUploadStart: setUploadStarted,
-          onProgress: setUploadProgress,
-        });
-        setSaved(t);
-      } catch (error) {
-        if (error instanceof DatabaseUploadError && error.code === 'conflict') {
-          pendingUpload = null;
-          conflictRecoveryService.discardStaleRuntime();
-          updateState({
-            phase: 'conflict',
-            errorMessage: t('addTransfer.save.conflictMessage'),
-            progress: null,
-            recoveryProgress: null,
-            canRetry: false,
-          });
-          toastStore.show(t('addTransfer.save.conflictToast'), 'error');
-          return;
-        }
-
-        updateState({
-          phase: 'upload_failed',
-          errorMessage: toLocalErrorMessage(error, t('addTransfer.save.uploadFailed')),
-          progress: null,
-          recoveryProgress: null,
-          canRetry: true,
-        });
-        toastStore.show(t('addTransfer.save.retryFailedToast'), 'error');
+    async retry(t, isOffline = false) {
+      await core.retryUpload(context(isOffline), translate(t));
+    },
+    async resolveConflict(t, isOffline = false) {
+      if (isOffline) return;
+      if (core.getState().phase === 'local_commit_recovery_failed') {
+        await core.retryLocalCommitRecovery(translate(t));
+      } else {
+        await core.resolveConflict(async () => context(false), translate(t));
       }
     },
-
-    async resolveConflict(t: AddTransferTranslator, isOffline: boolean = false): Promise<void> {
-      if (isOffline || state.phase !== 'conflict') {
-        return;
-      }
-
-      updateState({
-        phase: 'conflict_syncing',
-        errorMessage: null,
-        progress: null,
-        recoveryProgress: null,
-        canRetry: false,
-      });
-
-      try {
-        await conflictRecoveryService.syncLatestDatabase({
-          onProgress: (recoveryProgress) => {
-            updateState({
-              phase: 'conflict_syncing',
-              errorMessage: null,
-              progress: null,
-              recoveryProgress,
-              canRetry: false,
-            });
-          },
-        });
-
-        updateState({
-          phase: 'conflict_resolved',
-          errorMessage: null,
-          progress: null,
-          recoveryProgress: null,
-          canRetry: false,
-        });
-        toastStore.show(t('addTransfer.save.conflictResolvedToast'), 'success');
-      } catch (error) {
-        updateState({
-          phase: 'conflict',
-          errorMessage: toLocalErrorMessage(error, t('addTransfer.save.conflictSyncFailed')),
-          progress: null,
-          recoveryProgress: null,
-          canRetry: false,
-        });
-        toastStore.show(t('addTransfer.save.conflictSyncFailedToast'), 'error');
-      }
-    },
-
-    reset(): void {
-      pendingUpload = null;
-      updateState(INITIAL_STATE);
-    },
+    invalidate: () => core.invalidate(),
+    reset: () => core.reset(),
   };
 };

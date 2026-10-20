@@ -4,6 +4,7 @@ import type { CacheStore } from '@cache';
 import type { DriveItemBinding, GraphClient } from '@graph';
 import { appSelectedDriveItemBindingStore, appSyncStateStore, type SyncStateStore } from '@shared';
 
+import { appDatabaseSession, type DatabaseSession, sameDatabaseIdentity } from './databaseSession';
 import { resolveAppCacheStore } from './cacheStoreResolver';
 import { resolveAppGraphClient } from './graphClientResolver';
 import type { DatabaseUploadHandoff, DatabaseUploadOptions } from './transferSaveExportService';
@@ -13,6 +14,8 @@ export type DatabaseUploadErrorCode =
   | 'missing_cached_snapshot'
   | 'conflict'
   | 'upload_failed'
+  | 'context_changed'
+  | 'remote_outcome_unknown'
   | 'remote_commit_cache_failed';
 
 export class DatabaseUploadError extends Error {
@@ -38,6 +41,7 @@ export class DatabaseUploadError extends Error {
 
 export interface CreateDatabaseUploadHandoffServiceOptions {
   readonly now?: () => Date;
+  readonly session?: DatabaseSession;
   readonly uploadingMessage?: string;
   readonly uploadedMessage?: string;
   readonly conflictMessage?: string;
@@ -62,6 +66,7 @@ const toUploadError = (
   conflictMessage: string,
   failureMessage: string,
   expectedETag: string | null,
+  uploadWasInvoked: boolean,
 ): Error => {
   if (error instanceof DatabaseUploadError) {
     return error;
@@ -71,7 +76,19 @@ const toUploadError = (
     return new DatabaseUploadError('conflict', conflictMessage, error, expectedETag);
   }
 
-  return new DatabaseUploadError('upload_failed', failureMessage, error, expectedETag);
+  const status =
+    typeof error === 'object' && error !== null ? (error as { status?: number }).status : undefined;
+  const graphCode =
+    typeof error === 'object' && error !== null ? (error as { code?: string }).code : undefined;
+  const code =
+    !uploadWasInvoked || graphCode === 'unauthorized' || graphCode === 'forbidden'
+      ? 'upload_failed'
+      : status !== undefined && status >= 200 && status < 300
+        ? 'remote_commit_cache_failed'
+        : status === undefined || status >= 500
+          ? 'remote_outcome_unknown'
+          : 'upload_failed';
+  return new DatabaseUploadError(code, failureMessage, error, expectedETag);
 };
 
 export const createDatabaseUploadHandoffService = (
@@ -95,7 +112,43 @@ export const createDatabaseUploadHandoffService = (
       dbBytes: Uint8Array,
       uploadOptions?: DatabaseUploadOptions,
     ): Promise<void> {
-      const binding = resolveBinding(bindingProvider);
+      const context = uploadOptions?.context;
+      const assertContext = (): void => {
+        if (options.session !== undefined && context === undefined) {
+          throw new DatabaseUploadError(
+            'context_changed',
+            'An immutable upload context is required.',
+          );
+        }
+        if (context !== undefined) {
+          try {
+            options.session?.assert(context);
+          } catch (error) {
+            throw new DatabaseUploadError(
+              'context_changed',
+              'The database session changed.',
+              error,
+            );
+          }
+          const selected = resolveBinding(bindingProvider);
+          if (
+            selected === null ||
+            !sameDatabaseIdentity(context, { accountId: context.accountId, binding: selected })
+          ) {
+            throw new DatabaseUploadError('context_changed', 'The upload target changed.');
+          }
+        }
+      };
+      const contextIsCurrent = (): boolean => {
+        try {
+          assertContext();
+          return true;
+        } catch {
+          return false;
+        }
+      };
+      assertContext();
+      const binding = context?.binding ?? resolveBinding(bindingProvider);
 
       if (binding === null) {
         const error = new DatabaseUploadError(
@@ -108,8 +161,9 @@ export const createDatabaseUploadHandoffService = (
 
       syncStateStore.setSyncing(uploadingMessage, { branch: DEFAULT_UPLOAD_PROGRESS_BRANCH });
 
+      let uploadWasInvoked = false;
       let uploadResult: Awaited<ReturnType<GraphClient['uploadFile']>>;
-      let expectedETag = uploadOptions?.expectedETag ?? null;
+      let expectedETag = context?.baseETag ?? uploadOptions?.expectedETag ?? null;
 
       try {
         const currentSnapshot = await cacheStore.readSnapshot(binding);
@@ -125,24 +179,42 @@ export const createDatabaseUploadHandoffService = (
         }
 
         expectedETag ??= currentSnapshot.metadata.eTag;
+        assertContext();
 
+        uploadWasInvoked = true;
         uploadResult = await graphClient.uploadFile(
           binding,
           dbBytes,
           expectedETag,
           (loadedBytes, totalBytes) => {
+            if (!contextIsCurrent()) return;
             syncStateStore.updateProgress(loadedBytes, totalBytes, 'upload');
             uploadOptions?.onProgress?.({ loadedBytes, totalBytes });
           },
+          ...(context === undefined ? [] : [assertContext]),
         );
       } catch (error) {
-        const uploadError = toUploadError(error, conflictMessage, failureMessage, expectedETag);
+        const uploadError = toUploadError(
+          error,
+          conflictMessage,
+          failureMessage,
+          expectedETag,
+          uploadWasInvoked,
+        );
 
+        if (!contextIsCurrent()) throw uploadError;
         if (
           uploadError instanceof DatabaseUploadError &&
           uploadError.code === 'missing_cached_snapshot'
         ) {
           syncStateStore.setError(uploadError.message, { branch: DEFAULT_UPLOAD_FAILED_BRANCH });
+        } else if (
+          uploadError instanceof DatabaseUploadError &&
+          uploadError.code === 'remote_commit_cache_failed'
+        ) {
+          syncStateStore.setStale(uploadError.message, {
+            branch: DEFAULT_UPLOAD_CACHE_RECOVERY_BRANCH,
+          });
         } else if (uploadError instanceof DatabaseUploadError && uploadError.code === 'conflict') {
           syncStateStore.setStale(uploadError.message, { branch: DEFAULT_UPLOAD_CONFLICT_BRANCH });
         } else {
@@ -153,6 +225,7 @@ export const createDatabaseUploadHandoffService = (
       }
 
       try {
+        assertContext();
         await cacheStore.writeSnapshot({
           binding,
           metadata: {
@@ -162,6 +235,8 @@ export const createDatabaseUploadHandoffService = (
           dbBytes,
         });
 
+        assertContext();
+        if (context !== undefined) options.session?.accept(context, uploadResult.eTag);
         syncStateStore.setSynced(uploadedMessage, { branch: DEFAULT_UPLOAD_PROGRESS_BRANCH });
       } catch (error) {
         const cacheError = new DatabaseUploadError(
@@ -169,9 +244,10 @@ export const createDatabaseUploadHandoffService = (
           'The transfer was saved to OneDrive, but the local database cache could not be refreshed.',
           error,
         );
-        syncStateStore.setStale(cacheError.message, {
-          branch: DEFAULT_UPLOAD_CACHE_RECOVERY_BRANCH,
-        });
+        if (contextIsCurrent())
+          syncStateStore.setStale(cacheError.message, {
+            branch: DEFAULT_UPLOAD_CACHE_RECOVERY_BRANCH,
+          });
         throw cacheError;
       }
     },
@@ -183,4 +259,6 @@ export const createAppDatabaseUploadHandoffService = (): DatabaseUploadHandoff =
     resolveAppGraphClient(),
     resolveAppCacheStore(),
     appSelectedDriveItemBindingStore,
+    appSyncStateStore,
+    { session: appDatabaseSession },
   );
