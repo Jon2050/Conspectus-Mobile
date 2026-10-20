@@ -1,6 +1,6 @@
 <!-- Coordinates shell routing, startup auth hydration, and shared end-of-page deployment footer behavior. -->
 <script lang="ts">
-  import { afterUpdate, onDestroy, onMount, tick } from 'svelte';
+  import { afterUpdate, onDestroy, onMount } from 'svelte';
   import { get, type Readable } from 'svelte/store';
   import { _ } from 'svelte-i18n';
   import type { DriveItemBinding } from '@graph';
@@ -96,10 +96,6 @@
   export let loadingDelayMs = 160;
   export let showLoadingPlaceholder = true;
 
-  const FOOTER_VISIBILITY_THRESHOLD_PX = 24;
-  // Keep the footer visible until the user scrolls far enough away from the end of the page.
-  const FOOTER_VISIBILITY_HYSTERESIS_PX = 48;
-
   let currentRoute: AppRouteKey = DEFAULT_ROUTE;
   let addTransferFields: AddTransferFormFields = createInitialFormFields();
   let addTransferSaveState: AddTransferSaveState = addTransferSaveController.getState();
@@ -107,20 +103,16 @@
   let selectedBinding: DriveItemBinding | null = get(appSelectedDriveItemBindingStore);
   let addTransferHasLoadedDatabase = false;
   let appContentElement: HTMLElement | null = null;
-  let appContentPageElement: HTMLDivElement | null = null;
-  let footerIsVisible = true;
   let appShellIsMounted = false;
   let selectedBindingHasEmitted = false;
   let hasPerformedInitialSync = false;
   let dataRoutesAwaitInitialSync = false;
   let currentSyncId = 0;
-  let footerVisibilityTrackingIsActive = false;
   let lastRenderedRoute: AppRouteKey | null = null;
   let forceRefreshIsRunning = false;
   let authRecoveryIsPending = false;
   let authRecoveryError: string | null = null;
   let bindingRepairPersistenceIsRunning = false;
-  let stopFooterVisibilityTracking = (): void => {};
   const ownedReceiptAnalysisController =
     receiptCaptureController === null && receiptAnalysisController === null
       ? createReceiptAnalysisController()
@@ -532,73 +524,6 @@
     console.info('Startup freshness decision completed.', logDetails);
   };
 
-  const updateFooterVisibility = (): void => {
-    if (appContentElement === null) {
-      footerIsVisible = true;
-      return;
-    }
-
-    const { clientHeight, scrollHeight, scrollTop } = appContentElement;
-    const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
-
-    if (scrollHeight <= clientHeight + FOOTER_VISIBILITY_THRESHOLD_PX) {
-      footerIsVisible = true;
-      return;
-    }
-
-    if (footerIsVisible) {
-      footerIsVisible =
-        distanceFromBottom <= FOOTER_VISIBILITY_THRESHOLD_PX + FOOTER_VISIBILITY_HYSTERESIS_PX;
-      return;
-    }
-
-    footerIsVisible = distanceFromBottom <= FOOTER_VISIBILITY_THRESHOLD_PX;
-  };
-
-  const disconnectFooterVisibilityTracking = (): void => {
-    stopFooterVisibilityTracking();
-    stopFooterVisibilityTracking = (): void => {};
-    footerVisibilityTrackingIsActive = false;
-  };
-
-  const startFooterVisibilityTracking = async (): Promise<void> => {
-    disconnectFooterVisibilityTracking();
-    await tick();
-
-    if (showLoadingPlaceholder || appContentElement === null) {
-      footerIsVisible = false;
-      return;
-    }
-
-    const handleScroll = (): void => {
-      updateFooterVisibility();
-    };
-    const handleViewportResize = (): void => {
-      updateFooterVisibility();
-    };
-    let resizeObserver: ResizeObserver | null = null;
-
-    appContentElement.addEventListener('scroll', handleScroll, { passive: true });
-    window.addEventListener('resize', handleViewportResize);
-
-    if (typeof ResizeObserver === 'function' && appContentPageElement !== null) {
-      resizeObserver = new ResizeObserver(() => {
-        updateFooterVisibility();
-      });
-      resizeObserver.observe(appContentElement);
-      resizeObserver.observe(appContentPageElement);
-    }
-
-    stopFooterVisibilityTracking = (): void => {
-      appContentElement?.removeEventListener('scroll', handleScroll);
-      window.removeEventListener('resize', handleViewportResize);
-      resizeObserver?.disconnect();
-      resizeObserver = null;
-    };
-    footerVisibilityTrackingIsActive = true;
-    updateFooterVisibility();
-  };
-
   onMount(() => {
     appShellIsMounted = true;
     let isMounted = true;
@@ -639,24 +564,14 @@
         window.clearTimeout(timerId);
       }
       document.removeEventListener('visibilitychange', handleDocumentVisibilityChange);
-      disconnectFooterVisibilityTracking();
     };
   });
 
   afterUpdate(() => {
-    if (!appShellIsMounted || showLoadingPlaceholder) {
-      footerIsVisible = false;
-      return;
-    }
-
-    if (!footerVisibilityTrackingIsActive) {
-      void startFooterVisibilityTracking();
-    }
-
+    if (!appShellIsMounted || showLoadingPlaceholder) return;
     if (appContentElement !== null && lastRenderedRoute !== currentRoute) {
       lastRenderedRoute = currentRoute;
       appContentElement.scrollTop = 0;
-      updateFooterVisibility();
     }
   });
 
@@ -680,7 +595,6 @@
     receiptPreparationController.reset();
     appDatabaseSession.invalidate();
     resolveAppDbRuntime().close();
-    disconnectFooterVisibilityTracking();
   });
 </script>
 
@@ -822,7 +736,7 @@
     aria-live="polite"
     bind:this={appContentElement}
   >
-    <div class="app-content__page" bind:this={appContentPageElement}>
+    <div class="app-content__page">
       {#if showLoadingPlaceholder}
         <LoadingPlaceholder />
       {:else if currentRoute === 'accounts'}
@@ -849,14 +763,11 @@
       {:else}
         <SettingsRoute {syncStateStore} onForceRefresh={requestForceRefresh} />
       {/if}
+      {#if !showLoadingPlaceholder}<DeploymentInfoFooter />{/if}
     </div>
   </main>
 
-  <div
-    class="app-shell__bottom"
-    class:app-shell__bottom--with-safe-area={showLoadingPlaceholder || !footerIsVisible}
-    data-testid="app-shell-bottom"
-  >
+  <div class="app-shell__bottom" data-testid="app-shell-bottom">
     <nav class="app-nav" aria-label={$_('nav.primary')}>
       {#each APP_ROUTES as route (route.key)}
         <a
@@ -878,10 +789,6 @@
         </a>
       {/each}
     </nav>
-
-    {#if !showLoadingPlaceholder}
-      <DeploymentInfoFooter isVisible={footerIsVisible} />
-    {/if}
   </div>
 
   <style>

@@ -1401,122 +1401,35 @@ test('shows deployment footer metadata immediately on short pages', async ({ pag
 
   expect(navBox).not.toBeNull();
   expect(footerBox).not.toBeNull();
-  expect(footerBox!.y).toBeGreaterThan(navBox!.y + navBox!.height - 1);
+  expect(footerBox!.y + footerBox!.height).toBeLessThanOrEqual(navBox!.y);
 });
 
-test('reveals deployment footer only when reaching the end of a scrollable page', async ({
+test('keeps footer and navigation geometry stable while scrolling a long page', async ({
   page,
 }) => {
-  await installMockAuthClient(page, {
-    startAuthenticated: true,
-  });
-  await installMockGraphClient(page, {
-    extraRootDbFileCount: 80,
-  });
-
+  await installMockAuthClient(page, { startAuthenticated: true });
+  await installMockGraphClient(page, { extraRootDbFileCount: 80 });
   await page.goto(appPath('#/settings'));
   await page.getByRole('button', { name: 'Select DB File' }).click();
-
-  const appContent = page.getByTestId('app-shell-content');
+  await expect(page.getByTestId('db-file-browser-loading')).toHaveCount(0);
+  await expect(page.locator('[data-testid^="select-file-"]')).toHaveCount(81);
+  const content = page.getByTestId('app-shell-content');
   const footer = page.getByTestId('deployment-info-footer');
-  const appShellBottom = page.getByTestId('app-shell-bottom');
-
-  await expect
-    .poll(async () =>
-      appContent.evaluate((element) => ({
-        clientHeight: element.clientHeight,
-        scrollHeight: element.scrollHeight,
-      })),
-    )
-    .toEqual(
-      expect.objectContaining({
-        clientHeight: expect.any(Number),
-        scrollHeight: expect.any(Number),
-      }),
-    );
-
-  await expect
-    .poll(async () =>
-      appContent.evaluate((element) => element.scrollHeight > element.clientHeight + 24),
-    )
-    .toBe(true);
-
-  await expect(footer).toHaveAttribute('aria-hidden', 'true');
-  await expect(appShellBottom).toHaveClass(/app-shell__bottom--with-safe-area/);
-
-  await footer.evaluate((element) => {
-    const footerElement = element as HTMLElement;
-    const trackedWindow = window as typeof window & {
-      __CONSPECTUS_FOOTER_VISIBILITY_CHANGE_COUNT__?: number;
-      __CONSPECTUS_FOOTER_VISIBILITY_OBSERVER__?: MutationObserver;
-    };
-
-    trackedWindow.__CONSPECTUS_FOOTER_VISIBILITY_CHANGE_COUNT__ = 0;
-
-    const observer = new MutationObserver((mutations) => {
-      trackedWindow.__CONSPECTUS_FOOTER_VISIBILITY_CHANGE_COUNT__ =
-        (trackedWindow.__CONSPECTUS_FOOTER_VISIBILITY_CHANGE_COUNT__ ?? 0) +
-        mutations.filter((mutation) => mutation.attributeName === 'aria-hidden').length;
-    });
-
-    observer.observe(footerElement, {
-      attributes: true,
-      attributeFilter: ['aria-hidden'],
-    });
-
-    trackedWindow.__CONSPECTUS_FOOTER_VISIBILITY_OBSERVER__ = observer;
-  });
-
-  await appContent.evaluate((element) => {
+  const bottom = page.getByTestId('app-shell-bottom');
+  const initialBottom = await bottom.boundingBox();
+  const initialHeight = await content.evaluate((element) => element.clientHeight);
+  await expect(footer).not.toBeInViewport();
+  await content.evaluate((element) => {
     element.scrollTop = element.scrollHeight;
-    element.dispatchEvent(new Event('scroll'));
   });
-  await expect(footer).not.toHaveAttribute('aria-hidden', 'true');
-  await expect(appShellBottom).not.toHaveClass(/app-shell__bottom--with-safe-area/);
-  await page.waitForTimeout(300);
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          (
-            window as typeof window & {
-              __CONSPECTUS_FOOTER_VISIBILITY_CHANGE_COUNT__?: number;
-            }
-          ).__CONSPECTUS_FOOTER_VISIBILITY_CHANGE_COUNT__ ?? 0,
-      ),
-    )
-    .toBe(1);
-
-  await appContent.evaluate((element) => {
+  await expect(footer).toBeInViewport();
+  expect(await bottom.boundingBox()).toEqual(initialBottom);
+  expect(await content.evaluate((element) => element.clientHeight)).toBe(initialHeight);
+  await content.evaluate((element) => {
     element.scrollTop = 0;
-    element.dispatchEvent(new Event('scroll'));
   });
-  await expect(footer).toHaveAttribute('aria-hidden', 'true');
-  await expect(appShellBottom).toHaveClass(/app-shell__bottom--with-safe-area/);
-  await page.waitForTimeout(300);
-  await expect
-    .poll(() =>
-      page.evaluate(
-        () =>
-          (
-            window as typeof window & {
-              __CONSPECTUS_FOOTER_VISIBILITY_CHANGE_COUNT__?: number;
-            }
-          ).__CONSPECTUS_FOOTER_VISIBILITY_CHANGE_COUNT__ ?? 0,
-      ),
-    )
-    .toBe(2);
-
-  await page.evaluate(() => {
-    const trackedWindow = window as typeof window & {
-      __CONSPECTUS_FOOTER_VISIBILITY_CHANGE_COUNT__?: number;
-      __CONSPECTUS_FOOTER_VISIBILITY_OBSERVER__?: MutationObserver;
-    };
-
-    trackedWindow.__CONSPECTUS_FOOTER_VISIBILITY_OBSERVER__?.disconnect();
-    delete trackedWindow.__CONSPECTUS_FOOTER_VISIBILITY_OBSERVER__;
-    delete trackedWindow.__CONSPECTUS_FOOTER_VISIBILITY_CHANGE_COUNT__;
-  });
+  await expect(footer).not.toBeInViewport();
+  expect(await bottom.boundingBox()).toEqual(initialBottom);
 });
 
 test('loads transfers from real DB bytes and navigates months to see fixture data', async ({

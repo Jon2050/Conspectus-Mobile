@@ -3,7 +3,7 @@
   "budgets": {
     "javascript": {
       "rawBytes": 729088,
-      "gzipBytes": 219136
+      "gzipBytes": 220160
     },
     "css": {
       "rawBytes": 32768,

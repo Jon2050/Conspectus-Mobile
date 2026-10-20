@@ -8,8 +8,6 @@
     type BuildInfo,
   } from '@shared';
 
-  export let isVisible = false;
-
   let buildInfo: BuildInfo = getFallbackBuildInfo();
   let footerLabel = formatBuildInfoLabel(buildInfo);
 
@@ -25,12 +23,7 @@
   });
 </script>
 
-<footer
-  class="deployment-info-footer"
-  class:is-visible={isVisible}
-  data-testid="deployment-info-footer"
-  aria-hidden={isVisible ? undefined : 'true'}
->
+<footer class="deployment-info-footer" data-testid="deployment-info-footer">
   <p class="deployment-info-footer__text" data-testid="deployment-info-label">
     {footerLabel}
   </p>
@@ -38,24 +31,9 @@
 
 <style>
   .deployment-info-footer {
-    max-height: 0;
-    padding: 0 1rem;
-    opacity: 0;
-    transform: translateY(0.35rem);
-    transition:
-      max-height 0.18s ease,
-      padding 0.18s ease,
-      opacity 0.18s ease,
-      transform 0.18s ease;
-    overflow: hidden;
-    pointer-events: none;
-  }
-
-  .deployment-info-footer.is-visible {
-    max-height: 3rem;
-    padding: 0.2rem 1rem calc(0.25rem + env(safe-area-inset-bottom, 0));
-    opacity: 1;
-    transform: translateY(0);
+    margin-top: auto;
+    padding: 0.5rem 1rem;
+    overflow-wrap: anywhere;
   }
 
   .deployment-info-footer__text {

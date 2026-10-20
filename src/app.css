@@ -1,8 +1,7 @@
 /* Defines the shared mobile app shell layout, navigation, and reusable visual primitives. */
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap');
 
 :root {
-  --font-family: 'Outfit', 'Segoe UI', 'Helvetica Neue', sans-serif;
+  --font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
   font-family: var(--font-family);
   font-synthesis: none;
   line-height: 1.5;
@@ -92,7 +91,8 @@ body {
   min-height: 100dvh;
   max-width: 32rem;
   margin: 0 auto;
-  padding: 1rem;
+  padding: max(1rem, env(safe-area-inset-top, 0px)) max(1rem, env(safe-area-inset-right, 0px)) 1rem
+    max(1rem, env(safe-area-inset-left, 0px));
   gap: 1rem;
   overflow: hidden;
 }
@@ -138,9 +138,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-}
-
-.app-shell__bottom--with-safe-area {
+  flex: none;
   padding-bottom: calc(env(safe-area-inset-bottom, 0) + 0.5rem);
 }
 
@@ -287,6 +285,8 @@ body {
 
 .app-input {
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   min-height: 44px;
   /* Minimum mobile touch target */
   padding: 0.75rem 1rem;
@@ -342,7 +342,7 @@ body {
 
 @media (min-width: 768px) {
   .app-shell {
-    padding-top: 1.4rem;
+    padding-top: max(1.4rem, env(safe-area-inset-top, 0px));
     padding-bottom: 1.4rem;
   }
 }

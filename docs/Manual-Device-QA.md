@@ -127,6 +127,30 @@ Expected results:
 
 Evidence: one screenshot of Transfers and one of the keyboard-open Add Transfer sheet.
 
+For the AP2 smartphone-dialog acceptance, also record these checks separately in Safari and the
+installed iOS PWA, in portrait and landscape:
+
+- Compare the footer's version/build time with the candidate, then open Add immediately after a
+  cold load and again after options have loaded. The sheet touches the viewport bottom; its header
+  receives initial focus and the form starts at the top without opening the keyboard automatically.
+- Dismiss through the header, bottom action, backdrop, and a deliberate downward grip drag of at
+  least 80 CSS pixels. Small or predominantly horizontal grip movements and form scrolling must
+  leave it open. Reopen after entering a draft and confirm the values remain.
+- During a disposable QA upload, try the header, backdrop, and grip. None may dismiss the sheet
+  while the commit is busy. Confirm recovery actions remain reachable after a failed upload.
+- Focus date, amount, text fields and native selects with the keyboard open. Repeat with larger
+  iOS text and long account/category/model names; record the visible viewport, dialog bounds and
+  any horizontal overflow. Include Settings/OpenRouter fields and notch/home-indicator clearance.
+- Open and cancel the camera/picker without a selection; confirm the unchanged form remains usable.
+  Expand the receipt disclosure and confirm its processing/risk information remains reachable.
+- Scroll long Settings/Transfers pages to the footer and back. Navigation and content viewport
+  height must remain stable. Block external font endpoints and confirm the system font remains
+  readable without a font-driven layout change.
+
+Retain measurements and screenshots/recordings with exact device, OS, browser, mode, text-size and
+candidate identity. Desktop WebKit emulation is supplemental evidence only. Missing physical iOS
+evidence leaves audit finding U4 open even when the implementation's automated checks pass.
+
 ### QA-04 Successful transfer write and persistence
 
 1. Record the source and destination balances and current transfer count.

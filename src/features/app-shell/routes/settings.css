@@ -1,0 +1,275 @@
+.settings-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  --settings-error-color: color-mix(in srgb, var(--negative) 72%, var(--text-primary));
+  --settings-error-surface: color-mix(in srgb, var(--negative) 14%, var(--surface-strong));
+  --settings-dialog-border: color-mix(in srgb, var(--negative) 22%, var(--border));
+}
+
+.settings-screen__auth-status {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.settings-screen__safety-card {
+  display: grid;
+  gap: 0.65rem;
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--negative) 24%, var(--border));
+  border-left: 0.3rem solid var(--negative);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--negative) 8%, var(--surface-strong));
+  box-shadow: var(--shadow-sm);
+}
+
+.settings-screen__safety-card h3,
+.settings-screen__safety-card h4,
+.settings-screen__safety-card p {
+  margin: 0;
+}
+
+.settings-screen__safety-card h3 {
+  font-size: 1rem;
+}
+
+.settings-screen__safety-card h4 {
+  margin-top: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.settings-screen__safety-warning {
+  color: var(--settings-error-color);
+  font-weight: 700;
+}
+
+.settings-screen__safety-link {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 2.75rem;
+  padding: 0.35rem 0.5rem;
+  color: var(--text-primary);
+  font-weight: 650;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 0.125rem;
+  text-underline-offset: 0.18em;
+}
+
+.settings-screen__safety-link:focus-visible {
+  border-radius: var(--radius-sm);
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.settings-screen__auth-error {
+  margin: 0;
+  padding: 1rem;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--settings-error-color);
+  background: var(--settings-error-surface);
+}
+
+.settings-screen__binding-status {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.settings-screen__sync-status {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-strong));
+  color: var(--text-primary);
+}
+
+.settings-screen__binding-error {
+  margin: 0;
+  padding: 1rem;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--settings-error-color);
+  background: var(--settings-error-surface);
+}
+
+.settings-screen__subheading {
+  margin: 0;
+  font-size: 0.98rem;
+}
+
+.settings-screen__action-heading {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.settings-screen__action-heading--danger {
+  color: var(--settings-error-color);
+}
+
+.settings-screen__account-summary,
+.settings-screen__binding-summary,
+.settings-screen__information-list {
+  margin: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+
+.settings-screen__account-summary div,
+.settings-screen__binding-summary div,
+.settings-screen__information-list div {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.85rem;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--surface-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.settings-screen__account-summary dt,
+.settings-screen__binding-summary dt,
+.settings-screen__information-list dt {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.settings-screen__account-summary dd,
+.settings-screen__binding-summary dd,
+.settings-screen__information-list dd {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.settings-screen__information {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.4rem;
+}
+
+.settings-screen__actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.settings-screen__confirmation {
+  display: grid;
+  gap: 0.85rem;
+  width: min(32rem, calc(100vw - 2rem));
+  max-width: 100%;
+  margin: auto;
+  padding: 1.5rem;
+  border: 1px solid var(--settings-dialog-border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-strong);
+  box-shadow: var(--shadow-lg);
+}
+
+.settings-screen__confirmation:not([open]) {
+  display: none;
+}
+
+.settings-screen__confirmation::backdrop {
+  background: color-mix(in srgb, black 40%, transparent);
+}
+
+.settings-screen__confirmation h4,
+.settings-screen__confirmation p {
+  margin: 0;
+}
+
+.settings-screen__confirmation-status {
+  color: var(--text-secondary);
+}
+
+.settings-screen__confirmation-error {
+  color: var(--settings-error-color);
+}
+
+.settings-screen__browser {
+  display: grid;
+  gap: 0.85rem;
+  padding: 1.25rem;
+  border: none;
+  border-radius: var(--radius-lg);
+  background: var(--surface-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.settings-screen__browser-header {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.settings-screen__browser-header h4,
+.settings-screen__browser-group h4 {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.settings-screen__browser-header p,
+.settings-screen__browser-empty {
+  margin: 0;
+  color: var(--text-secondary);
+  word-break: break-word;
+}
+
+.settings-screen__browser-loading {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.settings-screen__browser-skeletons {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.settings-screen__browser-group {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.settings-screen__browser-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.settings-screen__browser-item {
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.85rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--surface-strong);
+  box-shadow: var(--shadow-sm);
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.settings-screen__browser-item:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.settings-screen__browser-item--folder {
+  border-left: 4px solid var(--accent);
+}
+
+.settings-screen__browser-item--file {
+  border-left: 4px solid var(--positive);
+}
