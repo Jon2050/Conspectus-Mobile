@@ -106,6 +106,8 @@ const toCatalogAnalysisError = (
   switch (error.code) {
     case 'invalid_key':
       return new ReceiptAnalysisError('auth_error', stage);
+    case 'timeout':
+      return new ReceiptAnalysisError('timeout', stage);
     case 'network_error':
       return new ReceiptAnalysisError('network_error', stage);
     case 'invalid_response':

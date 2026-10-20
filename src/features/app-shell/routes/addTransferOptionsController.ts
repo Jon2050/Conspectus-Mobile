@@ -2,22 +2,11 @@
 import { isDbRuntimeError, type AccountQueryService, type CategoryQueryService } from '@db';
 import type { SyncState } from '@shared';
 
-import type { AddTransferAccountOption, AddTransferCategoryOption } from './addTransferFormState';
-
-export type AddTransferOptionsOperation = 'loading' | 'ready' | 'error';
-
-export interface AddTransferOptionsError {
-  readonly message: string;
-  readonly cause?: unknown;
-}
-
-export interface AddTransferOptionsState {
-  readonly operation: AddTransferOptionsOperation;
-  readonly fromAccountOptions: readonly AddTransferAccountOption[];
-  readonly toAccountOptions: readonly AddTransferAccountOption[];
-  readonly categoryOptions: readonly AddTransferCategoryOption[];
-  readonly error: AddTransferOptionsError | null;
-}
+import type {
+  AddTransferOptionsState,
+  AddTransferOptionsError,
+} from '../../transfers/transferOptions';
+export type { AddTransferOptionsState } from '../../transfers/transferOptions';
 
 export type AddTransferOptionsStateListener = (state: AddTransferOptionsState) => void;
 

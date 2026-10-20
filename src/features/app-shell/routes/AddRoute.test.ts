@@ -1027,7 +1027,7 @@ describe('AddRoute component', () => {
     });
 
     expect(body).toContain('data-testid="add-transfer-form-error"');
-    expect(body).toContain('Failed to load options.');
+    expect(body).toContain('Der Vorgang konnte nicht abgeschlossen werden. Versuche es erneut.');
     expect(body).toMatch(/data-testid="add-transfer-submit"[^>]*disabled/);
     expect(body).not.toMatch(/data-testid="add-transfer-name"[^>]*disabled/);
   });

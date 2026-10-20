@@ -84,7 +84,7 @@ describe('startupSyncStateController', () => {
     );
   });
 
-  it('applies a successful online unchanged decision and surfaces a success toast', () => {
+  it('keeps unchanged background checks silent', () => {
     const store = createSyncStateStore();
     const toastStore = createToastStore();
     const decision: StartupFreshnessDecision = {
@@ -118,11 +118,7 @@ describe('startupSyncStateController', () => {
       branch: 'online_unchanged',
       progress: null,
     });
-    expect(toastStore.show).toHaveBeenCalledWith(
-      'Zwischengespeicherte DB ist aktuell',
-      'success',
-      3200,
-    );
+    expect(toastStore.show).not.toHaveBeenCalled();
   });
 
   it('applies offline startup failure as an actionable error', () => {
@@ -144,7 +140,7 @@ describe('startupSyncStateController', () => {
 
     expect(get(store)).toMatchObject({
       state: 'error',
-      message: 'Connection is required to load the database.',
+      message: 'Zum Laden der Datenbank ist eine Internetverbindung erforderlich.',
       branch: 'offline_unsupported',
     });
     expect(toastStore.show).not.toHaveBeenCalled();
@@ -174,7 +170,7 @@ describe('startupSyncStateController', () => {
 
     expect(get(store)).toEqual({
       state: 'error',
-      message: 'Your session has expired. Please sign in again to sync with OneDrive.',
+      message: 'Deine Anmeldung ist abgelaufen. Melde dich erneut an.',
       branch: 'online_auth_expired',
       progress: null,
     });
@@ -213,7 +209,7 @@ describe('startupSyncStateController', () => {
   it('resets to idle when the startup decision is skipped', () => {
     const store = createSyncStateStore({
       state: 'error',
-      message: 'Connection is required to load the database.',
+      message: 'Zum Laden der Datenbank ist eine Internetverbindung erforderlich.',
       branch: 'offline_unsupported',
     });
     const toastStore = createToastStore();

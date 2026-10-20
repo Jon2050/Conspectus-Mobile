@@ -24,6 +24,7 @@
     ReceiptTransferPreparationError,
     ReceiptTransferPreparationState,
   } from '../../receipt';
+  import { presentOperationFailure } from '../failurePresentation';
   import BottomSheet from '../components/BottomSheet.svelte';
   import ManualTransferForm from './ManualTransferForm.svelte';
   import ReceiptCapturePanel from './ReceiptCapturePanel.svelte';
@@ -35,7 +36,10 @@
     type ReceiptTransferCommitController,
     type ReceiptTransferCommitState,
   } from '../receiptTransferCommitController';
-  import { createInitialFormFields, type AddTransferFormFields } from './addTransferFormState';
+  import {
+    createInitialFormFields,
+    type AddTransferFormFields,
+  } from '../../transfers/addTransferFormState';
   import {
     createAddTransferOptionsController,
     shouldReloadAddTransferOptionsForSyncState,
@@ -184,7 +188,9 @@
     formError ??
     receiptCaptureError ??
     (conflictRecoveryIsRequired ? null : saveState.errorMessage) ??
-    optionsState.error?.message ??
+    (optionsState.error === null
+      ? null
+      : $_(presentOperationFailure(optionsState.error.cause).messageKey)) ??
     null;
   $: controlsAreDisabled =
     isSubmitting ||
@@ -384,7 +390,10 @@
     }
 
     lastObservedSyncState = syncSnapshot.state;
-    if (shouldReloadAddTransferOptionsForSyncState(syncSnapshot.state)) {
+    if (
+      shouldReloadAddTransferOptionsForSyncState(syncSnapshot.state) &&
+      !(syncSnapshot.branch === 'online_unchanged' && optionsState.operation === 'ready')
+    ) {
       void controller.load();
     }
   });
@@ -435,6 +444,7 @@
 
   $: if (
     componentHasMounted &&
+    canCreateTransfer &&
     receiptPreparationState.phase === 'ready_for_commit' &&
     receiptCommitState.phase === 'idle'
   ) {

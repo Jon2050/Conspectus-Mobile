@@ -2,7 +2,7 @@
 import { appCacheStore, closeAppCacheStoreConnections, type CacheStore } from '@cache';
 import { AUTH_SESSION_RESUME_STORAGE_KEY } from '@auth';
 
-export type SettingsCacheStore = Pick<CacheStore, 'readSnapshot' | 'clearAll'>;
+export type SettingsCacheStore = Pick<CacheStore, 'readSnapshot' | 'readMetadata' | 'clearAll'>;
 
 declare global {
   interface Window {
@@ -13,6 +13,7 @@ declare global {
 const FALLBACK_INDEXEDDB_DATABASE_NAMES = ['conspectus-mobile-cache', 'conspectus-cache'];
 
 const defaultCacheStore: SettingsCacheStore = {
+  readMetadata: (binding) => appCacheStore.readMetadata!(binding),
   readSnapshot: (binding) => appCacheStore.readSnapshot(binding),
   async clearAll(): Promise<void> {
     if (typeof window === 'undefined') {

@@ -1,3 +1,4 @@
+import { withRequestDeadline } from '@shared';
 // Fetches the account-filtered OpenRouter model catalog without exposing key or provider details.
 import {
   OpenRouterCatalogResponseError,
@@ -12,7 +13,8 @@ export type OpenRouterCatalogErrorCode =
   | 'network_error'
   | 'provider_error'
   | 'invalid_response'
-  | 'aborted';
+  | 'aborted'
+  | 'timeout';
 
 export class OpenRouterCatalogError extends Error {
   readonly code: OpenRouterCatalogErrorCode;
@@ -32,6 +34,7 @@ export interface OpenRouterModelCatalogClient {
 
 interface CreateOpenRouterModelCatalogClientOptions {
   readonly fetch?: typeof fetch;
+  readonly timeoutMs?: number;
 }
 
 const isAbortError = (error: unknown, signal: AbortSignal | undefined): boolean =>
@@ -52,44 +55,59 @@ export const createOpenRouterModelCatalogClient = (
         throw new OpenRouterCatalogError('invalid_key');
       }
 
-      let response: Response;
       try {
-        response = await fetchImpl(OPENROUTER_USER_MODELS_URL, {
-          method: 'GET',
-          headers: {
-            Accept: 'application/json',
-            Authorization: `Bearer ${normalizedApiKey}`,
+        return await withRequestDeadline(
+          async (requestSignal) => {
+            let response: Response;
+            try {
+              response = await fetchImpl(OPENROUTER_USER_MODELS_URL, {
+                method: 'GET',
+                headers: {
+                  Accept: 'application/json',
+                  Authorization: `Bearer ${normalizedApiKey}`,
+                },
+                cache: 'no-store',
+                credentials: 'omit',
+                redirect: 'error',
+                signal: requestSignal,
+              });
+            } catch (error) {
+              throw new OpenRouterCatalogError(
+                isAbortError(error, requestSignal) ? 'aborted' : 'network_error',
+              );
+            }
+
+            if (response.status === 401 || response.status === 403) {
+              throw new OpenRouterCatalogError('invalid_key', response.status);
+            }
+
+            if (!response.ok) {
+              throw new OpenRouterCatalogError('provider_error', response.status);
+            }
+
+            let payload: unknown;
+            try {
+              payload = await response.json();
+            } catch {
+              throw new OpenRouterCatalogError('invalid_response', response.status);
+            }
+
+            try {
+              return parseOpenRouterCompatibleModelCatalog(payload);
+            } catch (error) {
+              if (error instanceof OpenRouterCatalogResponseError) {
+                throw new OpenRouterCatalogError('invalid_response', response.status);
+              }
+              throw error;
+            }
           },
-          cache: 'no-store',
-          credentials: 'omit',
-          redirect: 'error',
-          ...(signal === undefined ? {} : { signal }),
-        });
+          options.timeoutMs ?? 30_000,
+          signal,
+        );
       } catch (error) {
-        throw new OpenRouterCatalogError(isAbortError(error, signal) ? 'aborted' : 'network_error');
-      }
-
-      if (response.status === 401 || response.status === 403) {
-        throw new OpenRouterCatalogError('invalid_key', response.status);
-      }
-
-      if (!response.ok) {
-        throw new OpenRouterCatalogError('provider_error', response.status);
-      }
-
-      let payload: unknown;
-      try {
-        payload = await response.json();
-      } catch {
-        throw new OpenRouterCatalogError('invalid_response', response.status);
-      }
-
-      try {
-        return parseOpenRouterCompatibleModelCatalog(payload);
-      } catch (error) {
-        if (error instanceof OpenRouterCatalogResponseError) {
-          throw new OpenRouterCatalogError('invalid_response', response.status);
-        }
+        if (signal?.aborted) throw new OpenRouterCatalogError('aborted');
+        if (error instanceof DOMException && error.name === 'TimeoutError')
+          throw new OpenRouterCatalogError('timeout');
         throw error;
       }
     },

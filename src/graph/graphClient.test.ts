@@ -50,6 +50,44 @@ const getFetchCall = (
   (fetchFn.mock.calls[0] as [string, RequestInit | undefined]) ?? ['', undefined];
 
 describe('createGraphClient', () => {
+  it('bounds metadata body consumption and actually aborts the request', async () => {
+    vi.useFakeTimers();
+    try {
+      const response = new Response();
+      vi.spyOn(response, 'json').mockImplementation(() => new Promise(() => {}));
+      const fetchFn = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>(
+        async () => response,
+      );
+      const graph = createGraphClient({
+        authClient: createAuthClient(),
+        fetchFn,
+        readTimeoutMs: 100,
+      });
+      const request = graph.getFileMetadata(DRIVE_ITEM_BINDING);
+      const assertion = expect(request).rejects.toMatchObject({
+        code: 'network_error',
+        cause: { name: 'TimeoutError' },
+      });
+      await vi.advanceTimersByTimeAsync(100);
+      await assertion;
+      expect(fetchFn.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('retains bounded Retry-After seconds for startup orchestration', async () => {
+    const graph = createGraphClient({
+      authClient: createAuthClient(),
+      fetchFn: vi.fn(
+        async () => new Response('', { status: 429, headers: { 'Retry-After': '5' } }),
+      ),
+    });
+    await expect(graph.getFileMetadata(DRIVE_ITEM_BINDING)).rejects.toMatchObject({
+      status: 429,
+      code: 'network_error',
+      retryAfterMs: 5000,
+    });
+  });
   it('preserves confirmed HTTP acceptance when upload response validation fails', async () => {
     const graph = createGraphClient({
       authClient: createAuthClient(),
@@ -412,7 +450,9 @@ describe('createGraphClient', () => {
     const parsedUrl = new URL(requestUrl as string);
     expect(parsedUrl.origin).toBe('https://graph.microsoft.com');
     expect(parsedUrl.pathname).toBe('/v1.0/drives/drive-123/items/item-456');
-    expect(parsedUrl.searchParams.get('$select')).toBe('eTag,size,lastModifiedDateTime');
+    expect(parsedUrl.searchParams.get('$select')).toBe(
+      'eTag,size,lastModifiedDateTime,@microsoft.graph.downloadUrl',
+    );
 
     const requestHeaders = getRequestHeaders(getFetchCall(fetchFn));
     expect(requestHeaders.get('Authorization')).toBe('Bearer graph-token');

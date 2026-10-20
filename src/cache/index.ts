@@ -18,6 +18,7 @@ export interface CachedDatabaseSnapshot {
 }
 
 export interface CacheStore {
+  readMetadata?(binding: CachedFileBinding): Promise<CachedSyncMetadata | null>;
   readSnapshot(binding: CachedFileBinding): Promise<CachedDatabaseSnapshot | null>;
   writeSnapshot(snapshot: CachedDatabaseSnapshot): Promise<void>;
   clearSnapshot(binding: CachedFileBinding): Promise<void>;

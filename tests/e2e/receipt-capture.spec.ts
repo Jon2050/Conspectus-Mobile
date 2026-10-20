@@ -114,6 +114,7 @@ const installReadyReceiptConfiguration = async (page: Page): Promise<void> => {
 const installReceiptAnalysisRoutes = async (
   page: Page,
   completionBodies: readonly unknown[],
+  firstStageGate?: Promise<void>,
 ): Promise<{ readonly catalogRequests: Request[]; readonly completionRequests: Request[] }> => {
   const catalogRequests: Request[] = [];
   const completionRequests: Request[] = [];
@@ -155,6 +156,7 @@ const installReceiptAnalysisRoutes = async (
     }
 
     completionRequests.push(request);
+    if (completionRequests.length === 1) await firstStageGate;
     const response = completionBodies[completionRequests.length - 1] ?? completionBodies.at(-1);
     await new Promise((resolve) => setTimeout(resolve, 250));
     await route.fulfill({
@@ -670,5 +672,65 @@ test('shows remote-save reconciliation failure without any write or upload retry
   await expect(page.getByTestId('receipt-upload-retry')).toHaveCount(0);
   await expect(page.getByTestId('receipt-conflict-retry')).toHaveCount(0);
   expect(await getLocalTransferWriteCallCount(page)).toBe(1);
+  expect(await getGraphUploadCallCount(page)).toBe(1);
+});
+
+test('keeps an in-flight receipt analysis through an unchanged foreground check', async ({
+  page,
+}) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await installReadyReceiptConfiguration(page);
+  const requests = await installReceiptAnalysisRoutes(page, [EXTRACTION, DERIVATION], gate);
+  await installReadyAddTransferTestDb(page, {
+    fromAccountOptionRows: [
+      { accountId: 11, name: 'Checking', amountCents: 1000, accountTypeId: 3 },
+    ],
+    toAccountOptionRows: [{ accountId: 2, name: 'Spendings', amountCents: 0, accountTypeId: 2 }],
+    categoryRows: [
+      { categoryId: 20, name: 'Einkauf' },
+      { categoryId: 21, name: 'Lebensmittel' },
+    ],
+  });
+  await page.goto(appPath('#/add'));
+  await page
+    .getByTestId('receipt-image-input')
+    .setInputFiles({ name: 'receipt.png', mimeType: 'image/png', buffer: RECEIPT_IMAGE });
+  await expect.poll(() => requests.completionRequests.length).toBe(1);
+  await page.evaluate(() => {
+    const state = window as typeof window & {
+      __CONSPECTUS_GRAPH_CLIENT__: {
+        getFileMetadata: (...args: unknown[]) => Promise<unknown>;
+      };
+      releaseFreshness?: () => void;
+    };
+    const graph = state.__CONSPECTUS_GRAPH_CLIENT__;
+    const original = graph.getFileMetadata;
+    graph.getFileMetadata = async (...args) => {
+      graph.getFileMetadata = original;
+      await new Promise<void>((resolve) => {
+        state.releaseFreshness = resolve;
+      });
+      return original(...args);
+    };
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  await page.waitForFunction(() => 'releaseFreshness' in window);
+  await expect(page.getByTestId('startup-sync-progress')).toBeVisible();
+  await expect(page.getByTestId('receipt-step-extraction')).toHaveAttribute('data-state', 'active');
+  await page.getByTestId('add-transfer-from-account').selectOption('11');
+  release();
+  await expect(page.getByTestId('receipt-step-derivation')).toHaveAttribute(
+    'data-state',
+    'complete',
+  );
+  expect(await getGraphUploadCallCount(page)).toBe(0);
+  await page.evaluate(() =>
+    (window as typeof window & { releaseFreshness: () => void }).releaseFreshness(),
+  );
+  await expect(page.getByTestId('receipt-commit-success')).toContainText('1 transfer created');
+  expect(requests.completionRequests).toHaveLength(2);
   expect(await getGraphUploadCallCount(page)).toBe(1);
 });

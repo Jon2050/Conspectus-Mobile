@@ -1,8 +1,5 @@
 // Resolves the production SQLite snapshot validator and localhost test overrides.
-import {
-  createSqliteSnapshotValidator,
-  type CachedDatabaseSnapshotValidator,
-} from './cachedDatabaseSnapshotService';
+import { createWorkerSnapshotValidator, type CachedDatabaseSnapshotValidator } from '@db';
 
 declare global {
   interface Window {
@@ -34,5 +31,5 @@ export const resolveAppSnapshotValidator = (): CachedDatabaseSnapshotValidator =
     return window.__CONSPECTUS_APP_SNAPSHOT_VALIDATOR__;
   }
 
-  return createSqliteSnapshotValidator();
+  return createWorkerSnapshotValidator();
 };

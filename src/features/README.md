@@ -41,5 +41,12 @@ Receipt AI settings:
 - `app-shell/databaseSession.ts` binds write permission to the opened runtime's account, file,
   original eTag and generation, excludes refresh during upload, and revokes permission on refresh,
   reset or sign-out. Shared IndexedDB metadata cannot update another tab's runtime provenance.
+- `app-shell/databaseRefreshController.ts` owns coalescing, supersession and runtime application
+  under that session. Same-version refresh keeps the clean runtime and active receipt workflow;
+  replacement invalidates transient receipt state. Bootstrap readiness follows actual completion.
+- `transfers/` owns shared form/date/amount/account validation and transfer-type rules consumed by
+  manual UI and receipt commands. Receipt code no longer imports these from app-shell routes.
+- `app-shell/failurePresentation.ts` maps diagnostic codes to localized classes and next actions.
+  Settings loads on demand. The common commit controller retains remote-outcome ownership.
 - Cancellation, account/file context changes, and supersession clear selection, coverage proof,
   derivation, and prepared commands; public UI state never exposes raw or normalized image bytes.

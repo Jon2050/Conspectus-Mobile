@@ -1,3 +1,6 @@
+import { measurePhase, withRequestDeadline } from '@shared';
+import { isDbRuntimeError } from '@db';
+import { SnapshotCacheError, SnapshotVersionError } from './cachedDatabaseSnapshotService';
 // Decides whether startup should use the cached DB snapshot, download a fresh one, or fail deterministically.
 import type { CacheStore, CachedDatabaseSnapshot } from '@cache';
 import type { DriveItemBinding, GraphClient, GraphError, GraphFileMetadata } from '@graph';
@@ -17,14 +20,22 @@ export type StartupFreshnessBranch =
   | 'online_metadata_failed'
   | 'online_download_failed'
   | 'online_auth_expired'
-  | 'online_file_missing';
+  | 'online_file_missing'
+  | 'cache_unavailable'
+  | 'database_invalid'
+  | 'database_changed'
+  | 'permission_denied';
 
 export type StartupFreshnessFailureCode =
   | 'offline_unsupported'
   | 'metadata_fetch_failed'
   | 'snapshot_download_failed'
   | 'auth_expired'
-  | 'file_not_found';
+  | 'file_not_found'
+  | 'cache_unavailable'
+  | 'database_invalid'
+  | 'database_changed'
+  | 'permission_denied';
 
 export type StartupFreshnessMode = 'reuse_if_current' | 'force_download';
 
@@ -53,6 +64,7 @@ export interface StartupFreshnessReadyDecision extends StartupFreshnessBaseDecis
   readonly branch: 'online_unchanged' | 'online_changed';
   readonly syncState: 'synced';
   readonly snapshot: CachedDatabaseSnapshot;
+  readonly reuseRuntime?: boolean;
 }
 
 export interface StartupFreshnessErrorDecision extends StartupFreshnessBaseDecision {
@@ -62,7 +74,11 @@ export interface StartupFreshnessErrorDecision extends StartupFreshnessBaseDecis
     | 'online_metadata_failed'
     | 'online_download_failed'
     | 'online_auth_expired'
-    | 'online_file_missing';
+    | 'online_file_missing'
+    | 'cache_unavailable'
+    | 'database_invalid'
+    | 'database_changed'
+    | 'permission_denied';
   readonly syncState: 'error';
   readonly snapshot: null;
   readonly failure: StartupFreshnessFailure;
@@ -80,7 +96,13 @@ export interface StartupFreshnessService {
     isOnline: boolean,
     onProgress?: (loadedBytes: number, totalBytes: number | null) => void,
     mode?: StartupFreshnessMode,
+    context?: FreshnessContext,
   ): Promise<StartupFreshnessDecision>;
+}
+
+export interface FreshnessContext {
+  readonly signal?: AbortSignal;
+  readonly activeSnapshot?: Omit<CachedDatabaseSnapshot, 'dbBytes'>;
 }
 
 export interface StartupFreshnessRetryOptions {
@@ -93,6 +115,7 @@ export interface StartupFreshnessRetryOptions {
 export interface CreateStartupFreshnessServiceOptions {
   readonly retry?: StartupFreshnessRetryOptions;
   readonly missingFileRecovery?: Pick<MissingFileRecoveryService, 'recover'>;
+  readonly validateCachedSnapshot?: (bytes: Uint8Array, signal?: AbortSignal) => Promise<void>;
 }
 
 interface NormalizedStartupFreshnessRetryOptions {
@@ -198,11 +221,14 @@ const executeWithRetry = async <Result>(
   operationDescription: string,
   operation: () => Promise<Result>,
   retryOptions: NormalizedStartupFreshnessRetryOptions,
+  signal?: AbortSignal,
 ): Promise<Result> => {
   for (let attempt = 1; attempt <= retryOptions.maxAttempts; attempt += 1) {
     try {
+      signal?.throwIfAborted();
       return await operation();
     } catch (error) {
+      signal?.throwIfAborted();
       if (!isRetryableStartupSyncError(error)) {
         throw error;
       }
@@ -215,7 +241,8 @@ const executeWithRetry = async <Result>(
         );
       }
 
-      await retryOptions.waitFor(calculateRetryDelayMs(attempt, retryOptions));
+      const delay = Math.max(calculateRetryDelayMs(attempt, retryOptions), error.retryAfterMs ?? 0);
+      await withRequestDeadline(async () => retryOptions.waitFor(delay), delay + 1_000, signal);
     }
   }
 
@@ -234,7 +261,8 @@ const createFailure = (
 
 export const createStartupFreshnessService = (
   graphClient: Pick<GraphClient, 'getFileMetadata'>,
-  cacheStore: Pick<CacheStore, 'readSnapshot'>,
+  cacheStore: Pick<CacheStore, 'readSnapshot'> &
+    Partial<Pick<CacheStore, 'readMetadata' | 'clearSnapshot'>>,
   snapshotService: Pick<CachedDatabaseSnapshotService, 'downloadAndCacheSnapshot'>,
   options: CreateStartupFreshnessServiceOptions = {},
 ): StartupFreshnessService => ({
@@ -243,7 +271,10 @@ export const createStartupFreshnessService = (
     isOnline: boolean,
     onProgress?: (loadedBytes: number, totalBytes: number | null) => void,
     mode: StartupFreshnessMode = 'reuse_if_current',
+    context: FreshnessContext = {},
   ): Promise<StartupFreshnessDecision> {
+    const signal = context.signal;
+    signal?.throwIfAborted();
     if (binding === null) {
       return {
         kind: 'skipped',
@@ -278,8 +309,10 @@ export const createStartupFreshnessService = (
       try {
         metadata = await executeWithRetry(
           'refresh the selected OneDrive database metadata',
-          async () => graphClient.getFileMetadata(effectiveBinding),
+          async () =>
+            measurePhase('metadata', () => graphClient.getFileMetadata(effectiveBinding, signal)),
           retryOptions,
+          signal,
         );
       } catch (error) {
         if (
@@ -293,14 +326,17 @@ export const createStartupFreshnessService = (
         try {
           effectiveBinding = await executeWithRetry(
             'resolve the selected OneDrive database at its saved path',
-            async () => missingFileRecovery.recover(binding),
+            async () => missingFileRecovery.recover(binding, signal),
             retryOptions,
+            signal,
           );
           recoveredBinding = effectiveBinding;
           metadata = await executeWithRetry(
             'refresh the recovered OneDrive database metadata',
-            async () => graphClient.getFileMetadata(effectiveBinding),
+            async () =>
+              measurePhase('metadata', () => graphClient.getFileMetadata(effectiveBinding, signal)),
             retryOptions,
+            signal,
           );
         } catch (recoveryError) {
           if (
@@ -324,13 +360,47 @@ export const createStartupFreshnessService = (
         }
       }
 
-      const cachedSnapshot = await cacheStore.readSnapshot(effectiveBinding);
-
-      if (
-        mode === 'reuse_if_current' &&
-        cachedSnapshot !== null &&
-        cachedSnapshot.metadata.eTag === metadata.eTag
-      ) {
+      let cachedSnapshot: CachedDatabaseSnapshot | null = null;
+      if (mode === 'reuse_if_current') {
+        const active = context.activeSnapshot;
+        if (
+          active !== undefined &&
+          active.binding.driveId === effectiveBinding.driveId &&
+          active.binding.itemId === effectiveBinding.itemId &&
+          active.metadata.eTag === metadata.eTag
+        ) {
+          return {
+            kind: 'ready',
+            branch: 'online_unchanged',
+            syncState: 'synced',
+            snapshot: { ...active, dbBytes: new Uint8Array() },
+            reuseRuntime: true,
+            failure: null,
+          };
+        }
+        try {
+          const cachedMetadata = await cacheStore.readMetadata?.(effectiveBinding);
+          if (cachedMetadata === undefined || cachedMetadata?.eTag === metadata.eTag) {
+            cachedSnapshot = await measurePhase('cache-read', () =>
+              cacheStore.readSnapshot(effectiveBinding),
+            );
+          }
+          if (cachedSnapshot !== null && cachedSnapshot.metadata.eTag === metadata.eTag) {
+            try {
+              await options.validateCachedSnapshot?.(cachedSnapshot.dbBytes, signal);
+            } catch {
+              signal?.throwIfAborted();
+              await cacheStore.clearSnapshot?.(effectiveBinding);
+              cachedSnapshot = null;
+            }
+          }
+        } catch {
+          // A targeted fresh download may repair a damaged entry. Cache writes still fail closed.
+          cachedSnapshot = null;
+        }
+        signal?.throwIfAborted();
+      }
+      if (cachedSnapshot !== null && cachedSnapshot.metadata.eTag === metadata.eTag) {
         return {
           kind: 'ready',
           branch: 'online_unchanged',
@@ -345,8 +415,14 @@ export const createStartupFreshnessService = (
         const downloadedSnapshot = await executeWithRetry(
           'download the latest OneDrive database snapshot',
           async () =>
-            snapshotService.downloadAndCacheSnapshot(effectiveBinding, metadata, onProgress),
+            snapshotService.downloadAndCacheSnapshot(
+              effectiveBinding,
+              metadata,
+              onProgress,
+              signal,
+            ),
           retryOptions,
+          signal,
         );
 
         return {
@@ -358,6 +434,31 @@ export const createStartupFreshnessService = (
           ...(recoveredBinding === undefined ? {} : { recoveredBinding }),
         };
       } catch (error) {
+        signal?.throwIfAborted();
+        const special =
+          error instanceof SnapshotCacheError
+            ? 'cache_unavailable'
+            : isDbRuntimeError(error)
+              ? 'database_invalid'
+              : error instanceof SnapshotVersionError
+                ? 'database_changed'
+                : null;
+        if (special !== null)
+          return {
+            kind: 'error',
+            branch: special,
+            syncState: 'error',
+            snapshot: null,
+            failure: createFailure(special, error, 'Unable to prepare the database.'),
+          };
+        if (isGraphError(error) && error.code === 'forbidden')
+          return {
+            kind: 'error',
+            branch: 'permission_denied',
+            syncState: 'error',
+            snapshot: null,
+            failure: createFailure('permission_denied', error, 'Access denied.'),
+          };
         const isAuthError = isGraphError(error) && error.code === 'unauthorized';
         const failureCode = isAuthError ? 'auth_expired' : 'snapshot_download_failed';
         const fallbackMessage = isAuthError
@@ -375,6 +476,15 @@ export const createStartupFreshnessService = (
         };
       }
     } catch (error) {
+      signal?.throwIfAborted();
+      if (isGraphError(error) && error.code === 'forbidden')
+        return {
+          kind: 'error',
+          branch: 'permission_denied',
+          syncState: 'error',
+          snapshot: null,
+          failure: createFailure('permission_denied', error, 'Access denied.'),
+        };
       const isAuthError = isGraphError(error) && error.code === 'unauthorized';
       const failureCode = isAuthError ? 'auth_expired' : 'metadata_fetch_failed';
       const fallbackMessage = isAuthError

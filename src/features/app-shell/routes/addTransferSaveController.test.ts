@@ -12,7 +12,7 @@ import {
   createInitialFormFields,
   NO_CATEGORY_SELECTED,
   type AddTransferFormFields,
-} from './addTransferFormState';
+} from '../../transfers/addTransferFormState';
 import {
   createAddTransferSaveController,
   type AddTransferSaveState,

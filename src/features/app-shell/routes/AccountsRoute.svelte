@@ -11,6 +11,7 @@
   } from '@shared';
   import { _, locale } from 'svelte-i18n';
 
+  import { presentOperationFailure } from '../failurePresentation';
   import SkeletonCard from '../components/SkeletonCard.svelte';
   import {
     createAccountsRouteController,
@@ -72,7 +73,9 @@
       {#if state.operation === 'loading'}
         {$_('accounts.loading')}
       {:else if state.operation === 'error'}
-        {state.error?.message ?? $_('accounts.errorDefault')}
+        {state.error?.cause
+          ? $_(presentOperationFailure(state.error.cause).messageKey)
+          : (state.error?.message ?? $_('accounts.errorDefault'))}
       {/if}
     </p>
   {/if}

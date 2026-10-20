@@ -63,7 +63,7 @@ describe('AccountsRoute', () => {
     });
 
     expect(body).toContain('role="alert"');
-    expect(body).toContain('Mock account query failure.');
+    expect(body).toContain('Der Vorgang konnte nicht abgeschlossen werden. Versuche es erneut.');
   });
 
   it('renders ready account cards with semantic amount hooks', () => {

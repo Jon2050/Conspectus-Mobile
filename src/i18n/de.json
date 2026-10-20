@@ -359,6 +359,20 @@
       "queryFailed": "Lokale SQLite-Abfrage unerwartet fehlgeschlagen.",
       "exportFailed": "Konnte lokale SQLite-Bytes nicht exportieren.",
       "fallback": "Konnte das lokale SQLite-Snapshot nicht öffnen. Wiederhole die Synchronisation in den Einstellungen."
+    },
+    "failure": {
+      "auth": "Deine Anmeldung ist abgelaufen. Melde dich erneut an.",
+      "offline": "Zum Laden der Datenbank ist eine Internetverbindung erforderlich.",
+      "connection": "Die Verbindung konnte nicht rechtzeitig hergestellt werden. Pr�fe die Verbindung und versuche es erneut.",
+      "cache": "Der lokale Datenbankcache ist nicht verfügbar. Versuche die Datenbank erneut von OneDrive zu laden. Deine Einstellungen bleiben erhalten.",
+      "database": "Diese Datei ist keine verwendbare Conspectus-Datenbank. Wähle eine kompatible Datenbank aus.",
+      "retry": "Erneut von OneDrive laden",
+      "view": "Die Ansicht konnte nicht geladen werden. Versuche es erneut.",
+      "retryView": "Ansicht erneut laden",
+      "changed": "Die Datenbank hat sich w�hrend des Downloads ge�ndert. Lade die aktuelle Version erneut.",
+      "permission": "Der Zugriff auf diese OneDrive-Datei wurde verweigert. W�hle eine zug�ngliche Datenbank aus.",
+      "query": "Die Datenbank konnte nicht gelesen werden. Lade sie erneut von OneDrive.",
+      "unexpected": "Der Vorgang konnte nicht abgeschlossen werden. Versuche es erneut."
     }
   }
 }

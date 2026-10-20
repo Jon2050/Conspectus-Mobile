@@ -234,23 +234,44 @@ they are fresh.
 
 Startup and forced-refresh orchestration follows this sequence:
 
-1. Resolve the authenticated account and its stored file binding.
-2. Require online connectivity and fetch current Graph metadata, including the eTag.
-3. If a complete cached snapshot has the same eTag, open those cached bytes.
-4. Otherwise, download the current file, validate its size, SQLite signature, schema compatibility,
-   and ability to open, then promote it to the cache and active database runtime.
-5. Close or withhold the database runtime when authentication, metadata, download, validation, or
+1. Resolve the authenticated account and its stored file binding. Bootstrap stays in a loading
+   state until authentication and the first database decision complete; no timer declares readiness.
+2. Require online connectivity and fetch current Graph metadata, including the eTag and, when
+   supplied, its download URL. `databaseRefreshController` coalesces requests for the same session.
+3. Reuse an already open, clean runtime only when its own account/file/version/generation still
+   matches the remote version. This path reads no cached bytes, reopens no SQLite connection,
+   preserves active forms/receipt analysis, and emits no success toast.
+4. Otherwise, inspect cache metadata separately, validate a matching cached snapshot or download
+   the current file. Forced refresh skips cache reads. Downloads recheck remote metadata before
+   promotion so a concurrent replacement cannot attach newer metadata to older bytes.
+5. Validate size, SQLite signature, integrity, required columns and integer primary keys, unique
+   primary income/spendings accounts, transfer types, and declared/logical references. The DB module
+   owns validation and performs no schema migration. Snapshots at least 1 MiB are validated in a
+   disposable worker; smaller files use the cached WASM runtime directly. Cancellation terminates
+   workers. Cache persistence must succeed before opening an imported snapshot for use.
+6. Close or withhold the database runtime when authentication, metadata, download, validation, or
    connectivity fails.
 
 Consequences:
 
 - Cached financial data is never shown as current without a successful online freshness check.
-- Losing IndexedDB data is recoverable by downloading the OneDrive file again.
+- Invalid cached snapshots are cleared by file identity and downloaded again. An unavailable cache
+  fails closed with a targeted retry; bindings and receipt settings are retained. There is no
+  uncached write mode and no automatic whole-app reset.
 - Transient Graph network failures use a small capped retry policy; authentication, permission,
   binding, conflict, and validation failures fail fast into explicit recovery states.
 - Settings remains accessible when financial routes are unavailable.
-- Overlapping sync operations use supersession guards so an older result cannot replace a newer
-  accepted runtime.
+- Session invalidation aborts superseded Graph/worker work as well as guarding result publication.
+  Graph reads include body-consumption deadlines (30 seconds for metadata/browse/URLs, 120 seconds
+  for database download); catalog requests have a 30-second deadline and no automatic retry.
+  Startup uses at most three transient attempts, exponential backoff and Retry-After capped at
+  60 seconds. These conservative bounds are not claims about measured mobile network latency.
+- `failurePresentation` supplies localized failure classes and recovery actions. Startup uses one
+  primary recovery surface; technical diagnostics remain available to local code/logging, rather
+  than being presented as the primary UI message. Remote-commit failures retain AP1 reconciliation.
+- Local Performance API entries named `conspectus:*` measure auth, metadata, cache, download,
+  validation, runtime open and the first data decision. No content, identity, or key is recorded
+  or transmitted. Settings is loaded on demand; receipt owners remain above the route lifecycle.
 
 ## Transfer write flow
 
@@ -268,6 +289,9 @@ application's business and database behavior:
 7. After remote success, persist the uploaded bytes and returned eTag and refresh visible data.
 
 Safety invariants:
+
+- Manual input and receipt command preparation consume the same form/amount/date/account/type
+  rules from `features/transfers`. The receipt feature does not import route-owned validation.
 
 - Manual entry and receipt batches use `transferCommitController`; their adapters own input
   validation and presentation, while the common controller owns commit, retry and recovery.

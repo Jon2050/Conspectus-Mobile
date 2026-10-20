@@ -17,6 +17,9 @@ Expected public interfaces (`src/cache/index.ts`):
 - `CachedSyncMetadata`: cached sync context (`eTag`, `lastSyncAtIso`).
 - `CachedDatabaseSnapshot`: persisted DB payload + metadata envelope.
 - `CacheStore`: read/write/clear API for startup sync and recovery flows.
+- `readMetadata` reads only the small sync envelope. Production freshness, upload handoff and
+  Settings timestamp reads avoid loading DB bytes when only metadata is needed. It is optional
+  for injected/legacy stores; those callers fall back to `readSnapshot`.
 
 Dexie schema (`src/cache/dexieCacheStore.ts`):
 

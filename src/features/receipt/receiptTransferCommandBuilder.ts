@@ -5,11 +5,11 @@ import {
   isoDateToEpochDay,
   type AddTransferAccountOption,
   type AddTransferFormFields,
-} from '../app-shell/routes/addTransferFormState';
-import { formatAmountInputDigits } from '../app-shell/routes/addTransferAmountInput';
-import type { AddTransferOptionsState } from '../app-shell/routes/addTransferOptionsController';
-import { validateAddTransfer } from '../app-shell/routes/addTransferValidation';
-import { deriveTransferType } from '../app-shell/routes/transferTypeDerivation';
+} from '../transfers/addTransferFormState';
+import { formatAmountInputDigits } from '../transfers/addTransferAmountInput';
+import type { AddTransferOptionsState } from '../transfers/transferOptions';
+import { validateAddTransfer } from '../transfers/addTransferValidation';
+import { deriveTransferType } from '../transfers/transferTypeDerivation';
 import type { ReceiptTransferDerivation } from './receiptAnalysisContracts';
 
 export type ReceiptTransferPreparationErrorCode =

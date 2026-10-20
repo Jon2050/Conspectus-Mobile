@@ -567,7 +567,11 @@ export const installMockGraphClient = async (
         }
 
         return {
-          eTag: metadataETagSequence.shift() ?? mockOptions.metadataETag ?? '"etag-1"',
+          eTag:
+            metadataETagSequence.shift() ??
+            mockOptions.metadataETagSequence?.at(-1) ??
+            mockOptions.metadataETag ??
+            '"etag-1"',
           sizeBytes: defaultDownloadBytes.length,
           lastModifiedDateTime: mockOptions.metadataLastModifiedDateTime ?? '2026-03-09T10:15:00Z',
         };
