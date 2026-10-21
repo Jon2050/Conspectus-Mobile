@@ -2,7 +2,6 @@
 <script lang="ts">
   import { _ } from 'svelte-i18n';
   import type { ReceiptCaptureController, ReceiptTransferPreparationState } from '../../receipt';
-  import type { ReceiptTransferCommitState } from '../receiptTransferCommitController';
   import type { AddTransferAccountOption } from '../../transfers/addTransferFormState';
   import type { AddTransferOptionsState } from '../../transfers/transferOptions';
   import type { ReceiptReviewDraft } from '../../receipt/receiptReviewDraft';
@@ -16,7 +15,6 @@
     receiptCaptureController,
     displayedReceiptSteps,
     receiptSourceAccountOptions,
-    receiptCommitState,
     handleReceiptFileChange,
     handleReceiptFileCancel,
     openReceiptCapture,
@@ -35,7 +33,6 @@
     receiptCaptureController: ReceiptCaptureController | null;
     displayedReceiptSteps: ReceiptTransferPreparationState['steps'];
     receiptSourceAccountOptions: readonly AddTransferAccountOption[];
-    receiptCommitState: ReceiptTransferCommitState;
     handleReceiptFileChange: (event: Event) => void;
     handleReceiptFileCancel: (event: Event) => void;
     openReceiptCapture: () => void;
@@ -135,19 +132,7 @@
       </p>
     {/if}
 
-    {#if receiptPreparationState.phase === 'error' || receiptCommitState.phase === 'failed' || receiptCommitState.phase === 'invalidated'}
-      <button
-        type="button"
-        class="app-button app-button--secondary add-transfer-form__action"
-        data-testid="receipt-photo-button"
-        aria-controls="receipt-image-capture"
-        disabled={receiptCaptureIsDisabled}
-        onclick={openReceiptCapture}
-      >
-        <span aria-hidden="true">📷</span>
-        {$_('addTransfer.receipt.freshAction')}
-      </button>
-    {:else if receiptPreparationState.phase === 'processing' || receiptPreparationState.phase === 'waiting_for_source' || receiptPreparationState.phase === 'reviewing' || receiptPreparationState.phase === 'ready_for_commit'}
+    {#if receiptPreparationState.phase === 'processing' || receiptPreparationState.phase === 'waiting_for_source' || receiptPreparationState.phase === 'reviewing' || receiptPreparationState.phase === 'ready_for_commit'}
       <div class="add-transfer-form__field receipt-source-account">
         <label class="add-transfer-form__label" for="receipt-source-account">
           {$_('addTransfer.receipt.sourceAccount')}
@@ -188,13 +173,6 @@
           onChange={handleReceiptDraftChange}
           onSave={handleReceiptSave}
         />
-        <button
-          type="button"
-          class="app-button app-button--secondary"
-          data-testid="receipt-photo-button"
-          disabled={receiptCaptureIsDisabled}
-          onclick={openReceiptCapture}>{$_('addTransfer.receipt.freshAction')}</button
-        >
       {/if}
     {/if}
   {/if}

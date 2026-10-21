@@ -4,19 +4,22 @@ Responsibility:
 
 - Encapsulate authenticated OpenRouter HTTP requests and response parsing.
 - Normalize provider failures without exposing API keys or provider response bodies.
-- Catalog and intelligence-benchmark GETs share a 30-second whole-load deadline, accept caller cancellation and never retry
-  automatically. Receipt analysis maps catalog deadlines to its existing timeout recovery; Settings
-  offers its existing explicit catalog retry. Completion deadlines remain separate.
+- Settings catalog and intelligence-benchmark GETs start in parallel and share a 30-second whole-load deadline, accept caller cancellation and never retry
+  automatically; failure cancels outstanding work. Settings offers its existing explicit catalog retry.
+  Receipt analysis never invokes either GET. Completion deadlines remain separate.
 - Derive current free receipt-vision and text model options from the authenticated live catalog and
   OpenRouter's `GET /api/v1/benchmarks?source=artificial-analysis&task_type=intelligence` endpoint.
   Join `canonical_slug` to `model_permaslug` exactly and require a finite Intelligence Index >= 20
   for both roles. Missing, malformed or ambiguous scores are excluded; benchmark-load failures
   fail the whole load. No external AA service, guessed name match, or bundled score list is used.
+- Classify missing model/endpoint failures at the completion boundary, separately from auth,
+  rate limits, network, timeouts, malformed responses and generic provider failures.
 - Send non-streaming text and ephemeral local-JPEG chat completions with provider fallback disabled.
 - Completions use a 90-second timeout and accept explicit reasoning controls. Live catalog reasoning
-  capabilities determine supported efforts and whether off is permitted; no model-name guessing.
+  capabilities saved by Settings determine supported efforts and whether off is permitted; no model-name guessing.
   Receipt production requests explicitly enable the lowest positive supported effort, or enable
-  the binary switch. The benchmark-only off mode is never selected by production.
+  the binary switch. Unknown/legacy capabilities leave the provider default untouched, without a
+  guaranteed minimum until a successful Settings refresh. The benchmark-only off mode is never selected by production.
 - Exclude the two confirmed harness-only Inkling free variants. Current model/endpoint metadata
   lack a machine-readable harness-access filter, so this narrow exclusion supplements live filtering.
 - JSON shape is requested in the app-owned prompts and validated locally. Completions do not send

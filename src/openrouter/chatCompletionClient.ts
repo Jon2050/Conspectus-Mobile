@@ -6,6 +6,7 @@ export const OPENROUTER_CHAT_COMPLETION_TIMEOUT_MS = 90_000;
 export const OPENROUTER_CHAT_COMPLETION_MAX_RESPONSE_CHARACTERS = 128 * 1024;
 
 export type OpenRouterChatCompletionErrorCode =
+  | 'model_unavailable'
   | 'auth_error'
   | 'rate_limited'
   | 'network_error'
@@ -134,6 +135,9 @@ const classifyProviderFailure = (
   }
   if (status === 408 || status === 504 || errorType === 'timeout') {
     return new OpenRouterChatCompletionError('timeout', status);
+  }
+  if (status === 404 || errorType === 'model_not_found' || errorType === 'no_available_endpoints') {
+    return new OpenRouterChatCompletionError('model_unavailable', status);
   }
   return new OpenRouterChatCompletionError('provider_error', status);
 };

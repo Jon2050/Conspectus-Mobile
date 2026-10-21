@@ -54,13 +54,11 @@ const derivationJson = {
   transfers: [
     {
       name: 'Lebensmittel',
-      amountCents: 450,
       categoryNames: ['Einkauf', 'Lebensmittel'],
       sourceItemIndexes: [0, 12],
     },
     {
       name: 'Süßwaren',
-      amountCents: 250,
       categoryNames: ['Einkauf', 'Lebensmittel', 'Süßigkeiten'],
       sourceItemIndexes: [8],
     },
@@ -253,7 +251,14 @@ describe('stage-two transfer derivation contract', () => {
     );
     expect(result).toMatchObject({
       ok: true,
-      value: { status: 'ok', receiptTotalCents: 700, transfers: derivationJson.transfers },
+      value: {
+        status: 'ok',
+        receiptTotalCents: 700,
+        transfers: [
+          { ...derivationJson.transfers[0], amountCents: 450 },
+          { ...derivationJson.transfers[1], amountCents: 250 },
+        ],
+      },
     });
   });
 
@@ -294,7 +299,6 @@ describe('stage-two transfer derivation contract', () => {
       transfers: [
         {
           name: 'Eigene Gruppe',
-          amountCents: 700,
           categoryNames: ['Benutzerdefiniert'],
           sourceItemIndexes: [0, 8, 12],
         },
@@ -314,7 +318,6 @@ describe('stage-two transfer derivation contract', () => {
       transfers: [
         {
           name: 'Eigene Gruppe',
-          amountCents: 700,
           categoryNames: ['Benutzerdefiniert', 'Benutzerdefiniert'],
           sourceItemIndexes: [0, 8, 12],
         },
@@ -352,7 +355,7 @@ describe('stage-two transfer derivation contract', () => {
 
   it('rejects duplicate, missing, and unknown source item indexes', () => {
     const duplicate = derivationJson.transfers.map((transfer, index) =>
-      index === 1 ? { ...transfer, sourceItemIndexes: [8, 12], amountCents: 200 } : transfer,
+      index === 1 ? { ...transfer, sourceItemIndexes: [8, 12] } : transfer,
     );
     expect(
       parseReceiptTransferDerivationResponse(
@@ -380,23 +383,105 @@ describe('stage-two transfer derivation contract', () => {
     ).toMatchObject({ ok: false, error: { code: 'UNKNOWN_SOURCE_ITEM_INDEX' } });
   });
 
-  it('requires every positive transfer amount to equal its referenced signed item sum', () => {
-    const wrongGroupSum = derivationJson.transfers.map((transfer, index) =>
-      index === 0 ? { ...transfer, amountCents: 500 } : transfer,
-    );
+  it('rejects legacy model amounts and computes positive groups locally', () => {
+    const legacy = [
+      { ...derivationJson.transfers[0], amountCents: 450 },
+      derivationJson.transfers[1],
+    ];
     expect(
       parseReceiptTransferDerivationResponse(
-        derivationWith({ transfers: wrongGroupSum }),
+        derivationWith({ transfers: legacy }),
         validExtraction,
       ),
-    ).toMatchObject({ ok: false, error: { code: 'TRANSFER_ITEM_TOTAL_MISMATCH' } });
-
-    const zero = derivationJson.transfers.map((transfer, index) =>
-      index === 0 ? { ...transfer, amountCents: 0 } : transfer,
-    );
+    ).toMatchObject({ ok: false, error: { code: 'UNKNOWN_KEY' } });
+    const negative = [
+      { ...derivationJson.transfers[0], sourceItemIndexes: [12] },
+      { ...derivationJson.transfers[1], sourceItemIndexes: [0, 8] },
+    ];
     expect(
-      parseReceiptTransferDerivationResponse(derivationWith({ transfers: zero }), validExtraction),
+      parseReceiptTransferDerivationResponse(
+        derivationWith({ transfers: negative }),
+        validExtraction,
+      ),
     ).toMatchObject({ ok: false, error: { code: 'INVALID_CENTS' } });
+  });
+
+  it.each([[], [999], [0, 999], [0, 0]].map((indexes) => ({ indexes })))(
+    'never invents partial amounts for invalid references %j',
+    ({ indexes }) => {
+      const raw = derivationWith({
+        status: 'error',
+        errorReason: 'Teilantwort.',
+        transfers: [{ ...derivationJson.transfers[0], sourceItemIndexes: indexes }],
+      });
+      expect(parseReceiptTransferDerivationResponse(raw, validExtraction)).toMatchObject({
+        ok: false,
+      });
+    },
+  );
+
+  it('rejects zero complete groups, retains zero only as a partial suggestion and checks the receipt total', () => {
+    const receipt: ReceiptExtraction = {
+      ...validExtraction,
+      receiptTotalCents: 100,
+      items: [
+        { ...validExtraction.items[0]!, index: 0, lineTotalCents: 50 },
+        { ...validExtraction.items[0]!, index: 1, lineTotalCents: -50 },
+        { ...validExtraction.items[0]!, index: 2, lineTotalCents: 100 },
+      ],
+    };
+    const transfers = [
+      { ...derivationJson.transfers[0], sourceItemIndexes: [0, 1] },
+      { ...derivationJson.transfers[1], sourceItemIndexes: [2] },
+    ];
+    expect(
+      parseReceiptTransferDerivationResponse(derivationWith({ transfers }), receipt),
+    ).toMatchObject({ ok: false, error: { code: 'INVALID_CENTS' } });
+    expect(
+      parseReceiptTransferDerivationResponse(
+        derivationWith({ transfers, status: 'error', errorReason: 'Nullgruppe.' }),
+        receipt,
+      ),
+    ).toMatchObject({
+      ok: true,
+      value: { status: 'error', transfers: [{ amountCents: 0 }, { amountCents: 100 }] },
+    });
+    expect(
+      parseReceiptTransferDerivationResponse(
+        derivationWith({ transfers: [{ ...transfers[0], sourceItemIndexes: [0, 1, 2] }] }),
+        { ...receipt, receiptTotalCents: 101 },
+      ),
+    ).toMatchObject({ ok: false, error: { code: 'RECEIPT_TOTAL_MISMATCH' } });
+  });
+
+  it('checks intermediate overflow even when a reordered group has a safe final sum', () => {
+    const huge: ReceiptExtraction = {
+      ...validExtraction,
+      receiptTotalCents: 1,
+      items: [
+        { ...validExtraction.items[0]!, index: 0, lineTotalCents: Number.MAX_SAFE_INTEGER },
+        { ...validExtraction.items[0]!, index: 1, lineTotalCents: -Number.MAX_SAFE_INTEGER },
+        { ...validExtraction.items[0]!, index: 2, lineTotalCents: 1 },
+      ],
+    };
+    for (const status of ['ok', 'error']) {
+      const raw = derivationWith({
+        status,
+        errorReason: status === 'ok' ? null : 'Teilantwort.',
+        transfers: [{ ...derivationJson.transfers[0], sourceItemIndexes: [0, 2, 1] }],
+      });
+      expect(parseReceiptTransferDerivationResponse(raw, huge)).toMatchObject({
+        ok: false,
+        error: { code: 'ARITHMETIC_OVERFLOW' },
+      });
+    }
+    const raw = derivationWith({
+      transfers: [{ ...derivationJson.transfers[0], sourceItemIndexes: [0, 1, 2] }],
+    });
+    expect(parseReceiptTransferDerivationResponse(raw, huge)).toMatchObject({
+      ok: true,
+      value: { transfers: [{ amountCents: 1 }] },
+    });
   });
 
   it('rejects redundant wire metadata, too many categories, and unknown keys', () => {

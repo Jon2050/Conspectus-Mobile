@@ -61,7 +61,7 @@ describe('OpenRouter receipt configuration', () => {
       apiKey: 'secret-key',
       visionModelId: 'shared-model',
       transferModelId: 'shared-model',
-      transferPrompt: { version: 7 },
+      transferPrompt: { version: 8 },
       transferRules: DEFAULT_TRANSFER_DERIVATION_RULES.text,
       extractionPrompt: { version: 6 },
     });

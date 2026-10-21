@@ -99,7 +99,6 @@ export type ReceiptAnalysisValidationErrorCode =
   | 'DUPLICATE_SOURCE_ITEM_INDEX'
   | 'UNKNOWN_SOURCE_ITEM_INDEX'
   | 'INCOMPLETE_SOURCE_COVERAGE'
-  | 'TRANSFER_ITEM_TOTAL_MISMATCH'
   | 'RECEIPT_TOTAL_MISMATCH';
 
 export interface ReceiptAnalysisValidationError {
@@ -124,20 +123,22 @@ const EXTRACTION_KEYS = [
 const EXTRACTION_ITEM_KEYS = ['index', 'name', 'quantityText', 'lineTotalCents', 'kind'] as const;
 // Wire format shares one purchase location; trusted extraction metadata is attached locally.
 const DERIVATION_KEYS = ['status', 'errorReason', 'buyplace', 'transfers'] as const;
-const TRANSFER_KEYS = ['name', 'amountCents', 'categoryNames', 'sourceItemIndexes'] as const;
+const TRANSFER_KEYS = ['name', 'categoryNames', 'sourceItemIndexes'] as const;
 const ITEM_KINDS: readonly ReceiptItemKind[] = ['item', 'discount', 'deposit', 'other'];
 
 type JsonObject = Record<string, unknown>;
+
+export type ReceiptReviewItem = Pick<ReceiptExtractionItem, 'index' | 'name' | 'lineTotalCents'>;
 
 export interface ReceiptReviewSeed {
   readonly currency?: string | null;
   readonly receiptDate: string | null;
   readonly buyplace: string | null;
   readonly receiptTotalCents: number | null;
-  readonly transfers: readonly Pick<
+  readonly transfers: readonly (Pick<
     ReceiptDerivedTransfer,
     'name' | 'amountCents' | 'categoryNames'
-  >[];
+  > & { readonly items?: readonly ReceiptReviewItem[] })[];
 }
 
 // Partial model responses are suggestions for human review, never validated booking commands.
@@ -226,6 +227,8 @@ export function parseReceiptTransferDerivationResponse(
     value.transfers.length > RECEIPT_ANALYSIS_LIMITS.transfers
   )
     return failure('INVALID_STRUCTURE', 'Invalid partial derivation.');
+  const itemByIndex = new Map(extraction.items.map((item) => [item.index, item]));
+  const coveredIndexes = new Set<number>();
   const transfers: ReceiptTransferDerivationError['transfers'][number][] = [];
   for (const transfer of value.transfers) {
     if (!isObject(transfer)) return failure('INVALID_STRUCTURE', 'Invalid partial transfer.');
@@ -233,20 +236,35 @@ export function parseReceiptTransferDerivationResponse(
     if (error) return { ok: false, error };
     if (
       boundedString(transfer.name, RECEIPT_ANALYSIS_LIMITS.transferNameCharacters) === null ||
-      !isSafeInteger(transfer.amountCents) ||
       !Array.isArray(transfer.categoryNames) ||
       transfer.categoryNames.length > 3 ||
       transfer.categoryNames.some(
         (name) => boundedString(name, RECEIPT_ANALYSIS_LIMITS.categoryNameCharacters) === null,
       ) ||
       !Array.isArray(transfer.sourceItemIndexes) ||
+      transfer.sourceItemIndexes.length === 0 ||
       transfer.sourceItemIndexes.length > RECEIPT_ANALYSIS_LIMITS.items ||
       transfer.sourceItemIndexes.some((index) => !isSafeInteger(index) || index < 0)
     )
       return failure('INVALID_STRUCTURE', 'Invalid partial transfer fields.');
+    const amounts: number[] = [];
+    for (const index of transfer.sourceItemIndexes as number[]) {
+      if (coveredIndexes.has(index))
+        return failure(
+          'DUPLICATE_SOURCE_ITEM_INDEX',
+          'A partial source index is assigned more than once.',
+        );
+      const item = itemByIndex.get(index);
+      if (!item) return failure('UNKNOWN_SOURCE_ITEM_INDEX', 'A partial source item is not known.');
+      coveredIndexes.add(index);
+      amounts.push(item.lineTotalCents);
+    }
+    const amountCents = safeCentSum(amounts);
+    if (amountCents === null)
+      return failure('ARITHMETIC_OVERFLOW', 'The partial group exceeds safe integer-cent bounds.');
     transfers.push({
       name: transfer.name as string,
-      amountCents: transfer.amountCents,
+      amountCents,
       categoryNames: [...transfer.categoryNames] as string[],
       sourceItemIndexes: [...transfer.sourceItemIndexes] as number[],
       buyplace: value.buyplace as string | null,
@@ -563,13 +581,6 @@ function parseCompleteReceiptTransferDerivationResponse(
         `${path}.name`,
       );
     }
-    if (!isSafeInteger(candidate.amountCents) || candidate.amountCents <= 0) {
-      return failure(
-        'INVALID_CENTS',
-        'Each transfer amount must be a positive safe integer-cent value.',
-        `${path}.amountCents`,
-      );
-    }
     if (
       !Array.isArray(candidate.categoryNames) ||
       candidate.categoryNames.length > RECEIPT_ANALYSIS_LIMITS.categoriesPerTransfer ||
@@ -641,11 +652,11 @@ function parseCompleteReceiptTransferDerivationResponse(
         `${path}.sourceItemIndexes`,
       );
     }
-    if (sourceTotal !== candidate.amountCents) {
+    if (sourceTotal <= 0) {
       return failure(
-        'TRANSFER_ITEM_TOTAL_MISMATCH',
-        'The transfer amount does not match the sum of its source items.',
-        `${path}.amountCents`,
+        'INVALID_CENTS',
+        'Each locally calculated group must be positive.',
+        `${path}.sourceItemIndexes`,
       );
     }
 
@@ -653,7 +664,7 @@ function parseCompleteReceiptTransferDerivationResponse(
     usedGroups.add(name);
     transfers.push({
       name,
-      amountCents: candidate.amountCents,
+      amountCents: sourceTotal,
       categoryNames: [...candidate.categoryNames] as string[],
       buyplace,
       receiptDate: extraction.receiptDate,

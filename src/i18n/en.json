@@ -79,7 +79,6 @@
       "normalizing": "Preparing the photo securely...",
       "stageOne": "Read photo",
       "stageTwo": "Create transfer data",
-      "freshAction": "Photograph a new receipt",
       "sourceAccount": "Source account for all transfers",
       "accountRequired": "Choose the source account for all transfers. Nothing is booked until you press Save.",
       "progressLabel": "Receipt processing progress",
@@ -120,7 +119,9 @@
         "stage_one_failed": "Receipt analysis failed. Start again with a new photo."
       },
       "analysisErrors": {
-        "model_unavailable": "The selected free model is no longer compatible. Check Receipt AI settings and start with a new photo.",
+        "model_unavailable_extraction": "The vision model or its endpoint is unavailable. Select another vision model in Receipt AI settings.",
+        "model_unavailable_derivation": "The text model or its endpoint is unavailable. Select another text model in Receipt AI settings.",
+        "model_unavailable": "The selected model or its endpoint is unavailable. Select another model for the failed step in Receipt AI settings.",
         "auth_error": "OpenRouter rejected the API key or permission. Check Receipt AI settings and start with a new photo.",
         "rate_limited": "OpenRouter is currently rate limiting requests. Wait, then start with a new photo.",
         "network_error": "OpenRouter could not be reached. Check the connection and start with a new photo.",
@@ -169,6 +170,11 @@
       "correction": "Check the date, merchant, amounts and categories. To correct a booking, close the mobile app, edit the database in Conspectus Desktop, then reopen and refresh the mobile app. Do not use both apps on this database at the same time.",
       "imageGuidance": "Use a sharp photo of the entire receipt with a readable date and total. For HEIC decoding problems, select a JPEG instead. Very long receipts and high-resolution photos may be unreadable or exceed device memory.",
       "review": {
+        "items": "Assigned items ({count})",
+        "noItems": "No items assigned.",
+        "moveItem": "Move to transfer {number}",
+        "moveFailed": "The item could not be moved because the group amount exceeds the supported range.",
+
         "hint": "Review the detected data. You can edit every field before saving. The destination is always SPENDINGS.",
         "transfer": "Transfer {number}",
         "category": "Category {number}",

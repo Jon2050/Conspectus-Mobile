@@ -1,12 +1,8 @@
 // Orchestrates one abortable two-stage receipt analysis without persisting provider inputs or results.
 import {
-  OpenRouterCatalogError,
   OpenRouterChatCompletionError,
   openRouterChatCompletionClient,
-  openRouterModelCatalogClient,
-  resolveOpenRouterReasoning,
   type OpenRouterChatCompletionClient,
-  type OpenRouterModelCatalogClient,
 } from '@openrouter';
 
 import {
@@ -65,7 +61,6 @@ export interface ReceiptAnalysisController extends ReceiptStageOneStarter {
 }
 
 interface CreateReceiptAnalysisControllerOptions {
-  readonly catalogClient?: OpenRouterModelCatalogClient;
   readonly completionClient?: OpenRouterChatCompletionClient;
 }
 
@@ -95,9 +90,6 @@ const toBase64 = (bytes: Uint8Array): string => {
   return btoa(binary);
 };
 
-const hasModel = (models: readonly { readonly id: string }[], modelId: string): boolean =>
-  models.some((model) => model.id === modelId);
-
 const reviewSeed = (
   extraction: ReceiptExtractionResult,
   derivation?: ReturnType<typeof parseReceiptTransferDerivationResponse>,
@@ -111,7 +103,13 @@ const reviewSeed = (
         ? (result.buyplace ?? extraction.storeName)
         : (result?.transfers[0]?.buyplace ?? extraction.storeName),
     receiptTotalCents: extraction.receiptTotalCents,
-    transfers: result?.transfers ?? [],
+    transfers:
+      result?.transfers.map((transfer) => ({
+        ...transfer,
+        items: extraction.items
+          .filter((item) => transfer.sourceItemIndexes.includes(item.index))
+          .map(({ index, name, lineTotalCents }) => ({ index, name, lineTotalCents })),
+      })) ?? [],
   };
 };
 
@@ -140,34 +138,12 @@ const recoverReviewSeed = (
   }
 };
 
-const toCatalogAnalysisError = (
-  error: OpenRouterCatalogError,
-  stage: ReceiptAnalysisStage,
-): ReceiptAnalysisError => {
-  switch (error.code) {
-    case 'invalid_key':
-      return new ReceiptAnalysisError('auth_error', stage);
-    case 'timeout':
-      return new ReceiptAnalysisError('timeout', stage);
-    case 'network_error':
-      return new ReceiptAnalysisError('network_error', stage);
-    case 'invalid_response':
-      return new ReceiptAnalysisError('invalid_response', stage);
-    case 'provider_error':
-      return new ReceiptAnalysisError(
-        error.status === 429 ? 'rate_limited' : 'provider_error',
-        stage,
-      );
-    case 'aborted':
-      throw createAbortError();
-  }
-};
-
 const toCompletionAnalysisError = (
   error: OpenRouterChatCompletionError,
   stage: ReceiptAnalysisStage,
 ): ReceiptAnalysisError => {
   const codeByProviderCode = {
+    model_unavailable: 'model_unavailable',
     auth_error: 'auth_error',
     rate_limited: 'rate_limited',
     network_error: 'network_error',
@@ -185,9 +161,6 @@ const toAnalysisError = (error: unknown, stage: ReceiptAnalysisStage): ReceiptAn
   if (error instanceof ReceiptAnalysisError) {
     return error;
   }
-  if (error instanceof OpenRouterCatalogError) {
-    return toCatalogAnalysisError(error, stage);
-  }
   if (error instanceof OpenRouterChatCompletionError) {
     return toCompletionAnalysisError(error, stage);
   }
@@ -197,7 +170,6 @@ const toAnalysisError = (error: unknown, stage: ReceiptAnalysisStage): ReceiptAn
 export const createReceiptAnalysisController = (
   options: CreateReceiptAnalysisControllerOptions = {},
 ): ReceiptAnalysisController => {
-  const catalogClient = options.catalogClient ?? openRouterModelCatalogClient;
   const completionClient = options.completionClient ?? openRouterChatCompletionClient;
   const listeners = new Set<(state: ReceiptAnalysisState) => void>();
   let state = INITIAL_STATE;
@@ -277,24 +249,12 @@ export const createReceiptAnalysisController = (
       let extraction: ReceiptExtractionResult;
       try {
         try {
-          const catalog = await catalogClient.load(
-            input.configuration.apiKey,
-            abortController.signal,
-          );
           assertActive(runId, abortController.signal);
-          if (!hasModel(catalog.visionModels, input.configuration.visionModelId)) {
-            throw new ReceiptAnalysisError('model_unavailable', 'extraction');
-          }
-
           const rawExtraction = await completionClient.complete(
             {
               apiKey: input.configuration.apiKey,
               model: input.configuration.visionModelId,
-              reasoning: resolveOpenRouterReasoning(
-                catalog.visionModels.find((model) => model.id === input.configuration.visionModelId)
-                  ?.reasoning,
-                'lowest',
-              ),
+              reasoning: input.configuration.visionReasoning,
               messages: receiptExtractionMessages(
                 input.configuration.extractionPrompt.text,
                 toBase64(input.image.bytes),
@@ -343,25 +303,11 @@ export const createReceiptAnalysisController = (
           review: state.review ?? null,
         });
 
-        const transferCatalog = await catalogClient.load(
-          input.configuration.apiKey,
-          abortController.signal,
-        );
-        assertActive(runId, abortController.signal);
-        if (!hasModel(transferCatalog.transferModels, input.configuration.transferModelId)) {
-          throw new ReceiptAnalysisError('model_unavailable', 'derivation');
-        }
-
         const rawDerivation = await completionClient.complete(
           {
             apiKey: input.configuration.apiKey,
             model: input.configuration.transferModelId,
-            reasoning: resolveOpenRouterReasoning(
-              transferCatalog.transferModels.find(
-                (model) => model.id === input.configuration.transferModelId,
-              )?.reasoning,
-              'lowest',
-            ),
+            reasoning: input.configuration.transferReasoning,
             messages: receiptDerivationMessages(
               input.configuration.transferPrompt.text,
               input.configuration.transferRules,
@@ -385,16 +331,7 @@ export const createReceiptAnalysisController = (
           );
         }
         const result = parsedDerivation.value;
-        const review: ReceiptReviewSeed = {
-          receiptDate: extraction.receiptDate,
-          buyplace:
-            result.status === 'error'
-              ? (result.buyplace ?? extraction.storeName)
-              : (result.transfers[0]?.buyplace ?? extraction.storeName),
-          receiptTotalCents: extraction.receiptTotalCents,
-          currency: extraction.currency,
-          transfers: result.transfers,
-        };
+        const review = reviewSeed(extraction, parsedDerivation);
         publish({ ...state, review });
         if (result.status === 'error') {
           throw new ReceiptAnalysisError(

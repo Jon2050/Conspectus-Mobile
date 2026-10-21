@@ -1,24 +1,12 @@
-// Verifies live model rechecks, request separation, exact two-stage validation, and transient cleanup.
+// Verifies two completions without metadata requests, partial review, failures and stale-run safety.
 import { describe, expect, it, vi } from 'vitest';
-import {
-  OpenRouterChatCompletionError,
-  OpenRouterCatalogError,
-  type OpenRouterChatCompletionErrorCode,
-  type OpenRouterChatCompletionClient,
-  type OpenRouterCompatibleModelCatalog,
-  type OpenRouterModelCatalogClient,
-} from '@openrouter';
-
+import { OpenRouterChatCompletionError, type OpenRouterChatCompletionErrorCode } from '@openrouter';
 import { createReceiptAnalysisController } from './receiptAnalysisController';
-import type { ReadyOpenRouterReceiptConfiguration } from './openRouterReceiptConfiguration';
-import type { NormalizedReceiptImage } from './receiptImageNormalization';
-import {
-  DEFAULT_TRANSFER_DERIVATION_RULES,
-  RECEIPT_EXTRACTION_SYSTEM_PROMPT,
-  TRANSFER_DERIVATION_SYSTEM_PROMPT,
-} from './prompts';
+import { toStoredReadyOpenRouterReceiptConfiguration } from './openRouterReceiptConfiguration';
+import { createOpenRouterSettingsStore } from './openRouterSettingsStore';
+import { RECEIPT_EXTRACTION_SYSTEM_PROMPT, TRANSFER_DERIVATION_SYSTEM_PROMPT } from './prompts';
 
-const EXTRACTION = JSON.stringify({
+const extraction = {
   status: 'ok',
   errorReason: null,
   storeName: 'Markt',
@@ -26,442 +14,290 @@ const EXTRACTION = JSON.stringify({
   currency: 'EUR',
   receiptTotalCents: 350,
   items: [
-    {
-      index: 0,
-      name: 'Brot',
-      quantityText: null,
-      lineTotalCents: 250,
-      kind: 'item',
-    },
-    {
-      index: 1,
-      name: 'Rabatt',
-      quantityText: null,
-      lineTotalCents: -50,
-      kind: 'discount',
-    },
-    {
-      index: 2,
-      name: 'Apfel',
-      quantityText: '1 kg',
-      lineTotalCents: 150,
-      kind: 'item',
-    },
+    { index: 0, name: 'Brot', quantityText: null, lineTotalCents: 250, kind: 'item' },
+    { index: 1, name: 'Rabatt', quantityText: null, lineTotalCents: -50, kind: 'discount' },
+    { index: 2, name: 'Apfel', quantityText: '1 kg', lineTotalCents: 150, kind: 'item' },
   ],
-});
-
-const DERIVATION = JSON.stringify({
+};
+const derivation = {
   status: 'ok',
   errorReason: null,
-  buyplace: 'Markt',
+  buyplace: 'Rewe',
   transfers: [
     {
       name: 'Brot und Äpfel',
-      amountCents: 350,
       categoryNames: ['Einkauf', 'Lebensmittel'],
       sourceItemIndexes: [0, 1, 2],
     },
   ],
-});
-
-const CONFIGURATION: ReadyOpenRouterReceiptConfiguration = {
+};
+const config = {
   apiKey: 'secret-key',
-  visionModelId: 'shared-model',
-  transferModelId: 'shared-model',
+  visionModelId: 'vision',
+  transferModelId: 'text',
   extractionPrompt: RECEIPT_EXTRACTION_SYSTEM_PROMPT,
   transferPrompt: TRANSFER_DERIVATION_SYSTEM_PROMPT,
-  transferRules: DEFAULT_TRANSFER_DERIVATION_RULES.text,
+  transferRules: 'Literal $& {{CUSTOM_PROMPT}} user rules',
+  visionReasoning: { enabled: true, effort: 'low' as const },
+  transferReasoning: { enabled: true, effort: 'medium' as const },
 };
-
-const catalog = (overrides: Partial<OpenRouterCompatibleModelCatalog> = {}) => ({
-  visionModels: [{ id: 'shared-model', name: 'Shared', label: 'Shared' }],
-  transferModels: [{ id: 'shared-model', name: 'Shared', label: 'Shared' }],
-  ...overrides,
-});
-
-const image = (bytes = new Uint8Array([1, 2, 3, 4])): NormalizedReceiptImage => ({
-  mimeType: 'image/jpeg',
-  bytes,
+const image = () => ({
+  mimeType: 'image/jpeg' as const,
+  bytes: new Uint8Array([1, 2, 3, 4]),
   width: 800,
   height: 1200,
 });
-
-const input = (
-  receiptImage: NormalizedReceiptImage,
-  configuration: ReadyOpenRouterReceiptConfiguration = CONFIGURATION,
-) => ({ image: receiptImage, configuration });
+const input = () => ({ configuration: config, image: image() });
 
 describe('receipt analysis controller', () => {
-  it('selects enabled minimum reasoning independently from each freshly loaded role catalog', async () => {
-    const catalogClient: OpenRouterModelCatalogClient = {
-      load: vi
-        .fn()
-        .mockResolvedValueOnce(
-          catalog({
-            visionModels: [
-              {
-                id: 'shared-model',
-                name: 'Vision',
-                label: 'Vision',
-                reasoning: {
-                  mandatory: false,
-                  supportedEfforts: ['high', 'low', 'none'],
-                  defaultEnabled: false,
-                },
-              },
-            ],
-          }),
-        )
-        .mockResolvedValueOnce(
-          catalog({
-            transferModels: [
-              {
-                id: 'shared-model',
-                name: 'Text',
-                label: 'Text',
-                reasoning: {
-                  mandatory: true,
-                  supportedEfforts: ['high', 'medium'],
-                },
-              },
-            ],
-          }),
-        ),
+  it('uses stored settings after restart, only two POSTs, separated messages and role-specific minimum reasoning', async () => {
+    const values = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        values.set(key, value);
+      },
+      removeItem: (key: string) => {
+        values.delete(key);
+      },
     };
-    const completionClient: OpenRouterChatCompletionClient = {
-      complete: vi.fn().mockResolvedValueOnce(EXTRACTION).mockResolvedValueOnce(DERIVATION),
-    };
-    const controller = createReceiptAnalysisController({ catalogClient, completionClient });
-    await controller.start(input(image()), new AbortController().signal);
-    expect(vi.mocked(completionClient.complete).mock.calls[0]?.[0].reasoning).toEqual({
-      enabled: true,
-      effort: 'low',
+    createOpenRouterSettingsStore({ storage }).write('account', {
+      apiKey: config.apiKey,
+      visionModelId: 'vision',
+      transferModelId: 'text',
+      transferRulesOverride: config.transferRules,
+      visionReasoning: {
+        modelId: 'vision',
+        capabilities: { mandatory: false, supportedEfforts: ['high', 'low', 'none'] },
+      },
+      transferReasoning: {
+        modelId: 'text',
+        capabilities: { mandatory: true, supportedEfforts: ['high', 'medium'] },
+      },
     });
-    expect(vi.mocked(completionClient.complete).mock.calls[1]?.[0].reasoning).toEqual({
-      enabled: true,
-      effort: 'medium',
+    const restored = createOpenRouterSettingsStore({ storage }).read('account')!;
+    const configuration = toStoredReadyOpenRouterReceiptConfiguration(restored)!;
+    let calls = 0;
+    const fetchMock = vi.fn<typeof fetch>(async (_url, init) => {
+      expect(init?.method).toBe('POST');
+      const result = ++calls === 1 ? extraction : derivation;
+      return Response.json({
+        choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(result) } }],
+      });
     });
-  });
-  it('keeps partial extraction and derivation fields in review after a model-declared error', async () => {
-    const extraction = {
-      ...JSON.parse(EXTRACTION),
-      status: 'error',
-      errorReason: 'Bon-Summe fehlt.',
-      receiptTotalCents: null,
-    };
-    const derivation = {
-      ...JSON.parse(DERIVATION),
-      status: 'error',
-      errorReason: 'Nur Teilantwort.',
-      buyplace: 'Rewe',
-    };
-    const completionClient: OpenRouterChatCompletionClient = {
-      complete: vi
-        .fn()
-        .mockResolvedValueOnce(JSON.stringify(extraction))
-        .mockResolvedValueOnce(JSON.stringify(derivation)),
-    };
+    const { createOpenRouterChatCompletionClient } = await import('@openrouter');
     const controller = createReceiptAnalysisController({
-      catalogClient: { load: vi.fn().mockResolvedValue(catalog()) },
-      completionClient,
+      completionClient: createOpenRouterChatCompletionClient({ fetch: fetchMock }),
     });
-    await expect(
-      controller.start(input(image()), new AbortController().signal),
-    ).rejects.toMatchObject({ code: 'model_error' });
-    expect(completionClient.complete).toHaveBeenCalledTimes(2);
+    const photo = image();
+    const phases: string[] = [];
+    controller.subscribe((state) => phases.push(state.phase));
+    await controller.start({ configuration, image: photo }, new AbortController().signal);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const bodies = fetchMock.mock.calls.map(([, init]) => JSON.parse(String(init?.body)));
+    expect(bodies[0].reasoning).toEqual(config.visionReasoning);
+    expect(bodies[1].reasoning).toEqual(config.transferReasoning);
+    expect(bodies[0].messages.map((m: { role: string }) => m.role)).toEqual(['system', 'user']);
+    expect(JSON.stringify(bodies[0])).toContain('data:image/jpeg;base64,');
+    expect(JSON.stringify(bodies[1])).not.toContain('data:image/jpeg;base64,');
+    expect(bodies[1].messages[0].content).toContain(config.transferRules);
+    expect(bodies[1].messages[1].content).toContain(JSON.stringify(extraction));
+    expect(phases).toContain('extracting');
+    expect(phases).toContain('deriving');
+    expect(photo.bytes.every((byte) => byte === 0)).toBe(true);
+    expect(controller.getState()).toMatchObject({
+      phase: 'succeeded',
+      extractedItemIndexes: [0, 1, 2],
+      derivation: {
+        transfers: [{ amountCents: 350, buyplace: 'Rewe', receiptDate: '2026-07-31' }],
+      },
+    });
+    expect(controller.getState().review?.transfers[0]?.items).toEqual(
+      extraction.items.map(({ index, name, lineTotalCents }) => ({ index, name, lineTotalCents })),
+    );
+    controller.reset();
+    expect(controller.getState().review).toBeNull();
+  });
+
+  it('preserves readable partial results and locally computed sums without promoting them', async () => {
+    const complete = vi
+      .fn()
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          ...extraction,
+          status: 'error',
+          errorReason: 'Summe fehlt.',
+          receiptTotalCents: null,
+        }),
+      )
+      .mockResolvedValueOnce(
+        JSON.stringify({ ...derivation, status: 'error', errorReason: 'Teilantwort.' }),
+      );
+    const controller = createReceiptAnalysisController({ completionClient: { complete } });
+    await expect(controller.start(input(), new AbortController().signal)).rejects.toMatchObject({
+      code: 'model_error',
+      stage: 'derivation',
+    });
     expect(controller.getState()).toMatchObject({
       phase: 'error',
       derivation: null,
       review: {
         receiptDate: '2026-07-31',
-        buyplace: 'Rewe',
         receiptTotalCents: null,
-        transfers: [{ amountCents: 350 }],
+        transfers: [
+          {
+            amountCents: 350,
+            items: [
+              { index: 0, name: 'Brot', lineTotalCents: 250 },
+              { index: 1, name: 'Rabatt', lineTotalCents: -50 },
+              { index: 2, name: 'Apfel', lineTotalCents: 150 },
+            ],
+          },
+        ],
       },
     });
   });
-  it('retains typed suggestions rejected for arithmetic without accepting a mistaken model ok', async () => {
-    const wrong = JSON.parse(DERIVATION);
-    wrong.transfers[0].amountCents = 351;
-    const controller = createReceiptAnalysisController({
-      catalogClient: { load: vi.fn().mockResolvedValue(catalog()) },
-      completionClient: {
-        complete: vi
-          .fn()
-          .mockResolvedValueOnce(EXTRACTION)
-          .mockResolvedValueOnce(JSON.stringify(wrong)),
-      },
-    });
-    await expect(
-      controller.start(input(image()), new AbortController().signal),
-    ).rejects.toMatchObject({ code: 'invalid_response' });
-    expect(controller.getState()).toMatchObject({
-      phase: 'error',
-      derivation: null,
-      review: { receiptDate: '2026-07-31', buyplace: 'Markt', transfers: [{ amountCents: 351 }] },
-    });
-    controller.reset();
-    expect(controller.getState().review).toBeNull();
-  });
-  it('reports catalog rate limiting without retrying or sending the image', async () => {
-    const catalogClient = {
-      load: vi.fn().mockRejectedValue(new OpenRouterCatalogError('provider_error', 429)),
-    };
-    const completionClient = { complete: vi.fn() };
-    const controller = createReceiptAnalysisController({ catalogClient, completionClient });
-    const photo = image();
-    await expect(
-      controller.start(input(photo), new AbortController().signal),
-    ).rejects.toMatchObject({ code: 'rate_limited' });
-    expect(catalogClient.load).toHaveBeenCalledOnce();
-    expect(completionClient.complete).not.toHaveBeenCalled();
-    expect(photo.bytes.every((byte) => byte === 0)).toBe(true);
-  });
-  it('rechecks each role, sends the image only to stage one, and retains only validated derivation', async () => {
-    const catalogClient: OpenRouterModelCatalogClient = {
-      load: vi.fn().mockResolvedValue(catalog()),
-    };
-    const completionClient: OpenRouterChatCompletionClient = {
-      complete: vi.fn().mockResolvedValueOnce(EXTRACTION).mockResolvedValueOnce(DERIVATION),
-    };
-    const controller = createReceiptAnalysisController({ catalogClient, completionClient });
-    const receiptImage = image();
 
-    await controller.start(
-      input(receiptImage, {
-        ...CONFIGURATION,
-        transferRules: '- Lebensmittel kommen in die Kategorien [Einkauf], [Lebensmittel].',
-      }),
-      new AbortController().signal,
-    );
-
-    expect(catalogClient.load).toHaveBeenCalledTimes(2);
-    expect(catalogClient.load).toHaveBeenNthCalledWith(1, 'secret-key', expect.any(AbortSignal));
-    expect(catalogClient.load).toHaveBeenNthCalledWith(2, 'secret-key', expect.any(AbortSignal));
-    expect(completionClient.complete).toHaveBeenCalledTimes(2);
-    const firstRequest = vi.mocked(completionClient.complete).mock.calls[0]?.[0];
-    const secondRequest = vi.mocked(completionClient.complete).mock.calls[1]?.[0];
-    expect(firstRequest).toMatchObject({ model: 'shared-model' });
-    expect(JSON.stringify(firstRequest)).toContain('image/jpeg');
-    expect(JSON.stringify(firstRequest)).not.toContain('"storeName":"Markt"');
-    expect(secondRequest).toMatchObject({
-      model: 'shared-model',
-    });
-    expect(secondRequest).not.toHaveProperty('responseFormat');
-    expect(JSON.stringify(secondRequest)).toContain('BENUTZERDEFINIERTE GRUPPIERUNGSREGELN');
-    expect(JSON.stringify(secondRequest)).toContain(
-      '- Lebensmittel kommen in die Kategorien [Einkauf], [Lebensmittel].',
-    );
-    expect(JSON.stringify(secondRequest)).not.toContain('image/jpeg');
-    expect(JSON.stringify(secondRequest)).not.toContain('accountId');
-    expect(receiptImage.bytes.every((value) => value === 0)).toBe(true);
-    expect(controller.getState()).toMatchObject({
-      phase: 'succeeded',
-      errorCode: null,
-      derivation: { status: 'ok', receiptTotalCents: 350 },
-      extractedItemIndexes: [0, 1, 2],
-    });
-  });
-
-  it('passes opaque custom grouping rules to stage two without app-side interpretation', async () => {
-    const catalogClient: OpenRouterModelCatalogClient = {
-      load: vi.fn().mockResolvedValue(catalog()),
-    };
-    const completionClient: OpenRouterChatCompletionClient = {
-      complete: vi.fn().mockResolvedValueOnce(EXTRACTION).mockResolvedValueOnce(DERIVATION),
-    };
-    const controller = createReceiptAnalysisController({ catalogClient, completionClient });
-    const receiptImage = image();
-
-    const opaqueRules = 'Sort items however these free-form instructions describe.';
-    await controller.start(
-      input(receiptImage, {
-        ...CONFIGURATION,
-        transferRules: opaqueRules,
-      }),
-      new AbortController().signal,
-    );
-
-    expect(catalogClient.load).toHaveBeenCalledTimes(2);
-    expect(completionClient.complete).toHaveBeenCalledTimes(2);
-    const secondRequest = vi.mocked(completionClient.complete).mock.calls[1]?.[0];
-    expect(JSON.stringify(secondRequest)).toContain(opaqueRules);
-    expect(receiptImage.bytes.every((value) => value === 0)).toBe(true);
-    expect(controller.getState()).toMatchObject({
-      phase: 'succeeded',
-      errorCode: null,
-      derivation: { status: 'ok' },
-    });
-  });
-
-  it('stops before image transmission when the fresh catalog rejects the selected vision model', async () => {
-    const catalogClient: OpenRouterModelCatalogClient = {
-      load: vi.fn().mockResolvedValue(catalog({ visionModels: [] })),
-    };
-    const completionClient: OpenRouterChatCompletionClient = { complete: vi.fn() };
-    const controller = createReceiptAnalysisController({ catalogClient, completionClient });
-    const receiptImage = image();
-
-    await expect(
-      controller.start(input(receiptImage), new AbortController().signal),
-    ).rejects.toMatchObject({ code: 'model_unavailable', stage: 'extraction' });
-
-    expect(completionClient.complete).not.toHaveBeenCalled();
-    expect(receiptImage.bytes.every((value) => value === 0)).toBe(true);
-    expect(controller.getState()).toMatchObject({
-      phase: 'error',
-      stage: 'extraction',
-      errorCode: 'model_unavailable',
-      derivation: null,
-    });
-  });
-
-  it('surfaces a bounded model reason and stops when no readable items remain', async () => {
-    const catalogClient: OpenRouterModelCatalogClient = {
-      load: vi.fn().mockResolvedValue(catalog()),
-    };
-    const completionClient: OpenRouterChatCompletionClient = {
-      complete: vi.fn().mockResolvedValue(
+  it('retains valid incomplete groups in review after rejecting mistaken complete coverage', async () => {
+    const complete = vi
+      .fn()
+      .mockResolvedValueOnce(JSON.stringify(extraction))
+      .mockResolvedValueOnce(
         JSON.stringify({
-          status: 'error',
-          errorReason: 'Der Gesamtbetrag ist nicht eindeutig lesbar.',
-          storeName: null,
-          receiptDate: null,
-          currency: null,
-          receiptTotalCents: null,
-          items: [],
+          ...derivation,
+          transfers: [{ ...derivation.transfers[0], sourceItemIndexes: [0] }],
         }),
-      ),
-    };
-    const controller = createReceiptAnalysisController({ catalogClient, completionClient });
-
-    await expect(
-      controller.start(input(image()), new AbortController().signal),
-    ).rejects.toMatchObject({ code: 'model_error', stage: 'extraction' });
-
-    expect(catalogClient.load).toHaveBeenCalledOnce();
-    expect(completionClient.complete).toHaveBeenCalledOnce();
+      );
+    const controller = createReceiptAnalysisController({ completionClient: { complete } });
+    await expect(controller.start(input(), new AbortController().signal)).rejects.toMatchObject({
+      code: 'invalid_response',
+    });
     expect(controller.getState()).toMatchObject({
-      phase: 'error',
-      errorCode: 'model_error',
-      errorReason: 'Der Gesamtbetrag ist nicht eindeutig lesbar.',
       derivation: null,
+      review: { transfers: [{ amountCents: 250 }] },
     });
   });
 
-  it('rechecks stage-two eligibility after extraction and stops before sending extracted data', async () => {
-    const catalogClient: OpenRouterModelCatalogClient = {
-      load: vi
-        .fn()
-        .mockResolvedValueOnce(catalog())
-        .mockResolvedValueOnce(catalog({ transferModels: [] })),
-    };
-    const completionClient: OpenRouterChatCompletionClient = {
-      complete: vi.fn().mockResolvedValue(EXTRACTION),
-    };
-    const controller = createReceiptAnalysisController({ catalogClient, completionClient });
-
-    await expect(
-      controller.start(input(image()), new AbortController().signal),
-    ).rejects.toMatchObject({ code: 'model_unavailable', stage: 'derivation' });
-
-    expect(catalogClient.load).toHaveBeenCalledTimes(2);
-    expect(completionClient.complete).toHaveBeenCalledOnce();
-    expect(controller.getState()).toMatchObject({
-      phase: 'error',
-      stage: 'derivation',
-      errorCode: 'model_unavailable',
-      derivation: null,
+  it('does not fabricate review groups from unknown source references', async () => {
+    const complete = vi
+      .fn()
+      .mockResolvedValueOnce(JSON.stringify(extraction))
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          ...derivation,
+          transfers: [{ ...derivation.transfers[0], sourceItemIndexes: [999] }],
+        }),
+      );
+    const controller = createReceiptAnalysisController({ completionClient: { complete } });
+    await expect(controller.start(input(), new AbortController().signal)).rejects.toMatchObject({
+      code: 'invalid_response',
     });
+    expect(controller.getState().review?.transfers).toEqual([]);
   });
 
-  it.each<[OpenRouterChatCompletionErrorCode, string]>([
-    ['auth_error', 'auth_error'],
-    ['rate_limited', 'rate_limited'],
-    ['network_error', 'network_error'],
-    ['timeout', 'timeout'],
-    ['refusal', 'refusal'],
-    ['provider_error', 'provider_error'],
-    ['invalid_response', 'invalid_response'],
-    ['over_limit', 'output_limit'],
-  ])(
-    'normalizes completion failure %s without provider details',
-    async (providerCode, expectedCode) => {
-      const catalogClient: OpenRouterModelCatalogClient = {
-        load: vi.fn().mockResolvedValue(catalog()),
-      };
-      const completionClient: OpenRouterChatCompletionClient = {
-        complete: vi.fn().mockRejectedValue(new OpenRouterChatCompletionError(providerCode, 503)),
-      };
-      const controller = createReceiptAnalysisController({ catalogClient, completionClient });
-
-      await expect(
-        controller.start(input(image()), new AbortController().signal),
-      ).rejects.toMatchObject({ code: expectedCode, stage: 'extraction', reason: null });
-      expect(JSON.stringify(controller.getState())).not.toContain('secret-key');
-      expect(JSON.stringify(controller.getState())).not.toContain('503');
+  it.each([1, 2])(
+    'identifies unavailable model at stage %s without losing config or known review',
+    async (stage) => {
+      const complete = vi.fn();
+      if (stage === 2) complete.mockResolvedValueOnce(JSON.stringify(extraction));
+      complete.mockRejectedValueOnce(new OpenRouterChatCompletionError('model_unavailable', 404));
+      const controller = createReceiptAnalysisController({ completionClient: { complete } });
+      const request = input();
+      const before = JSON.stringify(request.configuration);
+      await expect(controller.start(request, new AbortController().signal)).rejects.toMatchObject({
+        code: 'model_unavailable',
+        stage: stage === 1 ? 'extraction' : 'derivation',
+      });
+      expect(complete).toHaveBeenCalledTimes(stage);
+      expect(JSON.stringify(request.configuration)).toBe(before);
+      if (stage === 2)
+        expect(controller.getState().review).toMatchObject({
+          receiptTotalCents: 350,
+          buyplace: 'Markt',
+        });
     },
   );
 
-  it('aborts stale work and prevents an older run from replacing a newer result', async () => {
-    let resolveFirstCatalog: (value: OpenRouterCompatibleModelCatalog) => void = () => {};
-    const firstCatalog = new Promise<OpenRouterCompatibleModelCatalog>((resolve) => {
-      resolveFirstCatalog = resolve;
+  it.each<OpenRouterChatCompletionErrorCode>([
+    'auth_error',
+    'rate_limited',
+    'network_error',
+    'timeout',
+    'refusal',
+    'provider_error',
+    'invalid_response',
+    'over_limit',
+  ])('normalizes %s without provider details or retries', async (code) => {
+    const complete = vi.fn().mockRejectedValue(new OpenRouterChatCompletionError(code, 503));
+    const controller = createReceiptAnalysisController({ completionClient: { complete } });
+    const request = input();
+    await expect(controller.start(request, new AbortController().signal)).rejects.toMatchObject({
+      code: code === 'over_limit' ? 'output_limit' : code,
+      stage: 'extraction',
+      reason: null,
     });
-    const catalogClient: OpenRouterModelCatalogClient = {
-      load: vi
-        .fn()
-        .mockReturnValueOnce(firstCatalog)
-        .mockResolvedValueOnce(catalog())
-        .mockResolvedValueOnce(catalog()),
-    };
-    const completionClient: OpenRouterChatCompletionClient = {
-      complete: vi.fn().mockResolvedValueOnce(EXTRACTION).mockResolvedValueOnce(DERIVATION),
-    };
-    const controller = createReceiptAnalysisController({ catalogClient, completionClient });
-    const firstImage = image(new Uint8Array([9, 8, 7]));
-    const first = controller.start(input(firstImage), new AbortController().signal);
-    const second = controller.start(
-      input(image(), {
-        ...CONFIGURATION,
-        transferRules: '- Lebensmittel kommen in die Kategorien [Einkauf], [Lebensmittel].',
-      }),
-      new AbortController().signal,
-    );
+    expect(complete).toHaveBeenCalledOnce();
+    expect(JSON.stringify(controller.getState())).not.toContain('secret-key');
+    expect(request.image.bytes.every((b) => b === 0)).toBe(true);
+  });
 
-    resolveFirstCatalog(catalog());
-    await expect(first).rejects.toMatchObject({ name: 'AbortError' });
-    await expect(second).resolves.toBeUndefined();
-    expect(firstImage.bytes.every((value) => value === 0)).toBe(true);
+  it('stops when extraction has no readable items and preserves the bounded reason', async () => {
+    const complete = vi
+      .fn()
+      .mockResolvedValue(
+        JSON.stringify({ ...extraction, status: 'error', errorReason: 'Nicht lesbar.', items: [] }),
+      );
+    const controller = createReceiptAnalysisController({ completionClient: { complete } });
+    await expect(controller.start(input(), new AbortController().signal)).rejects.toMatchObject({
+      code: 'model_error',
+      stage: 'extraction',
+    });
+    expect(complete).toHaveBeenCalledOnce();
+  });
+
+  it('prevents a late completion from replacing a newer run', async () => {
+    let release: (value: string) => void = () => {};
+    const pending = new Promise<string>((resolve) => {
+      release = resolve;
+    });
+    const complete = vi
+      .fn()
+      .mockReturnValueOnce(pending)
+      .mockResolvedValueOnce(JSON.stringify(extraction))
+      .mockResolvedValueOnce(JSON.stringify(derivation));
+    const controller = createReceiptAnalysisController({ completionClient: { complete } });
+    const firstInput = input();
+    const first = controller.start(firstInput, new AbortController().signal);
+    const rejected = expect(first).rejects.toMatchObject({ name: 'AbortError' });
+    await controller.start(input(), new AbortController().signal);
+    release(JSON.stringify(extraction));
+    await rejected;
+    expect(firstInput.image.bytes.every((b) => b === 0)).toBe(true);
     expect(controller.getState().phase).toBe('succeeded');
   });
 
-  it('reset aborts active work and clears a completed derivation', async () => {
-    const catalogClient: OpenRouterModelCatalogClient = {
-      load: vi.fn().mockResolvedValue(catalog()),
-    };
-    const completionClient: OpenRouterChatCompletionClient = {
-      complete: vi.fn().mockResolvedValueOnce(EXTRACTION).mockResolvedValueOnce(DERIVATION),
-    };
-    const controller = createReceiptAnalysisController({ catalogClient, completionClient });
-    await controller.start(
-      input(image(), {
-        ...CONFIGURATION,
-        transferRules: '- Lebensmittel kommen in die Kategorien [Einkauf], [Lebensmittel].',
-      }),
-      new AbortController().signal,
-    );
-
-    controller.reset();
-
-    expect(controller.getState()).toEqual({
-      phase: 'idle',
-      review: null,
-      stage: null,
-      errorCode: null,
-      errorReason: null,
-      derivation: null,
-      extractedItemIndexes: null,
-    });
-  });
+  it.each(['reset', 'dispose', 'caller'] as const)(
+    'abandons active requests after %s',
+    async (action) => {
+      let release: (value: string) => void = () => {};
+      const complete = vi.fn().mockImplementation(
+        () =>
+          new Promise<string>((resolve) => {
+            release = resolve;
+          }),
+      );
+      const controller = createReceiptAnalysisController({ completionClient: { complete } });
+      const outer = new AbortController();
+      const request = input();
+      const pending = controller.start(request, outer.signal);
+      const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+      if (action === 'caller') outer.abort();
+      else controller[action]();
+      release(JSON.stringify(extraction));
+      await rejected;
+      expect(complete).toHaveBeenCalledOnce();
+      expect(request.image.bytes.every((b) => b === 0)).toBe(true);
+      expect(controller.getState().derivation).toBeNull();
+    },
+  );
 });

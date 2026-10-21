@@ -206,25 +206,25 @@
     on:touchend={handleTouchEnd}
     on:touchcancel={clearSwipeStart}
   >
-    <p
-      class="transfers-route__status"
-      class:transfers-route__status--error={state.operation === 'error'}
-      data-testid="transfers-route-status"
-      aria-live="polite"
-      role={state.operation === 'error' ? 'alert' : undefined}
-    >
-      {#if state.operation === 'loading'}
-        {$_('transfers.loading')}
-      {:else if state.operation === 'error'}
-        {state.error?.cause
-          ? $_(presentOperationFailure(state.error.cause).messageKey)
-          : (state.error?.message ?? $_('transfers.errorDefault'))}
-      {:else if state.operation === 'empty'}
-        {$_('transfers.emptyStatus')}
-      {:else if state.operation === 'ready'}
-        {$_('transfers.countFound', { values: { count: state.transfers.length } })}
-      {/if}
-    </p>
+    {#if state.operation !== 'empty'}
+      <p
+        class="transfers-route__status"
+        class:transfers-route__status--error={state.operation === 'error'}
+        data-testid="transfers-route-status"
+        aria-live="polite"
+        role={state.operation === 'error' ? 'alert' : undefined}
+      >
+        {#if state.operation === 'loading'}
+          {$_('transfers.loading')}
+        {:else if state.operation === 'error'}
+          {state.error?.cause
+            ? $_(presentOperationFailure(state.error.cause).messageKey)
+            : (state.error?.message ?? $_('transfers.errorDefault'))}
+        {:else if state.operation === 'ready'}
+          {$_('transfers.countFound', { values: { count: state.transfers.length } })}
+        {/if}
+      </p>
+    {/if}
 
     <div
       class="transfers-route__drag-track"

@@ -65,7 +65,8 @@ describe('TransfersRoute', () => {
     });
 
     expect(body).toContain('data-testid="transfers-route-empty"');
-    expect(body).toContain('Für diesen Monat sind keine Transfers vorhanden.');
+    expect(body).not.toContain('data-testid="transfers-route-status"');
+    expect(body).not.toContain('Für diesen Monat sind keine Transfers vorhanden.');
     expect(body).toContain('Es gibt keine Transfers für diesen Monat.');
   });
 

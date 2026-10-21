@@ -44,7 +44,6 @@ describe('receipt prompts', () => {
         transfers: [
           {
             name: 'Brot',
-            amountCents: 300,
             categoryNames: ['Einkauf', 'Lebensmittel'],
             sourceItemIndexes: [0],
           },
@@ -94,7 +93,8 @@ describe('receipt prompts', () => {
     expect(messages[0]?.content).toContain(rules);
     expect(messages[1]?.content).toContain(JSON.stringify(extraction));
     expect(messages[1]?.content).not.toContain('Use my names literally');
-    expect(TRANSFER_DERIVATION_SYSTEM_PROMPT.version).toBe(7);
+    expect(TRANSFER_DERIVATION_SYSTEM_PROMPT.version).toBe(8);
+    expect(TRANSFER_DERIVATION_SYSTEM_PROMPT.text).not.toContain('amountCents');
     expect(TRANSFER_DERIVATION_SYSTEM_PROMPT.text.length).toBeLessThan(2300);
     expect(TRANSFER_DERIVATION_SYSTEM_PROMPT.text).toContain('Bon-Kontext');
     expect(DEFAULT_TRANSFER_DERIVATION_RULES.version).toBe(5);

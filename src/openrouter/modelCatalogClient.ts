@@ -60,6 +60,10 @@ export const createOpenRouterModelCatalogClient = (
       try {
         return await withRequestDeadline(
           async (requestSignal) => {
+            const pending = new AbortController();
+            const abortPending = () => pending.abort(requestSignal.reason);
+            requestSignal.addEventListener('abort', abortPending, { once: true });
+            if (requestSignal.aborted) abortPending();
             const loadJson = async (url: string): Promise<unknown> => {
               let response: Response;
               try {
@@ -72,11 +76,11 @@ export const createOpenRouterModelCatalogClient = (
                   cache: 'no-store',
                   credentials: 'omit',
                   redirect: 'error',
-                  signal: requestSignal,
+                  signal: pending.signal,
                 });
               } catch (error) {
                 throw new OpenRouterCatalogError(
-                  isAbortError(error, requestSignal) ? 'aborted' : 'network_error',
+                  isAbortError(error, pending.signal) ? 'aborted' : 'network_error',
                 );
               }
 
@@ -97,16 +101,23 @@ export const createOpenRouterModelCatalogClient = (
               return payload;
             };
 
-            const payload = await loadJson(OPENROUTER_USER_MODELS_URL);
-            const benchmarks = await loadJson(OPENROUTER_INTELLIGENCE_BENCHMARKS_URL);
-
             try {
-              return parseOpenRouterCompatibleModelCatalog(payload, benchmarks);
-            } catch (error) {
-              if (error instanceof OpenRouterCatalogResponseError) {
-                throw new OpenRouterCatalogError('invalid_response', 200);
+              const [payload, benchmarks] = await Promise.all([
+                loadJson(OPENROUTER_USER_MODELS_URL),
+                loadJson(OPENROUTER_INTELLIGENCE_BENCHMARKS_URL),
+              ]);
+
+              try {
+                return parseOpenRouterCompatibleModelCatalog(payload, benchmarks);
+              } catch (error) {
+                if (error instanceof OpenRouterCatalogResponseError) {
+                  throw new OpenRouterCatalogError('invalid_response', 200);
+                }
+                throw error;
               }
-              throw error;
+            } finally {
+              requestSignal.removeEventListener('abort', abortPending);
+              pending.abort();
             }
           },
           options.timeoutMs ?? 30_000,

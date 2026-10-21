@@ -1,5 +1,10 @@
 // Defines stored and currently validated OpenRouter receipt configuration contracts.
-import type { OpenRouterCompatibleModelCatalog } from '@openrouter';
+import {
+  resolveOpenRouterReasoning,
+  type OpenRouterCompatibleModelCatalog,
+  type OpenRouterReasoningCapabilities,
+  type OpenRouterReasoningConfiguration,
+} from '@openrouter';
 
 import {
   DEFAULT_TRANSFER_DERIVATION_RULES,
@@ -7,7 +12,14 @@ import {
   TRANSFER_DERIVATION_SYSTEM_PROMPT,
 } from './prompts';
 
+export interface StoredModelReasoning {
+  readonly modelId: string;
+  readonly capabilities: OpenRouterReasoningCapabilities;
+}
+
 export interface StoredOpenRouterReceiptSettings {
+  readonly visionReasoning?: StoredModelReasoning;
+  readonly transferReasoning?: StoredModelReasoning;
   readonly apiKey: string;
   readonly visionModelId: string | null;
   readonly transferModelId: string | null;
@@ -15,6 +27,8 @@ export interface StoredOpenRouterReceiptSettings {
 }
 
 export interface ReadyOpenRouterReceiptConfiguration {
+  readonly visionReasoning?: OpenRouterReasoningConfiguration | undefined;
+  readonly transferReasoning?: OpenRouterReasoningConfiguration | undefined;
   readonly apiKey: string;
   readonly visionModelId: string;
   readonly transferModelId: string;
@@ -43,15 +57,25 @@ const includesModel = (
 export const reconcileOpenRouterModelSelections = (
   settings: StoredOpenRouterReceiptSettings,
   catalog: OpenRouterCompatibleModelCatalog,
-): StoredOpenRouterReceiptSettings => ({
-  ...settings,
-  visionModelId: includesModel(catalog.visionModels, settings.visionModelId)
-    ? settings.visionModelId
-    : null,
-  transferModelId: includesModel(catalog.transferModels, settings.transferModelId)
-    ? settings.transferModelId
-    : null,
-});
+): StoredOpenRouterReceiptSettings => {
+  const vision = catalog.visionModels.find((model) => model.id === settings.visionModelId);
+  const transfer = catalog.transferModels.find((model) => model.id === settings.transferModelId);
+  // Always replace both snapshots, including when the new key/catalog has no capabilities.
+  const base = { ...settings };
+  delete base.visionReasoning;
+  delete base.transferReasoning;
+  return {
+    ...base,
+    visionModelId: vision?.id ?? null,
+    transferModelId: transfer?.id ?? null,
+    ...(vision?.reasoning
+      ? { visionReasoning: { modelId: vision.id, capabilities: vision.reasoning } }
+      : {}),
+    ...(transfer?.reasoning
+      ? { transferReasoning: { modelId: transfer.id, capabilities: transfer.reasoning } }
+      : {}),
+  };
+};
 
 export const toStoredReadyOpenRouterReceiptConfiguration = (
   settings: StoredOpenRouterReceiptSettings,
@@ -69,6 +93,14 @@ export const toStoredReadyOpenRouterReceiptConfiguration = (
   }
 
   return {
+    visionReasoning:
+      settings.visionReasoning?.modelId === settings.visionModelId
+        ? resolveOpenRouterReasoning(settings.visionReasoning.capabilities, 'lowest')
+        : undefined,
+    transferReasoning:
+      settings.transferReasoning?.modelId === settings.transferModelId
+        ? resolveOpenRouterReasoning(settings.transferReasoning.capabilities, 'lowest')
+        : undefined,
     apiKey: settings.apiKey,
     visionModelId: settings.visionModelId,
     transferModelId: settings.transferModelId,
@@ -89,5 +121,7 @@ export const toReadyOpenRouterReceiptConfiguration = (
     return null;
   }
 
-  return toStoredReadyOpenRouterReceiptConfiguration(settings);
+  return toStoredReadyOpenRouterReceiptConfiguration(
+    reconcileOpenRouterModelSelections(settings, catalog),
+  );
 };

@@ -527,7 +527,7 @@ describe('AddRoute component', () => {
     }
   });
 
-  it('renders a localized analysis failure plus the bounded model reason for a fresh-photo restart', () => {
+  it('renders a localized analysis failure plus the bounded model reason with close and reopen', () => {
     const { body } = renderAddRoute({
       receiptCaptureController: createMockReceiptCaptureController({
         phase: 'error',
@@ -558,7 +558,8 @@ describe('AddRoute component', () => {
     expect(body).toContain('Der Gesamtbetrag ist unlesbar.');
     expect(body).not.toContain('receipt-analysis-retry');
     expect(body).not.toMatch(/data-testid="receipt-photo-button"[^>]*disabled/);
-    expect(body).toContain('Neuen Kassenbon fotografieren');
+    expect(body).not.toContain('data-testid="receipt-photo-button"');
+    expect(body).toContain('data-testid="add-transfer-close"');
   });
 
   it('renders actionable localized capture errors without source details', () => {
@@ -596,7 +597,8 @@ describe('AddRoute component', () => {
     expect(body).toContain('data-testid="add-transfer-close"');
     expect(body).toMatch(/data-testid="receipt-step-creation"[^>]*data-state="error"/);
     expect(body).not.toContain('data-testid="add-transfer-from-account"');
-    expect(body).toContain('Neuen Kassenbon fotografieren');
+    expect(body).not.toContain('data-testid="receipt-photo-button"');
+    expect(body).toContain('data-testid="add-transfer-close"');
   });
 
   it.each([
@@ -608,26 +610,30 @@ describe('AddRoute component', () => {
       code: 'primary_spendings_unavailable' as const,
       message: 'Das primäre Ausgabenkonto ist nicht eindeutig verfügbar.',
     },
-  ])('renders the account-topology failure $code as a fresh-photo restart', ({ code, message }) => {
-    const { body } = renderAddRoute({
-      receiptCaptureController: createMockReceiptCaptureController(),
-      receiptPreparationController: createMockReceiptPreparationController({
-        phase: 'error',
-        steps: [
-          { id: 'extraction', status: 'complete' },
-          { id: 'derivation', status: 'complete' },
-          { id: 'creation', status: 'error' },
-        ],
-        sourceAccountId: null,
-        readyForCommit: null,
-        error: { code, detail: null },
-      }),
-    });
+  ])(
+    'renders the account-topology failure $code without an in-form photo restart',
+    ({ code, message }) => {
+      const { body } = renderAddRoute({
+        receiptCaptureController: createMockReceiptCaptureController(),
+        receiptPreparationController: createMockReceiptPreparationController({
+          phase: 'error',
+          steps: [
+            { id: 'extraction', status: 'complete' },
+            { id: 'derivation', status: 'complete' },
+            { id: 'creation', status: 'error' },
+          ],
+          sourceAccountId: null,
+          readyForCommit: null,
+          error: { code, detail: null },
+        }),
+      });
 
-    expect(body).toContain(message);
-    expect(body).not.toContain('data-testid="add-transfer-from-account"');
-    expect(body).toContain('Neuen Kassenbon fotografieren');
-  });
+      expect(body).toContain(message);
+      expect(body).not.toContain('data-testid="add-transfer-from-account"');
+      expect(body).not.toContain('data-testid="receipt-photo-button"');
+      expect(body).toContain('data-testid="add-transfer-close"');
+    },
+  );
 
   it('renders the date field with app-input class', () => {
     const { body } = renderAddRoute();

@@ -37,6 +37,50 @@ const benchmarkResponse = () =>
   });
 
 describe('createOpenRouterModelCatalogClient', () => {
+  it('starts both GETs before either response resolves', async () => {
+    const pending = new Map<string, (response: Response) => void>();
+    const fetchMock = vi.fn<typeof fetch>(
+      (url) =>
+        new Promise((resolve) => {
+          pending.set(String(url), resolve);
+        }),
+    );
+    const request = createOpenRouterModelCatalogClient({ fetch: fetchMock }).load('secret');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    pending.get(OPENROUTER_INTELLIGENCE_BENCHMARKS_URL)!(benchmarkResponse());
+    pending.get(OPENROUTER_USER_MODELS_URL)!(catalogResponse());
+    await expect(request).resolves.toMatchObject({
+      transferModels: [{ id: 'provider/model:free' }],
+    });
+  });
+
+  it('aborts both pending requests with the caller and never retries', async () => {
+    const fetchMock = vi.fn<typeof fetch>(() => new Promise(() => {}));
+    const controller = new AbortController();
+    const request = createOpenRouterModelCatalogClient({ fetch: fetchMock }).load(
+      'secret',
+      controller.signal,
+    );
+    const rejected = expect(request).rejects.toMatchObject({ code: 'aborted' });
+    controller.abort();
+    await rejected;
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    for (const [, init] of fetchMock.mock.calls) expect(init?.signal?.aborted).toBe(true);
+  });
+
+  it('cancels the other pending GET when one request fails', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (url) =>
+      url === OPENROUTER_USER_MODELS_URL
+        ? new Response('unfiltered provider data', { status: 503 })
+        : new Promise(() => {}),
+    );
+    await expect(
+      createOpenRouterModelCatalogClient({ fetch: fetchMock }).load('secret'),
+    ).rejects.toMatchObject({ code: 'provider_error', status: 503 });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1]?.[1]?.signal?.aborted).toBe(true);
+  });
+
   it('bounds stalled response bodies and aborts the fetch signal without retry', async () => {
     vi.useFakeTimers();
     try {
@@ -50,7 +94,7 @@ describe('createOpenRouterModelCatalogClient', () => {
       await vi.advanceTimersByTimeAsync(100);
       await assertion;
       expect(fetchMock.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
-      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(fetchMock).toHaveBeenCalledTimes(2);
     } finally {
       vi.useRealTimers();
     }

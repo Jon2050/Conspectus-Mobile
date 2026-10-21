@@ -79,33 +79,101 @@ for (const failure of ['missing_destination', 'missing_category', 'ambiguous_cat
   });
 }
 
-for (const limitedStage of [1, 2]) {
-  test(`explains catalog rate limiting at stage ${limitedStage} without automatic retry`, async ({
+for (const status of [404, 429])
+  for (const limitedStage of [1, 2]) {
+    test(`explains completion HTTP ${status} at stage ${limitedStage} without automatic retry`, async ({
+      page,
+    }) => {
+      await installReadyReceiptConfiguration(page);
+      const requests = await installReceiptAnalysisRoutes(page, [EXTRACTION, DERIVATION]);
+      let completionCalls = 0;
+      await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
+        if (route.request().method() === 'OPTIONS') {
+          await route.fulfill({
+            status: 204,
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+              'Access-Control-Allow-Headers': 'authorization,content-type',
+              'Access-Control-Allow-Methods': 'POST,OPTIONS',
+            },
+          });
+          return;
+        }
+        completionCalls++;
+        await route.fulfill({
+          status: completionCalls === limitedStage ? status : 200,
+          headers: { 'Access-Control-Allow-Origin': '*' },
+          contentType: 'application/json',
+          body: JSON.stringify(
+            completionCalls === limitedStage
+              ? { error: { code: status } }
+              : {
+                  choices: [
+                    { finish_reason: 'stop', message: { content: JSON.stringify(EXTRACTION) } },
+                  ],
+                },
+          ),
+        });
+      });
+      await installReadyAddTransferTestDb(page, READY_RECEIPT_DB);
+      await page.goto(appPath('#/add'));
+      await page
+        .getByTestId('receipt-image-input')
+        .setInputFiles({ name: 'receipt.png', mimeType: 'image/png', buffer: RECEIPT_IMAGE });
+      await expect(page.getByTestId('add-transfer-form-error')).toContainText(
+        status === 429
+          ? 'rate limiting'
+          : limitedStage === 1
+            ? 'another vision model'
+            : 'another text model',
+      );
+      await expect(page.getByTestId('receipt-activity')).toHaveCount(0);
+      await expect(page.getByTestId('receipt-photo-button')).toHaveCount(0);
+      await page.waitForTimeout(350);
+      expect(completionCalls).toBe(limitedStage);
+      expect(requests.catalogRequests).toHaveLength(0);
+      expect(requests.completionRequests).toHaveLength(0);
+      expect(await getGraphUploadCallCount(page)).toBe(0);
+      const saved = await page.evaluate(() =>
+        JSON.parse(localStorage.getItem('conspectus.openRouterReceiptSettings')!),
+      );
+      expect(saved.settingsByAccountId['mock-home-account'].visionModelId).toBe(MODEL.id);
+      expect(saved.settingsByAccountId['mock-home-account'].transferModelId).toBe(MODEL.id);
+      if (limitedStage === 2) await expect(page.getByTestId('receipt-review')).toBeVisible();
+    });
+  }
+
+for (const legacy of [false, true]) {
+  test(`analyzes after reload without Settings or any metadata GET, legacy=${legacy}`, async ({
     page,
   }) => {
     await installReadyReceiptConfiguration(page);
     const requests = await installReceiptAnalysisRoutes(page, [EXTRACTION, DERIVATION]);
-    let catalogCalls = 0;
-    await page.route('https://openrouter.ai/api/v1/models/user', async (route) => {
-      catalogCalls++;
-      await route.fulfill({
-        status: catalogCalls === limitedStage ? 429 : 200,
-        headers: { 'Access-Control-Allow-Origin': '*' },
-        contentType: 'application/json',
-        body: JSON.stringify({ data: [MODEL] }),
-      });
-    });
     await installReadyAddTransferTestDb(page, READY_RECEIPT_DB);
     await page.goto(appPath('#/add'));
+    if (legacy) {
+      await page.evaluate(() => {
+        const key = 'conspectus.openRouterReceiptSettings';
+        const stored = JSON.parse(localStorage.getItem(key)!);
+        stored.version = 1;
+        delete stored.settingsByAccountId['mock-home-account'].visionReasoning;
+        delete stored.settingsByAccountId['mock-home-account'].transferReasoning;
+        localStorage.setItem(key, JSON.stringify(stored));
+      });
+    }
+    await page.reload();
     await page
       .getByTestId('receipt-image-input')
       .setInputFiles({ name: 'receipt.png', mimeType: 'image/png', buffer: RECEIPT_IMAGE });
-    await expect(page.getByTestId('add-transfer-form-error')).toContainText('rate limiting');
-    await expect(page.getByTestId('receipt-activity')).toHaveCount(0);
-    await expect(page.getByTestId('receipt-photo-button')).toBeEnabled();
-    await page.waitForTimeout(350);
-    expect(catalogCalls).toBe(limitedStage);
-    expect(requests.completionRequests).toHaveLength(limitedStage - 1);
+    await expect(page.getByTestId('receipt-review')).toBeVisible();
+    expect(requests.catalogRequests).toHaveLength(0);
+    expect(requests.completionRequests).toHaveLength(2);
+    for (const request of requests.completionRequests) {
+      expect(request.postDataJSON().reasoning).toEqual(
+        legacy ? undefined : { enabled: true, effort: 'low' },
+      );
+    }
+    expect(await getLocalTransferWriteCallCount(page)).toBe(0);
     expect(await getGraphUploadCallCount(page)).toBe(0);
   });
 }
@@ -174,7 +242,6 @@ const DERIVATION = {
   transfers: [
     {
       name: 'Brot',
-      amountCents: 350,
       categoryNames: ['Einkauf', 'Lebensmittel'],
       sourceItemIndexes: [0],
     },
@@ -196,13 +263,11 @@ const MULTI_DERIVATION = {
   transfers: [
     {
       name: 'Brot',
-      amountCents: 300,
       categoryNames: ['Einkauf', 'Lebensmittel'],
       sourceItemIndexes: [0],
     },
     {
       name: 'Reiniger',
-      amountCents: 200,
       categoryNames: ['Einkauf', 'Haushalt, Verbrauchsgüter, Reinigung'],
       sourceItemIndexes: [1],
     },
@@ -211,16 +276,25 @@ const MULTI_DERIVATION = {
 
 const installReadyReceiptConfiguration = async (page: Page): Promise<void> => {
   await page.addInitScript(() => {
+    if (window.localStorage.getItem('conspectus.openRouterReceiptSettings')) return;
     window.localStorage.setItem(
       'conspectus.openRouterReceiptSettings',
       JSON.stringify({
-        version: 1,
+        version: 2,
         settingsByAccountId: {
           'mock-home-account': {
             apiKey: 'sk-or-e2e-secret',
             visionModelId: 'provider/shared:free',
             transferModelId: 'provider/shared:free',
             transferRulesOverride: null,
+            visionReasoning: {
+              modelId: 'provider/shared:free',
+              capabilities: { mandatory: false, supportedEfforts: ['high', 'low', 'none'] },
+            },
+            transferReasoning: {
+              modelId: 'provider/shared:free',
+              capabilities: { mandatory: false, supportedEfforts: ['high', 'low', 'none'] },
+            },
           },
         },
       }),
@@ -237,27 +311,30 @@ const installReceiptAnalysisRoutes = async (
   const catalogRequests: Request[] = [];
   const completionRequests: Request[] = [];
 
-  await page.route('https://openrouter.ai/api/v1/models/user', async (route) => {
-    const request = route.request();
-    if (request.method() === 'OPTIONS') {
+  await page.route(
+    /https:\/\/openrouter\.ai\/api\/v1\/(?:models\/user|benchmarks\?.*)$/,
+    async (route) => {
+      const request = route.request();
+      if (request.method() === 'OPTIONS') {
+        await route.fulfill({
+          status: 204,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'authorization,content-type',
+            'Access-Control-Allow-Methods': 'GET,OPTIONS',
+          },
+        });
+        return;
+      }
+      catalogRequests.push(request);
       await route.fulfill({
-        status: 204,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'authorization,content-type',
-          'Access-Control-Allow-Methods': 'GET,OPTIONS',
-        },
+        status: 200,
+        contentType: 'application/json',
+        headers: { 'Access-Control-Allow-Origin': '*' },
+        body: JSON.stringify({ data: [MODEL] }),
       });
-      return;
-    }
-    catalogRequests.push(request);
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      headers: { 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify({ data: [MODEL] }),
-    });
-  });
+    },
+  );
 
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
     const request = route.request();
@@ -437,7 +514,7 @@ test('runs both OpenRouter stages and saves only after explicit review', async (
   expect(summarySize.scrollWidth).toBeLessThanOrEqual(summarySize.width);
   await page.screenshot({ path: `output/ap4/receipt-summary-${test.info().project.name}.png` });
 
-  expect(requests.catalogRequests).toHaveLength(2);
+  expect(requests.catalogRequests).toHaveLength(0);
   expect(requests.completionRequests).toHaveLength(2);
   const stageOneRequest = requests.completionRequests[0];
   const stageTwoRequest = requests.completionRequests[1];
@@ -465,6 +542,89 @@ test('runs both OpenRouter stages and saves only after explicit review', async (
   await expect(page.getByTestId('receipt-commit-success')).toHaveCount(0);
   await expect(page.getByTestId('receipt-photo-button')).toBeEnabled();
   await expect(page.getByTestId('add-transfer-date')).toBeVisible();
+});
+
+test('regroups named items with dynamic transfer buttons, recalculates amounts and removes only empty groups', async ({
+  page,
+}) => {
+  await installReadyReceiptConfiguration(page);
+  const extraction = {
+    ...EXTRACTION,
+    receiptTotalCents: 650,
+    items: [
+      { index: 0, name: 'Brot', quantityText: '2 Stk x 1,50', lineTotalCents: 300, kind: 'item' },
+      { index: 1, name: 'Pfand', quantityText: null, lineTotalCents: 25, kind: 'deposit' },
+      { index: 2, name: 'Rabatt', quantityText: null, lineTotalCents: -50, kind: 'discount' },
+      { index: 3, name: 'Apfel', quantityText: null, lineTotalCents: 150, kind: 'item' },
+      { index: 4, name: 'Pfand', quantityText: null, lineTotalCents: 25, kind: 'deposit' },
+      { index: 5, name: 'Reiniger', quantityText: null, lineTotalCents: 200, kind: 'item' },
+    ],
+  };
+  const derivation = {
+    ...MULTI_DERIVATION,
+    transfers: [
+      { ...MULTI_DERIVATION.transfers[0], sourceItemIndexes: [0, 1, 2, 3, 4] },
+      MULTI_DERIVATION.transfers[1],
+    ],
+  };
+  derivation.transfers[1] = { ...derivation.transfers[1]!, sourceItemIndexes: [5] };
+  await installReceiptAnalysisRoutes(page, [extraction, derivation]);
+  await installReadyAddTransferTestDb(page, READY_RECEIPT_DB);
+  await page.goto(appPath('#/add'));
+  await page
+    .getByTestId('receipt-image-input')
+    .setInputFiles({ name: 'receipt.png', mimeType: 'image/png', buffer: RECEIPT_IMAGE });
+  await expect(page.getByTestId('receipt-review')).toBeVisible();
+  await expect(page.getByTestId('receipt-photo-button')).toHaveCount(0);
+  const list = page.getByTestId('receipt-review-items-0');
+  await expect(list).not.toHaveAttribute('open', '');
+  await list.locator('summary').click();
+  await expect(list.locator('li')).toHaveCount(5);
+  await expect(
+    list.getByTestId('receipt-review-item-0').locator('.receipt-review__item-name'),
+  ).toHaveText('Brot');
+  await expect(list).not.toContainText('2 Stk');
+  await expect(list).not.toContainText('3,00');
+  await expect(page.getByTestId('receipt-review-remove-0')).toBeDisabled();
+  await page.getByTestId('receipt-review-add').click();
+  for (let item = 0; item < 5; item++) {
+    await expect(page.getByTestId(`receipt-review-move-${item}-1`)).toHaveText('2');
+    await expect(page.getByTestId(`receipt-review-move-${item}-2`)).toHaveText('3');
+    await expect(page.getByTestId(`receipt-review-move-${item}-0`)).toHaveCount(0);
+  }
+  await page.getByTestId('receipt-review-move-0-2').click();
+  await expect(page.getByTestId('receipt-review-amount-0')).toHaveValue('1,50€');
+  await expect(page.getByTestId('receipt-review-amount-2')).toHaveValue('3,00€');
+  await expect(list.locator('li')).toHaveCount(4);
+  for (const item of [1, 2, 3, 4]) await page.getByTestId(`receipt-review-move-${item}-2`).click();
+  await expect(page.getByTestId('receipt-review-amount-0')).toHaveValue('0,00€');
+  await expect(page.getByTestId('receipt-review-amount-2')).toHaveValue('4,50€');
+  await page.getByTestId('receipt-review-remove-0').click();
+  await expect(page.getByTestId('receipt-review-transfer-0')).toHaveCount(0);
+  await page.getByTestId('receipt-review-items-2').locator('summary').click();
+  await expect(page.getByTestId('receipt-review-move-0-1')).toHaveText('1');
+  await expect(page.getByTestId('receipt-review-move-0-0')).toHaveCount(0);
+  await page.getByTestId('receipt-review-add').click();
+  await expect(page.getByTestId('receipt-review-move-0-3')).toHaveText('3');
+  await page.getByTestId('receipt-review-remove-3').click();
+  await expect(page.getByTestId('receipt-review-move-0-3')).toHaveCount(0);
+  await page.getByTestId('receipt-review-name-2').fill('Neu zugeordnet');
+  await page.getByTestId('receipt-review-category-2-0').selectOption('Einkauf');
+  await page.getByTestId('add-transfer-from-account').selectOption('11');
+  const width = await page
+    .getByTestId('receipt-review')
+    .evaluate((node) => ({ width: node.clientWidth, scroll: node.scrollWidth }));
+  expect(width.scroll).toBeLessThanOrEqual(width.width);
+  await page.screenshot({
+    path: `output/receipt-review/regroup-${test.info().project.name}.png`,
+    fullPage: true,
+  });
+  expect(await getLocalTransferWriteCallCount(page)).toBe(0);
+  expect(await getGraphUploadCallCount(page)).toBe(0);
+  await page.getByTestId('receipt-review-save').click();
+  await expect(page.getByTestId('receipt-commit-success')).toContainText('2 transfers created');
+  expect(await getLocalTransferWriteCallCount(page)).toBe(1);
+  expect(await getGraphUploadCallCount(page)).toBe(1);
 });
 
 test('edits shared fields and grouped transfers and saves the reviewed batch once', async ({
@@ -702,7 +862,7 @@ test('cancels an active run on route abandonment and never restores its source o
   expect(await getGraphUploadCallCount(page)).toBe(0);
 });
 
-test('ends a model-declared failure and starts again only after a fresh file selection', async ({
+test('starts again after a model-declared failure by closing and reopening Add', async ({
   page,
 }) => {
   await installReadyReceiptConfiguration(page);
@@ -745,16 +905,16 @@ test('ends a model-declared failure and starts again only after a fresh file sel
   expect(requests.completionRequests).toHaveLength(1);
   await page.waitForTimeout(300);
   expect(requests.completionRequests).toHaveLength(1);
-  await expect(page.getByTestId('receipt-photo-button')).toBeEnabled();
-  await expect(page.getByTestId('receipt-photo-button')).toHaveAccessibleName(
-    'Photograph a new receipt',
-  );
+  await expect(page.getByTestId('receipt-photo-button')).toHaveCount(0);
   await expect(page.getByTestId('add-transfer-from-account')).toBeVisible();
   await expect(page.getByTestId('receipt-review-date')).toHaveValue('');
   await expect(page.getByTestId('receipt-step-extraction')).toHaveAttribute('data-state', 'error');
   await expect(page.getByTestId('receipt-activity')).toHaveCount(0);
   await expect(page.getByTestId('receipt-analysis-retry')).toHaveCount(0);
 
+  await page.getByTestId('add-transfer-close').click();
+  await page.locator('a[href="#/add"]').click();
+  await expect(page.getByTestId('receipt-photo-button')).toBeEnabled();
   await input.setInputFiles({ name: 'second.png', mimeType: 'image/png', buffer: RECEIPT_IMAGE });
   await expect(page.getByTestId('add-transfer-from-account')).toBeEnabled();
   await page.getByTestId('add-transfer-from-account').selectOption('11');
