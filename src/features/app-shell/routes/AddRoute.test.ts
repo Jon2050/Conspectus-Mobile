@@ -179,16 +179,17 @@ describe('AddRoute component', () => {
     expect(body).toContain('<form');
   });
 
-  it('renders one accessible native environment-camera input without a custom camera flow', () => {
+  it('renders one accessible native image picker for camera and existing photos', () => {
     const { body } = renderAddRoute({
       receiptCaptureController: createMockReceiptCaptureController(),
     });
 
     expect(body).toContain('data-testid="receipt-photo-button"');
-    expect(body).toContain('Kassenbon fotografieren');
+    expect(body).toContain('Foto aufnehmen oder hochladen');
     expect(body).toMatch(
-      /data-testid="receipt-image-input"[^>]*type="file"[^>]*accept="image\/\*"[^>]*capture="environment"/,
+      /data-testid="receipt-image-input"[^>]*type="file"[^>]*accept="image\/\*"/,
     );
+    expect(body).not.toMatch(/data-testid="receipt-image-input"[^>]*\bcapture=/);
     expect(body).not.toContain('multiple');
     expect(body).not.toContain('getUserMedia');
     expect(body).not.toContain('receipt-preview');

@@ -198,9 +198,11 @@ body {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.app-nav__item:hover {
-  color: var(--text-primary);
-  background: color-mix(in srgb, var(--accent-soft) 40%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .app-nav__item:hover {
+    color: var(--text-primary);
+    background: color-mix(in srgb, var(--accent-soft) 40%, transparent);
+  }
 }
 
 .app-nav__item.is-active {

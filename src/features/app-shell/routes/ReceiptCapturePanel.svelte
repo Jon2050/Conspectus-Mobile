@@ -57,18 +57,12 @@
       {$_('addTransfer.receipt.semanticRisk')}
     </p>
   </details>
-  {#if !receiptWorkflowIsActive}
-    <p class="add-transfer-form__receipt-hint" data-testid="receipt-duplicate-warning">
-      {$_('addTransfer.receipt.duplicateWarning')}
-    </p>
-  {/if}
   <input
     bind:this={receiptFileInputElement}
     id="receipt-image-capture"
     data-testid="receipt-image-input"
     type="file"
     accept="image/*"
-    capture="environment"
     hidden
     disabled={receiptFileSelectionIsDisabled ||
       (receiptWorkflowIsActive &&
