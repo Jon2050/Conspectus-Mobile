@@ -72,9 +72,9 @@
     "close": "Close",
     "receipt": {
       "heading": "Capture receipt",
-      "description": "Take a photo using your device's camera picker.",
+      "description": "Take a receipt photo or select an existing photo on your device.",
       "semanticRisk": "AI can misread fields or classify items incorrectly. Review the suggested data before saving.",
-      "action": "Photograph receipt",
+      "action": "Take or upload receipt photo",
       "integrationPending": "Receipt processing is currently unavailable.",
       "normalizing": "Preparing the photo securely...",
       "stageOne": "Read photo",
@@ -166,7 +166,6 @@
           "remote_commit_recovery_failed": "The transfers are saved to OneDrive, but the verified local refresh failed. Do not save them again."
         }
       },
-      "duplicateWarning": "Before taking another photo, check whether this receipt has already been booked. Repeated photos can create duplicates.",
       "correction": "Check the date, merchant, amounts and categories. To correct a booking, close the mobile app, edit the database in Conspectus Desktop, then reopen and refresh the mobile app. Do not use both apps on this database at the same time.",
       "imageGuidance": "Use a sharp photo of the entire receipt with a readable date and total. For HEIC decoding problems, select a JPEG instead. Very long receipts and high-resolution photos may be unreadable or exceed device memory.",
       "review": {

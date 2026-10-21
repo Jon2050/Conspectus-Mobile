@@ -72,9 +72,9 @@
     "close": "Schließen",
     "receipt": {
       "heading": "Kassenbon erfassen",
-      "description": "Nimm ein Foto mit der Kameraauswahl deines Geräts auf.",
+      "description": "Fotografiere einen Kassenbon oder wähle ein vorhandenes Foto auf deinem Gerät aus.",
       "semanticRisk": "Die KI kann Felder falsch lesen oder Artikel falsch zuordnen. Prüfe die vorgeschlagenen Daten vor dem Speichern.",
-      "action": "Kassenbon fotografieren",
+      "action": "Foto aufnehmen oder hochladen",
       "integrationPending": "Die Belegverarbeitung ist derzeit nicht verfügbar.",
       "normalizing": "Foto wird sicher vorbereitet...",
       "stageOne": "Foto auslesen",
@@ -166,9 +166,8 @@
           "remote_commit_recovery_failed": "Die Transfers sind in OneDrive gespeichert, aber die geprüfte lokale Aktualisierung ist fehlgeschlagen. Speichere sie nicht erneut."
         }
       },
-      "duplicateWarning": "",
       "correction": "Prüfe Datum, Händler, Beträge und Kategorien. Zur Korrektur schließe die Mobile-App, bearbeite die Datenbank in Conspectus Desktop und öffne und aktualisiere danach die Mobile-App. Nutze beide Apps nicht gleichzeitig mit dieser Datenbank.",
-      "imageGuidance": "Fotografiere den gesamten Beleg scharf mit lesbarem Datum und Gesamtbetrag. Bei HEIC-Leseproblemen wähle stattdessen ein JPEG.",
+      "imageGuidance": "Fotografiere den gesamten Beleg scharf mit lesbarem Datum und Gesamtbetrag.",
       "review": {
         "items": "Zugeordnete Artikel ({count})",
         "noItems": "Keine Artikel zugeordnet.",

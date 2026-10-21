@@ -157,9 +157,10 @@ diagnostics. Browser storage is not equivalent to a server-held secret; code run
 controlling the same browser profile may be able to access it. Confirmed local reset removes the
 record, and explicit OpenRouter deletion removes the complete record for the active account.
 
-Receipt capture uses one native file input with `accept="image/*"` and `capture="environment"` so
-supported mobile operating systems own the camera/picker UI. The app does not create a camera stream,
-preview, shutter, or separate gallery flow. Selected images are decoded with their browser-applied
+Receipt capture uses one native file input with `accept="image/*"` and no `capture` restriction so
+supported mobile operating systems offer both the camera and existing photos in their native picker.
+The app does not create a camera stream, preview, shutter, or separate gallery flow.
+Selected images are decoded with their browser-applied
 orientation, limited to a 20 MiB source, resized without upscaling to a maximum 2560-pixel long edge,
 and canvas-encoded once as JPEG at quality `0.85`; encoded output above 4 MiB is rejected. Canvas
 re-encoding transfers raster pixels instead of original EXIF, GPS, camera, or device metadata.
@@ -288,9 +289,8 @@ the draft; session replacement invalidates it. Catalog and completion failures n
 automatically; known data remains available for manual review or a deliberate fresh capture.
 
 Saving requires the explicit review Save action. A transient post-save summary shows
-the booked fields and directs corrections to Desktop with Mobile closed. A visible warning asks
-users to check existing transfers before a repeated photo; no cross-run duplicate detector or
-persistent receipt fingerprint is claimed. The image limits bound source/output bytes and output
+the booked fields and directs corrections to Desktop with Mobile closed. No cross-run duplicate
+detector or persistent receipt fingerprint is claimed. The image limits bound source/output bytes and output
 dimensions, not peak decoder memory or OCR legibility. Provider and physical-device qualification
 are tracked separately in [the AP4 evidence record](reviews/2026-10-20-ap4-receipt-qualification.md).
 

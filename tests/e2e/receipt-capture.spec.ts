@@ -372,9 +372,7 @@ const installReceiptAnalysisRoutes = async (
   return { catalogRequests, completionRequests };
 };
 
-test('exposes one native outward-camera image input without custom capture or gallery UI', async ({
-  page,
-}) => {
+test('offers camera and existing photos through one native image picker', async ({ page }) => {
   await installReadyAddTransferTestDb(page, {
     fromAccountOptionRows: [
       { accountId: 1, name: 'Primary Income', amountCents: 0, accountTypeId: 1 },
@@ -402,10 +400,10 @@ test('exposes one native outward-camera image input without custom capture or ga
   await expect(page.getByTestId('receipt-semantic-risk')).toContainText(
     'Review the suggested data before saving',
   );
-  await expect(photoButton).toHaveAccessibleName('Photograph receipt');
+  await expect(photoButton).toHaveAccessibleName('Take or upload receipt photo');
   await expect(nativeInput).toHaveAttribute('type', 'file');
   await expect(nativeInput).toHaveAttribute('accept', 'image/*');
-  await expect(nativeInput).toHaveAttribute('capture', 'environment');
+  await expect(nativeInput).not.toHaveAttribute('capture');
   await expect(nativeInput).not.toHaveAttribute('multiple', '');
   await expect(page.locator('video')).toHaveCount(0);
   await expect(page.locator('[data-testid*="gallery"]')).toHaveCount(0);
@@ -421,7 +419,9 @@ test('exposes one native outward-camera image input without custom capture or ga
   expect(captureSectionSize.scrollWidth).toBeLessThanOrEqual(captureSectionSize.clientWidth);
 });
 
-test('runs both OpenRouter stages and saves only after explicit review', async ({ page }) => {
+test('uploads an existing photo through the picker and saves only after explicit review', async ({
+  page,
+}) => {
   await installReadyReceiptConfiguration(page);
   let releaseExtraction!: () => void;
   const extractionGate = new Promise<void>((resolve) => {
@@ -461,7 +461,11 @@ test('runs both OpenRouter stages and saves only after explicit review', async (
   );
   await page.goto(appPath('#/add'));
 
-  await page.getByTestId('receipt-image-input').setInputFiles({
+  const fileChooserPromise = page.waitForEvent('filechooser');
+  await page.getByTestId('receipt-photo-button').click();
+  const fileChooser = await fileChooserPromise;
+  expect(fileChooser.isMultiple()).toBe(false);
+  await fileChooser.setFiles({
     name: 'receipt.png',
     mimeType: 'image/png',
     buffer: RECEIPT_IMAGE,
