@@ -1,6 +1,6 @@
 // Verifies service-worker callback wiring and guarded periodic update checks for active clients.
 import type { RegisterSWOptions } from 'vite-plugin-pwa/types';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createServiceWorkerUpdateController } from './serviceWorkerUpdateController';
 import {
@@ -10,12 +10,21 @@ import {
 } from './serviceWorkerUpdateRegistration';
 
 const createRegistration = (installing: ServiceWorker | null = null) =>
-  ({
+  Object.assign(new EventTarget(), {
     installing,
+    waiting: null,
+    active: { state: 'activated' },
     update: vi.fn().mockResolvedValue(undefined),
   }) as unknown as ServiceWorkerRegistration;
 
 describe('serviceWorkerUpdateRegistration', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
   it('wires prompt and activation callbacks and schedules hourly active-client checks', async () => {
     let capturedOptions: RegisterSWOptions | undefined;
     const updater = vi.fn().mockResolvedValue(undefined);
@@ -26,11 +35,13 @@ describe('serviceWorkerUpdateRegistration', () => {
     const controller = createServiceWorkerUpdateController();
     const notifyUpdateAvailable = vi.spyOn(controller, 'notifyUpdateAvailable');
     const scheduleInterval = vi.fn(() => 1 as unknown as ReturnType<typeof setInterval>);
+    const reloadPage = vi.fn();
 
     registerServiceWorkerUpdates(registerServiceWorker, controller, {
-      fetchServiceWorker: vi.fn(),
+      fetchServiceWorker: vi.fn().mockResolvedValue({ status: 200 }),
       isOnline: () => true,
       scheduleInterval,
+      reloadPage,
     });
 
     expect(capturedOptions?.immediate).toBe(true);
@@ -45,7 +56,8 @@ describe('serviceWorkerUpdateRegistration', () => {
 
     controller.notifyUpdateAvailable();
     await controller.acceptUpdate();
-    expect(updater).toHaveBeenCalledWith(true);
+    expect(reloadPage).toHaveBeenCalledOnce();
+    expect(updater).not.toHaveBeenCalled();
   });
 
   it('does not schedule checks when registration is unavailable', () => {
@@ -63,6 +75,83 @@ describe('serviceWorkerUpdateRegistration', () => {
 
     capturedOptions?.onRegisteredSW?.('/sw.js', undefined);
     expect(scheduleInterval).not.toHaveBeenCalled();
+  });
+
+  it('offers an update that activates without a waiting event on an uncontrolled page', () => {
+    const registration = createRegistration();
+    const controller = createServiceWorkerUpdateController();
+    const notifyUpdateAvailable = vi.spyOn(controller, 'notifyUpdateAvailable');
+    let options: RegisterSWOptions | undefined;
+    registerServiceWorkerUpdates(
+      (captured) => {
+        options = captured;
+        return vi.fn();
+      },
+      controller,
+      {
+        fetchServiceWorker: vi.fn().mockResolvedValue({ status: 200 }),
+        isOnline: () => true,
+        scheduleInterval: vi.fn(),
+      },
+    );
+    options?.onRegisteredSW?.('/sw.js', registration);
+    const worker = Object.assign(new EventTarget(), { state: 'installing' as ServiceWorkerState });
+    Object.defineProperty(registration, 'installing', { value: worker });
+    registration.dispatchEvent(new Event('updatefound'));
+    expect(notifyUpdateAvailable).not.toHaveBeenCalled();
+    worker.state = 'activated';
+    worker.dispatchEvent(new Event('statechange'));
+    expect(notifyUpdateAvailable).toHaveBeenCalledOnce();
+  });
+
+  it('checks immediately and on visible/online return without overlapping requests', async () => {
+    const windowTarget = new EventTarget();
+    const documentTarget = Object.assign(new EventTarget(), {
+      visibilityState: 'hidden' as DocumentVisibilityState,
+    });
+    const registration = createRegistration();
+    let finishFetch: (response: { status: number }) => void = () => {};
+    const fetchServiceWorker = vi.fn().mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finishFetch = resolve;
+        }),
+    );
+    let capturedOptions: RegisterSWOptions | undefined;
+    registerServiceWorkerUpdates(
+      (options) => {
+        capturedOptions = options;
+        return vi.fn();
+      },
+      createServiceWorkerUpdateController(),
+      {
+        fetchServiceWorker,
+        isOnline: () => true,
+        scheduleInterval: vi.fn(),
+        windowTarget,
+        documentTarget,
+      },
+    );
+
+    capturedOptions?.onRegisteredSW?.('/sw.js', registration);
+    expect(fetchServiceWorker).toHaveBeenCalledOnce();
+    windowTarget.dispatchEvent(new Event('online'));
+    expect(fetchServiceWorker).toHaveBeenCalledOnce();
+    finishFetch({ status: 200 });
+    await vi.waitFor(() => expect(registration.update).toHaveBeenCalledOnce());
+
+    documentTarget.dispatchEvent(new Event('visibilitychange'));
+    expect(fetchServiceWorker).toHaveBeenCalledOnce();
+    documentTarget.visibilityState = 'visible';
+    documentTarget.dispatchEvent(new Event('visibilitychange'));
+    expect(fetchServiceWorker).toHaveBeenCalledTimes(2);
+    finishFetch({ status: 200 });
+    await vi.waitFor(() => expect(registration.update).toHaveBeenCalledTimes(2));
+
+    windowTarget.dispatchEvent(new Event('online'));
+    expect(fetchServiceWorker).toHaveBeenCalledTimes(3);
+    finishFetch({ status: 200 });
+    await vi.waitFor(() => expect(registration.update).toHaveBeenCalledTimes(3));
   });
 });
 

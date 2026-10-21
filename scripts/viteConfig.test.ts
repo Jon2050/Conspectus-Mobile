@@ -2,14 +2,75 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   PWA_REGISTER_TYPE,
+  createBuildInfo,
+  verifyReleaseVersion,
   loadBuildEnvironment,
   resolveBasePath,
   resolveViteBasePath,
 } from '../vite.config';
+
+describe('build identity', () => {
+  const commitSha = '1234567890abcdef1234567890abcdef12345678';
+
+  it('pairs the package version with the checked-out commit and actual UTC build time', () => {
+    expect(createBuildInfo('0.9.05', commitSha, new Date('2026-10-21T10:20:30.456Z'))).toEqual({
+      version: '0.9.05+12345678',
+      commitSha,
+      buildTimeUtc: '2026-10-21T10:20:30Z',
+    });
+  });
+
+  it('distinguishes builds of different commits without changing the release version', () => {
+    expect(createBuildInfo('0.9.05', 'a'.repeat(40)).version).not.toBe(
+      createBuildInfo('0.9.05', 'b'.repeat(40)).version,
+    );
+  });
+
+  it('captures a fresh timestamp when the same commit is rebuilt', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-10-20T10:00:00Z'));
+      const first = createBuildInfo('0.9.05', commitSha);
+      vi.setSystemTime(new Date('2026-10-21T11:30:00Z'));
+      const second = createBuildInfo('0.9.05', commitSha);
+
+      expect(first.version).toBe(second.version);
+      expect(first.buildTimeUtc).toBe('2026-10-20T10:00:00Z');
+      expect(second.buildTimeUtc).toBe('2026-10-21T11:30:00Z');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('labels source archives without a Git identity as local and rejects malformed SHAs', () => {
+    expect(createBuildInfo('1.0.1-dev', null).version).toBe('1.0.1-dev+local');
+    expect(() => createBuildInfo('0.9.05', 'invalid')).toThrow('Build commit SHA');
+  });
+});
+
+describe('released version floor', () => {
+  it.each(['0.9.05', '1.0.0-dev'])('rejects %s below a published v1.0.0', (version) => {
+    expect(() => verifyReleaseVersion(version, ['v0.6.12', 'v1.0.0'])).toThrow(
+      'older than published release',
+    );
+  });
+
+  it.each(['1.0.0', '1.0.1-dev', '1.1.0'])(
+    'accepts %s at or above the published release',
+    (version) => {
+      expect(() => verifyReleaseVersion(version, ['v1.0.0'])).not.toThrow();
+    },
+  );
+
+  it('uses all release tags, regardless of ordering, and compares numeric version components', () => {
+    expect(() => verifyReleaseVersion('1.9.0', ['v2.0.0', 'v1.0.0'])).toThrow();
+    expect(() => verifyReleaseVersion('1.10.0-dev', ['v1.9.0'])).not.toThrow();
+  });
+});
 
 describe('PWA update strategy', () => {
   it('requires user confirmation before activating a waiting service worker', () => {

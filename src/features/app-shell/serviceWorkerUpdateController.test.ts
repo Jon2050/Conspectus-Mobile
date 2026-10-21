@@ -1,10 +1,17 @@
 // Verifies update notifications remain actionable and service-worker activation is single-flight.
 import { get } from 'svelte/store';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createServiceWorkerUpdateController } from './serviceWorkerUpdateController';
 
 describe('serviceWorkerUpdateController', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
   it('starts idle and exposes a new update persistently', () => {
     const controller = createServiceWorkerUpdateController();
 
@@ -32,7 +39,7 @@ describe('serviceWorkerUpdateController', () => {
 
     expect(get(controller)).toEqual({ phase: 'applying' });
     expect(updater).toHaveBeenCalledTimes(1);
-    expect(updater).toHaveBeenCalledWith(true);
+    expect(updater).toHaveBeenCalledWith(true, expect.any(AbortSignal));
 
     finishUpdate?.();
     await Promise.all([firstAttempt, duplicateAttempt]);
@@ -64,4 +71,29 @@ describe('serviceWorkerUpdateController', () => {
 
     expect(get(controller)).toEqual({ phase: 'error' });
   });
+
+  it.each([true, false])(
+    'times out and allows retry when navigation never happens (updater pending: %s)',
+    async (pending) => {
+      const updater = vi
+        .fn()
+        .mockImplementation(() => (pending ? new Promise<void>(() => {}) : Promise.resolve()));
+      const controller = createServiceWorkerUpdateController(100);
+      controller.setUpdater(updater);
+      controller.notifyUpdateAvailable();
+      const firstAttempt = controller.acceptUpdate();
+      const signal = updater.mock.calls[0]![1] as AbortSignal;
+      controller.notifyUpdateAvailable();
+      expect(get(controller).phase).toBe('applying');
+      await vi.advanceTimersByTimeAsync(100);
+      await firstAttempt;
+      expect(signal.aborted).toBe(true);
+      expect(get(controller).phase).toBe('error');
+      const retry = controller.acceptUpdate();
+      expect(updater).toHaveBeenCalledTimes(2);
+      expect(get(controller).phase).toBe('applying');
+      await vi.advanceTimersByTimeAsync(100);
+      await retry;
+    },
+  );
 });

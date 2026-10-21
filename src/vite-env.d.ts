@@ -1,7 +1,10 @@
 /// <reference types="vite/client" />
 
-declare const __APP_VERSION__: string;
-declare const __APP_BUILD_TIME_UTC__: string;
+declare const __APP_BUILD_INFO__: {
+  readonly version: string;
+  readonly commitSha: string | null;
+  readonly buildTimeUtc: string;
+};
 
 interface ImportMetaEnv {
   readonly VITE_AZURE_CLIENT_ID: string;

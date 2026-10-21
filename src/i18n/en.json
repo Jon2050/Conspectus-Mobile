@@ -26,7 +26,7 @@
     "action": "Update now",
     "applying": "Updating...",
     "retry": "Retry update",
-    "error": "The update could not be activated. Your current version is still running; try again."
+    "error": "The update did not complete. Try again. If it remains stuck, close all Conspectus windows and reopen the app."
   },
   "accounts": {
     "title": "Accounts",

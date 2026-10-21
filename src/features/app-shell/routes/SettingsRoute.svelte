@@ -7,9 +7,7 @@
   import {
     appSelectedDriveItemBindingStore,
     appSyncStateStore,
-    getFallbackBuildInfo,
-    loadBuildInfo,
-    type BuildInfo,
+    getBuildInfo,
     type SyncStateStore,
   } from '@shared';
   import { _ } from 'svelte-i18n';
@@ -74,7 +72,7 @@
   let lastSyncAtIso: string | null = null;
   let syncMetadataRequestId = 0;
   let loadedSyncMetadataBindingKey: string | null = null;
-  let buildInfo: BuildInfo = getFallbackBuildInfo();
+  const buildInfo = getBuildInfo();
   let forceRefreshIsPending = false;
   let forceRefreshStatusIsVisible = false;
   let syncSnapshot = get(syncStateStore);
@@ -304,9 +302,6 @@
 
   onMount(() => {
     void authController.initialize();
-    void loadBuildInfo().then((loadedBuildInfo) => {
-      buildInfo = loadedBuildInfo;
-    });
   });
 
   onDestroy(() => {

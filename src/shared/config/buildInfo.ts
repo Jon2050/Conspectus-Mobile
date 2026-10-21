@@ -1,12 +1,7 @@
-// Resolves deterministic runtime build metadata for app UI surfaces like the deployment footer.
+// Identifies the running bundle without mixing in metadata from a different deployment.
 export interface BuildInfo {
   readonly version: string;
   readonly buildTimeUtc: string;
-}
-
-export interface BuildInfoLoaderOptions {
-  readonly baseUrl?: string;
-  readonly fetch?: typeof fetch;
 }
 
 export interface BuildInfoFormatOptions {
@@ -14,70 +9,9 @@ export interface BuildInfoFormatOptions {
   readonly timeZone?: string;
 }
 
-interface DeployMetadataPayload {
-  readonly buildTimeUtc?: unknown;
-}
-
-const DEPLOY_METADATA_FILE_NAME = 'deploy-metadata.json';
-const ISO_UTC_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/u;
-
-const normalizeBaseUrl = (baseUrl: string): string =>
-  baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-const isValidBuildTimeUtc = (value: unknown): value is string =>
-  typeof value === 'string' &&
-  ISO_UTC_TIMESTAMP_PATTERN.test(value) &&
-  Number.isFinite(Date.parse(value));
-
-const resolveFallbackBuildInfo = (): BuildInfo => ({
-  version: __APP_VERSION__,
-  buildTimeUtc: __APP_BUILD_TIME_UTC__,
+export const getBuildInfo = (): BuildInfo => ({
+  ...__APP_BUILD_INFO__,
 });
-
-export const getFallbackBuildInfo = (): BuildInfo => ({
-  ...resolveFallbackBuildInfo(),
-});
-
-export const resolveDeployMetadataUrl = (baseUrl = import.meta.env.BASE_URL): string =>
-  new URL(DEPLOY_METADATA_FILE_NAME, `https://conspectus.local${normalizeBaseUrl(baseUrl)}`)
-    .pathname;
-
-export const loadBuildInfo = async (options: BuildInfoLoaderOptions = {}): Promise<BuildInfo> => {
-  const fallbackBuildInfo = resolveFallbackBuildInfo();
-  const fetchImplementation = options.fetch ?? globalThis.fetch?.bind(globalThis);
-
-  if (!fetchImplementation) {
-    return fallbackBuildInfo;
-  }
-
-  try {
-    const response = await fetchImplementation(resolveDeployMetadataUrl(options.baseUrl), {
-      cache: 'no-store',
-      headers: {
-        accept: 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      return fallbackBuildInfo;
-    }
-
-    const payload = (await response.json()) as DeployMetadataPayload;
-    if (!isRecord(payload) || !isValidBuildTimeUtc(payload.buildTimeUtc)) {
-      return fallbackBuildInfo;
-    }
-
-    return {
-      version: fallbackBuildInfo.version,
-      buildTimeUtc: payload.buildTimeUtc,
-    };
-  } catch {
-    return fallbackBuildInfo;
-  }
-};
 
 export const formatBuildInfoTimestamp = (
   buildTimeUtc: string,

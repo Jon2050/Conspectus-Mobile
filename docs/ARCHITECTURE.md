@@ -376,8 +376,24 @@ user can rebind without an unnecessary sign-in. Sign-out remains a separate expl
 ## PWA lifecycle and deployment
 
 The service worker uses prompt-based updates. A waiting version must not automatically reload an
-open transfer form; the user explicitly activates the update, after which the app reloads when the
-new worker controls the page.
+open transfer form; the user explicitly activates the update, after which the app reloads once the
+new worker is active.
+Update discovery runs on registration, when the app returns to the foreground or comes online,
+and hourly while active. Concurrent checks are coalesced; discovery never activates the update.
+After confirmation the app sends `SKIP_WAITING`, observes the waiting worker's activation directly,
+and reloads the accepting page. It does not depend on Workbox's `isUpdate` flag or a
+`controllerchange` event, which can be absent after a hard refresh bypassed service-worker control.
+An already activated worker from another tab is handled by reloading. A 15-second watchdog aborts
+stalled activation and returns a visible, retryable error if activation or navigation does not
+complete; update notifications cannot re-enable duplicate activation while a request is applying.
+Updates that activate immediately on an uncontrolled page are also offered visibly instead of
+leaving the old in-memory bundle running without a prompt.
+
+Footer and Settings identify the running JavaScript bundle using immutable build-time metadata.
+The displayed version combines the package release version and the first eight characters of the
+checked-out Git commit (for example, `1.0.1-dev+8c81c40a`). The UTC timestamp records the actual build,
+not commit or deployment time. The app never overwrites these values with separately fetched server
+metadata, which could belong to another build while a PWA update is waiting for confirmation.
 
 Deployment uses two isolated channels:
 

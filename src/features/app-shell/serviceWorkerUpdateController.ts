@@ -1,7 +1,8 @@
 // Holds the persistent service-worker update prompt state and activates a waiting worker once.
 import { writable } from 'svelte/store';
 
-export type ServiceWorkerUpdater = (reloadPage?: boolean) => Promise<void>;
+const SERVICE_WORKER_ACTIVATION_TIMEOUT_MS = 15_000;
+export type ServiceWorkerUpdater = (reloadPage?: boolean, signal?: AbortSignal) => Promise<void>;
 export type ServiceWorkerUpdatePhase = 'idle' | 'available' | 'applying' | 'error';
 
 export interface ServiceWorkerUpdateState {
@@ -17,16 +18,19 @@ export interface ServiceWorkerUpdateController {
 
 const INITIAL_STATE: ServiceWorkerUpdateState = { phase: 'idle' };
 
-export const createServiceWorkerUpdateController = (): ServiceWorkerUpdateController => {
+export const createServiceWorkerUpdateController = (
+  timeoutMs = SERVICE_WORKER_ACTIVATION_TIMEOUT_MS,
+): ServiceWorkerUpdateController => {
   const { subscribe, set, update } = writable<ServiceWorkerUpdateState>(INITIAL_STATE);
   let updater: ServiceWorkerUpdater | null = null;
+  let attemptId = 0;
 
   const setUpdater = (nextUpdater: ServiceWorkerUpdater): void => {
     updater = nextUpdater;
   };
 
   const notifyUpdateAvailable = (): void => {
-    set({ phase: 'available' });
+    update((state) => (state.phase === 'applying' ? state : { phase: 'available' }));
   };
 
   const acceptUpdate = async (): Promise<void> => {
@@ -45,11 +49,27 @@ export const createServiceWorkerUpdateController = (): ServiceWorkerUpdateContro
       return;
     }
 
+    const currentAttemptId = ++attemptId;
+    const abortController = new AbortController();
+    let timeout: ReturnType<typeof setTimeout>;
+    const navigationDeadline = new Promise<void>((resolve) => {
+      timeout = setTimeout(() => {
+        if (attemptId === currentAttemptId) {
+          abortController.abort();
+          set({ phase: 'error' });
+        }
+        resolve();
+      }, timeoutMs);
+    });
+
     try {
-      await updater(true);
+      await Promise.race([updater(true, abortController.signal), navigationDeadline]);
+      // Keep the watchdog armed until navigation destroys this page. A resolved updater alone
+      // does not prove that a browser actually reloaded (the previous implementation hung here).
     } catch (error) {
+      clearTimeout(timeout!);
       console.error('Activating the service worker update failed.', error);
-      set({ phase: 'error' });
+      if (attemptId === currentAttemptId) set({ phase: 'error' });
     }
   };
 

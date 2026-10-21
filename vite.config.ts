@@ -1,6 +1,7 @@
 // Configures deterministic app base paths, shared aliases, and PWA build metadata.
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath, URL } from 'node:url';
 import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig } from 'vitest/config';
@@ -16,8 +17,58 @@ const PACKAGE_JSON_URL = new URL('./package.json', import.meta.url);
 const packageJson = JSON.parse(readFileSync(PACKAGE_JSON_URL, 'utf-8')) as {
   version: string;
 };
-const appVersion = packageJson.version;
-const appBuildTimeUtc = new Date().toISOString().replace(/\.\d{3}Z$/u, 'Z');
+export const createBuildInfo = (
+  version: string,
+  commitSha: string | null,
+  buildDate: Date = new Date(),
+) => {
+  if (commitSha !== null && !/^[a-f0-9]{40}$/u.test(commitSha)) {
+    throw new Error('Build commit SHA must be a full lowercase Git SHA.');
+  }
+
+  const buildTime = buildDate.toISOString();
+  return {
+    version: `${version}+${commitSha?.slice(0, 8) ?? 'local'}`,
+    commitSha,
+    buildTimeUtc: buildTime.replace(/\.\d{3}Z$/u, 'Z'),
+  };
+};
+
+export const verifyReleaseVersion = (version: string, tags: string[]): void => {
+  const match = /^(\d+)\.(\d+)\.(\d+)(?:-([\da-z.-]+))?$/iu.exec(version);
+  if (!match) throw new Error(`Invalid package release version: ${version}`);
+  const current = match.slice(1, 4).map(Number);
+  for (const tag of tags) {
+    const released = /^v(\d+)\.(\d+)\.(\d+)$/u.exec(tag);
+    if (!released) continue;
+    const release = released.slice(1).map(Number);
+    const differentPart = current.findIndex((part, index) => part !== release[index]);
+    if (
+      (differentPart !== -1 && current[differentPart]! < release[differentPart]!) ||
+      (differentPart === -1 && match[4] !== undefined)
+    ) {
+      throw new Error(`Package version ${version} is older than published release ${tag}.`);
+    }
+  }
+};
+
+const readGit = (args: string[]): string =>
+  execFileSync('git', args, {
+    cwd: fileURLToPath(new URL('.', import.meta.url)),
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  }).trim();
+
+const resolveCommitSha = (): string | null => {
+  try {
+    return readGit(['rev-parse', 'HEAD']);
+  } catch {
+    if (process.env.CI) {
+      throw new Error('Cannot determine the checked-out Git commit for the CI build.');
+    }
+    return null;
+  }
+};
 
 const normalizeBasePrefix = (value: string | undefined): string => {
   const trimmedValue = value?.trim();
@@ -67,14 +118,28 @@ export const loadBuildEnvironment = (
 export default defineConfig(({ command, mode }) => {
   const environment = loadBuildEnvironment(mode);
   const basePath = resolveViteBasePath(environment, command, mode);
+  const commitSha = resolveCommitSha();
+  if (command === 'build' && commitSha !== null) {
+    verifyReleaseVersion(packageJson.version, readGit(['tag', '--list', 'v*']).split(/\r?\n/u));
+  }
+  const buildInfo = createBuildInfo(packageJson.version, commitSha);
   return {
     base: basePath,
     define: {
-      __APP_VERSION__: JSON.stringify(appVersion),
-      __APP_BUILD_TIME_UTC__: JSON.stringify(appBuildTimeUtc),
+      __APP_BUILD_INFO__: JSON.stringify(buildInfo),
     },
     plugins: [
       svelte(),
+      {
+        name: 'app-build-info',
+        generateBundle() {
+          this.emitFile({
+            type: 'asset',
+            fileName: 'build-info.json',
+            source: `${JSON.stringify(buildInfo, null, 2)}\n`,
+          });
+        },
+      },
       VitePWA({
         registerType: PWA_REGISTER_TYPE,
         scope: basePath,

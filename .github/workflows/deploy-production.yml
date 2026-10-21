@@ -38,6 +38,7 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: main
+          fetch-depth: 0
 
       - name: Resolve current main commit target
         id: target
@@ -127,12 +128,13 @@ jobs:
           node scripts/verify-build-channel.mjs
           --dist dist
           --channel production
+          --commit ${{ steps.target.outputs.commit_sha }}
           --base /conspectus/
 
       - name: Resolve production handoff identity
         id: handoff
         run: |
-          build_time_utc="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          build_time_utc="$(node -p "JSON.parse(require('node:fs').readFileSync('dist/build-info.json', 'utf8')).buildTimeUtc")"
           artifact_name="conspectus-mobile-production-${{ steps.target.outputs.commit_sha }}"
           {
             echo "artifact_name=${artifact_name}"
