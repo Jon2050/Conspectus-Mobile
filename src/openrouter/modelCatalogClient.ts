@@ -1,5 +1,5 @@
 import { withRequestDeadline } from '@shared';
-// Fetches the account-filtered OpenRouter model catalog without exposing key or provider details.
+// Fetches OpenRouter's account-filtered catalog and intelligence benchmarks without exposing keys.
 import {
   OpenRouterCatalogResponseError,
   parseOpenRouterCompatibleModelCatalog,
@@ -7,6 +7,8 @@ import {
 } from './modelCatalog';
 
 export const OPENROUTER_USER_MODELS_URL = 'https://openrouter.ai/api/v1/models/user';
+export const OPENROUTER_INTELLIGENCE_BENCHMARKS_URL =
+  'https://openrouter.ai/api/v1/benchmarks?source=artificial-analysis&task_type=intelligence';
 
 export type OpenRouterCatalogErrorCode =
   | 'invalid_key'
@@ -58,45 +60,51 @@ export const createOpenRouterModelCatalogClient = (
       try {
         return await withRequestDeadline(
           async (requestSignal) => {
-            let response: Response;
+            const loadJson = async (url: string): Promise<unknown> => {
+              let response: Response;
+              try {
+                response = await fetchImpl(url, {
+                  method: 'GET',
+                  headers: {
+                    Accept: 'application/json',
+                    Authorization: `Bearer ${normalizedApiKey}`,
+                  },
+                  cache: 'no-store',
+                  credentials: 'omit',
+                  redirect: 'error',
+                  signal: requestSignal,
+                });
+              } catch (error) {
+                throw new OpenRouterCatalogError(
+                  isAbortError(error, requestSignal) ? 'aborted' : 'network_error',
+                );
+              }
+
+              if (response.status === 401 || response.status === 403) {
+                throw new OpenRouterCatalogError('invalid_key', response.status);
+              }
+
+              if (!response.ok) {
+                throw new OpenRouterCatalogError('provider_error', response.status);
+              }
+
+              let payload: unknown;
+              try {
+                payload = await response.json();
+              } catch {
+                throw new OpenRouterCatalogError('invalid_response', response.status);
+              }
+              return payload;
+            };
+
+            const payload = await loadJson(OPENROUTER_USER_MODELS_URL);
+            const benchmarks = await loadJson(OPENROUTER_INTELLIGENCE_BENCHMARKS_URL);
+
             try {
-              response = await fetchImpl(OPENROUTER_USER_MODELS_URL, {
-                method: 'GET',
-                headers: {
-                  Accept: 'application/json',
-                  Authorization: `Bearer ${normalizedApiKey}`,
-                },
-                cache: 'no-store',
-                credentials: 'omit',
-                redirect: 'error',
-                signal: requestSignal,
-              });
-            } catch (error) {
-              throw new OpenRouterCatalogError(
-                isAbortError(error, requestSignal) ? 'aborted' : 'network_error',
-              );
-            }
-
-            if (response.status === 401 || response.status === 403) {
-              throw new OpenRouterCatalogError('invalid_key', response.status);
-            }
-
-            if (!response.ok) {
-              throw new OpenRouterCatalogError('provider_error', response.status);
-            }
-
-            let payload: unknown;
-            try {
-              payload = await response.json();
-            } catch {
-              throw new OpenRouterCatalogError('invalid_response', response.status);
-            }
-
-            try {
-              return parseOpenRouterCompatibleModelCatalog(payload);
+              return parseOpenRouterCompatibleModelCatalog(payload, benchmarks);
             } catch (error) {
               if (error instanceof OpenRouterCatalogResponseError) {
-                throw new OpenRouterCatalogError('invalid_response', response.status);
+                throw new OpenRouterCatalogError('invalid_response', 200);
               }
               throw error;
             }

@@ -20,6 +20,7 @@
   import { presentOperationFailure } from '../failurePresentation';
   import SettingsDatabaseBrowser from './SettingsDatabaseBrowser.svelte';
   import SettingsSafetySection from './SettingsSafetySection.svelte';
+  import SettingsSection from './SettingsSection.svelte';
   import SettingsBuildInformation from './SettingsBuildInformation.svelte';
   import './settings.css';
   import {
@@ -319,213 +320,219 @@
 
   <SettingsSafetySection />
 
-  <p
-    class="settings-screen__auth-status"
-    data-testid="auth-status-message"
-    aria-live="polite"
-    role={state.error === null ? undefined : 'alert'}
-  >
-    {authStatusMessage}
-  </p>
-
-  {#if state.session.isAuthenticated && state.session.account !== null}
-    <h3 class="settings-screen__subheading">{$_('settings.account.heading')}</h3>
-    <dl class="settings-screen__account-summary" data-testid="signed-in-account-summary">
-      <div>
-        <dt>{$_('settings.account.name')}</dt>
-        <dd>{state.session.account.displayName ?? $_('settings.account.unknown')}</dd>
-      </div>
-      <div>
-        <dt>{$_('settings.account.username')}</dt>
-        <dd>{state.session.account.username}</dd>
-      </div>
-    </dl>
-
-    <SettingsOpenRouterSection controller={openRouterController} />
-
-    <h3 class="settings-screen__subheading">{$_('settings.db.heading')}</h3>
+  <SettingsSection title={$_('settings.account.heading')} testId="settings-account-section">
     <p
-      class="settings-screen__binding-status"
-      data-testid="binding-status-message"
-      role={bindingState.error === null ? undefined : 'alert'}
+      class="settings-screen__auth-status"
+      data-testid="auth-status-message"
       aria-live="polite"
+      role={state.error === null ? undefined : 'alert'}
     >
-      {bindingStatusMessage}
+      {authStatusMessage}
     </p>
 
-    <h4 class="settings-screen__action-heading">{$_('settings.actions.standard')}</h4>
-    <div class="settings-screen__actions" data-testid="standard-settings-actions">
-      <button
-        class="app-button app-button--primary"
-        type="button"
-        on:click={handleBrowseClick}
-        disabled={authOperationIsPending ||
-          bindingState.operation !== 'idle' ||
-          localDataResetState.operation !== 'idle'}
-      >
-        {bindingState.selectedBinding === null
-          ? $_('settings.db.actions.select')
-          : $_('settings.db.actions.change')}
-      </button>
-
-      {#if bindingState.selectedBinding !== null && onForceRefresh !== null}
+    {#if state.session.isAuthenticated && state.session.account !== null}
+      <dl class="settings-screen__account-summary" data-testid="signed-in-account-summary">
+        <div>
+          <dt>{$_('settings.account.name')}</dt>
+          <dd>{state.session.account.displayName ?? $_('settings.account.unknown')}</dd>
+        </div>
+        <div>
+          <dt>{$_('settings.account.username')}</dt>
+          <dd>{state.session.account.username}</dd>
+        </div>
+      </dl>
+    {/if}
+    <div class="settings-screen__actions" data-testid="account-settings-actions">
+      {#if state.session.isAuthenticated}
         <button
           class="app-button app-button--secondary"
           type="button"
-          data-testid="force-refresh-button"
-          aria-busy={forceRefreshIsPending}
-          on:click={() => void handleForceRefreshClick()}
-          disabled={authOperationIsPending ||
-            bindingState.operation !== 'idle' ||
-            localDataResetState.operation !== 'idle' ||
-            forceRefreshIsPending ||
-            syncSnapshot.state === 'syncing'}
+          on:click={handleSignOutClick}
+          disabled={authOperationIsPending || localDataResetState.operation !== 'idle'}
         >
-          {forceRefreshIsPending ? $_('settings.sync.refreshing') : $_('settings.sync.refresh')}
+          {$_('settings.generalActions.signOut')}
+        </button>
+      {:else}
+        <button
+          class="app-button app-button--primary"
+          type="button"
+          on:click={handleSignInClick}
+          disabled={authOperationIsPending}
+        >
+          {$_('settings.generalActions.signIn')}
         </button>
       {/if}
+    </div>
+  </SettingsSection>
 
-      {#if bindingState.browserIsOpen}
-        {#if bindingState.canGoBack}
+  {#if state.session.isAuthenticated}
+    <SettingsSection title={$_('settings.sections.database')} testId="settings-database-section">
+      <p
+        class="settings-screen__binding-status"
+        data-testid="binding-status-message"
+        role={bindingState.error === null ? undefined : 'alert'}
+        aria-live="polite"
+      >
+        {bindingStatusMessage}
+      </p>
+
+      <h4 class="settings-screen__action-heading">{$_('settings.actions.standard')}</h4>
+      <div class="settings-screen__actions" data-testid="standard-settings-actions">
+        <button
+          class="app-button app-button--primary"
+          type="button"
+          on:click={handleBrowseClick}
+          disabled={authOperationIsPending ||
+            bindingState.operation !== 'idle' ||
+            localDataResetState.operation !== 'idle'}
+        >
+          {bindingState.selectedBinding === null
+            ? $_('settings.db.actions.select')
+            : $_('settings.db.actions.change')}
+        </button>
+
+        {#if bindingState.selectedBinding !== null && onForceRefresh !== null}
           <button
             class="app-button app-button--secondary"
             type="button"
-            on:click={handleBackClick}
-            disabled={bindingState.operation !== 'idle'}
+            data-testid="force-refresh-button"
+            aria-busy={forceRefreshIsPending}
+            on:click={() => void handleForceRefreshClick()}
+            disabled={authOperationIsPending ||
+              bindingState.operation !== 'idle' ||
+              localDataResetState.operation !== 'idle' ||
+              forceRefreshIsPending ||
+              syncSnapshot.state === 'syncing'}
           >
-            {$_('settings.db.actions.back')}
+            {forceRefreshIsPending ? $_('settings.sync.refreshing') : $_('settings.sync.refresh')}
           </button>
         {/if}
 
-        <button
-          class="app-button app-button--secondary"
-          type="button"
-          data-testid="cancel-db-file-browser-button"
-          on:click={handleCancelBrowseClick}
-          disabled={localDataResetState.operation !== 'idle'}
-        >
-          {$_('settings.db.actions.cancel')}
-        </button>
-      {/if}
-    </div>
+        {#if bindingState.browserIsOpen}
+          {#if bindingState.canGoBack}
+            <button
+              class="app-button app-button--secondary"
+              type="button"
+              on:click={handleBackClick}
+              disabled={bindingState.operation !== 'idle'}
+            >
+              {$_('settings.db.actions.back')}
+            </button>
+          {/if}
 
-    <h4 class="settings-screen__action-heading settings-screen__action-heading--danger">
-      {$_('settings.actions.destructive')}
-    </h4>
-    <div class="settings-screen__actions" data-testid="destructive-settings-actions">
-      <button
-        class="app-button app-button--danger"
-        type="button"
-        data-testid="reset-local-app-data-button"
-        on:click={handleRequestLocalResetClick}
-        disabled={authOperationIsPending ||
-          bindingState.operation !== 'idle' ||
-          localDataResetState.operation !== 'idle'}
-      >
-        {$_('settings.reset.button')}
-      </button>
-    </div>
+          <button
+            class="app-button app-button--secondary"
+            type="button"
+            data-testid="cancel-db-file-browser-button"
+            on:click={handleCancelBrowseClick}
+            disabled={localDataResetState.operation !== 'idle'}
+          >
+            {$_('settings.db.actions.cancel')}
+          </button>
+        {/if}
+      </div>
 
-    <dialog
-      bind:this={localDataResetDialogElement}
-      class="settings-screen__confirmation"
-      aria-labelledby="reset-local-data-title"
-      data-testid="reset-local-app-data-confirmation"
-      on:cancel={handleLocalResetDialogCancel}
-    >
-      <h4 id="reset-local-data-title">{$_('settings.reset.title')}</h4>
-      <p>
-        {$_('settings.reset.description')}
-      </p>
-
-      {#if localDataResetState.error !== null}
-        <p class="settings-screen__confirmation-error" role="alert">
-          {$_('sync.failure.cache')}
-        </p>
-      {/if}
-
-      {#if localDataResetState.operation === 'resetting'}
-        <p class="settings-screen__confirmation-status" aria-live="polite">
-          {$_('settings.reset.status')}
-        </p>
-      {/if}
-
-      <div class="settings-screen__actions">
-        <button
-          class="app-button app-button--secondary"
-          type="button"
-          on:click={handleCancelLocalResetClick}
-          disabled={localDataResetState.operation === 'resetting'}
-        >
-          {$_('settings.reset.cancel')}
-        </button>
+      <h4 class="settings-screen__action-heading settings-screen__action-heading--danger">
+        {$_('settings.actions.destructive')}
+      </h4>
+      <div class="settings-screen__actions" data-testid="destructive-settings-actions">
         <button
           class="app-button app-button--danger"
           type="button"
-          data-testid="confirm-reset-local-app-data-button"
-          on:click={handleConfirmLocalResetClick}
-          disabled={localDataResetState.operation === 'resetting'}
+          data-testid="reset-local-app-data-button"
+          on:click={handleRequestLocalResetClick}
+          disabled={authOperationIsPending ||
+            bindingState.operation !== 'idle' ||
+            localDataResetState.operation !== 'idle'}
         >
-          {$_('settings.reset.confirm')}
+          {$_('settings.reset.button')}
         </button>
       </div>
-    </dialog>
 
-    {#if bindingState.selectedBinding !== null}
-      <dl class="settings-screen__binding-summary" data-testid="selected-db-file-summary">
-        <div>
-          <dt>{$_('settings.db.summary.dbFile')}</dt>
-          <dd>{resolveDbFilePath(bindingState.selectedBinding)}</dd>
-        </div>
-        <div>
-          <dt>{$_('settings.sync.lastSync')}</dt>
-          <dd data-testid="settings-last-sync">
-            {lastSyncAtIso === null
-              ? $_('settings.sync.never')
-              : formatSettingsTimestampUtc(lastSyncAtIso) || $_('settings.sync.unknown')}
-          </dd>
-        </div>
-      </dl>
-
-      {#if forceRefreshStatusIsVisible && syncSnapshot.state !== 'idle' && syncSnapshot.message !== null}
-        <p
-          class="settings-screen__sync-status"
-          data-testid="force-refresh-status"
-          role={syncSnapshot.state === 'error' ? 'alert' : 'status'}
-          aria-live="polite"
-        >
-          {syncSnapshot.message}
+      <dialog
+        bind:this={localDataResetDialogElement}
+        class="settings-screen__confirmation"
+        aria-labelledby="reset-local-data-title"
+        data-testid="reset-local-app-data-confirmation"
+        on:cancel={handleLocalResetDialogCancel}
+      >
+        <h4 id="reset-local-data-title">{$_('settings.reset.title')}</h4>
+        <p>
+          {$_('settings.reset.description')}
         </p>
+
+        {#if localDataResetState.error !== null}
+          <p class="settings-screen__confirmation-error" role="alert">
+            {$_('sync.failure.cache')}
+          </p>
+        {/if}
+
+        {#if localDataResetState.operation === 'resetting'}
+          <p class="settings-screen__confirmation-status" aria-live="polite">
+            {$_('settings.reset.status')}
+          </p>
+        {/if}
+
+        <div class="settings-screen__actions">
+          <button
+            class="app-button app-button--secondary"
+            type="button"
+            on:click={handleCancelLocalResetClick}
+            disabled={localDataResetState.operation === 'resetting'}
+          >
+            {$_('settings.reset.cancel')}
+          </button>
+          <button
+            class="app-button app-button--danger"
+            type="button"
+            data-testid="confirm-reset-local-app-data-button"
+            on:click={handleConfirmLocalResetClick}
+            disabled={localDataResetState.operation === 'resetting'}
+          >
+            {$_('settings.reset.confirm')}
+          </button>
+        </div>
+      </dialog>
+
+      {#if bindingState.selectedBinding !== null}
+        <dl class="settings-screen__binding-summary" data-testid="selected-db-file-summary">
+          <div>
+            <dt>{$_('settings.db.summary.dbFile')}</dt>
+            <dd>{resolveDbFilePath(bindingState.selectedBinding)}</dd>
+          </div>
+          <div>
+            <dt>{$_('settings.sync.lastSync')}</dt>
+            <dd data-testid="settings-last-sync">
+              {lastSyncAtIso === null
+                ? $_('settings.sync.never')
+                : formatSettingsTimestampUtc(lastSyncAtIso) || $_('settings.sync.unknown')}
+            </dd>
+          </div>
+        </dl>
+
+        {#if forceRefreshStatusIsVisible && syncSnapshot.state !== 'idle' && syncSnapshot.message !== null}
+          <p
+            class="settings-screen__sync-status"
+            data-testid="force-refresh-status"
+            role={syncSnapshot.state === 'error' ? 'alert' : 'status'}
+            aria-live="polite"
+          >
+            {syncSnapshot.message}
+          </p>
+        {/if}
       {/if}
-    {/if}
 
-    {#if bindingState.browserIsOpen}
-      <SettingsDatabaseBrowser {bindingState} {handleOpenFolderClick} {handleSelectFileClick} />
-    {/if}
+      {#if bindingState.browserIsOpen}
+        <SettingsDatabaseBrowser {bindingState} {handleOpenFolderClick} {handleSelectFileClick} />
+      {/if}
+    </SettingsSection>
+    <SettingsSection
+      title={$_('settings.sections.receiptScanning')}
+      testId="settings-receipt-section"
+    >
+      <SettingsOpenRouterSection controller={openRouterController} />
+    </SettingsSection>
   {/if}
-
-  <h3 class="settings-screen__subheading">{$_('settings.actions.account')}</h3>
-  <div class="settings-screen__actions" data-testid="account-settings-actions">
-    {#if state.session.isAuthenticated}
-      <button
-        class="app-button app-button--secondary"
-        type="button"
-        on:click={handleSignOutClick}
-        disabled={authOperationIsPending || localDataResetState.operation !== 'idle'}
-      >
-        {$_('settings.generalActions.signOut')}
-      </button>
-    {:else}
-      <button
-        class="app-button app-button--primary"
-        type="button"
-        on:click={handleSignInClick}
-        disabled={authOperationIsPending}
-      >
-        {$_('settings.generalActions.signIn')}
-      </button>
-    {/if}
-  </div>
 
   <SettingsBuildInformation {buildInfo} />
 </section>

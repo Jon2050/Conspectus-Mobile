@@ -177,6 +177,13 @@
     </p>
   {/if}
 
+  <p class="openrouter-settings__help" data-testid="openrouter-model-filter-help">
+    {$_('settings.openRouter.models.filterHelp')}
+    <a href="https://openrouter.ai/rankings" target="_blank" rel="noopener noreferrer">
+      {$_('settings.openRouter.models.benchmarkSource')}
+    </a>
+  </p>
+
   <div class="openrouter-settings__field">
     <label for="openrouter-vision-model">{$_('settings.openRouter.models.visionLabel')}</label>
     <select

@@ -3,7 +3,8 @@
 All images are generated SVG text fixtures with fictional transactions dated 2026-10-20; they contain
 no personal data. `gold.json` separately records expected stage-one extraction and stage-two groups
 or rejection. The corpus covers mixed groups, discount, deposit/return, restaurant precedence,
-quantity/tax/payment, exact merchant names, unsupported/ambiguous goods, refunds, zero total,
+quantity/tax/payment, shared/normalized merchant names, plausible abbreviations, unsupported goods,
+items without plausible context, refunds, zero total,
 negative groups, long receipts, unreadable fields and non-EUR currency.
 
 The source images are inspectable independently from the gold JSON. Browser tests exercise the real
@@ -28,9 +29,9 @@ For recorded provider evaluation, prepare a JSON array with one object per model
     "transferModelId": "actual selected text model ID",
     "sourceRevision": "40-character source Git SHA",
     "capturedAt": "2026-10-20T20:00:00Z",
-    "extractionPromptVersion": 4,
-    "derivationPromptVersion": 4,
-    "rulesVersion": 4,
+    "extractionPromptVersion": 6,
+    "derivationPromptVersion": 7,
+    "rulesVersion": 5,
     "cases": [
       {
         "id": "mixed-discount",

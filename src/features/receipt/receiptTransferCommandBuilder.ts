@@ -6,7 +6,11 @@ import {
   type AddTransferAccountOption,
   type AddTransferFormFields,
 } from '../transfers/addTransferFormState';
-import { formatAmountInputDigits } from '../transfers/addTransferAmountInput';
+import {
+  formatAmountInputDigits,
+  parseAmountInputCents,
+} from '../transfers/addTransferAmountInput';
+import { receiptReviewTotalCents, type ReceiptReviewDraft } from './receiptReviewDraft';
 import type { AddTransferOptionsState } from '../transfers/transferOptions';
 import { validateAddTransfer } from '../transfers/addTransferValidation';
 import { deriveTransferType } from '../transfers/transferTypeDerivation';
@@ -146,7 +150,7 @@ export const validateReceiptSourceAccountTopology = (
 
 export const buildReceiptTransferCommands = (
   derivation: ReceiptTransferDerivation,
-  expectedItemIndexes: readonly number[],
+  expectedItemIndexes: readonly number[] | null,
   sourceAccountId: number,
   optionsState: AddTransferOptionsState,
 ): ReceiptTransferCommandBuildResult => {
@@ -177,7 +181,7 @@ export const buildReceiptTransferCommands = (
   ) {
     return failure('total_mismatch');
   }
-  if (!hasSafeExactCoverage(derivation, expectedItemIndexes)) {
+  if (expectedItemIndexes !== null && !hasSafeExactCoverage(derivation, expectedItemIndexes)) {
     return failure('invalid_item_coverage');
   }
 
@@ -267,6 +271,38 @@ export const buildReceiptTransferCommands = (
   }
 
   return { ok: true, commands: Object.freeze(commands) };
+};
+
+export const buildReviewedReceiptTransferCommands = (
+  draft: ReceiptReviewDraft,
+  sourceAccountId: number,
+  options: AddTransferOptionsState,
+): ReceiptTransferCommandBuildResult => {
+  const total = receiptReviewTotalCents(draft);
+  if (draft.currency !== null && draft.currency !== 'EUR')
+    return failure('invalid_transfer', 'addTransfer.receipt.review.currencyUnsupported');
+  if (total === null || total <= 0 || draft.transfers.length === 0 || draft.transfers.length > 100)
+    return failure('non_positive_amount');
+  // This is an explicitly reviewed manual batch. Check its entered fields and local sum;
+  // the original OCR total is informational and may itself have been read incorrectly.
+  return buildReceiptTransferCommands(
+    {
+      status: 'ok',
+      errorReason: null,
+      receiptTotalCents: total,
+      transfers: draft.transfers.map((transfer) => ({
+        name: transfer.name,
+        amountCents: parseAmountInputCents(transfer.amount) ?? 0,
+        categoryNames: transfer.categoryNames,
+        buyplace: draft.buyplace,
+        receiptDate: draft.date,
+        sourceItemIndexes: [],
+      })),
+    },
+    null,
+    sourceAccountId,
+    options,
+  );
 };
 
 export const validatePreparedReceiptTransferCommands = (

@@ -64,6 +64,11 @@ Startup validation:
 - App startup fails fast when required variables are missing.
 - A clear startup message is shown in the UI and explains how to fix the configuration.
 
+Receipt AI testing uses a separate, Git-ignored `.env.receipt.local` for `OPENROUTER_API_KEY`,
+`OPENROUTER_VISION_MODEL`, `OPENROUTER_TRANSFER_MODEL` and `RECEIPT_TEST_CASES`. These Node-only test
+settings must not use the `VITE_` prefix and do not configure the app's Settings screen. See
+[receipt testing](docs/Receipt-Testing.md) for setup, live diagnostics and offline feature tests.
+
 ## Local Auth Testing
 
 For real Microsoft sign-in and OneDrive browse testing, the app must run on a redirect URI that is registered in the Entra SPA app registration.
@@ -104,6 +109,8 @@ Use these documents as the canonical sources for their topics:
   [docs/Conspectus-Desktop-Info.md](docs/Conspectus-Desktop-Info.md).
 - Contribution and delivery workflow for humans and coding agents:
   [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).
+- Receipt feature tests, private photograph fixtures and opt-in OpenRouter evaluation:
+  [docs/Receipt-Testing.md](docs/Receipt-Testing.md).
 
 ## Security
 

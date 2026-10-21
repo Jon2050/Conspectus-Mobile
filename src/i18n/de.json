@@ -73,7 +73,7 @@
     "receipt": {
       "heading": "Kassenbon erfassen",
       "description": "Nimm ein Foto mit der Kameraauswahl deines Geräts auf.",
-      "semanticRisk": "Die KI-Zuordnung kann trotz erfolgreicher Betrags- und Strukturprüfung fachlich falsch sein. Prüfe deine Gruppen- und Kategorienregeln in den Einstellungen.",
+      "semanticRisk": "Die KI kann Felder falsch lesen oder Artikel falsch zuordnen. Prüfe die vorgeschlagenen Daten vor dem Speichern.",
       "action": "Kassenbon fotografieren",
       "integrationPending": "Die Belegverarbeitung ist derzeit nicht verfügbar.",
       "normalizing": "Foto wird sicher vorbereitet...",
@@ -81,8 +81,9 @@
       "stageTwo": "Transferdaten erstellen",
       "freshAction": "Neuen Kassenbon fotografieren",
       "sourceAccount": "Quellkonto für alle Transfers",
-      "accountRequired": "Wähle ein Quellkonto, damit die Transfers automatisch erstellt werden können.",
+      "accountRequired": "Wähle das Quellkonto für alle Teiltransfers. Gespeichert wird erst mit „Speichern“.",
       "progressLabel": "Fortschritt der Kassenbonverarbeitung",
+      "processing": "Die Verarbeitung läuft. Dies kann einen Moment dauern.",
       "steps": {
         "extraction": "Foto auslesen",
         "derivation": "Transferdaten erstellen",
@@ -164,9 +165,23 @@
           "remote_commit_recovery_failed": "Die Transfers sind in OneDrive gespeichert, aber die geprüfte lokale Aktualisierung ist fehlgeschlagen. Speichere sie nicht erneut."
         }
       },
-      "duplicateWarning": "Nach der Kontowahl werden Transfers automatisch gespeichert. Prüfe vor einer weiteren Aufnahme, ob dieser Beleg bereits gebucht wurde. Wiederholte Fotos können Duplikate erzeugen.",
+      "duplicateWarning": "Prüfe vor einer weiteren Aufnahme, ob dieser Beleg bereits gebucht wurde. Wiederholte Fotos können Duplikate erzeugen.",
       "correction": "Prüfe Datum, Händler, Beträge und Kategorien. Zur Korrektur schließe die Mobile-App, bearbeite die Datenbank in Conspectus Desktop und öffne und aktualisiere danach die Mobile-App. Nutze beide Apps nicht gleichzeitig mit dieser Datenbank.",
-      "imageGuidance": "Fotografiere den gesamten Beleg scharf mit lesbarem Datum und Gesamtbetrag. Bei HEIC-Leseproblemen wähle stattdessen ein JPEG. Sehr lange Bons und hochauflösende Fotos können unlesbar sein oder den Gerätespeicher überfordern."
+      "imageGuidance": "Fotografiere den gesamten Beleg scharf mit lesbarem Datum und Gesamtbetrag. Bei HEIC-Leseproblemen wähle stattdessen ein JPEG. Sehr lange Bons und hochauflösende Fotos können unlesbar sein oder den Gerätespeicher überfordern.",
+      "review": {
+        "hint": "Prüfe die erkannten Daten. Du kannst alle Angaben vor dem Speichern bearbeiten. Das Zielkonto ist immer AUSGABEN.",
+        "transfer": "Teiltransfer {number}",
+        "category": "Kategorie {number}",
+        "noCategory": "Keine Kategorie",
+        "unknownCategory": "nicht gefunden",
+        "add": "Teiltransfer hinzufügen",
+        "remove": "Teiltransfer entfernen",
+        "total": "Gesamtbetrag",
+        "receiptTotal": "Erkannter Bon-Gesamtbetrag",
+        "totalDifference": "Die Summe der Teilbeträge weicht vom erkannten Bon-Gesamtbetrag ab. Prüfe die Beträge vor dem Speichern.",
+        "save": "Speichern",
+        "currencyUnsupported": "Es können nur Beträge in EUR gespeichert werden."
+      }
     },
     "save": {
       "localSave": "Transfer wird lokal gespeichert und der Datenbank-Upload vorbereitet...",
@@ -205,6 +220,10 @@
     }
   },
   "settings": {
+    "sections": {
+      "database": "Datenbank",
+      "receiptScanning": "Bon Scanning"
+    },
     "title": "Einstellungen",
     "description": "Verwalte OneDrive-Zugriff, lokale Daten und kontobezogene Beleg-KI-Einstellungen.",
     "safety": {
@@ -268,8 +287,10 @@
         "visionLabel": "Modell zum Auslesen des Belegs",
         "transferLabel": "Modell zum Ableiten der Transfers",
         "placeholder": "Kompatibles kostenloses Modell wählen",
-        "noVisionModels": "Derzeit ist kein kostenloses Modell mit Bildeingabe und Textausgabe zum Auslesen von Belegen verfügbar.",
-        "noTransferModels": "Derzeit ist kein kostenloses Textmodell mit Unterstützung für strukturierte Ausgaben zum Ableiten von Transfers verfügbar."
+        "noVisionModels": "Derzeit ist kein kostenloses Modell mit Bildeingabe, Textausgabe und einem Artificial Analysis Intelligence Index von mindestens 20 verfügbar.",
+        "noTransferModels": "Derzeit ist kein kostenloses Textmodell mit einem Artificial Analysis Intelligence Index von mindestens 20 verfügbar.",
+        "filterHelp": "Beide Auswahllisten enthalten kostenlose Modelle mit einem Artificial Analysis Intelligence Index von mindestens 20. Quelle: Artificial Analysis über den Live-Benchmarkkatalog von OpenRouter. Modelle ohne bestätigten Wert werden nicht angeboten.",
+        "benchmarkSource": "Benchmarkdaten bei OpenRouter"
       },
       "prompt": {
         "label": "Regeln zum Gruppieren der Bonpositionen",

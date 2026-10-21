@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "allowJs": false,
+    "checkJs": false,
+    "types": ["node", "svelte", "vite/client", "vite-plugin-pwa/client"]
+  },
+  "include": ["tests/live/**/*.ts", "vitest.receipt.config.ts", "src/**/*.d.ts"]
+}

@@ -13,13 +13,13 @@ export type {
   OpenRouterChatCompletionRequest,
   OpenRouterChatContent,
   OpenRouterChatJpegContent,
-  OpenRouterChatJsonSchema,
   OpenRouterChatMessage,
   OpenRouterChatMessageRole,
   OpenRouterChatTextContent,
 } from './chatCompletionClient';
 export {
   OPENROUTER_USER_MODELS_URL,
+  OPENROUTER_INTELLIGENCE_BENCHMARKS_URL,
   OpenRouterCatalogError,
   createOpenRouterModelCatalogClient,
   openRouterModelCatalogClient,
@@ -33,3 +33,8 @@ export {
   parseOpenRouterCompatibleModelCatalog,
 } from './modelCatalog';
 export type { OpenRouterCompatibleModelCatalog, OpenRouterModelOption } from './modelCatalog';
+export { resolveOpenRouterReasoning } from './reasoning';
+export type {
+  OpenRouterReasoningConfiguration,
+  OpenRouterReasoningCapabilities,
+} from './reasoning';

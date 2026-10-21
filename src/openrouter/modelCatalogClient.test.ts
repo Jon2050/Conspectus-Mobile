@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   OPENROUTER_USER_MODELS_URL,
+  OPENROUTER_INTELLIGENCE_BENCHMARKS_URL,
   OpenRouterCatalogError,
   createOpenRouterModelCatalogClient,
 } from './modelCatalogClient';
@@ -13,6 +14,7 @@ const catalogResponse = (): Response =>
       data: [
         {
           id: 'provider/model:free',
+          canonical_slug: 'provider/model-snapshot',
           name: 'Free Model',
           architecture: { input_modalities: ['text'], output_modalities: ['text'] },
           pricing: { prompt: '0', completion: '0' },
@@ -22,6 +24,17 @@ const catalogResponse = (): Response =>
     }),
     { status: 200, headers: { 'Content-Type': 'application/json' } },
   );
+
+const benchmarkResponse = () =>
+  Response.json({
+    data: [
+      {
+        source: 'artificial-analysis',
+        model_permaslug: 'provider/model-snapshot',
+        intelligence_index: 20,
+      },
+    ],
+  });
 
 describe('createOpenRouterModelCatalogClient', () => {
   it('bounds stalled response bodies and aborts the fetch signal without retry', async () => {
@@ -43,14 +56,16 @@ describe('createOpenRouterModelCatalogClient', () => {
     }
   });
   it('sends a bodyless authenticated GET without caching or credentials', async () => {
-    const fetchMock = vi.fn<typeof fetch>(async () => catalogResponse());
+    const fetchMock = vi.fn<typeof fetch>(async (url) =>
+      url === OPENROUTER_USER_MODELS_URL ? catalogResponse() : benchmarkResponse(),
+    );
     const client = createOpenRouterModelCatalogClient({ fetch: fetchMock });
 
     await expect(client.load('  secret-api-key  ')).resolves.toMatchObject({
       transferModels: [{ id: 'provider/model:free' }],
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     const [url, init] = fetchMock.mock.calls[0] ?? [];
     expect(url).toBe(OPENROUTER_USER_MODELS_URL);
     expect(init).toMatchObject({
@@ -65,6 +80,42 @@ describe('createOpenRouterModelCatalogClient', () => {
     });
     expect(init).not.toHaveProperty('body');
     expect(String(url)).not.toContain('secret-api-key');
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(OPENROUTER_INTELLIGENCE_BENCHMARKS_URL);
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject(init!);
+  });
+
+  it.each([429, 500])('fails closed when benchmark retrieval returns HTTP %s', async (status) => {
+    const fetchMock = vi.fn<typeof fetch>(async (url) =>
+      url === OPENROUTER_USER_MODELS_URL
+        ? catalogResponse()
+        : new Response('secret provider details', { status }),
+    );
+    const client = createOpenRouterModelCatalogClient({ fetch: fetchMock });
+    const error = await client.load('secret-key').catch((error: unknown) => error);
+    expect(error).toMatchObject({ code: 'provider_error', status });
+    expect(JSON.stringify(error)).not.toContain('secret');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('bounds a stalled benchmark body with the same whole-load deadline', async () => {
+    vi.useFakeTimers();
+    try {
+      const stalled = new Response();
+      vi.spyOn(stalled, 'json').mockImplementation(() => new Promise(() => {}));
+      const fetchMock = vi.fn<typeof fetch>(async (url) =>
+        url === OPENROUTER_USER_MODELS_URL ? catalogResponse() : stalled,
+      );
+      const request = createOpenRouterModelCatalogClient({ fetch: fetchMock, timeoutMs: 100 }).load(
+        'secret',
+      );
+      const assertion = expect(request).rejects.toMatchObject({ code: 'timeout' });
+      await vi.advanceTimersByTimeAsync(100);
+      await assertion;
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock.mock.calls[1]?.[1]?.signal?.aborted).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it.each([401, 403])(

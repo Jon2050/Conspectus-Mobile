@@ -36,15 +36,17 @@ export interface ReceiptExtraction {
 export interface ReceiptExtractionError {
   readonly status: 'error';
   readonly errorReason: string;
-  readonly storeName: null;
-  readonly receiptDate: null;
-  readonly currency: null;
-  readonly receiptTotalCents: null;
-  readonly items: readonly [];
+  readonly storeName: string | null;
+  readonly receiptDate: string | null;
+  readonly currency: string | null;
+  readonly receiptTotalCents: number | null;
+  readonly items: readonly ReceiptExtractionItem[];
 }
 
 export type ReceiptExtractionResult = ReceiptExtraction | ReceiptExtractionError;
 
+// Local enriched result, not the model wire format: date/total come only from stage one;
+// the single stage-two purchase location is expanded for the existing command builder.
 export interface ReceiptDerivedTransfer {
   readonly name: string;
   readonly amountCents: number;
@@ -64,8 +66,12 @@ export interface ReceiptTransferDerivation {
 export interface ReceiptTransferDerivationError {
   readonly status: 'error';
   readonly errorReason: string;
-  readonly receiptTotalCents: null;
-  readonly transfers: readonly [];
+  readonly receiptTotalCents: number | null;
+  readonly buyplace: string | null;
+  readonly transfers: readonly (Omit<ReceiptDerivedTransfer, 'buyplace' | 'receiptDate'> & {
+    readonly buyplace: string | null;
+    readonly receiptDate: string | null;
+  })[];
 }
 
 export type ReceiptTransferDerivationResult =
@@ -106,75 +112,6 @@ export type ReceiptAnalysisParseResult<T> =
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly error: ReceiptAnalysisValidationError };
 
-const schema = {
-  type: 'object',
-  additionalProperties: false,
-  required: ['status', 'errorReason', 'receiptTotalCents', 'transfers'],
-  properties: {
-    status: { type: 'string', enum: ['ok', 'error'] },
-    errorReason: {
-      type: ['string', 'null'],
-      maxLength: RECEIPT_ANALYSIS_LIMITS.errorReasonCharacters,
-    },
-    receiptTotalCents: {
-      type: ['integer', 'null'],
-      minimum: 1,
-      maximum: Number.MAX_SAFE_INTEGER,
-    },
-    transfers: {
-      type: 'array',
-      maxItems: RECEIPT_ANALYSIS_LIMITS.transfers,
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        required: [
-          'name',
-          'amountCents',
-          'categoryNames',
-          'buyplace',
-          'receiptDate',
-          'sourceItemIndexes',
-        ],
-        properties: {
-          name: {
-            type: 'string',
-            minLength: 1,
-            maxLength: RECEIPT_ANALYSIS_LIMITS.transferNameCharacters,
-          },
-          amountCents: { type: 'integer', minimum: 1, maximum: Number.MAX_SAFE_INTEGER },
-          categoryNames: {
-            type: 'array',
-            maxItems: RECEIPT_ANALYSIS_LIMITS.categoriesPerTransfer,
-            items: {
-              type: 'string',
-              minLength: 1,
-              maxLength: RECEIPT_ANALYSIS_LIMITS.categoryNameCharacters,
-            },
-          },
-          buyplace: {
-            type: 'string',
-            minLength: 1,
-            maxLength: RECEIPT_ANALYSIS_LIMITS.buyplaceCharacters,
-          },
-          receiptDate: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
-          sourceItemIndexes: {
-            type: 'array',
-            minItems: 1,
-            maxItems: RECEIPT_ANALYSIS_LIMITS.items,
-            items: { type: 'integer', minimum: 0, maximum: Number.MAX_SAFE_INTEGER },
-          },
-        },
-      },
-    },
-  },
-} satisfies Record<string, unknown>;
-
-export const RECEIPT_TRANSFER_DERIVATION_JSON_SCHEMA = Object.freeze({
-  name: 'receipt_transfer_derivation',
-  strict: true,
-  schema,
-}) satisfies Readonly<Record<string, unknown>>;
-
 const EXTRACTION_KEYS = [
   'status',
   'errorReason',
@@ -185,18 +122,148 @@ const EXTRACTION_KEYS = [
   'items',
 ] as const;
 const EXTRACTION_ITEM_KEYS = ['index', 'name', 'quantityText', 'lineTotalCents', 'kind'] as const;
-const DERIVATION_KEYS = ['status', 'errorReason', 'receiptTotalCents', 'transfers'] as const;
-const TRANSFER_KEYS = [
-  'name',
-  'amountCents',
-  'categoryNames',
-  'buyplace',
-  'receiptDate',
-  'sourceItemIndexes',
-] as const;
+// Wire format shares one purchase location; trusted extraction metadata is attached locally.
+const DERIVATION_KEYS = ['status', 'errorReason', 'buyplace', 'transfers'] as const;
+const TRANSFER_KEYS = ['name', 'amountCents', 'categoryNames', 'sourceItemIndexes'] as const;
 const ITEM_KINDS: readonly ReceiptItemKind[] = ['item', 'discount', 'deposit', 'other'];
 
 type JsonObject = Record<string, unknown>;
+
+export interface ReceiptReviewSeed {
+  readonly currency?: string | null;
+  readonly receiptDate: string | null;
+  readonly buyplace: string | null;
+  readonly receiptTotalCents: number | null;
+  readonly transfers: readonly Pick<
+    ReceiptDerivedTransfer,
+    'name' | 'amountCents' | 'categoryNames'
+  >[];
+}
+
+// Partial model responses are suggestions for human review, never validated booking commands.
+export function parseReceiptExtractionResponse(
+  raw: string,
+): ReceiptAnalysisParseResult<ReceiptExtractionResult> {
+  const parsed = parseJson(raw);
+  if (!parsed.ok) return parsed;
+  const value = parsed.value;
+  if (!isObject(value) || value.status !== 'error')
+    return parseCompleteReceiptExtractionResponse(raw);
+  const keysError = validateExactKeys(value, EXTRACTION_KEYS, '$');
+  if (keysError) return { ok: false, error: keysError };
+  const reason = boundedString(value.errorReason, RECEIPT_ANALYSIS_LIMITS.errorReasonCharacters);
+  if (!reason) return failure('INVALID_ERROR_REASON', 'An error response needs a bounded reason.');
+  if (
+    (value.storeName !== null &&
+      boundedString(value.storeName, RECEIPT_ANALYSIS_LIMITS.storeNameCharacters) === null) ||
+    (value.receiptDate !== null && !isRealIsoDate(value.receiptDate)) ||
+    (value.currency !== null &&
+      (typeof value.currency !== 'string' || !/^[A-Z]{3}$/u.test(value.currency))) ||
+    (value.receiptTotalCents !== null && !isSafeInteger(value.receiptTotalCents))
+  ) {
+    return failure('INVALID_STRUCTURE', 'Partial receipt fields must be well-formed or null.');
+  }
+  if (!Array.isArray(value.items) || value.items.length > RECEIPT_ANALYSIS_LIMITS.items)
+    return failure('INVALID_ITEM_COUNT', 'Invalid partial item count.');
+  const indexes = new Set<number>();
+  const items: ReceiptExtractionItem[] = [];
+  for (const item of value.items) {
+    if (!isObject(item)) return failure('INVALID_STRUCTURE', 'Invalid partial item.');
+    const error = validateExactKeys(item, EXTRACTION_ITEM_KEYS, '$.items');
+    if (error) return { ok: false, error };
+    if (
+      !isSafeInteger(item.index) ||
+      item.index < 0 ||
+      indexes.has(item.index) ||
+      boundedString(item.name, RECEIPT_ANALYSIS_LIMITS.itemNameCharacters) === null ||
+      (item.quantityText !== null &&
+        boundedString(item.quantityText, RECEIPT_ANALYSIS_LIMITS.quantityTextCharacters) ===
+          null) ||
+      !isSafeInteger(item.lineTotalCents) ||
+      !ITEM_KINDS.includes(item.kind as ReceiptItemKind)
+    )
+      return failure('INVALID_STRUCTURE', 'Invalid partial item fields.');
+    indexes.add(item.index);
+    items.push({ ...item } as unknown as ReceiptExtractionItem);
+  }
+  return {
+    ok: true,
+    value: {
+      status: 'error',
+      errorReason: reason,
+      storeName: value.storeName as string | null,
+      receiptDate: value.receiptDate as string | null,
+      currency: value.currency as string | null,
+      receiptTotalCents: value.receiptTotalCents as number | null,
+      items,
+    },
+  };
+}
+
+export function parseReceiptTransferDerivationResponse(
+  raw: string,
+  extraction: ReceiptExtractionResult,
+): ReceiptAnalysisParseResult<ReceiptTransferDerivationResult> {
+  const parsed = parseJson(raw);
+  if (!parsed.ok) return parsed;
+  const value = parsed.value;
+  if (!isObject(value) || value.status !== 'error') {
+    if (extraction.status !== 'ok')
+      return failure(
+        'INVALID_STRUCTURE',
+        'An incomplete extraction cannot yield a complete derivation.',
+      );
+    return parseCompleteReceiptTransferDerivationResponse(raw, extraction);
+  }
+  const keysError = validateExactKeys(value, DERIVATION_KEYS, '$');
+  if (keysError) return { ok: false, error: keysError };
+  const reason = boundedString(value.errorReason, RECEIPT_ANALYSIS_LIMITS.errorReasonCharacters);
+  if (!reason) return failure('INVALID_ERROR_REASON', 'An error response needs a bounded reason.');
+  if (
+    (value.buyplace !== null &&
+      boundedString(value.buyplace, RECEIPT_ANALYSIS_LIMITS.buyplaceCharacters) === null) ||
+    !Array.isArray(value.transfers) ||
+    value.transfers.length > RECEIPT_ANALYSIS_LIMITS.transfers
+  )
+    return failure('INVALID_STRUCTURE', 'Invalid partial derivation.');
+  const transfers: ReceiptTransferDerivationError['transfers'][number][] = [];
+  for (const transfer of value.transfers) {
+    if (!isObject(transfer)) return failure('INVALID_STRUCTURE', 'Invalid partial transfer.');
+    const error = validateExactKeys(transfer, TRANSFER_KEYS, '$.transfers');
+    if (error) return { ok: false, error };
+    if (
+      boundedString(transfer.name, RECEIPT_ANALYSIS_LIMITS.transferNameCharacters) === null ||
+      !isSafeInteger(transfer.amountCents) ||
+      !Array.isArray(transfer.categoryNames) ||
+      transfer.categoryNames.length > 3 ||
+      transfer.categoryNames.some(
+        (name) => boundedString(name, RECEIPT_ANALYSIS_LIMITS.categoryNameCharacters) === null,
+      ) ||
+      !Array.isArray(transfer.sourceItemIndexes) ||
+      transfer.sourceItemIndexes.length > RECEIPT_ANALYSIS_LIMITS.items ||
+      transfer.sourceItemIndexes.some((index) => !isSafeInteger(index) || index < 0)
+    )
+      return failure('INVALID_STRUCTURE', 'Invalid partial transfer fields.');
+    transfers.push({
+      name: transfer.name as string,
+      amountCents: transfer.amountCents,
+      categoryNames: [...transfer.categoryNames] as string[],
+      sourceItemIndexes: [...transfer.sourceItemIndexes] as number[],
+      buyplace: value.buyplace as string | null,
+      receiptDate: extraction.receiptDate,
+    });
+  }
+  return {
+    ok: true,
+    value: {
+      status: 'error',
+      errorReason: reason,
+      buyplace: value.buyplace as string | null,
+      receiptTotalCents: extraction.receiptTotalCents,
+      transfers,
+    },
+  };
+}
 
 function failure(
   code: ReceiptAnalysisValidationErrorCode,
@@ -283,70 +350,7 @@ function parseJson(raw: string): ReceiptAnalysisParseResult<unknown> {
   }
 }
 
-function parseModelError<T>(
-  value: JsonObject,
-  stage: 'extraction' | 'derivation',
-): ReceiptAnalysisParseResult<T> | null {
-  if (value.status !== 'error') return null;
-  const reason = boundedString(value.errorReason, RECEIPT_ANALYSIS_LIMITS.errorReasonCharacters);
-  if (reason === null) {
-    return failure(
-      'INVALID_ERROR_REASON',
-      'An error response must contain a concrete, bounded reason.',
-      '$.errorReason',
-    );
-  }
-
-  if (stage === 'extraction') {
-    if (
-      value.storeName !== null ||
-      value.receiptDate !== null ||
-      value.currency !== null ||
-      value.receiptTotalCents !== null ||
-      !Array.isArray(value.items) ||
-      value.items.length !== 0
-    ) {
-      return failure(
-        'INVALID_STRUCTURE',
-        'An extraction error response must not contain partial results.',
-      );
-    }
-    return {
-      ok: true,
-      value: {
-        status: 'error',
-        errorReason: reason,
-        storeName: null,
-        receiptDate: null,
-        currency: null,
-        receiptTotalCents: null,
-        items: [],
-      } as T,
-    };
-  }
-
-  if (
-    value.receiptTotalCents !== null ||
-    !Array.isArray(value.transfers) ||
-    value.transfers.length !== 0
-  ) {
-    return failure(
-      'INVALID_STRUCTURE',
-      'A derivation error response must not contain partial transfers.',
-    );
-  }
-  return {
-    ok: true,
-    value: {
-      status: 'error',
-      errorReason: reason,
-      receiptTotalCents: null,
-      transfers: [],
-    } as T,
-  };
-}
-
-export function parseReceiptExtractionResponse(
+function parseCompleteReceiptExtractionResponse(
   raw: string,
 ): ReceiptAnalysisParseResult<ReceiptExtractionResult> {
   const parsed = parseJson(raw);
@@ -361,8 +365,6 @@ export function parseReceiptExtractionResponse(
     return failure('INVALID_STATUS', 'The extraction status must be "ok" or "error".', '$.status');
   }
 
-  const modelError = parseModelError<ReceiptExtractionResult>(parsed.value, 'extraction');
-  if (modelError !== null) return modelError;
   if (parsed.value.errorReason !== null) {
     return failure(
       'INVALID_ERROR_REASON',
@@ -495,7 +497,7 @@ export function parseReceiptExtractionResponse(
   };
 }
 
-export function parseReceiptTransferDerivationResponse(
+function parseCompleteReceiptTransferDerivationResponse(
   raw: string,
   extraction: ReceiptExtraction,
 ): ReceiptAnalysisParseResult<ReceiptTransferDerivationResult> {
@@ -511,8 +513,6 @@ export function parseReceiptTransferDerivationResponse(
     return failure('INVALID_STATUS', 'The derivation status must be "ok" or "error".', '$.status');
   }
 
-  const modelError = parseModelError<ReceiptTransferDerivationResult>(parsed.value, 'derivation');
-  if (modelError !== null) return modelError;
   if (parsed.value.errorReason !== null) {
     return failure(
       'INVALID_ERROR_REASON',
@@ -520,18 +520,12 @@ export function parseReceiptTransferDerivationResponse(
       '$.errorReason',
     );
   }
-  if (!isSafeInteger(parsed.value.receiptTotalCents) || parsed.value.receiptTotalCents <= 0) {
+  const buyplace = boundedString(parsed.value.buyplace, RECEIPT_ANALYSIS_LIMITS.buyplaceCharacters);
+  if (buyplace === null) {
     return failure(
-      'INVALID_CENTS',
-      'The derived receipt total must be a positive safe integer-cent value.',
-      '$.receiptTotalCents',
-    );
-  }
-  if (parsed.value.receiptTotalCents !== extraction.receiptTotalCents) {
-    return failure(
-      'RECEIPT_TOTAL_MISMATCH',
-      'The derived receipt total does not match the extraction.',
-      '$.receiptTotalCents',
+      'INVALID_STRING',
+      'The shared purchase location is missing or too long.',
+      '$.buyplace',
     );
   }
   if (
@@ -595,21 +589,6 @@ export function parseReceiptTransferDerivationResponse(
         'DUPLICATE_CATEGORY',
         'A category may occur only once per transfer.',
         `${path}.categoryNames`,
-      );
-    }
-    const buyplace = boundedString(candidate.buyplace, RECEIPT_ANALYSIS_LIMITS.buyplaceCharacters);
-    if (buyplace === null || buyplace !== extraction.storeName) {
-      return failure(
-        'INVALID_STRING',
-        'The purchase location must exactly match the extracted store name.',
-        `${path}.buyplace`,
-      );
-    }
-    if (!isRealIsoDate(candidate.receiptDate) || candidate.receiptDate !== extraction.receiptDate) {
-      return failure(
-        'INVALID_DATE',
-        'The transfer date must exactly match the validated receipt date.',
-        `${path}.receiptDate`,
       );
     }
     if (
@@ -677,7 +656,7 @@ export function parseReceiptTransferDerivationResponse(
       amountCents: candidate.amountCents,
       categoryNames: [...candidate.categoryNames] as string[],
       buyplace,
-      receiptDate: candidate.receiptDate,
+      receiptDate: extraction.receiptDate,
       sourceItemIndexes: [...candidate.sourceItemIndexes] as number[],
     });
   }

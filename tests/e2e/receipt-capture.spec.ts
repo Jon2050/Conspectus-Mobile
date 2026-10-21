@@ -1,6 +1,7 @@
 // Verifies the browser-visible native receipt capture boundary without simulating OS camera UI.
 import { expect, test, type Page, type Request } from '@playwright/test';
 import fs from 'node:fs';
+import { installOpenRouterBenchmarkFixture } from './support/openrouter-benchmarks';
 
 import {
   appPath,
@@ -10,6 +11,7 @@ import {
 } from './support/app-test-harness';
 
 test.use({ viewport: { width: 320, height: 720 } });
+test.beforeEach(async ({ page }) => installOpenRouterBenchmarkFixture(page));
 
 const RECEIPT_IMAGE = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
@@ -18,13 +20,20 @@ const RECEIPT_IMAGE = Buffer.from(
 
 const MODEL = {
   id: 'provider/shared:free',
+  canonical_slug: 'provider/shared-snapshot',
   name: 'Shared Free Model',
   architecture: {
     input_modalities: ['text', 'image'],
     output_modalities: ['text'],
   },
   pricing: { prompt: '0', completion: '0', request: '0', image: '0' },
-  supported_parameters: ['structured_outputs'],
+  supported_parameters: [],
+  reasoning: {
+    mandatory: false,
+    supported_efforts: ['high', 'low', 'none'],
+    default_enabled: false,
+    default_effort: 'none',
+  },
 };
 
 const READY_RECEIPT_DB = {
@@ -92,6 +101,7 @@ for (const limitedStage of [1, 2]) {
       .getByTestId('receipt-image-input')
       .setInputFiles({ name: 'receipt.png', mimeType: 'image/png', buffer: RECEIPT_IMAGE });
     await expect(page.getByTestId('add-transfer-form-error')).toContainText('rate limiting');
+    await expect(page.getByTestId('receipt-activity')).toHaveCount(0);
     await expect(page.getByTestId('receipt-photo-button')).toBeEnabled();
     await page.waitForTimeout(350);
     expect(catalogCalls).toBe(limitedStage);
@@ -160,14 +170,12 @@ const EXTRACTION = {
 const DERIVATION = {
   status: 'ok',
   errorReason: null,
-  receiptTotalCents: 350,
+  buyplace: 'Markt',
   transfers: [
     {
       name: 'Brot',
       amountCents: 350,
       categoryNames: ['Einkauf', 'Lebensmittel'],
-      buyplace: 'Markt',
-      receiptDate: '2026-07-31',
       sourceItemIndexes: [0],
     },
   ],
@@ -184,22 +192,18 @@ const MULTI_EXTRACTION = {
 
 const MULTI_DERIVATION = {
   ...DERIVATION,
-  receiptTotalCents: 500,
+  buyplace: 'Rewe',
   transfers: [
     {
       name: 'Brot',
       amountCents: 300,
       categoryNames: ['Einkauf', 'Lebensmittel'],
-      buyplace: 'Markt',
-      receiptDate: '2026-07-31',
       sourceItemIndexes: [0],
     },
     {
       name: 'Reiniger',
       amountCents: 200,
       categoryNames: ['Einkauf', 'Haushalt, Verbrauchsgüter, Reinigung'],
-      buyplace: 'Markt',
-      receiptDate: '2026-07-31',
       sourceItemIndexes: [1],
     },
   ],
@@ -228,6 +232,7 @@ const installReceiptAnalysisRoutes = async (
   page: Page,
   completionBodies: readonly unknown[],
   firstStageGate?: Promise<void>,
+  secondStageGate?: Promise<void>,
 ): Promise<{ readonly catalogRequests: Request[]; readonly completionRequests: Request[] }> => {
   const catalogRequests: Request[] = [];
   const completionRequests: Request[] = [];
@@ -270,6 +275,7 @@ const installReceiptAnalysisRoutes = async (
 
     completionRequests.push(request);
     if (completionRequests.length === 1) await firstStageGate;
+    if (completionRequests.length === 2) await secondStageGate;
     const response = completionBodies[completionRequests.length - 1] ?? completionBodies.at(-1);
     await route.fulfill({
       status: 200,
@@ -317,7 +323,7 @@ test('exposes one native outward-camera image input without custom capture or ga
   const nativeInput = page.getByTestId('receipt-image-input');
   await expect(photoButton).toBeVisible();
   await expect(page.getByTestId('receipt-semantic-risk')).toContainText(
-    'AI classification can still be semantically wrong',
+    'Review the suggested data before saving',
   );
   await expect(photoButton).toHaveAccessibleName('Photograph receipt');
   await expect(nativeInput).toHaveAttribute('type', 'file');
@@ -338,18 +344,21 @@ test('exposes one native outward-camera image input without custom capture or ga
   expect(captureSectionSize.scrollWidth).toBeLessThanOrEqual(captureSectionSize.clientWidth);
 });
 
-test('runs both OpenRouter stages and automatically commits one validated transfer', async ({
-  page,
-}) => {
+test('runs both OpenRouter stages and saves only after explicit review', async ({ page }) => {
   await installReadyReceiptConfiguration(page);
   let releaseExtraction!: () => void;
   const extractionGate = new Promise<void>((resolve) => {
     releaseExtraction = resolve;
   });
+  let releaseDerivation!: () => void;
+  const derivationGate = new Promise<void>((resolve) => {
+    releaseDerivation = resolve;
+  });
   const requests = await installReceiptAnalysisRoutes(
     page,
     [EXTRACTION, DERIVATION],
     extractionGate,
+    derivationGate,
   );
   await installReadyAddTransferTestDb(
     page,
@@ -385,14 +394,39 @@ test('runs both OpenRouter stages and automatically commits one validated transf
     'Receipt processing progress',
   );
   await expect(page.getByTestId('receipt-step-extraction')).toHaveAttribute('data-state', 'active');
+  await expect(page.getByTestId('receipt-activity')).toBeVisible();
+  await expect(
+    page.getByTestId('receipt-step-extraction').locator('.receipt-progress__marker'),
+  ).toHaveCSS('animation-iteration-count', 'infinite');
   await expect(page.getByTestId('add-transfer-from-account')).toBeEnabled();
   await expect(page.getByTestId('add-transfer-date')).toHaveCount(0);
   await expect(page.getByTestId('add-transfer-submit')).toHaveCount(0);
   await expect(page.getByTestId('receipt-progress')).not.toContainText('%');
   await page.getByTestId('add-transfer-from-account').selectOption('11');
   releaseExtraction();
-  // The source selector disappears as soon as the prepared commands are handed off.
-  // Assert the durable result instead of racing that transition.
+  await expect(page.getByTestId('receipt-step-derivation')).toHaveAttribute('data-state', 'active');
+  await expect(page.getByTestId('receipt-step-extraction')).toHaveAttribute(
+    'data-state',
+    'complete',
+  );
+  await expect(page.getByTestId('receipt-activity')).toBeVisible();
+  await expect(
+    page.getByTestId('receipt-step-derivation').locator('.receipt-progress__marker'),
+  ).toHaveCSS('animation-iteration-count', 'infinite');
+  await page.screenshot({
+    path: `output/receipt-review/processing-${test.info().project.name}.png`,
+  });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(
+    page.getByTestId('receipt-step-derivation').locator('.receipt-progress__marker'),
+  ).toHaveCSS('animation-name', 'none');
+  await expect(page.getByTestId('receipt-activity')).toBeVisible();
+  releaseDerivation();
+  await expect(page.getByTestId('receipt-review')).toBeVisible();
+  await expect(page.getByTestId('receipt-activity')).toHaveCount(0);
+  expect(await getLocalTransferWriteCallCount(page)).toBe(0);
+  expect(await getGraphUploadCallCount(page)).toBe(0);
+  await page.getByTestId('receipt-review-save').click();
   await expect(page.getByTestId('receipt-commit-success')).toContainText('1 transfer created');
   await expect(page.getByTestId('receipt-step-creation')).toHaveAttribute('data-state', 'complete');
   await expect(page.getByTestId('receipt-saved-summary')).toContainText('Brot');
@@ -411,6 +445,8 @@ test('runs both OpenRouter stages and automatically commits one validated transf
   expect(stageTwoRequest?.headers().authorization).toBe('Bearer sk-or-e2e-secret');
   const stageOneBody = stageOneRequest?.postDataJSON() as Record<string, unknown>;
   const stageTwoBody = stageTwoRequest?.postDataJSON() as Record<string, unknown>;
+  expect(stageOneBody.reasoning).toEqual({ enabled: true, effort: 'low' });
+  expect(stageTwoBody.reasoning).toEqual({ enabled: true, effort: 'low' });
   expect(JSON.stringify(stageOneBody)).toContain('data:image/jpeg;base64,');
   expect(JSON.stringify(stageTwoBody)).not.toContain('data:image/jpeg;base64,');
   expect(JSON.stringify(stageTwoBody)).not.toContain('accountId');
@@ -418,12 +454,9 @@ test('runs both OpenRouter stages and automatically commits one validated transf
   expect(stageOneBody.provider).toEqual({ allow_fallbacks: false });
   expect(stageTwoBody.provider).toEqual({
     allow_fallbacks: false,
-    require_parameters: true,
   });
-  expect(stageTwoBody.response_format).toMatchObject({
-    type: 'json_schema',
-    json_schema: { strict: true },
-  });
+  expect(stageTwoBody).not.toHaveProperty('response_format');
+  expect(stageTwoBody.provider).not.toHaveProperty('require_parameters');
   expect(await getLocalTransferWriteCallCount(page)).toBe(1);
   expect(await getGraphUploadCallCount(page)).toBe(1);
 
@@ -434,7 +467,7 @@ test('runs both OpenRouter stages and automatically commits one validated transf
   await expect(page.getByTestId('add-transfer-date')).toBeVisible();
 });
 
-test('waits for a deliberate late source selection and commits a multi-transfer batch once', async ({
+test('edits shared fields and grouped transfers and saves the reviewed batch once', async ({
   page,
 }) => {
   await page.clock.setFixedTime(new Date('2026-07-31T12:00:00.000Z'));
@@ -479,6 +512,32 @@ test('waits for a deliberate late source selection and commits a multi-transfer 
   await expect(page.getByTestId('add-transfer-from-account').locator('option')).toHaveCount(2);
 
   await page.getByTestId('add-transfer-from-account').selectOption('11');
+  await expect(page.getByTestId('receipt-review-date')).toHaveValue('2026-07-31');
+  await expect(page.getByTestId('receipt-review-buyplace')).toHaveValue('Rewe');
+  await page.getByTestId('receipt-review-date').fill('2026-07-30');
+  await page.getByTestId('receipt-review-buyplace').fill('Rewe korrigiert');
+  await page.getByTestId('receipt-review-name-0').fill('Brot korrigiert');
+  await page
+    .getByTestId('receipt-review-category-0-1')
+    .selectOption('Haushalt, Verbrauchsgüter, Reinigung');
+  await page.getByTestId('receipt-review-amount-0').fill('4,00');
+  await page.getByTestId('receipt-review-amount-1').fill('1,00');
+  expect(await getLocalTransferWriteCallCount(page)).toBe(0);
+  expect(await getGraphUploadCallCount(page)).toBe(0);
+  await page.screenshot({
+    path: `output/receipt-review/review-${test.info().project.name}.png`,
+    fullPage: true,
+  });
+  const reviewWidth = await page
+    .getByTestId('receipt-review')
+    .evaluate((element) => ({ width: element.clientWidth, scroll: element.scrollWidth }));
+  expect(reviewWidth.scroll).toBeLessThanOrEqual(reviewWidth.width);
+  await page.getByTestId('receipt-review-save').scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: `output/receipt-review/review-bottom-${test.info().project.name}.png`,
+    fullPage: true,
+  });
+  await page.getByTestId('receipt-review-save').click();
 
   await expect(page.getByTestId('receipt-commit-success')).toContainText('2 transfers created');
   await expect(page.getByTestId('receipt-step-creation')).toHaveAttribute('data-state', 'complete');
@@ -491,6 +550,62 @@ test('waits for a deliberate late source selection and commits a multi-transfer 
   await expect(page.getByTestId('transfers-month-label')).toHaveText('July 2026');
   await expect(page.getByTestId('route-transfers')).toContainText('Brot');
   await expect(page.getByTestId('route-transfers')).toContainText('Reiniger');
+  await expect(page.locator('.transfer-card__date')).toHaveText(['July 30, 2026', 'July 30, 2026']);
+  // Stage two supplies this shared normalized name once; both persisted rows inherit it.
+  await expect(
+    page.locator('.transfer-card__buyplace-prefix').filter({ hasText: '(Rewe korrigiert)' }),
+  ).toHaveCount(2);
+});
+
+test('reviews and corrects partial responses without any booking before Save', async ({ page }) => {
+  await installReadyReceiptConfiguration(page);
+  const requests = await installReceiptAnalysisRoutes(page, [
+    {
+      ...MULTI_EXTRACTION,
+      status: 'error',
+      errorReason: 'Der Gesamtbetrag ist unleserlich.',
+      receiptTotalCents: null,
+    },
+    { ...MULTI_DERIVATION, status: 'error', errorReason: 'Der Gesamtbetrag fehlt.' },
+  ]);
+  await installReadyAddTransferTestDb(page, {
+    fromAccountOptionRows: [
+      { accountId: 11, name: 'Checking', amountCents: 1000, accountTypeId: 3 },
+    ],
+    toAccountOptionRows: [{ accountId: 2, name: 'Spendings', amountCents: 0, accountTypeId: 2 }],
+    categoryRows: [
+      { categoryId: 20, name: 'Einkauf' },
+      { categoryId: 21, name: 'Lebensmittel' },
+      { categoryId: 22, name: 'Haushalt, Verbrauchsgüter, Reinigung' },
+      { categoryId: 23, name: 'Süßigkeiten' },
+      { categoryId: 24, name: 'Restaurant, Bar, Bäcker' },
+    ],
+  });
+  await page.goto(appPath('#/add'));
+  await page
+    .getByTestId('receipt-image-input')
+    .setInputFiles({ name: 'partial.png', mimeType: 'image/png', buffer: RECEIPT_IMAGE });
+  await expect(page.getByTestId('receipt-review-date')).toHaveValue('2026-07-31');
+  await expect(page.getByTestId('receipt-review-buyplace')).toHaveValue('Rewe');
+  await expect(page.getByTestId('receipt-review-name-0')).toHaveValue('Brot');
+  await expect(page.getByTestId('receipt-review-name-1')).toHaveValue('Reiniger');
+  await expect(page.getByTestId('add-transfer-form-error')).toContainText('Gesamtbetrag');
+  expect(await getLocalTransferWriteCallCount(page)).toBe(0);
+  await page.getByTestId('add-transfer-from-account').selectOption('11');
+  await page.getByTestId('receipt-review-name-0').fill('Brot korrigiert');
+  await page.getByTestId('receipt-review-add').click();
+  await page.getByTestId('receipt-review-remove-2').click();
+  await page.context().setOffline(true);
+  await expect(page.getByTestId('receipt-review-save')).toBeDisabled();
+  await expect(page.getByTestId('receipt-review-name-0')).toHaveValue('Brot korrigiert');
+  await page.context().setOffline(false);
+  await expect(page.getByTestId('receipt-review-save')).toBeEnabled();
+  expect(await getGraphUploadCallCount(page)).toBe(0);
+  await page.getByTestId('receipt-review-save').click();
+  await expect(page.getByTestId('receipt-commit-success')).toContainText('2 transfers created');
+  expect(requests.completionRequests).toHaveLength(2);
+  expect(await getLocalTransferWriteCallCount(page)).toBe(1);
+  expect(await getGraphUploadCallCount(page)).toBe(1);
 });
 
 test('clears completed receipt state when upload finishes after leaving Add', async ({ page }) => {
@@ -524,6 +639,7 @@ test('clears completed receipt state when upload finishes after leaving Add', as
     buffer: RECEIPT_IMAGE,
   });
   await page.getByTestId('add-transfer-from-account').selectOption('11');
+  await page.getByTestId('receipt-review-save').click();
   await expect(
     page.locator('[data-testid="progress-indicator"][data-kind="upload"]'),
   ).toBeVisible();
@@ -633,13 +749,16 @@ test('ends a model-declared failure and starts again only after a fresh file sel
   await expect(page.getByTestId('receipt-photo-button')).toHaveAccessibleName(
     'Photograph a new receipt',
   );
-  await expect(page.getByTestId('add-transfer-from-account')).toHaveCount(0);
+  await expect(page.getByTestId('add-transfer-from-account')).toBeVisible();
+  await expect(page.getByTestId('receipt-review-date')).toHaveValue('');
   await expect(page.getByTestId('receipt-step-extraction')).toHaveAttribute('data-state', 'error');
+  await expect(page.getByTestId('receipt-activity')).toHaveCount(0);
   await expect(page.getByTestId('receipt-analysis-retry')).toHaveCount(0);
 
   await input.setInputFiles({ name: 'second.png', mimeType: 'image/png', buffer: RECEIPT_IMAGE });
   await expect(page.getByTestId('add-transfer-from-account')).toBeEnabled();
   await page.getByTestId('add-transfer-from-account').selectOption('11');
+  await page.getByTestId('receipt-review-save').click();
   await expect(page.getByTestId('receipt-commit-success')).toContainText('1 transfer created');
   expect(requests.completionRequests).toHaveLength(3);
   expect(await getLocalTransferWriteCallCount(page)).toBe(1);
@@ -683,6 +802,7 @@ test('retries only exported bytes after a transport failure without another SQL 
     buffer: RECEIPT_IMAGE,
   });
   await page.getByTestId('add-transfer-from-account').selectOption('11');
+  await page.getByTestId('receipt-review-save').click();
   await expect(page.getByTestId('receipt-upload-retry')).toBeVisible();
   expect(await getLocalTransferWriteCallCount(page)).toBe(1);
   expect(await getGraphUploadCallCount(page)).toBe(1);
@@ -726,6 +846,7 @@ test('keeps byte-only retry visible when connectivity is lost during upload', as
     buffer: RECEIPT_IMAGE,
   });
   await page.getByTestId('add-transfer-from-account').selectOption('11');
+  await page.getByTestId('receipt-review-save').click();
   await expect(
     page.locator('[data-testid="progress-indicator"][data-kind="upload"]'),
   ).toBeVisible();
@@ -781,6 +902,7 @@ test('refreshes an eTag conflict and waits for an explicit revalidated batch ret
     buffer: RECEIPT_IMAGE,
   });
   await page.getByTestId('add-transfer-from-account').selectOption('11');
+  await page.getByTestId('receipt-review-save').click();
   await expect(page.getByTestId('receipt-conflict-refresh')).toBeVisible();
   expect(await getGraphUploadCallCount(page)).toBe(1);
 
@@ -830,6 +952,7 @@ test('shows remote-save reconciliation failure without any write or upload retry
     buffer: RECEIPT_IMAGE,
   });
   await page.getByTestId('add-transfer-from-account').selectOption('11');
+  await page.getByTestId('receipt-review-save').click();
 
   await expect(page.getByTestId('receipt-remote-saved')).toContainText(
     'saved to OneDrive, but local data could not be refreshed',
@@ -911,6 +1034,9 @@ for (const pickerReturnsDuringRefresh of [false, true]) {
     await page.evaluate(() =>
       (window as typeof window & { releaseFreshness: () => void }).releaseFreshness(),
     );
+    await expect(page.getByTestId('receipt-review-save')).toBeEnabled();
+    expect(await getGraphUploadCallCount(page)).toBe(0);
+    await page.getByTestId('receipt-review-save').click();
     await expect(page.getByTestId('receipt-commit-success')).toContainText('1 transfer created');
     expect(requests.completionRequests).toHaveLength(2);
     expect(await getGraphUploadCallCount(page)).toBe(1);

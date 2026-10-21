@@ -13,6 +13,14 @@ Dependency boundaries:
 - May depend on all lower-level modules.
 - Must not be imported by infrastructure modules.
 
+Settings presentation:
+
+- Group settings in the reusable `app-shell/routes/SettingsSection.svelte` component. Each native
+  disclosure starts collapsed on route entry; new settings areas should use their own section.
+- Manual transfer entry defaults the source to the primary income account and the target to the
+  primary spendings account by account type, preserving existing drafts. Receipt preparation keeps
+  its separate deliberate source-account selection.
+
 Receipt AI settings:
 
 - `receipt/prompts/` owns the separate hidden stage prompts and versioned user-editable grouping-rule
@@ -29,10 +37,12 @@ Receipt AI settings:
   `receipt/receiptAnalysisController.ts` orchestrates the two OpenRouter stages. The analysis
   controller revalidates each selected model immediately before use, releases image bytes after
   stage 1, passes the editable grouping rules verbatim to stage 2 without parsing them, and retains
-  only a structurally and arithmetically validated transient derivation plus its item-index coverage
-  proof for the later local-transfer workflow.
+  typed partial metadata/groups for manual review as well as validated complete derivations.
+  Mistaken model success is still rejected; readable suggestions may remain editable.
 - `receipt/receiptTransferPreparationController.ts` owns the deliberate per-run source selection,
-  accessible three-step progress state, and immutable in-memory command handoff. Its pure command
+  accessible three-step progress state, editable shared metadata/group rows and explicit Save handoff.
+  `app-shell/routes/ReceiptReviewForm.svelte` presents that draft. Analysis/account selection never
+  writes. Its pure command
   builder resolves exact current category names, targets the sole primary spendings account, and
   reuses Add Transfer validation and type derivation without writing SQLite or OneDrive.
 - `app-shell/transferCommitController.ts` owns the common transaction/export/upload, byte-only
@@ -51,8 +61,9 @@ Receipt AI settings:
 - Cancellation, account/file context changes, and supersession clear selection, coverage proof,
   derivation, and prepared commands; public UI state never exposes raw or normalized image bytes.
 - `receipt/receiptSetupValidation.ts` checks topology and the known default category metadata before
-  remote work without interpreting custom rules. Same-context loading suspends preparation; terminal
-  errors invalidate it. The Add route retains only commands for its transient post-save summary.
+  remote work without interpreting custom rules. Same-context loading and options errors suspend
+  saving while retaining the editable draft; session replacement clears it. The Add route retains
+  only commands for its transient post-save summary.
 - The synthetic receipt gold corpus and recorded-response evaluator distinguish parser consistency
   from actual provider semantics; qualification gaps are recorded in
   `docs/reviews/2026-10-20-ap4-receipt-qualification.md`.

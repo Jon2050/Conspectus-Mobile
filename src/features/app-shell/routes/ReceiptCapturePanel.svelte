@@ -4,6 +4,9 @@
   import type { ReceiptCaptureController, ReceiptTransferPreparationState } from '../../receipt';
   import type { ReceiptTransferCommitState } from '../receiptTransferCommitController';
   import type { AddTransferAccountOption } from '../../transfers/addTransferFormState';
+  import type { AddTransferOptionsState } from '../../transfers/transferOptions';
+  import type { ReceiptReviewDraft } from '../../receipt/receiptReviewDraft';
+  import ReceiptReviewForm from './ReceiptReviewForm.svelte';
   let {
     receiptFileInputElement = $bindable(null),
     receiptCaptureIsDisabled,
@@ -18,6 +21,11 @@
     handleReceiptFileCancel,
     openReceiptCapture,
     handleReceiptSourceAccountChange,
+    receiptCategoryOptions,
+    reviewIsDisabled,
+    sourceIsDisabled,
+    handleReceiptDraftChange,
+    handleReceiptSave,
   }: {
     receiptFileInputElement?: HTMLInputElement | null;
     receiptCaptureIsDisabled: boolean;
@@ -32,6 +40,11 @@
     handleReceiptFileCancel: (event: Event) => void;
     openReceiptCapture: () => void;
     handleReceiptSourceAccountChange: (event: Event) => void;
+    receiptCategoryOptions: AddTransferOptionsState['categoryOptions'];
+    reviewIsDisabled: boolean;
+    sourceIsDisabled: boolean;
+    handleReceiptDraftChange: (draft: ReceiptReviewDraft) => void;
+    handleReceiptSave: () => void;
   } = $props();
 </script>
 
@@ -61,7 +74,9 @@
     capture="environment"
     hidden
     disabled={receiptFileSelectionIsDisabled ||
-      (receiptWorkflowIsActive && receiptPreparationState.phase !== 'error')}
+      (receiptWorkflowIsActive &&
+        receiptPreparationState.phase !== 'error' &&
+        !receiptPreparationState.draft)}
     onchange={handleReceiptFileChange}
     oncancel={handleReceiptFileCancel}
   />
@@ -114,6 +129,12 @@
       {/each}
     </ol>
 
+    {#if displayedReceiptSteps.some((step) => step.status === 'active')}
+      <p class="add-transfer-form__receipt-hint" data-testid="receipt-activity">
+        {$_('addTransfer.receipt.processing')}
+      </p>
+    {/if}
+
     {#if receiptPreparationState.phase === 'error' || receiptCommitState.phase === 'failed' || receiptCommitState.phase === 'invalidated'}
       <button
         type="button"
@@ -126,7 +147,7 @@
         <span aria-hidden="true">📷</span>
         {$_('addTransfer.receipt.freshAction')}
       </button>
-    {:else if receiptPreparationState.phase === 'processing' || receiptPreparationState.phase === 'waiting_for_source' || receiptPreparationState.phase === 'ready_for_commit'}
+    {:else if receiptPreparationState.phase === 'processing' || receiptPreparationState.phase === 'waiting_for_source' || receiptPreparationState.phase === 'reviewing' || receiptPreparationState.phase === 'ready_for_commit'}
       <div class="add-transfer-form__field receipt-source-account">
         <label class="add-transfer-form__label" for="receipt-source-account">
           {$_('addTransfer.receipt.sourceAccount')}
@@ -136,7 +157,7 @@
           class="app-input"
           data-testid="add-transfer-from-account"
           value={receiptPreparationState.sourceAccountId ?? ''}
-          disabled={receiptPreparationState.phase === 'ready_for_commit'}
+          disabled={receiptPreparationState.phase === 'ready_for_commit' || sourceIsDisabled}
           onchange={handleReceiptSourceAccountChange}
         >
           <option value="">{$_('addTransfer.fromAccountPlaceholder')}</option>
@@ -158,6 +179,22 @@
             { values: { count: receiptPreparationState.readyForCommit.length } },
           )}
         </p>
+      {/if}
+      {#if receiptPreparationState.draft}
+        <ReceiptReviewForm
+          draft={receiptPreparationState.draft}
+          categories={receiptCategoryOptions}
+          disabled={reviewIsDisabled || receiptPreparationState.phase === 'ready_for_commit'}
+          onChange={handleReceiptDraftChange}
+          onSave={handleReceiptSave}
+        />
+        <button
+          type="button"
+          class="app-button app-button--secondary"
+          data-testid="receipt-photo-button"
+          disabled={receiptCaptureIsDisabled}
+          onclick={openReceiptCapture}>{$_('addTransfer.receipt.freshAction')}</button
+        >
       {/if}
     {/if}
   {/if}

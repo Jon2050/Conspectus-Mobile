@@ -73,7 +73,7 @@
     "receipt": {
       "heading": "Capture receipt",
       "description": "Take a photo using your device's camera picker.",
-      "semanticRisk": "AI classification can still be semantically wrong even after amount and structure validation succeeds. Review your group and category rules in Settings.",
+      "semanticRisk": "AI can misread fields or classify items incorrectly. Review the suggested data before saving.",
       "action": "Photograph receipt",
       "integrationPending": "Receipt processing is currently unavailable.",
       "normalizing": "Preparing the photo securely...",
@@ -81,8 +81,9 @@
       "stageTwo": "Create transfer data",
       "freshAction": "Photograph a new receipt",
       "sourceAccount": "Source account for all transfers",
-      "accountRequired": "Select a source account so the transfers can be created automatically.",
+      "accountRequired": "Choose the source account for all transfers. Nothing is booked until you press Save.",
       "progressLabel": "Receipt processing progress",
+      "processing": "Processing is ongoing. This may take a moment.",
       "steps": {
         "extraction": "Read photo",
         "derivation": "Create transfer data",
@@ -164,9 +165,23 @@
           "remote_commit_recovery_failed": "The transfers are saved to OneDrive, but the verified local refresh failed. Do not save them again."
         }
       },
-      "duplicateWarning": "Transfers are saved automatically after account selection. Before taking another photo, check whether this receipt has already been booked. Repeated photos can create duplicates.",
+      "duplicateWarning": "Before taking another photo, check whether this receipt has already been booked. Repeated photos can create duplicates.",
       "correction": "Check the date, merchant, amounts and categories. To correct a booking, close the mobile app, edit the database in Conspectus Desktop, then reopen and refresh the mobile app. Do not use both apps on this database at the same time.",
-      "imageGuidance": "Use a sharp photo of the entire receipt with a readable date and total. For HEIC decoding problems, select a JPEG instead. Very long receipts and high-resolution photos may be unreadable or exceed device memory."
+      "imageGuidance": "Use a sharp photo of the entire receipt with a readable date and total. For HEIC decoding problems, select a JPEG instead. Very long receipts and high-resolution photos may be unreadable or exceed device memory.",
+      "review": {
+        "hint": "Review the detected data. You can edit every field before saving. The destination is always SPENDINGS.",
+        "transfer": "Transfer {number}",
+        "category": "Category {number}",
+        "noCategory": "No category",
+        "unknownCategory": "not found",
+        "add": "Add transfer",
+        "remove": "Remove transfer",
+        "total": "Total",
+        "receiptTotal": "Detected receipt total",
+        "totalDifference": "The transfer amounts differ from the detected receipt total. Check the amounts before saving.",
+        "save": "Save",
+        "currencyUnsupported": "Only EUR amounts can be saved."
+      }
     },
     "save": {
       "localSave": "Saving transfer locally and preparing the database upload...",
@@ -205,6 +220,10 @@
     }
   },
   "settings": {
+    "sections": {
+      "database": "Database",
+      "receiptScanning": "Receipt scanning"
+    },
     "title": "Settings",
     "description": "Manage OneDrive access, local data, and account-scoped receipt AI settings.",
     "safety": {
@@ -268,8 +287,10 @@
         "visionLabel": "Receipt extraction model",
         "transferLabel": "Transfer derivation model",
         "placeholder": "Select a compatible free model",
-        "noVisionModels": "No current free image-input and text-output model is available for receipt extraction.",
-        "noTransferModels": "No current free text model with structured-output support is available for transfer derivation."
+        "noVisionModels": "No current free image-input and text-output model with an Artificial Analysis Intelligence Index of at least 20 is available.",
+        "noTransferModels": "No current free text model with an Artificial Analysis Intelligence Index of at least 20 is available.",
+        "filterHelp": "Both lists contain free models with an Artificial Analysis Intelligence Index of at least 20. Source: Artificial Analysis via OpenRouter's live benchmark catalog. Models without a confirmed score are excluded.",
+        "benchmarkSource": "Benchmark data on OpenRouter"
       },
       "prompt": {
         "label": "Receipt-item grouping rules",

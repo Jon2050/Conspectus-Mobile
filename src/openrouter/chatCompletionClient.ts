@@ -1,7 +1,8 @@
 // Sends bounded, non-streaming OpenRouter chat completions through a redacted provider boundary.
+import type { OpenRouterReasoningConfiguration } from './reasoning';
 
 export const OPENROUTER_CHAT_COMPLETIONS_URL = 'https://openrouter.ai/api/v1/chat/completions';
-export const OPENROUTER_CHAT_COMPLETION_TIMEOUT_MS = 60_000;
+export const OPENROUTER_CHAT_COMPLETION_TIMEOUT_MS = 90_000;
 export const OPENROUTER_CHAT_COMPLETION_MAX_RESPONSE_CHARACTERS = 128 * 1024;
 
 export type OpenRouterChatCompletionErrorCode =
@@ -45,17 +46,11 @@ export interface OpenRouterChatMessage {
   readonly content: string | readonly OpenRouterChatContent[];
 }
 
-export interface OpenRouterChatJsonSchema {
-  readonly name: string;
-  readonly schema: Readonly<Record<string, unknown>>;
-  readonly description?: string;
-}
-
 export interface OpenRouterChatCompletionRequest {
+  readonly reasoning?: OpenRouterReasoningConfiguration | undefined;
   readonly apiKey: string;
   readonly model: string;
   readonly messages: readonly OpenRouterChatMessage[];
-  readonly responseFormat?: OpenRouterChatJsonSchema;
 }
 
 export interface OpenRouterChatCompletionClient {
@@ -169,31 +164,12 @@ const serializeMessages = (messages: readonly OpenRouterChatMessage[]): readonly
   }));
 
 const createRequestBody = (request: OpenRouterChatCompletionRequest): UnknownRecord => {
-  const provider = {
-    allow_fallbacks: false,
-    ...(request.responseFormat === undefined ? {} : { require_parameters: true }),
-  };
-
   return {
     model: request.model,
     messages: serializeMessages(request.messages),
     stream: false,
-    provider,
-    ...(request.responseFormat === undefined
-      ? {}
-      : {
-          response_format: {
-            type: 'json_schema',
-            json_schema: {
-              name: request.responseFormat.name,
-              strict: true,
-              schema: request.responseFormat.schema,
-              ...(request.responseFormat.description === undefined
-                ? {}
-                : { description: request.responseFormat.description }),
-            },
-          },
-        }),
+    ...(request.reasoning ? { reasoning: request.reasoning } : {}),
+    provider: { allow_fallbacks: false },
   };
 };
 

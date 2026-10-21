@@ -48,7 +48,15 @@ const evaluate = (expected: GoldCase, observed: Observation) => {
     return 'unsafe_acceptance';
   return isDeepStrictEqual(
     groups(derivation.value),
-    groups(expected.derivation as ReceiptTransferDerivation),
+
+    groups(
+      (
+        parseReceiptTransferDerivationResponse(
+          JSON.stringify(expected.derivation),
+          extraction.value,
+        ) as { ok: true; value: ReceiptTransferDerivation }
+      ).value,
+    ),
   )
     ? 'correct'
     : 'unsafe_acceptance';
@@ -82,13 +90,8 @@ describe('synthetic receipt gold corpus and evaluation', () => {
     derivation.transfers[1]!.categoryNames = ['Einkauf', 'Lebensmittel'];
     expect(evaluate(entry, { ...entry, derivation, latencyMs: 1 })).toBe('unsafe_acceptance');
     const extraction = { ...entry.extraction, receiptDate: '2026-10-19' };
-    const wrongDate = {
-      ...entry.derivation!,
-      transfers: entry.derivation!.transfers.map((transfer) => ({
-        ...transfer,
-        receiptDate: '2026-10-19',
-      })),
-    };
+
+    const wrongDate = entry.derivation;
     expect(evaluate(entry, { ...entry, extraction, derivation: wrongDate, latencyMs: 1 })).toBe(
       'unsafe_acceptance',
     );

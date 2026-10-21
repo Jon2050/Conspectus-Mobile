@@ -3,11 +3,12 @@ import { describe, expect, it } from 'vitest';
 
 import {
   OpenRouterCatalogResponseError,
-  parseOpenRouterCompatibleModelCatalog,
+  parseOpenRouterCompatibleModelCatalog as parseWithBenchmarks,
 } from './modelCatalog';
 
 const model = (id: string, overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
   id,
+  canonical_slug: `${id}-snapshot`,
   name: `Name ${id}`,
   architecture: {
     input_modalities: ['text'],
@@ -21,7 +22,46 @@ const model = (id: string, overrides: Record<string, unknown> = {}): Record<stri
   ...overrides,
 });
 
+const benchmark = (modelId: string, score: unknown = 20) => ({
+  source: 'artificial-analysis',
+  model_permaslug: `${modelId}-snapshot`,
+  intelligence_index: score,
+});
+
+const parseOpenRouterCompatibleModelCatalog = (payload: { data: unknown }) =>
+  parseWithBenchmarks(payload, {
+    data: Array.isArray(payload.data)
+      ? [
+          ...new Set(
+            payload.data
+              .filter(
+                (entry): entry is Record<string, unknown> =>
+                  entry !== null && typeof entry === 'object',
+              )
+              .map((entry) => String(entry.id)),
+          ),
+        ].map((id) => benchmark(id))
+      : [],
+  });
+
 describe('parseOpenRouterCompatibleModelCatalog', () => {
+  it('excludes confirmed free harness-only variants while retaining other eligible models and reasoning metadata', () => {
+    const catalog = parseOpenRouterCompatibleModelCatalog({
+      data: [
+        model('thinkingmachines/inkling:free'),
+        model('thinkingmachines/inkling-small:free'),
+        model('provider/text:free', {
+          reasoning: { mandatory: true, supported_efforts: ['max', 'low'], default_effort: 'max' },
+        }),
+      ],
+    });
+    expect(catalog.transferModels.map((option) => option.id)).toEqual(['provider/text:free']);
+    expect(catalog.transferModels[0]?.reasoning).toMatchObject({
+      mandatory: true,
+      supportedEfforts: ['low', 'max'],
+      defaultEffort: 'max',
+    });
+  });
   it('derives independent role options and permits one eligible model in both roles', () => {
     const sharedModel = model('provider/shared:free', {
       name: 'Shared Free',
@@ -99,7 +139,6 @@ describe('parseOpenRouterCompatibleModelCatalog', () => {
         model('provider/no-text-output', {
           architecture: { input_modalities: ['image'], output_modalities: ['image'] },
         }),
-        model('provider/no-structured-output'),
         model('openrouter/free', {
           architecture: { input_modalities: ['text', 'image'], output_modalities: ['text'] },
           supported_parameters: ['structured_outputs'],
@@ -108,6 +147,49 @@ describe('parseOpenRouterCompatibleModelCatalog', () => {
     });
 
     expect(catalog).toEqual({ visionModels: [], transferModels: [] });
+  });
+
+  it('accepts text models without structured-output metadata at the exact intelligence threshold', () => {
+    const catalog = parseWithBenchmarks(
+      { data: [model('plain')] },
+      { data: [benchmark('plain', 20)] },
+    );
+    expect(catalog.transferModels.map(({ id }) => id)).toEqual(['plain']);
+  });
+
+  it('joins only exact canonical snapshots and filters both roles by finite scores of at least 20', () => {
+    const vision = (id: string) =>
+      model(id, {
+        architecture: { input_modalities: ['text', 'image'], output_modalities: ['text'] },
+      });
+    const models = [
+      'threshold',
+      'above',
+      'below',
+      'unknown',
+      'wrong-version',
+      'string',
+      'nonfinite',
+      'wrong-source',
+      'ambiguous',
+    ].map(vision);
+    const data = [
+      benchmark('threshold', 20),
+      benchmark('above', 42.7),
+      benchmark('below', 19.99),
+      { ...benchmark('wrong-version', 90), model_permaslug: 'wrong-version-other-snapshot' },
+      benchmark('string', '99'),
+      benchmark('nonfinite', Infinity),
+      { ...benchmark('wrong-source', 99), source: 'design-arena' },
+      benchmark('ambiguous', 99),
+      benchmark('ambiguous', 1),
+    ];
+    const result = parseWithBenchmarks({ data: models }, { data });
+    expect(result.visionModels.map(({ id }) => id).sort()).toEqual(['above', 'threshold']);
+    expect(result.transferModels).toEqual(result.visionModels);
+    expect(() => parseWithBenchmarks({ data: models }, { data: null })).toThrow(
+      OpenRouterCatalogResponseError,
+    );
   });
 
   it('accepts textual zero formats without treating underflowing nonzero decimals as free', () => {
@@ -150,7 +232,9 @@ describe('parseOpenRouterCompatibleModelCatalog', () => {
 
   it('ignores malformed entries but rejects a malformed catalog envelope', () => {
     expect(
-      parseOpenRouterCompatibleModelCatalog({ data: [null, {}, model('provider/plain')] }),
+      parseOpenRouterCompatibleModelCatalog({
+        data: [null, {}, model('provider/plain', { canonical_slug: '' })],
+      }),
     ).toEqual({
       visionModels: [],
       transferModels: [],

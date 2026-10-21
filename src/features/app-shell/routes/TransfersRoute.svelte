@@ -426,7 +426,7 @@
   .transfer-card {
     display: flex;
     flex-direction: column;
-    gap: 0.08rem;
+    gap: 0;
     padding: 0.4rem 0.75rem;
     border-radius: var(--radius-lg);
     background: var(--surface-strong);
@@ -494,6 +494,7 @@
   }
 
   .transfer-card__details {
+    margin-top: -1px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -528,6 +529,7 @@
     list-style: none;
     padding: 0;
     margin: 0;
+    margin-left: auto;
     display: flex;
     flex-wrap: wrap;
     gap: 0.3rem;

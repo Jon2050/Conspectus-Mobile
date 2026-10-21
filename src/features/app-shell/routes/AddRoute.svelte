@@ -3,7 +3,13 @@
   import { onDestroy, onMount, tick } from 'svelte';
   import { get } from 'svelte/store';
   import { _ } from 'svelte-i18n';
-  import { appAccountQueryService, appCategoryQueryService, type CreateTransferInput } from '@db';
+  import {
+    appAccountQueryService,
+    appCategoryQueryService,
+    PRIMARY_INCOME_ACCOUNT_TYPE_ID,
+    PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID,
+    type CreateTransferInput,
+  } from '@db';
   import {
     appSyncStateStore,
     appNetworkStateStore,
@@ -30,6 +36,7 @@
   import BottomSheet from '../components/BottomSheet.svelte';
   import ManualTransferForm from './ManualTransferForm.svelte';
   import ReceiptCapturePanel from './ReceiptCapturePanel.svelte';
+  import type { ReceiptReviewDraft } from '../../receipt/receiptReviewDraft';
   import TransferCommitStatus from './TransferCommitStatus.svelte';
   import './addTransfer.css';
   import {
@@ -87,6 +94,7 @@
   let receiptSetupError: ReceiptTransferPreparationError | null = null;
   let receiptSummary: readonly CreateTransferInput[] = [];
   let optionsState: AddTransferOptionsState = controller.getState();
+  let defaultAccountsApplied = false;
   let saveState: AddTransferSaveState = saveController.getState();
   let receiptCaptureState: ReceiptCaptureState = receiptCaptureController?.getState() ?? {
     phase: 'idle',
@@ -127,7 +135,7 @@
     saveState.phase === 'invalidated';
   $: receiptCaptureIsBusy =
     receiptCaptureState.phase === 'normalizing' ||
-    receiptCaptureState.phase === 'handed_off' ||
+    (receiptCaptureState.phase === 'handed_off' && !receiptPreparationState.draft) ||
     receiptAnalysisState.phase === 'extracting' ||
     receiptAnalysisState.phase === 'deriving';
   $: receiptWorkflowIsActive =
@@ -228,6 +236,8 @@
   const resetSuccessfulSave = (): void => {
     if (saveController.getState().phase === 'saved') {
       fields = createInitialFormFields();
+      defaultAccountsApplied = false;
+      applyDefaultAccounts();
     }
   };
 
@@ -242,6 +252,10 @@
   };
 
   const handleSubmit = async (): Promise<void> => {
+    if (receiptWorkflowIsActive) {
+      await handleReceiptSave();
+      return;
+    }
     const result = await saveController.submit(fields, optionsState, $_, isOffline);
     validationErrors = [...result.validationErrors];
     const saveCompleted = saveController.getState().phase === 'saved';
@@ -304,6 +318,21 @@
     receiptPreparationController.selectSourceAccount(sourceAccountId, optionsState);
   };
 
+  const handleReceiptDraftChange = (draft: ReceiptReviewDraft): void => {
+    receiptPreparationController.updateDraft(draft);
+  };
+
+  const handleReceiptSave = async (): Promise<void> => {
+    if (submitIsDisabled || receiptCaptureIsBusy || receiptCommitState.phase !== 'idle') return;
+    receiptPreparationController.prepareForSave(optionsState);
+    const commands = receiptPreparationController.claimReadyForCommit();
+    if (commands === null) return;
+    receiptSummary = commands;
+    receiptCaptureController?.reset();
+    receiptAnalysisController?.reset();
+    await receiptCommitController.commit(commands, createReceiptCommitContext(), $_);
+  };
+
   const handleReceiptFileCancel = (event: Event): void => {
     (event.currentTarget as HTMLInputElement).value = '';
   };
@@ -342,8 +371,29 @@
     await receiptCommitController.retryLocalCommitRecovery($_);
   };
 
+  const applyDefaultAccounts = (): void => {
+    if (optionsState.operation !== 'ready' || defaultAccountsApplied) return;
+    defaultAccountsApplied = true;
+    fields = {
+      ...fields,
+      fromAccountId:
+        fields.fromAccountId ??
+        optionsState.fromAccountOptions.find(
+          (account) => account.accountTypeId === PRIMARY_INCOME_ACCOUNT_TYPE_ID,
+        )?.accountId ??
+        null,
+      toAccountId:
+        fields.toAccountId ??
+        optionsState.toAccountOptions.find(
+          (account) => account.accountTypeId === PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID,
+        )?.accountId ??
+        null,
+    };
+  };
+
   const unsubscribeController = controller.subscribe((nextState) => {
     optionsState = nextState;
+    applyDefaultAccounts();
     receiptPreparationController.refreshOptions(nextState);
   });
   const unsubscribeSaveController = saveController.subscribe((nextState) => {
@@ -459,25 +509,13 @@
     componentHasMounted &&
     receiptWorkflowIsActive &&
     isOffline &&
-    ['processing', 'waiting_for_source', 'ready_for_commit'].includes(receiptPreparationState.phase)
+    receiptPreparationState.error?.code !== 'offline' &&
+    ['processing', 'waiting_for_source', 'reviewing', 'ready_for_commit'].includes(
+      receiptPreparationState.phase,
+    )
   ) {
     receiptPreparationController.failForOffline();
     receiptCaptureController?.cancel();
-  }
-
-  $: if (
-    componentHasMounted &&
-    canCreateTransfer &&
-    receiptPreparationState.phase === 'ready_for_commit' &&
-    receiptCommitState.phase === 'idle'
-  ) {
-    const commands = receiptPreparationController.claimReadyForCommit();
-    if (commands !== null) {
-      receiptSummary = commands;
-      receiptCaptureController?.reset();
-      receiptAnalysisController?.reset();
-      void receiptCommitController.commit(commands, createReceiptCommitContext(), $_);
-    }
   }
 
   onMount(() => {
@@ -524,6 +562,7 @@
 
     <BottomSheet
       {isOpen}
+      showCloseButton={false}
       canClose={!isSubmitting && !saveIsBusy && !receiptCommitIsBusy}
       closeLabel={$_('addTransfer.close')}
       title={$_('addTransfer.title')}
@@ -568,6 +607,11 @@
           {handleReceiptFileCancel}
           {openReceiptCapture}
           {handleReceiptSourceAccountChange}
+          receiptCategoryOptions={optionsState.categoryOptions}
+          reviewIsDisabled={submitIsDisabled || receiptCaptureIsBusy}
+          sourceIsDisabled={sourceAccountIsDisabled || receiptCommitIsBusy || isOffline}
+          {handleReceiptDraftChange}
+          {handleReceiptSave}
         />
 
         {#if !receiptWorkflowIsActive}

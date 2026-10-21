@@ -103,7 +103,10 @@ const toNormalizationError = (
       ? error
       : new ReceiptImageNormalizationError(fallbackCode);
 
-export const createReceiptImageNormalizer = (codec: ReceiptImageCodec): ReceiptImageNormalizer => ({
+export const createReceiptImageNormalizer = (
+  codec: ReceiptImageCodec,
+  maxLongEdgePx: number = RECEIPT_IMAGE_MAX_LONG_EDGE_PX,
+): ReceiptImageNormalizer => ({
   async normalize(file, signal): Promise<NormalizedReceiptImage> {
     throwIfAborted(signal);
     if (file.size === 0) {
@@ -122,7 +125,11 @@ export const createReceiptImageNormalizer = (codec: ReceiptImageCodec): ReceiptI
 
     try {
       throwIfAborted(signal);
-      const dimensions = calculateReceiptImageDimensions(decodedImage.width, decodedImage.height);
+      const dimensions = calculateReceiptImageDimensions(
+        decodedImage.width,
+        decodedImage.height,
+        maxLongEdgePx,
+      );
 
       let encodedImage: Blob;
       try {

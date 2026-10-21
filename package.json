@@ -20,7 +20,14 @@
     "format:write": "prettier --write .",
     "test": "vitest run && vitest run --config vitest.scripts.config.ts",
     "test:e2e": "playwright test",
-    "typecheck": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json"
+    "test:receipt": "vitest run src/features/receipt src/openrouter src/features/app-shell/receiptTransferCommitController.test.ts src/features/app-shell/writeSafety.integration.test.ts src/db/transferWriteService.test.ts",
+    "test:receipt:e2e": "playwright test tests/e2e/receipt-capture.spec.ts tests/e2e/openrouter-settings.spec.ts",
+    "test:receipt:check": "tsc --project tsconfig.receipt.json && vitest run --config vitest.receipt.config.ts --testNamePattern=offline:",
+    "test:receipt:models": "vitest run --config vitest.receipt.config.ts --testNamePattern=catalog:",
+    "test:receipt:live": "vitest run --config vitest.receipt.config.ts --testNamePattern=live:",
+    "typecheck": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
+    "test:receipt:benchmark": "vitest run --config vitest.receipt.config.ts --testNamePattern=benchmark:",
+    "test:receipt:image-sizes": "vitest run --config vitest.receipt.config.ts --testNamePattern=image-sizes:"
   },
   "lint-staged": {
     "*.{js,ts,svelte}": [

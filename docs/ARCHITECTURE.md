@@ -129,12 +129,20 @@ The Settings catalog contract is:
 1. Send the key only in the `Authorization` header of a bodyless, no-store request to OpenRouter's
    authenticated `/api/v1/models/user` endpoint. This account-filtered endpoint keeps the user's
    OpenRouter provider preferences, privacy settings, and guardrails effective.
-2. Treat the key as validated for the current Settings visit only after that request succeeds and
-   returns a parseable catalog. Never use a bundled or previously fetched model list.
+2. Also fetch `/api/v1/benchmarks?source=artificial-analysis&task_type=intelligence` from OpenRouter
+   with the same key and no-store settings. Both GETs share one 30-second whole-load deadline.
+   Treat the visit as validated only after both responses are parseable. Never use a bundled or
+   previously fetched model list or an external AA service. Join the model's `canonical_slug`
+   exactly to the benchmark's `model_permaslug`; both roles require a finite Intelligence Index
+   of at least 20. Missing, invalid or duplicate benchmark identities are excluded. A failed
+   benchmark request fails the complete load without invalidating saved selections.
 3. Offer receipt extraction only from current models with image input, text output, zero prompt and
    completion prices, and no nonzero request or image surcharge.
 4. Offer transfer derivation only from current models with text input/output, zero prompt and
-   completion prices, no nonzero request surcharge, and advertised `structured_outputs` support.
+   completion prices and no nonzero request surcharge. Structured-output support is not required.
+   Exclude the confirmed harness-restricted `thinkingmachines/inkling:free` and
+   `thinkingmachines/inkling-small:free` variants. Current catalog/endpoint metadata do not expose
+   that restriction as a capability, so this is a narrow explicit exclusion based on their 403s.
 5. Keep the two selections independent and allow the same eligible model in both roles. A successful
    refresh removes a saved role selection that is no longer eligible without choosing a replacement.
    Authentication, network, parse, and provider failures disable the controls but do not prove the
@@ -163,33 +171,52 @@ storage for native `File` and canvas APIs; the application neither requests nor 
 
 Receipt analysis is an abortable, two-stage feature workflow behind typed OpenRouter interfaces:
 
+Both stages choose the lowest positive reasoning effort advertised in the freshly loaded model
+metadata and explicitly enable reasoning. Models with only an on/off control use on; a model
+without reasoning capabilities receives no invented reasoning parameter. Production never selects
+`none` or the benchmark's optional off mode.
+
 1. Immediately before stage 1, fetch the authenticated account-specific model catalog and verify
-   that the configured vision model is still free and image/text compatible. Only then send the
+   together with live OpenRouter benchmarks and verify that the configured vision model is still
+   free, image/text compatible and has an Intelligence Index >= 20. Only then send the
    versioned app-owned extraction prompt and normalized JPEG to that exact model.
-2. Parse the non-streaming response as a complete EUR extraction. Integer-cent arithmetic must
-   prove that every signed receipt line is represented exactly once and sums to the receipt total;
-   malformed, partial, ambiguous, refused, or model-declared error output fails closed. Release the
-   normalized image bytes as soon as this stage no longer consumes them.
+2. Parse bounded non-streaming JSON. A successful extraction requires complete EUR fields and exact
+   integer-cent line arithmetic. An error response retains typed readable metadata and items;
+   unknown fields may be null. Preserve these suggestions for manual review without treating them
+   as a successful extraction. Release image bytes as soon as stage one finishes.
 3. Immediately before stage 2, fetch the catalog again and verify that the independently configured
-   text model remains free and advertises structured output. Send only the validated extraction and
-   hidden app-owned derivation prompt plus the editable grouping rules, never the image or Microsoft
+   text model remains free, text-compatible and has an Intelligence Index >= 20. Send the typed
+   extraction (possibly partial when readable items exist) and the app-owned derivation prompt.
+   Its visible `{{CUSTOM_PROMPT}}` slot is replaced once with the opaque user rules in the system
+   message; extraction JSON is a separate user message. Never send the image or Microsoft
    account, Conspectus account, balance,
    transfer-history, category-table, database, or OneDrive data.
-4. Require a strict app-owned JSON Schema and provider parameter support. The editable grouping
-   rules are opaque prompt text: the app sends them verbatim to stage 2 and does not parse, interpret,
+4. Request the app-owned JSON format in the versioned prompt without `response_format` or
+   `require_parameters`. Validate the returned JSON locally. The editable grouping
+   rules are opaque prompt text: the app inserts them verbatim and does not parse, interpret,
    or validate their transfer/category mapping. The second model creates the transfer names and
-   category arrays. Local validation proves bounded output structure, positive integer-cent transfer
+   category arrays and one shared `buyplace`, allowing merchant-name normalization according to
+   the user's rules. Stage 2 returns neither `receiptDate` nor `receiptTotalCents`; the parser copies
+   the validated extraction date to every local transfer and retains the extraction total locally.
+   The shared purchase location is expanded into each local transfer command. Both prompts require
+   German model-declared error reasons for display. Local validation proves bounded output structure, positive integer-cent transfer
    amounts, exact once-only source-line coverage, per-group arithmetic, and an exact receipt-total
-   match. The validated result and only its item-index coverage proof remain transient for local
-   preparation.
-5. While both remote stages run, show the current valid source accounts without preselecting one.
-   Stage 2 never waits for or receives that selection. Once both the validated derivation and a
-   deliberate current-run source selection exist, resolve every category name by one exact current
-   local match, target the sole primary spendings account, revalidate coverage and exact cent totals,
-   and reuse the existing Add Transfer validation and transfer-type rules. The resulting immutable
-   command batch is held only in memory for M9-05; this preparation step performs no SQLite, cache,
-   Graph, or OneDrive mutation and exposes no review or editing surface.
-6. Claim a prepared command batch once, revalidate it against the authenticated verified-current
+   match. Model-declared errors retain bounded partial groups and metadata. A model's incorrect
+   "ok" remains rejected, but typed fields can still seed the manual draft after local validation fails.
+5. While processing, animate the active step marker and show a localized waiting message without
+   invented percentages. Respect reduced-motion preferences and stop the activity indicator when
+   waiting for review or after a failure. Show the valid source accounts without preselection, then one shared date and purchase location,
+   followed by editable transfer names, up to three categories and amounts. Users can add/remove
+   rows. All data is transient and cleared on route/context replacement; ordinary options refresh
+   and offline transitions preserve the review draft. Stage 2 never receives the source selection.
+   Display both the entered sum and any extracted receipt total. A difference is informational:
+   the user may be correcting an OCR mistake, so the manual batch is validated against entered
+   amounts rather than the old OCR coverage proof. Known non-EUR results cannot be booked as EUR.
+6. Only an explicit Save (including deliberate form submission) validates the reviewed inputs,
+   resolves category names uniquely against current local options and targets the sole primary
+   spendings account. It reuses Add Transfer validation and type derivation, freezes the resulting
+   batch, and claims it once. Neither analysis completion nor account selection writes anything.
+   Revalidate the batch against the authenticated verified-current
    runtime, and apply all transfer inserts and balance changes in one SQLite transaction. Export one
    full snapshot and send it through the existing eTag/`If-Match` upload boundary. The final progress
    step remains active until OneDrive acceptance and required cache reconciliation; only then is the
@@ -208,27 +235,34 @@ the subsequent SQLite export fails or is empty, the app closes that runtime and 
 verified OneDrive snapshot before enabling another write, preventing an unreported local batch from
 entering a later upload.
 
-Both calls use the explicitly selected model without model or provider fallback. They add no app
+Both calls use the explicitly selected model without model or provider fallback and a 90-second
+completion deadline. Use the lowest positive reasoning effort declared by the current catalog;
+models exposing only a binary switch use enabled reasoning. Unknown capabilities leave the provider
+default untouched. Mandatory reasoning is never disabled. The opt-in benchmark compares these
+settings with `enabled: false` where allowed. Both calls add no app
 owned ZDR or data-collection routing restriction, so stricter OpenRouter account preferences and
 guardrails remain effective. Any catalog, transport, model, parsing, validation, cancellation, or
-supersession failure aborts the whole run, clears transient extraction/derivation state, performs no
-SQLite, cache, Graph, or OneDrive mutation, and requires a fresh native photo selection. A completed
+supersession failure performs no SQLite, cache, Graph, or OneDrive mutation. Provider and analysis
+errors preserve known typed data for manual review; cancellation or context replacement clears it.
+A completed
 older run cannot publish over a newer run or changed application context.
 
 These validations prove structural and arithmetic consistency, not that the model classified every
 receipt line into the semantically correct user-defined group. The capture UI discloses this residual
 risk before analysis; users maintain the grouping and category rules in Settings.
 
-Receipt derivation copies the extracted merchant name exactly. The shipped default rules reject
-unsupported or ambiguous items rather than guessing; grocery deposits/returns belong to normal
+Receipt derivation may simplify the merchant name according to the user's rules. The shipped
+default rules classify abbreviated or ambiguous items by plausibility using receipt context;
+unsupported items without a plausible matching rule are rejected. Grocery deposits/returns belong to normal
 food, and the whole-receipt restaurant rule takes precedence. Discounts/returns reduce only their
 identifiable group. Nonpositive receipts or groups fail closed. Custom rules remain opaque prompt
 text. Before capture and again on picker return, local preflight requires valid account topology;
 the default rules additionally require all five referenced category names to exist uniquely.
-Temporary same-context options loading suspends preparation, while session replacement or terminal
-options errors invalidate it. Catalog and completion rate limits require an explicit fresh capture.
+Temporary same-context options loading suspends saving. Options errors disable Save while keeping
+the draft; session replacement invalidates it. Catalog and completion failures never retry models
+automatically; known data remains available for manual review or a deliberate fresh capture.
 
-Automatic saving remains deliberate through source selection. A transient post-save summary shows
+Saving requires the explicit review Save action. A transient post-save summary shows
 the booked fields and directs corrections to Desktop with Mobile closed. A visible warning asks
 users to check existing transfers before a repeated photo; no cross-run duplicate detector or
 persistent receipt fingerprint is claimed. The image limits bound source/output bytes and output

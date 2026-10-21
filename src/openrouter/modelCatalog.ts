@@ -1,8 +1,13 @@
 // Parses OpenRouter model metadata and derives the free models eligible for each receipt AI role.
+import {
+  parseOpenRouterReasoningCapabilities,
+  type OpenRouterReasoningCapabilities,
+} from './reasoning';
 export interface OpenRouterModelOption {
   readonly id: string;
   readonly name: string;
   readonly label: string;
+  readonly reasoning?: OpenRouterReasoningCapabilities;
 }
 
 export interface OpenRouterCompatibleModelCatalog {
@@ -17,13 +22,22 @@ export class OpenRouterCatalogResponseError extends Error {
   }
 }
 
+const RECEIPT_MODEL_MIN_INTELLIGENCE_INDEX = 20;
+// Confirmed gateway 403 "Gate Free Endpoints by Agentic Harness". The current catalog and
+// endpoint metadata expose no capability flag for this access gate. Exclude only these variants.
+const HARNESS_RESTRICTED_MODELS = new Set([
+  'thinkingmachines/inkling:free',
+  'thinkingmachines/inkling-small:free',
+]);
+
 interface ParsedCatalogModel {
   readonly id: string;
+  readonly canonicalSlug: string;
   readonly name: string;
   readonly inputModalities: ReadonlySet<string>;
   readonly outputModalities: ReadonlySet<string>;
-  readonly supportedParameters: ReadonlySet<string>;
   readonly pricing: Record<string, unknown>;
+  readonly reasoning?: OpenRouterReasoningCapabilities;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -49,17 +63,20 @@ const parseCatalogModel = (value: unknown): ParsedCatalogModel | null => {
 
   const id = typeof value.id === 'string' ? value.id.trim() : '';
   const name = typeof value.name === 'string' ? value.name.trim() : '';
-  if (!id || !name) {
+  const canonicalSlug = typeof value.canonical_slug === 'string' ? value.canonical_slug.trim() : '';
+  if (!id || !name || !canonicalSlug) {
     return null;
   }
 
+  const reasoning = parseOpenRouterReasoningCapabilities(value.reasoning);
   return {
     id,
+    canonicalSlug,
     name,
     inputModalities: toStringSet(value.architecture.input_modalities),
     outputModalities: toStringSet(value.architecture.output_modalities),
-    supportedParameters: toStringSet(value.supported_parameters),
     pricing: value.pricing,
+    ...(reasoning ? { reasoning } : {}),
   };
 };
 
@@ -98,13 +115,41 @@ const isTransferModel = (model: ParsedCatalogModel): boolean =>
   !isRouterPseudoModel(model) &&
   hasFreeBasePricing(model) &&
   model.inputModalities.has('text') &&
-  model.outputModalities.has('text') &&
-  model.supportedParameters.has('structured_outputs');
+  model.outputModalities.has('text');
+
+const parseIntelligenceScores = (payload: unknown): ReadonlyMap<string, number> => {
+  if (!isRecord(payload) || !Array.isArray(payload.data)) {
+    throw new OpenRouterCatalogResponseError();
+  }
+  const scores = new Map<string, number>();
+  const seen = new Set<string>();
+  for (const entry of payload.data) {
+    if (
+      !isRecord(entry) ||
+      entry.source !== 'artificial-analysis' ||
+      typeof entry.model_permaslug !== 'string' ||
+      !entry.model_permaslug.trim()
+    )
+      continue;
+    const slug = entry.model_permaslug.trim();
+    const score = entry.intelligence_index;
+    if (seen.has(slug)) {
+      scores.delete(slug);
+      continue;
+    }
+    seen.add(slug);
+    if (typeof score === 'number' && Number.isFinite(score) && score >= 0) {
+      scores.set(slug, score);
+    }
+  }
+  return scores;
+};
 
 const toOption = (model: ParsedCatalogModel): OpenRouterModelOption => ({
   id: model.id,
   name: model.name,
   label: `${model.name} — ${model.id}`,
+  ...(model.reasoning ? { reasoning: model.reasoning } : {}),
 });
 
 const toSortedUniqueOptions = (
@@ -127,14 +172,21 @@ const toSortedUniqueOptions = (
 
 export const parseOpenRouterCompatibleModelCatalog = (
   value: unknown,
+  benchmarkPayload: unknown,
 ): OpenRouterCompatibleModelCatalog => {
   if (!isRecord(value) || !Array.isArray(value.data)) {
     throw new OpenRouterCatalogResponseError();
   }
 
+  const intelligenceScores = parseIntelligenceScores(benchmarkPayload);
   const parsedModels = value.data
     .map(parseCatalogModel)
-    .filter((model): model is ParsedCatalogModel => model !== null);
+    .filter((model): model is ParsedCatalogModel => model !== null)
+    .filter((model) => !HARNESS_RESTRICTED_MODELS.has(model.id))
+    .filter(
+      (model) =>
+        (intelligenceScores.get(model.canonicalSlug) ?? -1) >= RECEIPT_MODEL_MIN_INTELLIGENCE_INDEX,
+    );
 
   return {
     visionModels: toSortedUniqueOptions(parsedModels, isVisionModel),
