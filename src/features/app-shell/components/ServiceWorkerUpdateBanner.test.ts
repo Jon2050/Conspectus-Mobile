@@ -1,11 +1,18 @@
 // Verifies the persistent update banner's hidden, actionable, busy, and retry states.
 import { render } from 'svelte/server';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createServiceWorkerUpdateController } from '../serviceWorkerUpdateController';
 import ServiceWorkerUpdateBanner from './ServiceWorkerUpdateBanner.svelte';
 
 describe('ServiceWorkerUpdateBanner component', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
   it('stays hidden until a service worker update is available', () => {
     const { body } = render(ServiceWorkerUpdateBanner, {
       props: { updateController: createServiceWorkerUpdateController() },

@@ -314,6 +314,31 @@ npm run check:lighthouse -- https://jon2050.github.io/Conspectus-Mobile/previews
 
 ## Artifact Contract
 
+### Build identity (`build-info.json`)
+
+Every Vite build generates one identity object, embeds it in the JavaScript bundle, and emits the
+same object as `build-info.json`. Its fields are `version` (package version plus eight-character
+commit suffix), `commitSha` (full checked-out Git SHA), and `buildTimeUtc` (UTC build time).
+Release versions in `package.json` and `package-lock.json` remain governed by the release process;
+ordinary commits do not require a package-version bump. Source archives without Git are labelled
+`+local` for local use; CI fails if the checked-out commit cannot be resolved.
+Build jobs fetch complete Git history and release tags. A package version below a stable published
+`vX.Y.Z` tag fails the build, including a prerelease below an already released identical core
+version. The current development version is `1.0.1-dev`, correcting the historical M9 downgrade
+from published `1.0.0` to `0.9.01` through `0.9.05`; it does not claim a new production release.
+
+`verify-build-channel.mjs` rejects missing or invalid metadata, an unexpected commit (`--commit`),
+and metadata whose identity is absent from the app bundle. `Quality` and `Deploy Production` supply
+the expected source SHA. Preview publication reuses the identity in the qualified artifact without
+rebuilding it. Production handoff reads `buildTimeUtc` from this file instead of creating a later
+deployment timestamp. Rollbacks retain the original artifact's identity.
+
+Footer and Settings always show the running bundle's identity. A previously installed PWA can keep
+showing its previous build until the user accepts the update banner. After deployment, compare the
+preview's `preview-deploy-marker.json` and `build-info.json` with that display to distinguish an old
+local client from an outdated deployment. Builds published before this contract have no
+`build-info.json`; their version/time are embedded in their JavaScript bundle.
+
 ### `quality-preview-dist`
 
 - Producer: `Quality`

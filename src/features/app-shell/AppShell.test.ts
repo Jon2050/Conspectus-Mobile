@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { readable } from 'svelte/store';
 import { render } from 'svelte/server';
-import { createSyncStateStore, formatBuildInfoLabel, getFallbackBuildInfo } from '@shared';
+import { createSyncStateStore, formatBuildInfoLabel, getBuildInfo } from '@shared';
 
 import AppShell from './AppShell.svelte';
 import { createServiceWorkerUpdateController } from './serviceWorkerUpdateController';
@@ -109,7 +109,7 @@ describe('AppShell component', () => {
       expect(body).toContain('data-testid="deployment-info-footer"');
       expect(body).toContain('aria-label="Hauptnavigation"');
       expect(body).toContain('data-testid="deployment-info-label"');
-      expect(body).toContain(formatBuildInfoLabel(getFallbackBuildInfo()));
+      expect(body).toContain(formatBuildInfoLabel(getBuildInfo()));
       expect(body).toContain(`href="#/${route}"`);
       expect(body).toContain('aria-current="page"');
       expect(body).toContain(`src="${NAV_ICON_BASE_URL}${routeMeta.icon}"`);

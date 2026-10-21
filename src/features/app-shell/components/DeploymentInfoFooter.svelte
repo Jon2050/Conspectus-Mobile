@@ -1,26 +1,8 @@
 <!-- Renders the shared end-of-page deployment footer using locally available app build metadata. -->
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import {
-    formatBuildInfoLabel,
-    getFallbackBuildInfo,
-    loadBuildInfo,
-    type BuildInfo,
-  } from '@shared';
+  import { formatBuildInfoLabel, getBuildInfo } from '@shared';
 
-  let buildInfo: BuildInfo = getFallbackBuildInfo();
-  let footerLabel = formatBuildInfoLabel(buildInfo);
-
-  const updateFooterLabel = (nextBuildInfo: BuildInfo): void => {
-    buildInfo = nextBuildInfo;
-    footerLabel = formatBuildInfoLabel(nextBuildInfo);
-  };
-
-  onMount(() => {
-    void (async () => {
-      updateFooterLabel(await loadBuildInfo());
-    })();
-  });
+  const footerLabel = formatBuildInfoLabel(getBuildInfo());
 </script>
 
 <footer class="deployment-info-footer" data-testid="deployment-info-footer">

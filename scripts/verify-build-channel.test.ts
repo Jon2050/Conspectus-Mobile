@@ -35,6 +35,11 @@ const VALID_HTACCESS = `DirectoryIndex index.html
 
 const VALID_SERVICE_WORKER = 'createHandlerBoundToURL("index.html")';
 const VALID_PREVIEW_SERVICE_WORKER = 'createHandlerBoundToURL("index.html")';
+const VALID_BUILD_INFO = {
+  version: '1.0.1-dev+12345678',
+  commitSha: '1234567890abcdef1234567890abcdef12345678',
+  buildTimeUtc: '2026-10-21T10:20:30Z',
+};
 const VALID_MANIFEST_ICONS = [
   { src: 'icons/moneysack192x192.png', sizes: '192x192', purpose: 'any' },
   { src: 'icons/moneysack512x512.png', sizes: '512x512', purpose: 'any maskable' },
@@ -85,7 +90,11 @@ const createDistFixture = (
   );
 
   writeText(path.join(distPath, 'assets', 'index.css'), '.app { color: #111; }');
-  writeText(path.join(distPath, 'assets', 'index.js'), jsAssetContent);
+  writeText(
+    path.join(distPath, 'assets', 'index.js'),
+    `${jsAssetContent}\nconst buildInfo = ${JSON.stringify(VALID_BUILD_INFO)};`,
+  );
+  writeText(path.join(distPath, 'build-info.json'), JSON.stringify(VALID_BUILD_INFO));
   writeText(path.join(distPath, 'sw.js'), VALID_SERVICE_WORKER);
   if (options.includeHtaccess ?? true) {
     writeText(path.join(distPath, '.htaccess'), VALID_HTACCESS);
@@ -100,6 +109,68 @@ const runVerifier = (args: string[]) =>
   });
 
 describe('verify-build-channel script', () => {
+  it.each([
+    {
+      name: 'timestamp from another build',
+      overrides: { buildTimeUtc: '2026-10-20T10:20:30Z' },
+      expected: 'does not match the identity embedded',
+    },
+    {
+      name: 'invalid timestamp',
+      overrides: { buildTimeUtc: 'invalid' },
+      expected: 'valid UTC build timestamp',
+    },
+    {
+      name: 'version unrelated to the commit',
+      overrides: { version: '0.9.05' },
+      expected: 'Build version must identify',
+    },
+  ])('rejects $name', ({ overrides, expected }) => {
+    const fixturePath = createFixtureDirectory();
+    try {
+      const distPath = createDistFixture(
+        fixturePath,
+        "navigator.serviceWorker.register('/test-app/sw.js', { scope: '/test-app/' });",
+      );
+      writeText(
+        path.join(distPath, 'build-info.json'),
+        JSON.stringify({ ...VALID_BUILD_INFO, ...overrides }),
+      );
+      const result = runVerifier([
+        '--dist',
+        distPath,
+        '--channel',
+        'preview',
+        '--base',
+        '/test-app/',
+      ]);
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(expected);
+    } finally {
+      rmSync(fixturePath, { force: true, recursive: true });
+    }
+  });
+
+  it('rejects a missing identity file and an artifact from a different commit', () => {
+    const fixturePath = createFixtureDirectory();
+    try {
+      const distPath = createDistFixture(
+        fixturePath,
+        "navigator.serviceWorker.register('/test-app/sw.js', { scope: '/test-app/' });",
+      );
+      const args = ['--dist', distPath, '--channel', 'preview', '--base', '/test-app/'];
+      const wrongCommit = runVerifier([...args, '--commit', 'a'.repeat(40)]);
+      expect(wrongCommit.status).toBe(1);
+      expect(wrongCommit.stderr).toContain('Build commit mismatch');
+      rmSync(path.join(distPath, 'build-info.json'));
+      const missingIdentity = runVerifier(args);
+      expect(missingIdentity.status).toBe(1);
+      expect(missingIdentity.stderr).toContain('Missing expected file:');
+      expect(missingIdentity.stderr).toContain('build-info.json');
+    } finally {
+      rmSync(fixturePath, { force: true, recursive: true });
+    }
+  });
   it('accepts valid production channel output', () => {
     const fixturePath = createFixtureDirectory();
 
@@ -396,9 +467,10 @@ describe('verify-build-channel script', () => {
       writeText(path.join(distPath, 'assets', 'index.css'), '.app { color: #111; }');
       writeText(path.join(distPath, 'sw.js'), VALID_PREVIEW_SERVICE_WORKER);
       writeText(path.join(distPath, '.htaccess'), VALID_HTACCESS);
+      writeText(path.join(distPath, 'build-info.json'), JSON.stringify(VALID_BUILD_INFO));
       writeText(
         path.join(distPath, 'assets', 'index.js'),
-        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('${previewBase}sw.js', { scope: '${previewBase}' }); }`,
+        `if ('serviceWorker' in navigator) { navigator.serviceWorker.register('${previewBase}sw.js', { scope: '${previewBase}' }); }\nconst buildInfo = ${JSON.stringify(VALID_BUILD_INFO)};`,
       );
 
       const result = runVerifier([

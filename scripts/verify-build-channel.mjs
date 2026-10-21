@@ -18,6 +18,7 @@ const parseArgs = (argv) => {
     dist: 'dist',
     channel: '',
     base: '',
+    commit: '',
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -39,6 +40,12 @@ const parseArgs = (argv) => {
       index += 1;
       continue;
     }
+
+    if (current === '--commit') {
+      args.commit = argv[index + 1] ?? '';
+      index += 1;
+      continue;
+    }
   }
 
   if (!args.channel) {
@@ -53,6 +60,7 @@ const parseArgs = (argv) => {
     dist: args.dist,
     channel: args.channel,
     base: normalizeBasePath(args.base),
+    commit: args.commit,
   };
 };
 
@@ -231,6 +239,35 @@ const collectJavaScriptAssets = (distDir) => {
     .map((entry) => readTextFile(path.join(assetsDirPath, entry)));
 };
 
+const verifyBuildInfo = (distDir, expectedCommit) => {
+  const buildInfo = JSON.parse(readTextFile(path.join(distDir, 'build-info.json')));
+  assert(
+    typeof buildInfo.buildTimeUtc === 'string' &&
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/u.test(buildInfo.buildTimeUtc) &&
+      Number.isFinite(Date.parse(buildInfo.buildTimeUtc)),
+    'Build metadata must contain a valid UTC build timestamp.',
+  );
+  assert(
+    typeof buildInfo.version === 'string' &&
+      typeof buildInfo.commitSha === 'string' &&
+      /^[a-f0-9]{40}$/u.test(buildInfo.commitSha) &&
+      buildInfo.version.endsWith(`+${buildInfo.commitSha.slice(0, 8)}`),
+    'Build version must identify the full Git commit recorded in build-info.json.',
+  );
+  assert(
+    !expectedCommit || buildInfo.commitSha === expectedCommit,
+    `Build commit mismatch. Expected "${expectedCommit}", got "${buildInfo.commitSha}".`,
+  );
+  assert(
+    collectJavaScriptAssets(distDir).some((asset) =>
+      [buildInfo.version, buildInfo.commitSha, buildInfo.buildTimeUtc].every((value) =>
+        asset.includes(JSON.stringify(value)),
+      ),
+    ),
+    'Build metadata does not match the identity embedded in the app bundle.',
+  );
+};
+
 const verifyServiceWorkerRegistration = (distDir, expectedBasePath) => {
   const jsAssets = collectJavaScriptAssets(distDir);
   const hasServiceWorkerPath = jsAssets.some((assetText) =>
@@ -310,6 +347,7 @@ const main = () => {
   verifyManifest(manifestText, args.base);
   verifyServiceWorkerRegistration(distDir, args.base);
   verifyServiceWorkerNavigationFallback(distDir);
+  verifyBuildInfo(distDir, args.commit);
 
   console.log(
     `[verify-build-channel] ${args.channel} build output is valid for base path ${args.base}`,

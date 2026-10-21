@@ -2,6 +2,7 @@
 import { expect, test } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 
 import {
   APP_BASE_PATH,
@@ -1429,6 +1430,55 @@ test('shows deployment footer metadata immediately on short pages', async ({ pag
   expect(footerBox!.y + footerBox!.height).toBeLessThanOrEqual(navBox!.y);
 });
 
+test('shows the running build identity in footer and Settings despite newer server metadata', async ({
+  page,
+  request,
+}) => {
+  const response = await request.get(appPath('build-info.json'));
+  expect(response.ok()).toBeTruthy();
+  const buildInfo = (await response.json()) as { version: string; buildTimeUtc: string };
+  const metadataRequests: string[] = [];
+  page.on('request', (outgoing) => {
+    if (/\/(?:deploy-metadata|build-info)\.json$/u.test(outgoing.url())) {
+      metadataRequests.push(outgoing.url());
+    }
+  });
+  await page.route('**/deploy-metadata.json', (route) =>
+    route.fulfill({
+      json: { version: '99.0.0', buildTimeUtc: '2099-01-01T00:00:00Z' },
+    }),
+  );
+  await page.goto(appPath('#/settings'));
+  await expect(page.getByTestId('settings-build-version')).toHaveText(buildInfo.version);
+  expect(buildInfo.version).toMatch(/\+[a-f0-9]{8}$/u);
+  const expected = await page.evaluate(({ version, buildTimeUtc }) => {
+    const date = new Date(buildTimeUtc);
+    const settingsTime = new Intl.DateTimeFormat(undefined, {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: 'UTC',
+      hour12: false,
+    }).format(date);
+    const footerDate = new Intl.DateTimeFormat(undefined, {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(date);
+    const footerTime = new Intl.DateTimeFormat(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(date);
+    return {
+      settings: `${settingsTime} UTC`,
+      footer: `Ver. ${version} ${footerDate} ${footerTime}`,
+    };
+  }, buildInfo);
+  await expect(page.getByTestId('settings-build-time')).toHaveText(expected.settings);
+  await expect(page.getByTestId('deployment-info-label')).toHaveText(expected.footer);
+  expect(metadataRequests).toEqual([]);
+});
+
 test('keeps footer and navigation geometry stable while scrolling a long page', async ({
   page,
 }) => {
@@ -2041,13 +2091,9 @@ test('prompts for an available service worker update and reloads into it', async
       `${originalServiceWorker}\n// playwright-update-${Date.now()}\n`,
     );
 
-    await page.evaluate(async (appBasePath) => {
-      const registration = await navigator.serviceWorker.getRegistration(appBasePath);
-      if (!registration) {
-        throw new Error('Expected an active service worker registration.');
-      }
-      await registration.update();
-    }, APP_BASE_PATH);
+    await page.evaluate(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
 
     await expect(page.getByTestId('service-worker-update-banner')).toBeVisible({
       timeout: 15_000,
@@ -2063,6 +2109,190 @@ test('prompts for an available service worker update and reloads into it', async
     await expect(page.getByTestId('service-worker-update-banner')).toHaveCount(0);
   } finally {
     fs.writeFileSync(serviceWorkerPath, originalServiceWorker);
+  }
+});
+
+for (const keepControlledTab of [false, true]) {
+  test(`updates to new build metadata after a hard refresh left the page uncontrolled (other tab: ${keepControlledTab})`, async ({
+    page,
+    context,
+  }, testInfo) => {
+    test.skip(
+      testInfo.project.name !== 'chromium',
+      'Hard-refresh bypass is exercised with Chromium CDP.',
+    );
+    const distDirectory = path.join(process.cwd(), 'dist');
+    const indexPath = path.join(distDirectory, 'index.html');
+    const workerPath = path.join(distDirectory, 'sw.js');
+    const originalIndex = fs.readFileSync(indexPath, 'utf8');
+    const originalWorker = fs.readFileSync(workerPath, 'utf8');
+    const currentBuild = JSON.parse(
+      fs.readFileSync(path.join(distDirectory, 'build-info.json'), 'utf8'),
+    ) as {
+      version: string;
+      buildTimeUtc: string;
+      commitSha: string;
+    };
+    const currentAsset = /src="[^"]*\/assets\/(index-[^"]+\.js)"/u.exec(originalIndex)![1]!;
+    const originalAsset = fs.readFileSync(path.join(distDirectory, 'assets', currentAsset), 'utf8');
+    const nextAssetName = 'index-update-regression.js';
+    const nextAssetPath = path.join(distDirectory, 'assets', nextAssetName);
+    const currentSettingsAsset = fs
+      .readdirSync(path.join(distDirectory, 'assets'))
+      .find((name) => /^SettingsRoute-.+\.js$/u.test(name))!;
+    const originalSettingsAsset = fs.readFileSync(
+      path.join(distDirectory, 'assets', currentSettingsAsset),
+      'utf8',
+    );
+    const nextSettingsAssetName = 'SettingsRoute-update-regression.js';
+    const nextSettingsAssetPath = path.join(distDirectory, 'assets', nextSettingsAssetName);
+    const nextVersion = currentBuild.version.replace(/\+[a-f0-9]{8}$/u, '+bbbbbbbb');
+    const nextBuildTime = new Date(Date.parse(currentBuild.buildTimeUtc) + 60_000)
+      .toISOString()
+      .replace(/\.\d{3}Z$/u, 'Z');
+    const keeper = keepControlledTab ? await context.newPage() : null;
+
+    try {
+      await page.goto(appPath('#/settings'));
+      await expect
+        .poll(() =>
+          page.evaluate(
+            async (base) => Boolean((await navigator.serviceWorker.getRegistration(base))?.active),
+            APP_BASE_PATH,
+          ),
+        )
+        .toBeTruthy();
+      if (keeper !== null) {
+        await keeper.goto(appPath());
+        await expect
+          .poll(() => keeper.evaluate(() => Boolean(navigator.serviceWorker.controller)))
+          .toBeTruthy();
+      }
+      const cdp = await context.newCDPSession(page);
+      await cdp.send('Network.enable');
+      await cdp.send('Network.setBypassServiceWorker', { bypass: true });
+      await page.reload();
+      await expect(page.getByTestId('settings-build-version')).toHaveText(currentBuild.version);
+      expect(await page.evaluate(() => navigator.serviceWorker.controller)).toBeNull();
+      await cdp.send('Network.setBypassServiceWorker', { bypass: false });
+
+      const nextIndex = originalIndex.replace(currentAsset, nextAssetName);
+      fs.writeFileSync(
+        nextAssetPath,
+        originalAsset
+          .replaceAll(currentBuild.version, nextVersion)
+          .replaceAll(currentBuild.buildTimeUtc, nextBuildTime)
+          .replaceAll(currentBuild.commitSha, 'b'.repeat(40))
+          .replaceAll(currentSettingsAsset, nextSettingsAssetName),
+      );
+      fs.writeFileSync(
+        nextSettingsAssetPath,
+        originalSettingsAsset.replaceAll(currentAsset, nextAssetName),
+      );
+      fs.writeFileSync(indexPath, nextIndex);
+      fs.writeFileSync(
+        workerPath,
+        originalWorker
+          .replace(currentAsset, nextAssetName)
+          .replace(currentSettingsAsset, nextSettingsAssetName)
+          .replace(
+            /url:"index\.html",revision:"[^"]+"/u,
+            `url:"index.html",revision:"${createHash('md5').update(nextIndex).digest('hex')}"`,
+          ),
+      );
+      await page.evaluate(() => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      await expect(page.getByTestId('service-worker-update-banner')).toBeVisible({
+        timeout: 15_000,
+      });
+      await Promise.all([
+        page.waitForEvent('framenavigated'),
+        page.getByTestId('service-worker-update-button').click(),
+      ]);
+      await expect(page.getByTestId('settings-build-version')).toHaveText(nextVersion);
+      const expectedTime = await page.evaluate(
+        (timestamp) =>
+          `${new Intl.DateTimeFormat(undefined, {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+            timeZone: 'UTC',
+            hour12: false,
+          }).format(new Date(timestamp))} UTC`,
+        nextBuildTime,
+      );
+      await expect(page.getByTestId('settings-build-time')).toHaveText(expectedTime);
+      await expect(page.getByTestId('deployment-info-label')).toContainText(nextVersion);
+      await expect(page.getByTestId('service-worker-update-banner')).toHaveCount(0);
+    } finally {
+      fs.writeFileSync(indexPath, originalIndex);
+      fs.writeFileSync(workerPath, originalWorker);
+      if (fs.existsSync(nextAssetPath)) fs.unlinkSync(nextAssetPath);
+      if (fs.existsSync(nextSettingsAssetPath)) fs.unlinkSync(nextSettingsAssetPath);
+      await keeper?.close();
+    }
+  });
+}
+
+test('shows a retryable update error instead of an endless spinner when activation stalls', async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== 'chromium',
+    'One real-worker timeout/retry smoke is sufficient.',
+  );
+  const workerPath = path.join(process.cwd(), 'dist', 'sw.js');
+  const originalWorker = fs.readFileSync(workerPath, 'utf8');
+  const stalledWorker = originalWorker.replaceAll('"SKIP_WAITING"', '"TEST_SKIP_WAITING"');
+  expect(stalledWorker).not.toBe(originalWorker);
+  try {
+    await page.clock.install();
+    await page.goto(appPath());
+    await expect
+      .poll(() =>
+        page.evaluate(
+          async (base) => Boolean((await navigator.serviceWorker.getRegistration(base))?.active),
+          APP_BASE_PATH,
+        ),
+      )
+      .toBeTruthy();
+    await page.reload();
+    await expect
+      .poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller)))
+      .toBeTruthy();
+    fs.writeFileSync(workerPath, stalledWorker);
+    await page.evaluate(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await expect(page.getByTestId('service-worker-update-banner')).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId('service-worker-update-button').click();
+    await expect(page.getByTestId('service-worker-update-button')).toHaveText('Updating...');
+    await page.clock.fastForward(16_000);
+    await expect(page.getByTestId('service-worker-update-error')).toBeVisible();
+    await expect(page.getByTestId('service-worker-update-button')).toBeEnabled();
+    await expect(page.getByTestId('service-worker-update-button')).toHaveText('Retry update');
+
+    // Let the intentionally stalled test worker accept the next activation attempt.
+    await page.evaluate(() => {
+      const originalPostMessage = ServiceWorker.prototype.postMessage;
+      Object.defineProperty(ServiceWorker.prototype, 'postMessage', {
+        value(this: ServiceWorker, message: unknown) {
+          const payload = message as { type?: string };
+          originalPostMessage.call(
+            this,
+            payload.type === 'SKIP_WAITING' ? { type: 'TEST_SKIP_WAITING' } : message,
+          );
+        },
+      });
+    });
+    await Promise.all([
+      page.waitForEvent('framenavigated'),
+      page.getByTestId('service-worker-update-button').click(),
+    ]);
+    await expect(page.getByTestId('app-shell')).toBeVisible();
+    await expect(page.getByTestId('service-worker-update-banner')).toHaveCount(0);
+  } finally {
+    fs.writeFileSync(workerPath, originalWorker);
   }
 });
 

@@ -26,7 +26,7 @@
     "action": "Jetzt aktualisieren",
     "applying": "Wird aktualisiert...",
     "retry": "Update erneut versuchen",
-    "error": "Das Update konnte nicht aktiviert werden. Die aktuelle Version läuft weiter; versuche es erneut."
+    "error": "Das Update wurde nicht abgeschlossen. Versuche es erneut. Falls es weiter hängt, schließe alle Conspectus-Fenster und öffne die App erneut."
   },
   "accounts": {
     "title": "Konten",
