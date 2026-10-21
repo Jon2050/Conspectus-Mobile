@@ -22,5 +22,10 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["vite.config.ts", "vitest.scripts.config.ts", "scripts/**/*.test.ts"]
+  "include": [
+    "vite.config.ts",
+    "vitest.scripts.config.ts",
+    "vitest.receipt.config.ts",
+    "scripts/**/*.test.ts"
+  ]
 }

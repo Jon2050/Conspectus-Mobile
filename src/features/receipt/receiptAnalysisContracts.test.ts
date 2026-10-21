@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   RECEIPT_ANALYSIS_LIMITS,
-  RECEIPT_TRANSFER_DERIVATION_JSON_SCHEMA,
   parseReceiptExtractionResponse,
   parseReceiptTransferDerivationResponse,
 } from './receiptAnalysisContracts';
@@ -50,22 +49,19 @@ const validExtraction: ReceiptExtraction = extraction.value;
 const derivationJson = {
   status: 'ok',
   errorReason: null,
-  receiptTotalCents: 700,
+
+  buyplace: 'Testmarkt',
   transfers: [
     {
       name: 'Lebensmittel',
       amountCents: 450,
       categoryNames: ['Einkauf', 'Lebensmittel'],
-      buyplace: 'Testmarkt',
-      receiptDate: '2024-02-29',
       sourceItemIndexes: [0, 12],
     },
     {
       name: 'Süßwaren',
       amountCents: 250,
       categoryNames: ['Einkauf', 'Lebensmittel', 'Süßigkeiten'],
-      buyplace: 'Testmarkt',
-      receiptDate: '2024-02-29',
       sourceItemIndexes: [8],
     },
   ],
@@ -85,7 +81,7 @@ describe('stage-one receipt extraction parser', () => {
     expect(validExtraction.items.map((item) => item.index)).toEqual([0, 8, 12]);
   });
 
-  it('accepts a bounded error result only when all partial data is cleared', () => {
+  it('accepts a bounded error result even when no fields could be read', () => {
     const result = parseReceiptExtractionResponse(
       JSON.stringify({
         status: 'error',
@@ -179,7 +175,7 @@ describe('stage-one receipt extraction parser', () => {
     expect(JSON.stringify(result)).not.toContain(secret);
   });
 
-  it('rejects empty, oversized, or partial model error results', () => {
+  it('rejects empty or oversized errors but retains readable partial fields', () => {
     const baseError = {
       status: 'error',
       errorReason: ' ',
@@ -205,20 +201,51 @@ describe('stage-one receipt extraction parser', () => {
       parseReceiptExtractionResponse(
         JSON.stringify({ ...baseError, errorReason: 'Unleserlich.', storeName: 'Teilwert' }),
       ),
-    ).toMatchObject({ ok: false, error: { code: 'INVALID_STRUCTURE' } });
+    ).toMatchObject({ ok: true, value: { storeName: 'Teilwert', status: 'error' } });
   });
 });
 
 describe('stage-two transfer derivation contract', () => {
-  it('publishes a fixed strict and JSON-serializable schema', () => {
-    expect(RECEIPT_TRANSFER_DERIVATION_JSON_SCHEMA).toMatchObject({
-      name: 'receipt_transfer_derivation',
-      strict: true,
-      schema: { type: 'object', additionalProperties: false },
+  it('retains typed partial extraction metadata and incomplete groups without promoting them to successful output', () => {
+    const partial = parseReceiptExtractionResponse(
+      extractionWith({
+        status: 'error',
+        errorReason: 'Ein Betrag fehlt.',
+        receiptTotalCents: null,
+      }),
+    );
+    expect(partial).toMatchObject({
+      ok: true,
+      value: {
+        status: 'error',
+        storeName: 'Testmarkt',
+        receiptDate: '2024-02-29',
+        receiptTotalCents: null,
+        items: extractionJson.items,
+      },
     });
-    expect(() => JSON.parse(JSON.stringify(RECEIPT_TRANSFER_DERIVATION_JSON_SCHEMA))).not.toThrow();
+    if (!partial.ok) throw new Error('Expected partial extraction');
+    const derived = parseReceiptTransferDerivationResponse(
+      derivationWith({
+        status: 'error',
+        errorReason: 'Unvollstaendig.',
+        transfers: [derivationJson.transfers[0]],
+      }),
+      partial.value,
+    );
+    expect(derived).toMatchObject({
+      ok: true,
+      value: {
+        status: 'error',
+        buyplace: 'Testmarkt',
+        receiptTotalCents: null,
+        transfers: [{ amountCents: 450, receiptDate: '2024-02-29' }],
+      },
+    });
+    expect(
+      parseReceiptTransferDerivationResponse(JSON.stringify(derivationJson), partial.value),
+    ).toMatchObject({ ok: false });
   });
-
   it('accepts complete once-only coverage and exact signed source-group sums', () => {
     const result = parseReceiptTransferDerivationResponse(
       JSON.stringify(derivationJson),
@@ -230,6 +257,37 @@ describe('stage-two transfer derivation contract', () => {
     });
   });
 
+  it('accepts one normalized store and inherits the validated date and total for every transfer', () => {
+    const result = parseReceiptTransferDerivationResponse(
+      derivationWith({ buyplace: 'Rewe' }),
+      validExtraction,
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        receiptTotalCents: 700,
+        transfers: [
+          { buyplace: 'Rewe', receiptDate: '2024-02-29' },
+          { buyplace: 'Rewe', receiptDate: '2024-02-29' },
+        ],
+      },
+    });
+
+    for (const buyplace of ['', null, 'x'.repeat(RECEIPT_ANALYSIS_LIMITS.buyplaceCharacters + 1)]) {
+      expect(
+        parseReceiptTransferDerivationResponse(derivationWith({ buyplace }), validExtraction),
+      ).toMatchObject({ ok: false, error: { code: 'INVALID_STRING' } });
+    }
+
+    expect(
+      parseReceiptTransferDerivationResponse(
+        derivationWith({ receiptDate: '2025-01-01' }),
+        validExtraction,
+      ),
+    ).toMatchObject({ ok: false, error: { code: 'UNKNOWN_KEY' } });
+  });
+
   it('accepts LLM-generated transfer names and categories without interpreting user rules', () => {
     const custom = {
       ...derivationJson,
@@ -238,8 +296,6 @@ describe('stage-two transfer derivation contract', () => {
           name: 'Eigene Gruppe',
           amountCents: 700,
           categoryNames: ['Benutzerdefiniert'],
-          buyplace: 'Testmarkt',
-          receiptDate: '2024-02-29',
           sourceItemIndexes: [0, 8, 12],
         },
       ],
@@ -260,8 +316,6 @@ describe('stage-two transfer derivation contract', () => {
           name: 'Eigene Gruppe',
           amountCents: 700,
           categoryNames: ['Benutzerdefiniert', 'Benutzerdefiniert'],
-          buyplace: 'Testmarkt',
-          receiptDate: '2024-02-29',
           sourceItemIndexes: [0, 8, 12],
         },
       ],
@@ -310,7 +364,7 @@ describe('stage-two transfer derivation contract', () => {
     const missing = [derivationJson.transfers[0]];
     expect(
       parseReceiptTransferDerivationResponse(
-        derivationWith({ receiptTotalCents: 700, transfers: missing }),
+        derivationWith({ transfers: missing }),
         validExtraction,
       ),
     ).toMatchObject({ ok: false, error: { code: 'INCOMPLETE_SOURCE_COVERAGE' } });
@@ -345,13 +399,13 @@ describe('stage-two transfer derivation contract', () => {
     ).toMatchObject({ ok: false, error: { code: 'INVALID_CENTS' } });
   });
 
-  it('rejects changed receipt totals, store/date changes, too many categories, and unknown keys', () => {
+  it('rejects redundant wire metadata, too many categories, and unknown keys', () => {
     expect(
       parseReceiptTransferDerivationResponse(
         derivationWith({ receiptTotalCents: 701 }),
         validExtraction,
       ),
-    ).toMatchObject({ ok: false, error: { code: 'RECEIPT_TOTAL_MISMATCH' } });
+    ).toMatchObject({ ok: false, error: { code: 'UNKNOWN_KEY' } });
 
     for (const changed of [
       { ...derivationJson.transfers[0], buyplace: 'Anderer Markt' },
@@ -366,11 +420,12 @@ describe('stage-two transfer derivation contract', () => {
     }
   });
 
-  it('accepts only bounded nonempty error reasons and no partial transfers', () => {
+  it('requires bounded nonempty error reasons even when partial transfers are returned', () => {
     const error = {
       status: 'error',
       errorReason: 'Eine Position kann nicht sicher zugeordnet werden.',
-      receiptTotalCents: null,
+
+      buyplace: null,
       transfers: [],
     };
     expect(

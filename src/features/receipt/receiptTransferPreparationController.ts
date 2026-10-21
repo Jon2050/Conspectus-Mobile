@@ -4,11 +4,10 @@ import type { CreateTransferInput } from '@db';
 import type { AddTransferOptionsState } from '../transfers/transferOptions';
 import type { ReceiptAnalysisState } from './receiptAnalysisController';
 import {
-  buildReceiptTransferCommands,
-  validateReceiptSourceAccountTopology,
+  buildReviewedReceiptTransferCommands,
   type ReceiptTransferPreparationError,
 } from './receiptTransferCommandBuilder';
-import type { ReceiptTransferDerivation } from './receiptAnalysisContracts';
+import { createReceiptReviewDraft, type ReceiptReviewDraft } from './receiptReviewDraft';
 
 export type ReceiptProcessingStepId = 'extraction' | 'derivation' | 'creation';
 export type ReceiptProcessingStepStatus = 'pending' | 'active' | 'complete' | 'error';
@@ -16,6 +15,7 @@ export type ReceiptTransferPreparationPhase =
   | 'idle'
   | 'processing'
   | 'waiting_for_source'
+  | 'reviewing'
   | 'ready_for_commit'
   | 'committing'
   | 'commit_failed'
@@ -33,6 +33,7 @@ export interface ReceiptTransferPreparationState {
   readonly sourceAccountId: number | null;
   readonly readyForCommit: readonly CreateTransferInput[] | null;
   readonly error: ReceiptTransferPreparationError | null;
+  readonly draft?: ReceiptReviewDraft | null;
 }
 
 export interface ReceiptTransferPreparationController {
@@ -46,6 +47,8 @@ export interface ReceiptTransferPreparationController {
   ): void;
   selectSourceAccount(sourceAccountId: number | null, optionsState: AddTransferOptionsState): void;
   refreshOptions(optionsState: AddTransferOptionsState): void;
+  updateDraft(draft: ReceiptReviewDraft): void;
+  prepareForSave(optionsState: AddTransferOptionsState): void;
   claimReadyForCommit(): readonly CreateTransferInput[] | null;
   markCommitActive(): void;
   markCommitFailed(): void;
@@ -72,31 +75,38 @@ const INITIAL_STATE: ReceiptTransferPreparationState = Object.freeze({
   sourceAccountId: null,
   readyForCommit: null,
   error: null,
+  draft: null,
 });
 
 export const createReceiptTransferPreparationController =
   (): ReceiptTransferPreparationController => {
     const listeners = new Set<(state: ReceiptTransferPreparationState) => void>();
     let state = INITIAL_STATE;
-    let derivation: ReceiptTransferDerivation | null = null;
-    let expectedItemIndexes: readonly number[] | null = null;
+
     let isDisposed = false;
 
     const publish = (nextState: ReceiptTransferPreparationState): void => {
-      state = Object.freeze(nextState);
+      const draft = nextState.draft;
+      state = Object.freeze({
+        ...nextState,
+        draft: draft
+          ? Object.freeze({
+              ...draft,
+              transfers: Object.freeze(
+                draft.transfers.map((row) =>
+                  Object.freeze({ ...row, categoryNames: Object.freeze([...row.categoryNames]) }),
+                ),
+              ),
+            })
+          : null,
+      });
       listeners.forEach((listener) => listener(state));
-    };
-
-    const clearTransientResult = (): void => {
-      derivation = null;
-      expectedItemIndexes = null;
     };
 
     const fail = (
       step: ReceiptProcessingStepId,
       error: ReceiptTransferPreparationError | null,
     ): void => {
-      clearTransientResult();
       const failedSteps =
         step === 'extraction'
           ? steps('error', 'pending', 'pending')
@@ -105,6 +115,7 @@ export const createReceiptTransferPreparationController =
             : steps('complete', 'complete', 'error');
       publish({
         phase: 'error',
+        draft: null,
         steps: failedSteps,
         sourceAccountId: null,
         readyForCommit: null,
@@ -113,43 +124,31 @@ export const createReceiptTransferPreparationController =
     };
 
     const tryPrepare = (optionsState: AddTransferOptionsState): void => {
-      if (
-        isDisposed ||
-        derivation === null ||
-        expectedItemIndexes === null ||
-        state.sourceAccountId === null ||
-        state.phase === 'ready_for_commit' ||
-        state.phase === 'error'
-      ) {
+      if (isDisposed || !state.draft || !['reviewing', 'waiting_for_source'].includes(state.phase))
+        return;
+      if (state.sourceAccountId === null) {
+        publish({ ...state, error: { code: 'source_account_unavailable', detail: null } });
         return;
       }
-      // A same-context options refresh suspends preparation, not the remote analysis.
-      // Identity/version replacement is cancelled by the session owner before this point.
-      if (optionsState.operation === 'loading') return;
-
-      const result = buildReceiptTransferCommands(
-        derivation,
-        expectedItemIndexes,
+      const result = buildReviewedReceiptTransferCommands(
+        state.draft,
         state.sourceAccountId,
         optionsState,
       );
       if (!result.ok) {
-        fail('creation', result.error);
+        publish({ ...state, error: result.error });
         return;
       }
-
-      clearTransientResult();
       publish({
+        ...state,
         phase: 'ready_for_commit',
-        steps: steps('complete', 'complete', 'active'),
-        sourceAccountId: state.sourceAccountId,
+        steps: steps('complete', 'complete', 'pending'),
         readyForCommit: result.commands,
         error: null,
       });
     };
 
     const reset = (): void => {
-      clearTransientResult();
       if (!isDisposed) {
         publish(INITIAL_STATE);
       }
@@ -173,9 +172,9 @@ export const createReceiptTransferPreparationController =
 
       beginRun(): void {
         if (isDisposed) return;
-        clearTransientResult();
         publish({
           phase: 'processing',
+          draft: null,
           steps: steps('active', 'pending', 'pending'),
           sourceAccountId: null,
           readyForCommit: null,
@@ -184,12 +183,12 @@ export const createReceiptTransferPreparationController =
       },
 
       handleCaptureFailure(): void {
-        if (!isDisposed && state.phase !== 'idle' && state.phase !== 'error') {
+        if (!isDisposed && !state.draft && state.phase !== 'idle' && state.phase !== 'error') {
           fail('extraction', null);
         }
       },
 
-      handleAnalysisState(analysisState, optionsState): void {
+      handleAnalysisState(analysisState): void {
         if (isDisposed || state.phase === 'idle' || state.phase === 'error') {
           return;
         }
@@ -202,86 +201,75 @@ export const createReceiptTransferPreparationController =
           publish({ ...state, phase: 'processing', steps: steps('complete', 'active', 'pending') });
           return;
         }
-        if (analysisState.phase === 'error') {
-          fail(analysisState.stage === 'derivation' ? 'derivation' : 'extraction', null);
-          return;
-        }
-        if (
-          analysisState.phase === 'succeeded' &&
-          analysisState.derivation !== null &&
-          analysisState.extractedItemIndexes !== null
-        ) {
-          derivation = analysisState.derivation;
-          expectedItemIndexes = Object.freeze([...analysisState.extractedItemIndexes]);
-          if (optionsState.operation === 'loading') return;
-          if (state.sourceAccountId === null) {
-            const topologyError = validateReceiptSourceAccountTopology(optionsState);
-            if (topologyError !== null) {
-              fail('creation', topologyError);
-              return;
-            }
-            publish({
-              ...state,
-              phase: 'waiting_for_source',
-              steps: steps('complete', 'complete', 'pending'),
-            });
+        if (analysisState.phase === 'error' || analysisState.phase === 'succeeded') {
+          const result = analysisState.derivation;
+          const seed =
+            analysisState.review ??
+            (result
+              ? {
+                  receiptDate: result.transfers[0]?.receiptDate ?? null,
+                  buyplace: result.transfers[0]?.buyplace ?? null,
+                  receiptTotalCents: result.receiptTotalCents,
+                  transfers: result.transfers,
+                }
+              : null);
+          if (!seed) {
+            fail(analysisState.stage === 'derivation' ? 'derivation' : 'extraction', null);
             return;
           }
           publish({
             ...state,
-            phase: 'processing',
-            steps: steps('complete', 'complete', 'active'),
+            phase: state.sourceAccountId === null ? 'waiting_for_source' : 'reviewing',
+            draft: createReceiptReviewDraft(seed),
+            readyForCommit: null,
+            error: null,
+            steps:
+              analysisState.phase === 'error'
+                ? steps(
+                    analysisState.stage === 'extraction' ? 'error' : 'complete',
+                    analysisState.stage === 'derivation' ? 'error' : 'pending',
+                    'pending',
+                  )
+                : steps('complete', 'complete', 'pending'),
           });
-          tryPrepare(optionsState);
         }
       },
 
-      selectSourceAccount(sourceAccountId, optionsState): void {
-        if (isDisposed || !['processing', 'waiting_for_source'].includes(state.phase)) {
+      selectSourceAccount(sourceAccountId): void {
+        if (isDisposed || !['processing', 'waiting_for_source', 'reviewing'].includes(state.phase))
           return;
-        }
-        publish({ ...state, sourceAccountId });
-        if (derivation !== null && expectedItemIndexes !== null) {
-          if (sourceAccountId === null) {
-            publish({ ...state, sourceAccountId: null, phase: 'waiting_for_source' });
-            return;
-          }
-          publish({
-            ...state,
-            sourceAccountId,
-            phase: 'processing',
-            steps: steps('complete', 'complete', 'active'),
-          });
-          tryPrepare(optionsState);
-        }
+        publish({
+          ...state,
+          sourceAccountId,
+          error: null,
+          phase: state.draft
+            ? sourceAccountId === null
+              ? 'waiting_for_source'
+              : 'reviewing'
+            : 'processing',
+        });
       },
 
       refreshOptions(optionsState): void {
-        if (isDisposed || !['processing', 'waiting_for_source'].includes(state.phase)) {
+        if (
+          isDisposed ||
+          !['processing', 'waiting_for_source', 'reviewing'].includes(state.phase) ||
+          optionsState.operation === 'loading'
+        )
           return;
-        }
-        if (optionsState.operation === 'loading') return;
         if (optionsState.operation !== 'ready') {
-          fail(activeStep(), { code: 'options_unavailable', detail: null });
-          return;
-        }
-        if (derivation !== null && state.sourceAccountId === null) {
-          const topologyError = validateReceiptSourceAccountTopology(optionsState);
-          if (topologyError !== null) {
-            fail('creation', topologyError);
-          } else {
-            publish({
-              ...state,
-              phase: 'waiting_for_source',
-              steps: steps('complete', 'complete', 'pending'),
-            });
-          }
-          return;
-        }
-        if (state.sourceAccountId !== null && derivation !== null) {
-          tryPrepare(optionsState);
+          if (state.draft)
+            publish({ ...state, error: { code: 'options_unavailable', detail: null } });
+          else fail(activeStep(), { code: 'options_unavailable', detail: null });
         }
       },
+
+      updateDraft(draft): void {
+        if (isDisposed || !['reviewing', 'waiting_for_source'].includes(state.phase)) return;
+        publish({ ...state, draft, error: null });
+      },
+
+      prepareForSave: tryPrepare,
 
       claimReadyForCommit(): readonly CreateTransferInput[] | null {
         if (isDisposed || state.phase !== 'ready_for_commit' || state.readyForCommit === null) {
@@ -294,6 +282,7 @@ export const createReceiptTransferPreparationController =
           sourceAccountId: state.sourceAccountId,
           readyForCommit: null,
           error: null,
+          draft: null,
         });
         return commands;
       },
@@ -326,6 +315,11 @@ export const createReceiptTransferPreparationController =
       },
 
       failForOffline(): void {
+        if (state.error?.code === 'offline') return;
+        if (!isDisposed && state.draft) {
+          publish({ ...state, error: { code: 'offline', detail: null } });
+          return;
+        }
         if (!isDisposed && state.phase !== 'idle' && state.phase !== 'error') {
           fail(activeStep(), { code: 'offline', detail: null });
         }
@@ -335,7 +329,6 @@ export const createReceiptTransferPreparationController =
 
       dispose(): void {
         if (isDisposed) return;
-        clearTransientResult();
         isDisposed = true;
         state = INITIAL_STATE;
         listeners.clear();

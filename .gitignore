@@ -12,6 +12,8 @@ dist
 dist-ssr
 *.local
 .env
+.env.receipt.local
+tests/fixtures/receipts/photographs.local/
 playwright-report
 test-results
 reports

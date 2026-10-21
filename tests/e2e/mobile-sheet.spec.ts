@@ -46,10 +46,14 @@ for (const viewport of [
     expect(await content.evaluate((element) => element.scrollTop)).toBe(0);
     const bounds = await sheet.boundingBox();
     expect(Math.abs(bounds!.y + bounds!.height - viewport.height)).toBeLessThan(2);
-    await expect(page.getByTestId('add-transfer-date')).toBeEnabled();
-    expect(await content.evaluate((element) => element.scrollTop)).toBe(0);
-    await expect(page.locator('.bottom-sheet__header')).toBeFocused();
-    await expect(page.getByTestId('bottom-sheet-close')).toBeInViewport();
+    const date = page.getByTestId('add-transfer-date');
+    await expect(date).toBeEnabled();
+    await expect(date).toHaveAttribute('type', 'date');
+    expect((await date.boundingBox())!.height).toBeLessThanOrEqual(49);
+    expect((await date.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await date.fill('2026-10-21');
+    await expect(date).toHaveValue('2026-10-21');
+    await expect(page.getByTestId('bottom-sheet-close')).toHaveCount(0);
     expect(
       await content.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
     ).toBe(true);
@@ -64,8 +68,8 @@ for (const viewport of [
     }
     await page.getByTestId('add-transfer-submit').scrollIntoViewIfNeeded();
     await expect(page.getByTestId('add-transfer-submit')).toBeInViewport();
-    await expect(page.getByTestId('bottom-sheet-close')).toBeInViewport();
-    await page.getByTestId('bottom-sheet-close').click();
+    await expect(page.getByTestId('bottom-sheet-close')).toHaveCount(0);
+    await page.getByTestId('add-transfer-close').click();
     await expect(sheet).toHaveCount(0);
   });
 }
@@ -117,14 +121,14 @@ test('blocks every dismissal path during upload', async ({ page }) => {
   await page.getByTestId('add-transfer-to-account').selectOption('12');
   await page.getByTestId('add-transfer-submit').click();
   await expect(page.getByTestId('add-transfer-upload-status')).toBeVisible();
-  await expect(page.getByTestId('bottom-sheet-close')).toBeDisabled();
+  await expect(page.getByTestId('bottom-sheet-close')).toHaveCount(0);
   await expect(page.getByTestId('add-transfer-close')).toBeDisabled();
   await page.keyboard.press('Escape');
   await dragGrip(page, 100);
   await page.mouse.click(1, 1);
   await expect(page.getByRole('dialog')).toBeVisible();
   await expect(page.getByTestId('add-transfer-success-status')).toBeVisible();
-  await page.getByTestId('bottom-sheet-close').click();
+  await page.getByTestId('add-transfer-close').click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
@@ -147,7 +151,7 @@ test('uses system fonts without requests and supports larger text and viewport r
     { width: 720, height: 320 },
   ]) {
     await page.setViewportSize(viewport);
-    await expect(page.getByTestId('bottom-sheet-close')).toBeInViewport();
+    await expect(page.getByTestId('bottom-sheet-close')).toHaveCount(0);
     await page.getByTestId('add-transfer-submit').scrollIntoViewIfNeeded();
     await expect(page.getByTestId('add-transfer-submit')).toBeInViewport();
     expect(
@@ -156,7 +160,7 @@ test('uses system fonts without requests and supports larger text and viewport r
         .evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
     ).toBe(true);
   }
-  await page.getByTestId('bottom-sheet-close').click();
+  await page.getByTestId('add-transfer-close').click();
   await page.getByRole('link', { name: 'Settings', exact: true }).click();
   await expect(page.getByTestId('route-settings')).toBeVisible();
   expect(

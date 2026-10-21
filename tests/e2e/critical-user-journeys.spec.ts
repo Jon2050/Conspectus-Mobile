@@ -5,6 +5,7 @@ import path from 'node:path';
 
 import {
   appPath,
+  expandSettingsSections,
   getCacheReadSnapshotCallCount,
   getGraphDownloadCallCount,
   getGraphMetadataCallCount,
@@ -70,7 +71,9 @@ test('critical journey: signs in, binds a OneDrive DB, and reads accounts and tr
   await page.clock.setFixedTime(new Date('2024-04-15T12:00:00.000Z'));
 
   await page.goto(appPath('#/settings'));
+  await expandSettingsSections(page);
   await page.getByRole('button', { name: 'Sign in with Microsoft' }).click();
+  await expandSettingsSections(page);
 
   await expect(page.getByTestId('auth-status-message')).toContainText('Signed in.');
   await expect(page.getByText('mock-user@example.com')).toBeVisible();
@@ -104,6 +107,7 @@ test('critical journey: signs in, binds a OneDrive DB, and reads accounts and tr
   await expect(page.getByTestId('transfer-card-1')).toHaveCount(0);
 
   await page.getByRole('link', { name: 'Settings' }).click();
+  await expandSettingsSections(page);
   await expect(page.getByTestId('selected-db-file-summary')).toContainText('budget.db');
 });
 
@@ -194,6 +198,7 @@ test('critical journey: offline startup fails closed without cached account or t
   await expect(page.getByTestId('transfers-route-cards')).toHaveCount(0);
 
   await page.getByRole('link', { name: 'Settings' }).click();
+  await expandSettingsSections(page);
   await expect(page.getByTestId('route-settings')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Change DB file' })).toBeVisible();
 });

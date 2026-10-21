@@ -8,6 +8,7 @@ import {
   APP_BASE_PATH,
   RUNTIME_CLIENT_ID_PATTERN,
   appPath,
+  expandSettingsSections,
   createSqliteBytes,
   createMockGraphError,
   REQUIRED_MANIFEST_ICONS,
@@ -101,6 +102,7 @@ test('loads a mobile app shell and navigates primary routes', async ({ page }) =
   await expect(page.getByRole('dialog')).toHaveCount(0);
 
   await page.getByRole('link', { name: 'Settings' }).click();
+  await expandSettingsSections(page);
   await expect(page).toHaveURL(/#\/settings$/);
   await expect(page.getByRole('heading', { level: 2, name: 'Settings' })).toBeVisible();
 });
@@ -509,6 +511,7 @@ test('force refresh downloads an unchanged DB and reports progress plus the new 
   await installMockDbRuntime(page, { forceAlwaysOpen: true });
 
   await page.goto(appPath('#/settings'));
+  await expandSettingsSections(page);
 
   await expect(page.getByTestId('force-refresh-button')).toBeEnabled();
   const initialLastSync = await page.getByTestId('settings-last-sync').textContent();
@@ -549,6 +552,7 @@ test('force refresh reports an offline failure and remains retryable', async ({ 
   await installMockStartupNetworkState(page, false);
 
   await page.goto(appPath('#/settings'));
+  await expandSettingsSections(page);
 
   const refreshButton = page.getByTestId('force-refresh-button');
   await expect(refreshButton).toBeEnabled();
@@ -821,6 +825,7 @@ test('keeps the app usable and offers rebind when the exact saved path is missin
     .toBe(oldBinding.itemId);
 
   await page.getByTestId('missing-file-recovery-button').click();
+  await expandSettingsSections(page);
   await expect(page.getByTestId('route-settings')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Change DB file' })).toBeVisible();
   await page.getByRole('button', { name: 'Change DB file' }).click();
@@ -1217,6 +1222,7 @@ test('rejects cached transfer data when transient startup download failures exha
   expect(await getGraphDownloadCallCount(page)).toBe(3);
 
   await page.getByRole('link', { name: 'Settings' }).click();
+  await expandSettingsSections(page);
   await expect(page.getByTestId('route-settings')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Change DB file' })).toBeVisible();
 });
@@ -1286,6 +1292,7 @@ test('rejects the cached DB and offers sign-in again when download auth expires'
   expect(await getGraphDownloadCallCount(page)).toBe(1);
 
   await page.getByRole('link', { name: 'Settings' }).click();
+  await expandSettingsSections(page);
   await expect(page.getByTestId('route-settings')).toBeVisible();
 });
 
@@ -1347,6 +1354,7 @@ test('triggers a fresh sync after a successful DB file selection', async ({ page
   await installMockStartupNetworkState(page, true);
 
   await page.goto(appPath('#/settings'));
+  await expandSettingsSections(page);
 
   await expect(
     page.locator(
@@ -1398,11 +1406,13 @@ test('restored binding triggers sync after interactive sign-in without reload', 
   await installMockStartupNetworkState(page, true);
 
   await page.goto(appPath('#/settings'));
+  await expandSettingsSections(page);
 
   await expect(page.getByTestId('auth-status-message')).toContainText('Signed out.');
   await expect(page.locator('.toast')).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Sign in with Microsoft' }).click();
+  await expandSettingsSections(page);
 
   await expect(page.getByTestId('auth-status-message')).toContainText('Signed in.');
   await expect(page.getByText('Downloaded the latest DB from OneDrive.')).toBeVisible();
@@ -1449,6 +1459,7 @@ test('shows the running build identity in footer and Settings despite newer serv
     }),
   );
   await page.goto(appPath('#/settings'));
+  await expandSettingsSections(page);
   await expect(page.getByTestId('settings-build-version')).toHaveText(buildInfo.version);
   expect(buildInfo.version).toMatch(/\+[a-f0-9]{8}$/u);
   const expected = await page.evaluate(({ version, buildTimeUtc }) => {
@@ -1485,6 +1496,7 @@ test('keeps footer and navigation geometry stable while scrolling a long page', 
   await installMockAuthClient(page, { startAuthenticated: true });
   await installMockGraphClient(page, { extraRootDbFileCount: 80 });
   await page.goto(appPath('#/settings'));
+  await expandSettingsSections(page);
   await page.getByRole('button', { name: 'Select DB File' }).click();
   await expect(page.getByTestId('db-file-browser-loading')).toHaveCount(0);
   await expect(page.locator('[data-testid^="select-file-"]')).toHaveCount(81);
@@ -1553,6 +1565,7 @@ test('supports sign-in and sign-out auth UX states in settings', async ({ page }
   });
 
   await page.goto(appPath('#/settings'));
+  await expandSettingsSections(page);
 
   const statusMessage = page.getByTestId('auth-status-message');
   await expect(page.getByRole('heading', { level: 2, name: 'Settings' })).toBeVisible();
@@ -1602,6 +1615,7 @@ test('allows selecting a OneDrive .db file from the settings browser', async ({ 
   await installMockDbRuntime(page);
 
   await page.goto(appPath('#/settings'));
+  await expandSettingsSections(page);
 
   await expect(page.getByTestId('signed-in-account-summary')).toBeVisible();
   await expect(page.getByTestId('binding-status-message')).toContainText(
@@ -1636,6 +1650,7 @@ test('allows selecting a OneDrive .db file from the settings browser', async ({ 
   await expect(page.getByRole('heading', { level: 2, name: 'Accounts' })).toBeVisible();
 
   await page.getByRole('link', { name: 'Settings' }).click();
+  await expandSettingsSections(page);
   await expect(page.getByTestId('binding-status-message')).toContainText('DB file selected.');
   await expect(page.getByTestId('selected-db-file-summary')).toContainText('budget.db');
 
@@ -1660,6 +1675,7 @@ test('shows an in-panel loading state while OneDrive browse results are pending'
   });
 
   await page.goto(appPath('#/settings'));
+  await expandSettingsSections(page);
   await page.getByRole('button', { name: 'Select DB File' }).click();
 
   await expect(page.getByTestId('binding-status-message')).toContainText(
@@ -1681,6 +1697,7 @@ test('keeps the selected DB file after reload', async ({ page }) => {
   await installMockGraphClient(page);
 
   await page.goto(appPath('#/settings'));
+  await expandSettingsSections(page);
   await page.getByRole('button', { name: 'Select DB File' }).click();
   await page.getByTestId('select-file-file-root-db').click();
   expect(await getGraphListChildrenCallCount(page)).toBe(1);
@@ -1690,6 +1707,7 @@ test('keeps the selected DB file after reload', async ({ page }) => {
   await expect(page.getByTestId('db-file-browser')).toHaveCount(0);
 
   await page.reload();
+  await expandSettingsSections(page);
 
   await expect(page.getByTestId('binding-status-message')).toContainText('DB file selected.');
   await expect(page.getByTestId('selected-db-file-summary')).toContainText('conspectus.db');
@@ -1707,6 +1725,7 @@ test('allows cancelling a DB file rebind without changing the current selection'
   await installMockGraphClient(page);
 
   await page.goto(appPath('#/settings'));
+  await expandSettingsSections(page);
   await page.getByRole('button', { name: 'Select DB File' }).click();
   await page.getByTestId('select-file-file-root-db').click();
   await expect(page.getByTestId('selected-db-file-summary')).toContainText('conspectus.db');
@@ -1732,6 +1751,7 @@ test('resets local app data only after destructive confirmation', async ({ page 
   });
 
   await page.goto(appPath('#/settings'));
+  await expandSettingsSections(page);
   await page.getByRole('button', { name: 'Select DB File' }).click();
   await page.getByTestId('select-file-file-root-db').click();
   await expect(page.getByTestId('selected-db-file-summary')).toContainText('conspectus.db');
@@ -1765,6 +1785,7 @@ test('resets local app data only after destructive confirmation', async ({ page 
   expect(persistedBindingValue).toBeNull();
 
   await page.reload();
+  await expandSettingsSections(page);
   await expect(page.getByTestId('binding-status-message')).toContainText(
     'No DB file selected yet.',
   );
@@ -1780,6 +1801,7 @@ test('restores selected DB file after startup on a non-settings route', async ({
   await installMockDbRuntime(page);
 
   await page.goto(appPath('#/settings'));
+  await expandSettingsSections(page);
   await page.getByRole('button', { name: 'Select DB File' }).click();
   await page.getByTestId('select-file-file-root-db').click();
 
@@ -1791,6 +1813,7 @@ test('restores selected DB file after startup on a non-settings route', async ({
   expect(await getGraphListChildrenCallCount(page)).toBe(0);
 
   await page.getByRole('link', { name: 'Settings' }).click();
+  await expandSettingsSections(page);
   await expect(page.getByTestId('binding-status-message')).toContainText('DB file selected.');
   await expect(page.getByTestId('selected-db-file-summary')).toContainText('conspectus.db');
 });
@@ -1804,6 +1827,7 @@ test('shows browse errors without pretending the OneDrive folder is empty', asyn
   });
 
   await page.goto(appPath('#/settings'));
+  await expandSettingsSections(page);
 
   await page.getByRole('button', { name: 'Select DB File' }).click();
 
@@ -1826,6 +1850,7 @@ test('shows binding error when token acquisition fails during OneDrive browse', 
   });
 
   await page.goto(appPath('#/settings'));
+  await expandSettingsSections(page);
   await page.getByRole('button', { name: 'Select DB File' }).click();
 
   await expect(page.getByRole('alert')).toContainText('Your session has expired. Sign in again.');
@@ -1846,6 +1871,7 @@ test('shows validation error for malformed .db selection and does not persist a 
   });
 
   await page.goto(appPath('#/settings'));
+  await expandSettingsSections(page);
   await page.getByRole('button', { name: 'Select DB File' }).click();
   await page.getByTestId('select-file-file-malformed-db').click();
 
@@ -1875,6 +1901,7 @@ test('processes redirect auth hash before route navigation and keeps signed-in s
   await expect(page.getByRole('heading', { level: 2, name: 'Accounts' })).toBeVisible();
 
   await page.getByRole('link', { name: 'Settings' }).click();
+  await expandSettingsSections(page);
   await expect(page).toHaveURL(/#\/settings$/);
   await expect(page.getByTestId('signed-in-account-summary')).toBeVisible();
   await expect(page.getByTestId('auth-status-message')).toContainText('Signed in.');
@@ -1886,8 +1913,10 @@ test('shows auth error UI when sign-in fails in settings', async ({ page }) => {
   });
 
   await page.goto(appPath('#/settings'));
+  await expandSettingsSections(page);
 
   await page.getByRole('button', { name: 'Sign in with Microsoft' }).click();
+  await expandSettingsSections(page);
 
   await expect(page.getByRole('alert')).toContainText(
     'The connection could not be established in time. Check your connection and try again.',
@@ -2082,6 +2111,7 @@ test('prompts for an available service worker update and reloads into it', async
       .toBeTruthy();
 
     await page.reload();
+    await expandSettingsSections(page);
     await expect
       .poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller)))
       .toBeTruthy();
@@ -2154,6 +2184,7 @@ for (const keepControlledTab of [false, true]) {
 
     try {
       await page.goto(appPath('#/settings'));
+      await expandSettingsSections(page);
       await expect
         .poll(() =>
           page.evaluate(
@@ -2172,6 +2203,7 @@ for (const keepControlledTab of [false, true]) {
       await cdp.send('Network.enable');
       await cdp.send('Network.setBypassServiceWorker', { bypass: true });
       await page.reload();
+      await expandSettingsSections(page);
       await expect(page.getByTestId('settings-build-version')).toHaveText(currentBuild.version);
       expect(await page.evaluate(() => navigator.serviceWorker.controller)).toBeNull();
       await cdp.send('Network.setBypassServiceWorker', { bypass: false });

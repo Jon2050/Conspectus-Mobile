@@ -106,6 +106,8 @@ const createMockReceiptPreparationController = (
   handleAnalysisState: () => {},
   selectSourceAccount: () => {},
   refreshOptions: () => {},
+  updateDraft: () => {},
+  prepareForSave: () => {},
   claimReadyForCommit: () => null,
   markCommitActive: () => {},
   markCommitFailed: () => {},
@@ -193,7 +195,7 @@ describe('AddRoute component', () => {
     expect(body).not.toContain('gallery');
     expect(body).not.toMatch(/data-testid="receipt-photo-button"[^>]*disabled/);
     expect(body).toContain('data-testid="receipt-semantic-risk"');
-    expect(body).toContain('fachlich falsch sein');
+    expect(body).toContain('vorgeschlagenen Daten vor dem Speichern');
   });
 
   it('disables capture when no stage-one consumer is composed', () => {
@@ -590,6 +592,8 @@ describe('AddRoute component', () => {
     });
 
     expect(body).toContain('Die Kategorie "Einkauf"');
+    expect(body).not.toContain('data-testid="bottom-sheet-close"');
+    expect(body).toContain('data-testid="add-transfer-close"');
     expect(body).toMatch(/data-testid="receipt-step-creation"[^>]*data-state="error"/);
     expect(body).not.toContain('data-testid="add-transfer-from-account"');
     expect(body).toContain('Neuen Kassenbon fotografieren');
@@ -830,7 +834,7 @@ describe('AddRoute component', () => {
     expect(body).toMatch(/data-testid="add-transfer-name"[^>]*disabled/);
     expect(body).toMatch(/data-testid="add-transfer-buyplace"[^>]*disabled/);
     expect(body).toMatch(/data-testid="add-transfer-close"[^>]*disabled/);
-    expect(body).toMatch(/data-testid="bottom-sheet-close"[^>]*disabled/);
+    expect(body).not.toContain('data-testid="bottom-sheet-close"');
   });
 
   it('renders local save status and disables controls while the local write/export runs', () => {
@@ -846,7 +850,7 @@ describe('AddRoute component', () => {
     expect(body).toContain('aria-busy="true"');
     expect(body).toMatch(/data-testid="add-transfer-submit"[^>]*disabled/);
     expect(body).toMatch(/data-testid="add-transfer-close"[^>]*disabled/);
-    expect(body).toMatch(/data-testid="bottom-sheet-close"[^>]*disabled/);
+    expect(body).not.toContain('data-testid="bottom-sheet-close"');
   });
 
   it('renders determinate upload progress while the database upload runs', () => {

@@ -4,23 +4,20 @@ import {
   OpenRouterChatCompletionError,
   openRouterChatCompletionClient,
   openRouterModelCatalogClient,
+  resolveOpenRouterReasoning,
   type OpenRouterChatCompletionClient,
   type OpenRouterModelCatalogClient,
 } from '@openrouter';
 
 import {
-  RECEIPT_TRANSFER_DERIVATION_JSON_SCHEMA,
   parseReceiptExtractionResponse,
   parseReceiptTransferDerivationResponse,
-  type ReceiptExtraction,
+  type ReceiptExtractionResult,
+  type ReceiptReviewSeed,
   type ReceiptTransferDerivation,
 } from './receiptAnalysisContracts';
 import { disposeNormalizedReceiptImage } from './receiptImageNormalization';
-import {
-  RECEIPT_EXTRACTION_IMAGE_INSTRUCTION,
-  TRANSFER_DERIVATION_EXTRACTION_HEADING,
-  TRANSFER_DERIVATION_RULES_HEADING,
-} from './prompts';
+import { receiptExtractionMessages, receiptDerivationMessages } from './receiptAnalysisMessages';
 import type { ReceiptStageOneStartInput, ReceiptStageOneStarter } from './receiptCaptureController';
 
 export type ReceiptAnalysisPhase = 'idle' | 'extracting' | 'deriving' | 'succeeded' | 'error';
@@ -45,6 +42,7 @@ export interface ReceiptAnalysisState {
   readonly errorCode: ReceiptAnalysisErrorCode | null;
   readonly errorReason: string | null;
   readonly derivation: ReceiptTransferDerivation | null;
+  readonly review?: ReceiptReviewSeed | null;
   readonly extractedItemIndexes: readonly number[] | null;
 }
 
@@ -77,6 +75,7 @@ const INITIAL_STATE: ReceiptAnalysisState = {
   errorCode: null,
   errorReason: null,
   derivation: null,
+  review: null,
   extractedItemIndexes: null,
 };
 
@@ -98,6 +97,48 @@ const toBase64 = (bytes: Uint8Array): string => {
 
 const hasModel = (models: readonly { readonly id: string }[], modelId: string): boolean =>
   models.some((model) => model.id === modelId);
+
+const reviewSeed = (
+  extraction: ReceiptExtractionResult,
+  derivation?: ReturnType<typeof parseReceiptTransferDerivationResponse>,
+): ReceiptReviewSeed => {
+  const result = derivation?.ok ? derivation.value : null;
+  return {
+    receiptDate: extraction.receiptDate,
+    currency: extraction.currency,
+    buyplace:
+      result?.status === 'error'
+        ? (result.buyplace ?? extraction.storeName)
+        : (result?.transfers[0]?.buyplace ?? extraction.storeName),
+    receiptTotalCents: extraction.receiptTotalCents,
+    transfers: result?.transfers ?? [],
+  };
+};
+
+// A model's mistaken "ok" is never accepted as successful. Bounded, typed suggestions can
+// still populate the manual review after arithmetic/coverage validation has rejected them.
+const recoverReviewSeed = (
+  raw: string,
+  extraction?: ReceiptExtractionResult,
+): ReceiptReviewSeed | null => {
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+    const partial = JSON.stringify({
+      ...value,
+      status: 'error',
+      errorReason: 'Local validation rejected a complete response.',
+    });
+    if (extraction) {
+      const parsed = parseReceiptTransferDerivationResponse(partial, extraction);
+      return parsed.ok ? reviewSeed(extraction, parsed) : null;
+    }
+    const parsed = parseReceiptExtractionResponse(partial);
+    return parsed.ok ? reviewSeed(parsed.value) : null;
+  } catch {
+    return null;
+  }
+};
 
 const toCatalogAnalysisError = (
   error: OpenRouterCatalogError,
@@ -198,6 +239,7 @@ export const createReceiptAnalysisController = (
       stage: error.stage,
       errorCode: error.code,
       errorReason: error.reason,
+      review: state.review ?? null,
       derivation: null,
       extractedItemIndexes: null,
     });
@@ -232,7 +274,7 @@ export const createReceiptAnalysisController = (
       }
       publish({ ...INITIAL_STATE, phase: 'extracting', stage: 'extraction' });
 
-      let extraction: ReceiptExtraction;
+      let extraction: ReceiptExtractionResult;
       try {
         try {
           const catalog = await catalogClient.load(
@@ -248,28 +290,22 @@ export const createReceiptAnalysisController = (
             {
               apiKey: input.configuration.apiKey,
               model: input.configuration.visionModelId,
-              messages: [
-                {
-                  role: 'system',
-                  content: input.configuration.extractionPrompt.text,
-                },
-                {
-                  role: 'user',
-                  content: [
-                    {
-                      type: 'text',
-                      text: RECEIPT_EXTRACTION_IMAGE_INSTRUCTION,
-                    },
-                    { type: 'image/jpeg', base64: toBase64(input.image.bytes) },
-                  ],
-                },
-              ],
+              reasoning: resolveOpenRouterReasoning(
+                catalog.visionModels.find((model) => model.id === input.configuration.visionModelId)
+                  ?.reasoning,
+                'lowest',
+              ),
+              messages: receiptExtractionMessages(
+                input.configuration.extractionPrompt.text,
+                toBase64(input.image.bytes),
+              ),
             },
             abortController.signal,
           );
           assertActive(runId, abortController.signal);
           const parsedExtraction = parseReceiptExtractionResponse(rawExtraction);
           if (!parsedExtraction.ok) {
+            publish({ ...state, review: recoverReviewSeed(rawExtraction) });
             throw new ReceiptAnalysisError(
               parsedExtraction.error.code === 'OUTPUT_TOO_LARGE'
                 ? 'output_limit'
@@ -277,20 +313,35 @@ export const createReceiptAnalysisController = (
               'extraction',
             );
           }
-          if (parsedExtraction.value.status === 'error') {
-            throw new ReceiptAnalysisError(
-              'model_error',
-              'extraction',
-              parsedExtraction.value.errorReason,
-            );
-          }
           extraction = parsedExtraction.value;
+          publish({
+            ...state,
+            review: {
+              receiptDate: extraction.receiptDate,
+              buyplace: extraction.storeName,
+              receiptTotalCents: extraction.receiptTotalCents,
+              currency: extraction.currency,
+              transfers: [],
+            },
+          });
+          if (
+            extraction.status === 'error' &&
+            (extraction.items.length === 0 ||
+              (extraction.currency !== null && extraction.currency !== 'EUR'))
+          ) {
+            throw new ReceiptAnalysisError('model_error', 'extraction', extraction.errorReason);
+          }
         } finally {
           disposeNormalizedReceiptImage(input.image);
         }
 
         assertActive(runId, abortController.signal);
-        publish({ ...INITIAL_STATE, phase: 'deriving', stage: 'derivation' });
+        publish({
+          ...INITIAL_STATE,
+          phase: 'deriving',
+          stage: 'derivation',
+          review: state.review ?? null,
+        });
 
         const transferCatalog = await catalogClient.load(
           input.configuration.apiKey,
@@ -305,30 +356,27 @@ export const createReceiptAnalysisController = (
           {
             apiKey: input.configuration.apiKey,
             model: input.configuration.transferModelId,
-            messages: [
-              { role: 'system', content: input.configuration.transferPrompt.text },
-              {
-                role: 'user',
-                content:
-                  TRANSFER_DERIVATION_RULES_HEADING +
-                  '\n' +
-                  input.configuration.transferRules +
-                  '\n\n' +
-                  TRANSFER_DERIVATION_EXTRACTION_HEADING +
-                  '\n' +
-                  JSON.stringify(extraction),
-              },
-            ],
-            responseFormat: {
-              name: RECEIPT_TRANSFER_DERIVATION_JSON_SCHEMA.name,
-              schema: RECEIPT_TRANSFER_DERIVATION_JSON_SCHEMA.schema,
-            },
+            reasoning: resolveOpenRouterReasoning(
+              transferCatalog.transferModels.find(
+                (model) => model.id === input.configuration.transferModelId,
+              )?.reasoning,
+              'lowest',
+            ),
+            messages: receiptDerivationMessages(
+              input.configuration.transferPrompt.text,
+              input.configuration.transferRules,
+              extraction,
+            ),
           },
           abortController.signal,
         );
         assertActive(runId, abortController.signal);
         const parsedDerivation = parseReceiptTransferDerivationResponse(rawDerivation, extraction);
         if (!parsedDerivation.ok) {
+          publish({
+            ...state,
+            review: recoverReviewSeed(rawDerivation, extraction) ?? state.review ?? null,
+          });
           throw new ReceiptAnalysisError(
             parsedDerivation.error.code === 'OUTPUT_TOO_LARGE'
               ? 'output_limit'
@@ -336,11 +384,23 @@ export const createReceiptAnalysisController = (
             'derivation',
           );
         }
-        if (parsedDerivation.value.status === 'error') {
+        const result = parsedDerivation.value;
+        const review: ReceiptReviewSeed = {
+          receiptDate: extraction.receiptDate,
+          buyplace:
+            result.status === 'error'
+              ? (result.buyplace ?? extraction.storeName)
+              : (result.transfers[0]?.buyplace ?? extraction.storeName),
+          receiptTotalCents: extraction.receiptTotalCents,
+          currency: extraction.currency,
+          transfers: result.transfers,
+        };
+        publish({ ...state, review });
+        if (result.status === 'error') {
           throw new ReceiptAnalysisError(
             'model_error',
             'derivation',
-            parsedDerivation.value.errorReason,
+            [extraction.errorReason, result.errorReason].filter(Boolean).join(' '),
           );
         }
 
@@ -351,7 +411,8 @@ export const createReceiptAnalysisController = (
           stage: null,
           errorCode: null,
           errorReason: null,
-          derivation: parsedDerivation.value,
+          derivation: result,
+          review,
           extractedItemIndexes: Object.freeze(extraction.items.map((item) => item.index)),
         });
       } catch (error) {

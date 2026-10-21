@@ -16,6 +16,18 @@ const resolveAppBasePath = (): string => {
 export const APP_BASE_PATH = resolveAppBasePath();
 export const RUNTIME_CLIENT_ID_PATTERN = /VITE_AZURE_CLIENT_ID:"[^"]*"/g;
 export const appPath = (suffix = ''): string => `${APP_BASE_PATH}${suffix}`;
+// Existing settings journeys explicitly expand their sections before interacting.
+export const expandSettingsSections = async (page: Page): Promise<void> => {
+  if (!page.url().endsWith('#/settings')) return;
+  await page.getByTestId('settings-account-section').locator('summary').waitFor();
+  for (const id of ['account', 'safety', 'build', 'database', 'receipt']) {
+    const section = page.getByTestId(`settings-${id}-section`);
+    if ((await section.count()) && (await section.getAttribute('open')) === null) {
+      await section.locator(':scope > summary').click();
+    }
+  }
+};
+
 const SQLITE_DATABASE_HEADER_BYTES = [
   0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, 0x20, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74, 0x20, 0x33, 0x00,
 ];

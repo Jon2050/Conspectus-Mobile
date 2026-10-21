@@ -53,14 +53,12 @@ const EXTRACTION = JSON.stringify({
 const DERIVATION = JSON.stringify({
   status: 'ok',
   errorReason: null,
-  receiptTotalCents: 350,
+  buyplace: 'Markt',
   transfers: [
     {
       name: 'Brot und Äpfel',
       amountCents: 350,
       categoryNames: ['Einkauf', 'Lebensmittel'],
-      buyplace: 'Markt',
-      receiptDate: '2026-07-31',
       sourceItemIndexes: [0, 1, 2],
     },
   ],
@@ -94,6 +92,117 @@ const input = (
 ) => ({ image: receiptImage, configuration });
 
 describe('receipt analysis controller', () => {
+  it('selects enabled minimum reasoning independently from each freshly loaded role catalog', async () => {
+    const catalogClient: OpenRouterModelCatalogClient = {
+      load: vi
+        .fn()
+        .mockResolvedValueOnce(
+          catalog({
+            visionModels: [
+              {
+                id: 'shared-model',
+                name: 'Vision',
+                label: 'Vision',
+                reasoning: {
+                  mandatory: false,
+                  supportedEfforts: ['high', 'low', 'none'],
+                  defaultEnabled: false,
+                },
+              },
+            ],
+          }),
+        )
+        .mockResolvedValueOnce(
+          catalog({
+            transferModels: [
+              {
+                id: 'shared-model',
+                name: 'Text',
+                label: 'Text',
+                reasoning: {
+                  mandatory: true,
+                  supportedEfforts: ['high', 'medium'],
+                },
+              },
+            ],
+          }),
+        ),
+    };
+    const completionClient: OpenRouterChatCompletionClient = {
+      complete: vi.fn().mockResolvedValueOnce(EXTRACTION).mockResolvedValueOnce(DERIVATION),
+    };
+    const controller = createReceiptAnalysisController({ catalogClient, completionClient });
+    await controller.start(input(image()), new AbortController().signal);
+    expect(vi.mocked(completionClient.complete).mock.calls[0]?.[0].reasoning).toEqual({
+      enabled: true,
+      effort: 'low',
+    });
+    expect(vi.mocked(completionClient.complete).mock.calls[1]?.[0].reasoning).toEqual({
+      enabled: true,
+      effort: 'medium',
+    });
+  });
+  it('keeps partial extraction and derivation fields in review after a model-declared error', async () => {
+    const extraction = {
+      ...JSON.parse(EXTRACTION),
+      status: 'error',
+      errorReason: 'Bon-Summe fehlt.',
+      receiptTotalCents: null,
+    };
+    const derivation = {
+      ...JSON.parse(DERIVATION),
+      status: 'error',
+      errorReason: 'Nur Teilantwort.',
+      buyplace: 'Rewe',
+    };
+    const completionClient: OpenRouterChatCompletionClient = {
+      complete: vi
+        .fn()
+        .mockResolvedValueOnce(JSON.stringify(extraction))
+        .mockResolvedValueOnce(JSON.stringify(derivation)),
+    };
+    const controller = createReceiptAnalysisController({
+      catalogClient: { load: vi.fn().mockResolvedValue(catalog()) },
+      completionClient,
+    });
+    await expect(
+      controller.start(input(image()), new AbortController().signal),
+    ).rejects.toMatchObject({ code: 'model_error' });
+    expect(completionClient.complete).toHaveBeenCalledTimes(2);
+    expect(controller.getState()).toMatchObject({
+      phase: 'error',
+      derivation: null,
+      review: {
+        receiptDate: '2026-07-31',
+        buyplace: 'Rewe',
+        receiptTotalCents: null,
+        transfers: [{ amountCents: 350 }],
+      },
+    });
+  });
+  it('retains typed suggestions rejected for arithmetic without accepting a mistaken model ok', async () => {
+    const wrong = JSON.parse(DERIVATION);
+    wrong.transfers[0].amountCents = 351;
+    const controller = createReceiptAnalysisController({
+      catalogClient: { load: vi.fn().mockResolvedValue(catalog()) },
+      completionClient: {
+        complete: vi
+          .fn()
+          .mockResolvedValueOnce(EXTRACTION)
+          .mockResolvedValueOnce(JSON.stringify(wrong)),
+      },
+    });
+    await expect(
+      controller.start(input(image()), new AbortController().signal),
+    ).rejects.toMatchObject({ code: 'invalid_response' });
+    expect(controller.getState()).toMatchObject({
+      phase: 'error',
+      derivation: null,
+      review: { receiptDate: '2026-07-31', buyplace: 'Markt', transfers: [{ amountCents: 351 }] },
+    });
+    controller.reset();
+    expect(controller.getState().review).toBeNull();
+  });
   it('reports catalog rate limiting without retrying or sending the image', async () => {
     const catalogClient = {
       load: vi.fn().mockRejectedValue(new OpenRouterCatalogError('provider_error', 429)),
@@ -137,8 +246,8 @@ describe('receipt analysis controller', () => {
     expect(JSON.stringify(firstRequest)).not.toContain('"storeName":"Markt"');
     expect(secondRequest).toMatchObject({
       model: 'shared-model',
-      responseFormat: { name: 'receipt_transfer_derivation' },
     });
+    expect(secondRequest).not.toHaveProperty('responseFormat');
     expect(JSON.stringify(secondRequest)).toContain('BENUTZERDEFINIERTE GRUPPIERUNGSREGELN');
     expect(JSON.stringify(secondRequest)).toContain(
       '- Lebensmittel kommen in die Kategorien [Einkauf], [Lebensmittel].',
@@ -207,7 +316,7 @@ describe('receipt analysis controller', () => {
     });
   });
 
-  it('surfaces a bounded model reason and never starts stage two after model-declared failure', async () => {
+  it('surfaces a bounded model reason and stops when no readable items remain', async () => {
     const catalogClient: OpenRouterModelCatalogClient = {
       load: vi.fn().mockResolvedValue(catalog()),
     };
@@ -347,6 +456,7 @@ describe('receipt analysis controller', () => {
 
     expect(controller.getState()).toEqual({
       phase: 'idle',
+      review: null,
       stage: null,
       errorCode: null,
       errorReason: null,

@@ -98,24 +98,13 @@ describe('createOpenRouterChatCompletionClient', () => {
     expect(init?.body).not.toContain('secret-api-key');
   });
 
-  it('adds only strict JSON Schema enforcement to a structured text request', async () => {
+  it('sends ordinary text JSON instructions without requiring structured-output support', async () => {
     const fetchMock = vi.fn<typeof fetch>(async () => createSuccessResponse('{"transfers":[]}'));
     const client = createOpenRouterChatCompletionClient({ fetch: fetchMock });
-    const schema = {
-      type: 'object',
-      additionalProperties: false,
-      required: ['transfers'],
-      properties: { transfers: { type: 'array', items: { type: 'object' } } },
-    };
 
     await client.complete(
       textRequest({
         messages: [{ role: 'user', content: 'Derive transfers from validated extraction JSON.' }],
-        responseFormat: {
-          name: 'receipt_transfers',
-          description: 'Validated receipt transfer batch',
-          schema,
-        },
       }),
     );
 
@@ -125,17 +114,10 @@ describe('createOpenRouterChatCompletionClient', () => {
       model: 'provider/model:free',
       messages: [{ role: 'user', content: 'Derive transfers from validated extraction JSON.' }],
       stream: false,
-      provider: { allow_fallbacks: false, require_parameters: true },
-      response_format: {
-        type: 'json_schema',
-        json_schema: {
-          name: 'receipt_transfers',
-          strict: true,
-          schema,
-          description: 'Validated receipt transfer batch',
-        },
-      },
+      provider: { allow_fallbacks: false },
     });
+    expect(body).not.toHaveProperty('response_format');
+    expect(body.provider).not.toHaveProperty('require_parameters');
     expect(body).not.toHaveProperty('models');
     expect(body).not.toHaveProperty('plugins');
     expect(body).not.toHaveProperty('zdr');

@@ -15,6 +15,7 @@
     ariaLabel = 'Dialog',
     canClose = true,
     closeLabel = 'Close',
+    showCloseButton = true,
     onClose = () => {},
     children,
   }: {
@@ -23,6 +24,7 @@
     ariaLabel?: string;
     canClose?: boolean;
     closeLabel?: string;
+    showCloseButton?: boolean;
     onClose?: () => void;
     children?: Snippet;
   } = $props();
@@ -133,13 +135,15 @@
       </div>
       <div class="bottom-sheet__heading">
         {#if title}<h3 id={titleId}>{title}</h3>{/if}
-        <button
-          type="button"
-          class="app-button app-button--secondary"
-          data-testid="bottom-sheet-close"
-          disabled={!canClose}
-          onclick={requestClose}>{closeLabel}</button
-        >
+        {#if showCloseButton}
+          <button
+            type="button"
+            class="app-button app-button--secondary"
+            data-testid="bottom-sheet-close"
+            disabled={!canClose}
+            onclick={requestClose}>{closeLabel}</button
+          >
+        {/if}
       </div>
     </header>
 

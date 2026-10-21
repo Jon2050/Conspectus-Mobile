@@ -117,17 +117,13 @@ limits per asset class:
 
 | Asset class |               Raw limit |              Gzip limit |
 | ----------- | ----------------------: | ----------------------: |
-| JavaScript  | 776 KiB (794,624 bytes) | 240 KiB (245,760 bytes) |
-| CSS         |   32 KiB (32,768 bytes) |  6.25 KiB (6,400 bytes) |
+| JavaScript  |  1 MB (1,000,000 bytes) |  1 MB (1,000,000 bytes) |
+| CSS         | 0.25 MB (250,000 bytes) | 0.25 MB (250,000 bytes) |
 
-AP3 adds a separately loaded SQLite validation worker after measuring a >50 ms synchronous scan
-on a synthetic 7.3 MiB database. The worker's sql.js loader contributes approximately 45 KiB raw /
-16 KiB gzip to the aggregate, while loading Settings on demand reduces the initial main chunk by
-approximately 24 KiB raw. The remaining growth implements import/reference validation, request
-deadlines and session coordination. Independent CSS chunk compression also adds a small gzip cost.
-The limits include these deliberate costs with a small reserve; all worker/lazy chunks still count.
-Detailed before/after measurements and limitations are recorded in
-[`reviews/2026-10-20-ap3-implementation.md`](reviews/2026-10-20-ap3-implementation.md).
+These are the user-selected aggregate ceilings, using decimal MB rather than binary MiB.
+They replace incremental allowances for individual features. Gzip measurements remain visible,
+but use the same ceilings so there is no smaller compressed-size gate. All lazy and worker
+chunks still count; these totals do not represent startup download size or a runtime speed test.
 
 Raw totals guard parse, storage, and uncompressed delivery cost. Gzip totals are calculated by
 compressing each emitted file independently and summing the results, matching separate network

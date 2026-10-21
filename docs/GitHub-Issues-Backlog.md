@@ -68,7 +68,7 @@ Scope:
 - Store the OpenRouter API key, two independently selected model IDs, and editable/resettable
   receipt-item grouping rules locally per active Microsoft account; keep both complete stage prompts
   app-owned and populate both model comboboxes from current OpenRouter catalog, pricing, modality,
-  and structured-output metadata.
+  metadata plus OpenRouter's live Artificial Analysis Intelligence Index (minimum 20 for both roles).
 - Keep both model comboboxes empty and disabled until the API key passes an authenticated catalog
   request; fetch a fresh catalog whenever Settings is opened and clear any saved role selection
   that a successful refresh proves no longer meets its free/capability criteria.
@@ -138,7 +138,7 @@ Exit criteria:
 - Label: `security`
 - Milestone: `M9 - Receipt Capture + OpenRouter`
 - Summary: Add account-scoped key and prompt settings plus separate live-filtered comboboxes for
-  free vision and structured-output models. Model selection requires a validated key, refreshes on
+  free vision and text models with a live OpenRouter AA Intelligence Index of at least 20. Model selection requires a validated key, refreshes on
   every Settings entry, clears newly invalid selections, has no manual-ID fallback, and permits one
   compatible model in both roles; only one plain free-form grouping-rules field is then
   visible/editable.

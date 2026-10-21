@@ -35,6 +35,24 @@ const deferred = () => {
 };
 
 describe('receipt image normalization', () => {
+  it('encodes a requested benchmark size directly from the decoded original with unchanged quality', async () => {
+    const decodedImage = createDecodedImage();
+    const codec: ReceiptImageCodec = {
+      decode: vi.fn().mockResolvedValue(decodedImage),
+      encodeJpeg: vi.fn().mockResolvedValue(new Blob(['jpeg'], { type: 'image/jpeg' })),
+    };
+    const signal = new AbortController().signal;
+    const result = await createReceiptImageNormalizer(codec, 1280).normalize(createFile(), signal);
+    expect(result).toMatchObject({ width: 1280, height: 960 });
+    expect(codec.encodeJpeg).toHaveBeenCalledWith(
+      decodedImage,
+      1280,
+      960,
+      RECEIPT_IMAGE_JPEG_QUALITY,
+      signal,
+    );
+    expect(decodedImage.dispose).toHaveBeenCalledOnce();
+  });
   it('preserves aspect ratio, avoids upscaling, and bounds the longest edge', () => {
     expect(calculateReceiptImageDimensions(1200, 800)).toEqual({ width: 1200, height: 800 });
     expect(calculateReceiptImageDimensions(4032, 3024)).toEqual({ width: 2560, height: 1920 });

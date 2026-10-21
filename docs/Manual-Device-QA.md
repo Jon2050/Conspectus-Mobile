@@ -255,7 +255,10 @@ data.
 3. During extraction and again during derivation, switch to another app, lock/unlock the phone,
    and return. Repeat with a photo returned while the unchanged foreground freshness check runs.
 4. Repeat while changing the account/bound file or resetting; never reuse the old analysis on a
-   new target. Open the keyboard and rotate during source selection.
+   new target. Open the keyboard and rotate during source selection and receipt review.
+5. After analysis, verify the shared date/purchase location and all grouped rows. Edit a name,
+   category and partial amount, add/remove a row and inspect the entered versus detected total.
+   Confirm that no booking occurs before Save, including after source-account selection.
 
 Expected results:
 
@@ -275,18 +278,21 @@ results and redacted screenshots. Synthetic gold replay is supplemental, not pro
 ### QA-10 Receipt errors, uncertain upload and correction
 
 1. Exercise an unavailable model, provider rate limit and network loss during each analysis stage.
-2. Save a supported receipt with a deliberate source account and verify the post-save summary.
+2. Review a supported receipt, select a source account and explicitly press Save; verify the post-save summary.
    Interrupt upload; separately exercise a changed remote eTag and an acknowledged upload with
    local cache reconciliation failure using disposable test infrastructure where available.
 3. Close/reopen and recover using only the offered action. Reload online and count transfers and
    balances. Photograph the same receipt again only deliberately, observing the duplicate warning.
-4. For a wrong recognized item/category, open the database in Conspectus Desktop after closing
+4. Exercise a partial model error: readable metadata and groups must remain editable. Lose/recover
+   connectivity while editing and confirm the draft survives without an automatic save.
+5. For a correction needed after saving, open the database in Conspectus Desktop after closing
    Mobile, correct the created transfer, close Desktop and refresh Mobile.
 
 Expected results:
 
-- Analysis failures never automatically rerun model calls or save partial batches. A fresh capture
-  is deliberate; transient validated results are not silently reused after cancellation.
+- Analysis failures never automatically rerun model calls or book anything. Typed partial results
+  remain reviewable; saving requires explicit corrected input and Save. A fresh capture is
+  deliberate; transient data is cleared on cancellation or context replacement.
 - Retry sends the original bytes/eTag without another SQL commit. Conflicts require authoritative
   refresh and explicit save-again. Unknown remote outcomes are identified as uncertain; inspect the
   refreshed database before taking a new photo or saving again. Confirmed remote success followed

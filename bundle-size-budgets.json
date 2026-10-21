@@ -2,12 +2,12 @@
   "description": "Defines the maximum raw and gzip bytes allowed for emitted JavaScript and CSS.",
   "budgets": {
     "javascript": {
-      "rawBytes": 794624,
-      "gzipBytes": 245760
+      "rawBytes": 1000000,
+      "gzipBytes": 1000000
     },
     "css": {
-      "rawBytes": 32768,
-      "gzipBytes": 6400
+      "rawBytes": 250000,
+      "gzipBytes": 250000
     }
   }
 }

@@ -1,9 +1,11 @@
 // Covers live OpenRouter Settings validation, reconciliation, privacy, and account isolation.
 import { expect, test, type Page, type Request } from '@playwright/test';
 
-import { appPath, installMockAuthClient } from './support/app-test-harness';
+import { appPath, installMockAuthClient, expandSettingsSections } from './support/app-test-harness';
+import { installOpenRouterBenchmarkFixture } from './support/openrouter-benchmarks';
 
 test.use({ viewport: { width: 390, height: 844 } });
+test.beforeEach(async ({ page }) => installOpenRouterBenchmarkFixture(page));
 
 interface CatalogReply {
   readonly status: number;
@@ -16,34 +18,38 @@ interface CatalogRouteCapture {
 
 const sharedModel = {
   id: 'provider/shared:free',
+  canonical_slug: 'provider/shared-snapshot',
   name: 'Shared Free Model',
   architecture: {
     input_modalities: ['text', 'image'],
     output_modalities: ['text'],
   },
   pricing: { prompt: '0', completion: '0' },
-  supported_parameters: ['structured_outputs'],
+  supported_parameters: [],
 };
 
 const transferOnlyModel = {
   id: 'provider/text:free',
+  canonical_slug: 'provider/text-snapshot',
   name: 'Text Free Model',
   architecture: {
     input_modalities: ['text'],
     output_modalities: ['text'],
   },
   pricing: { prompt: '0', completion: '0', request: '0' },
-  supported_parameters: ['structured_outputs'],
+  supported_parameters: [],
 };
 
 const sharedTransferOnlyModel = {
   ...transferOnlyModel,
   id: 'provider/shared:free',
+  canonical_slug: 'provider/shared-snapshot',
   name: 'Shared Free Model',
 };
 
 const visionOnlyModel = {
   id: 'provider/vision:free',
+  canonical_slug: 'provider/vision-snapshot',
   name: 'Vision Free Model',
   architecture: {
     input_modalities: ['image'],
@@ -80,7 +86,11 @@ const installCatalogRoute = async (
     await route.fulfill({
       status: reply.status,
       contentType: 'application/json',
-      headers: { 'Access-Control-Allow-Origin': '*' },
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'authorization',
+        'Access-Control-Allow-Methods': 'GET,OPTIONS',
+      },
       body: JSON.stringify(reply.status === 200 ? { data: reply.data ?? [] } : { error: 'failed' }),
     });
   });
@@ -91,8 +101,66 @@ const installCatalogRoute = async (
 const openAuthenticatedSettings = async (page: Page): Promise<void> => {
   await installMockAuthClient(page, { startAuthenticated: true });
   await page.goto(appPath('#/settings'));
+  await expandSettingsSections(page);
   await expect(page.getByTestId('openrouter-settings')).toBeVisible();
 };
+
+test('filters both roles by live intelligence scores and accepts text models without structured outputs', async ({
+  page,
+}) => {
+  await page.route('https://openrouter.ai/api/v1/benchmarks?**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'authorization',
+        'Access-Control-Allow-Methods': 'GET,OPTIONS',
+      },
+      body: JSON.stringify({
+        data: [
+          {
+            source: 'artificial-analysis',
+            model_permaslug: 'provider/shared-snapshot',
+            intelligence_index: 19.99,
+          },
+          {
+            source: 'artificial-analysis',
+            model_permaslug: 'provider/text-snapshot',
+            intelligence_index: 20,
+          },
+          {
+            source: 'artificial-analysis',
+            model_permaslug: 'provider/vision-snapshot',
+            intelligence_index: 25,
+          },
+        ],
+      }),
+    });
+  });
+  await installCatalogRoute(page, [
+    {
+      status: 200,
+      data: [
+        sharedModel,
+        transferOnlyModel,
+        visionOnlyModel,
+        { ...sharedModel, id: 'provider/unknown:free', canonical_slug: 'unknown-snapshot' },
+      ],
+    },
+  ]);
+  await openAuthenticatedSettings(page);
+  await page.getByTestId('openrouter-api-key-input').fill('sk-or-test-intelligence');
+  await page.getByTestId('openrouter-save-key-button').click();
+  await expect(page.getByTestId('openrouter-key-configured')).toBeVisible();
+  const vision = page.getByTestId('openrouter-vision-model');
+  const text = page.getByTestId('openrouter-transfer-model');
+  await expect(vision.locator('option')).toHaveCount(2);
+  await expect(text.locator('option')).toHaveCount(2);
+  await vision.selectOption('provider/vision:free');
+  await text.selectOption('provider/text:free');
+  await expect(page.getByTestId('openrouter-model-filter-help')).toContainText('at least 20');
+});
 
 test('validates a write-only key and configures both receipt roles from the live catalog', async ({
   page,
@@ -209,6 +277,7 @@ test('refreshes on every Settings entry, retains IDs on transient failure, and c
 
   await page.getByRole('link', { name: 'Accounts' }).click();
   await page.getByRole('link', { name: 'Settings' }).click();
+  await expandSettingsSections(page);
   await expect(page.getByRole('alert')).toContainText('could not provide the model catalog');
   await expect(page.getByTestId('openrouter-vision-model')).toBeDisabled();
   await expect(page.getByTestId('openrouter-transfer-model')).toBeDisabled();
@@ -237,6 +306,7 @@ test('refreshes on every Settings entry, retains IDs on transient failure, and c
 
   await page.getByRole('link', { name: 'Accounts' }).click();
   await page.getByRole('link', { name: 'Settings' }).click();
+  await expandSettingsSections(page);
   await expect(
     page.getByText('The API key is valid and the current model catalog is loaded.'),
   ).toBeVisible();
@@ -254,6 +324,7 @@ test('does not expose one Microsoft account configuration to another and support
     accountUsername: 'one@example.com',
   });
   await page.goto(appPath('#/settings'));
+  await expandSettingsSections(page);
   await page.getByTestId('openrouter-api-key-input').fill('sk-or-test-account-one');
   await page.getByTestId('openrouter-save-key-button').click();
   await expect(page.getByTestId('openrouter-key-configured')).toBeVisible();
@@ -268,6 +339,7 @@ test('does not expose one Microsoft account configuration to another and support
     accountUsername: 'two@example.com',
   });
   await secondPage.goto(appPath('#/settings'));
+  await expandSettingsSections(secondPage);
   await expect(secondPage.getByText('two@example.com')).toBeVisible();
   await expect(secondPage.getByTestId('openrouter-key-configured')).toHaveCount(0);
   await expect(secondPage.getByTestId('openrouter-vision-model')).toBeDisabled();
