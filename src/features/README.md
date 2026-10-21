@@ -25,7 +25,9 @@ Receipt AI settings:
 
 - `receipt/prompts/` owns the separate hidden stage prompts and versioned user-editable grouping-rule
   default. The schema-versioned per-Microsoft-account settings record contains the user-owned
-  OpenRouter key, two independent model IDs, and only a custom grouping-rules override.
+  OpenRouter key, two independent model IDs, model-bound reasoning capability snapshots and a
+  custom grouping-rules override. Schema 2 reads legacy schema 1 without losing selections; legacy
+  unknown capabilities use provider defaults until refreshed in Settings (no guaranteed minimum).
 - `app-shell/routes/settingsOpenRouterController.ts` validates that record against a fresh
   authenticated catalog on every Settings entry and never exposes the key in public UI state.
 - `receipt/receiptImageNormalization.ts` owns the testable capture limits and normalized JPEG
@@ -35,13 +37,22 @@ Receipt AI settings:
   orientation and canvas-re-encodes pixels so source EXIF/GPS/device metadata is not copied.
 - `receipt/receiptCaptureController.ts` owns a single in-memory capture while
   `receipt/receiptAnalysisController.ts` orchestrates the two OpenRouter stages. The analysis
-  controller revalidates each selected model immediately before use, releases image bytes after
+  controller directly uses each stored model without catalog/benchmark requests, releases image bytes after
   stage 1, passes the editable grouping rules verbatim to stage 2 without parsing them, and retains
   typed partial metadata/groups for manual review as well as validated complete derivations.
+  Stage-two wire groups contain no amounts; the parser calculates signed cent sums from valid
+  references locally, checks overflow, positive complete groups and exact source coverage.
+  Settings persists reasoning capabilities on successful catalog refresh and model selection;
+  production enables the lowest known positive effort after restart too. Request availability
+  failures retain known drafts/settings and identify the failing role with a Settings hint.
   Mistaken model success is still rejected; readable suggestions may remain editable.
 - `receipt/receiptTransferPreparationController.ts` owns the deliberate per-run source selection,
   accessible three-step progress state, editable shared metadata/group rows and explicit Save handoff.
-  `app-shell/routes/ReceiptReviewForm.svelte` presents that draft. Analysis/account selection never
+  `app-shell/routes/ReceiptReviewForm.svelte` presents that draft with collapsible article-name lists
+  and numbered move buttons. `receipt/receiptReviewDraft.ts` owns item moves and safe signed-cent
+  recalculation for the two affected groups; only empty groups can be removed. Source articles
+  remain ephemeral, immutable in controller state and are cleared at handoff/reset. Starting a new
+  photo requires closing and reopening Add. Analysis/account selection never
   writes. Its pure command
   builder resolves exact current category names, targets the sole primary spendings account, and
   reuses Add Transfer validation and type derivation without writing SQLite or OneDrive.

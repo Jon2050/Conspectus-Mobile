@@ -352,3 +352,44 @@ test('does not expose one Microsoft account configuration to another and support
     await page.evaluate(() => localStorage.getItem('conspectus.openRouterReceiptSettings')),
   ).toBeNull();
 });
+
+test('starts both Settings metadata GETs before either response finishes', async ({ page }) => {
+  const started = new Set<string>();
+  let release: () => void = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(
+    /https:\/\/openrouter\.ai\/api\/v1\/(?:models\/user|benchmarks\?.*)$/,
+    async (route) => {
+      if (route.request().method() === 'OPTIONS') {
+        await route.fulfill({
+          status: 204,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Headers': 'authorization,content-type',
+            'Access-Control-Allow-Methods': 'GET,OPTIONS',
+          },
+        });
+        return;
+      }
+      started.add(route.request().url().includes('/models/') ? 'models' : 'benchmarks');
+      await gate;
+      await route.fulfill({
+        status: 200,
+        headers: { 'Access-Control-Allow-Origin': '*' },
+        contentType: 'application/json',
+        body: JSON.stringify({ data: [] }),
+      });
+    },
+  );
+  await openAuthenticatedSettings(page);
+  await page.getByTestId('openrouter-api-key-input').fill('sk-or-test-parallel');
+  await page.getByTestId('openrouter-save-key-button').click();
+  try {
+    await expect.poll(() => started.size).toBe(2);
+  } finally {
+    release();
+  }
+  await expect(page.getByTestId('openrouter-key-configured')).toBeVisible();
+});

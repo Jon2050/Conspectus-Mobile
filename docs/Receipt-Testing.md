@@ -30,7 +30,15 @@ existing key: `/api/v1/models/user` and
 `canonical_slug`/`model_permaslug` identity. Unknown scores are excluded; benchmark failures fail the
 load. No additional AA key or external AA request is needed. Structured-output support is not a
 filter or request requirement; the prompt requests JSON and the app checks it locally.
-The harness does not bypass those rules or retry/switch models automatically.
+Catalog selection belongs to Settings. The explicit `test:receipt:models` command simulates that
+prior visit and saves resolved minimum reasoning in ignored
+`output/receipt-live/model-reasoning.local.json`, bound to a SHA-256 digest of the key and exact model
+IDs; the key itself is not copied there. The live command reads that snapshot locally and makes no
+catalog/benchmark request, before or during photo analysis. Missing, damaged or key/model-mismatched
+metadata leaves the provider default untouched, just like migrated app settings; minimum active
+reasoning is then not guaranteed. Run the catalog command explicitly to refresh known capabilities.
+Reports record `metadataLatencyMs: 0` for live analysis and the prior snapshot timestamp/setup
+latency separately as `priorSettingsMetadata`. Analysis sends only two completion POSTs. There are no retries or automatic model switches.
 
 The env file is read only by the Node test process. Never prefix its key with `VITE_`: that prefix
 exposes values to the frontend build. Shell environment values override the local file. These test
@@ -48,9 +56,9 @@ settings do not configure the app's account-scoped Settings screen.
 | `npm run test:receipt:benchmark`   | Compare every currently eligible model once per suitable role on the first manifest image.  |
 | `npm run test:receipt:image-sizes` | Compare five image sizes with three sequential extraction requests per size and photo gold. |
 
-The last command sends each normalized image to the selected vision model and the extracted data to
+The live command sends each normalized image to the selected vision model and the extracted data to
 the second model. Invoke it deliberately after configuring the key and models. Neither ordinary
-`npm test` nor CI invokes it. A full 14-case corpus can make up to 28 completion requests plus catalog
+`npm test` nor CI invokes it. A full 14-case corpus can make up to 28 completion requests and zero metadata
 requests; availability and provider quotas still apply. There are no automatic retries.
 
 The check command verifies the browser image path and orchestration using a known synthetic answer.
@@ -87,7 +95,10 @@ For fully reviewed cases use `extraction` and `derivation` in the same format as
 transfer title wording and group order. A declared error or `derivation: null` means the case expects
 rejection; only an actual parser-valid model rejection qualifies, never a network/auth/contract error.
 Partial `expectedExtraction` cases assert only their specified fields plus optional ordered line
-totals. A passing partial case is explicitly marked as still requiring grouping review.
+totals. A passing partial case is explicitly marked as still requiring grouping review. If `expectedItems`
+is provided, the live test also checks ordered article names/quantities against their amounts with
+the photograph evaluator and reports `photoQuality` mismatches. Matching totals alone never qualify
+article assignment. Existing pre-change reports retain their original, less strict verdict.
 
 To evaluate the entire synthetic corpus, set:
 
@@ -201,7 +212,14 @@ suggestions can still populate the manual draft. The system template visibly con
 `{{CUSTOM_PROMPT}}`, replaced once with the user's literal grouping instructions.
 
 Analysis completion and account selection never book anything. The review shows one shared date
-and purchase location and editable rows with name, categories and amount. Save validates the
+and purchase location and editable rows with name, categories and amount. Each row has a collapsed
+article-name list with numbered destinations for all other rows. Moves update source/destination
+amounts from signed source lines and preserve article identity, including duplicate names. Only empty
+rows can be removed; button numbers update after adding/removing groups. Manual amount corrections
+remain editable, but moving an article recalculates the two affected amounts. The active form has
+no photograph-again button; close and reopen Add for a new receipt. Offline tests cover exact moves,
+discounts, empty/nonpositive groups, overflow, dynamic numbering and Save without extra provider calls.
+Save validates the
 entered fields against current local accounts/categories and commits one immutable batch through
 the common SQL/conditional-upload/recovery controller. The destination is always primary spendings.
 The extracted total and entered sum are shown independently; a difference warns the reviewer and
@@ -240,3 +258,61 @@ and matched the partial monetary gold. The reasoning comparison measured MiniMax
 for extraction and 10.9 seconds for grouping. NVIDIA off was faster but both text models produced
 group arithmetic errors; Super VL on timed out after 90 seconds. These single-case observations
 do not establish average latency or general semantic accuracy.
+
+## Local arithmetic and stored reasoning contract
+
+Derivation prompt version 8 removes `amountCents` from every wire transfer. Gold responses and
+provider mocks contain only `name`, `categoryNames` and `sourceItemIndexes`; local parsed results
+still contain amounts, date and purchase location for existing review/commit consumers. The parser
+sums signed extraction lines using safe integer cents, rejects overflow (including intermediate
+sums), duplicate/unknown/missing source references and nonpositive complete groups, and requires
+complete coverage and the validated receipt total for success. Partial responses use only valid
+known references; no missing line becomes zero. Arithmetic consistency proves no semantic mapping.
+
+Settings schema 2 persists optional gateway capabilities per account and selected role/model.
+Successful catalog validation and model selection replace these snapshots; key/model/account changes
+cannot reuse an unrelated snapshot. Both independent Settings GETs run in parallel under the same
+30-second deadline and cancellation boundary. Neither GET belongs to receipt analysis.
+Schema-1 configurations are still usable directly after restart: absent/invalid capabilities use
+the provider default without an invented effort. This migration fallback cannot guarantee active
+minimum reasoning. A successful Settings visit supplies known capabilities for subsequent runs and
+restarts; known efforts use enabled plus the lowest positive level, binary models use enabled.
+Production never requests `none` or disabled reasoning.
+
+Offline browser tests cover restart with schema 1 and 2, zero metadata GETs, only two POSTs,
+role-specific unavailable-model hints, completion rate limiting, unchanged settings/review data and
+no writes before Save. Settings tests verify both GETs start before either response completes.
+Real HTTP/provider failures remain failures, never successful quality evidence. Local report fields
+separate prior snapshot setup latency, each whole completion latency and total receipt-analysis latency;
+raw model contents and parser diagnostics are retained unchanged (apart from key redaction).
+
+## 2026-10-21 implementation comparison
+
+All runs used the selected MiniMax model in both roles with known active `low` reasoning:
+
+| Run                                                   | Extraction | Derivation | Receipt analysis | Metadata in analysis                          |
+| ----------------------------------------------------- | ---------: | ---------: | ---------------: | --------------------------------------------- |
+| Before, prompt v7                                     |   47.624 s |    7.472 s |         59.123 s | Four serial GETs, 2.042 s to response headers |
+| Intermediate v8, old arithmetic instructions retained |   64.077 s |    7.327 s |         73.746 s | None                                          |
+| Final v8 prompt                                       |   21.524 s |   11.113 s |         34.399 s | None                                          |
+| Final harness, persisted prior catalog snapshot       |   19.356 s |   14.133 s |         35.224 s | None                                          |
+
+The final harness run made exactly two completion POSTs. Its explicit prior catalog setup command
+finished separately in 1.234 s and persisted minimum reasoning; the live run itself made no setup
+requests. The earlier v8 harness measurements used a separate simulated prior Settings visit before
+timing analysis (0.749 s / 0.550 s); this prefetch has since been removed from the live command too.
+These are individual observations, not evidence of a reliable speedup or average latency.
+
+All four responses fail the strict independent photograph transcription check. The old run's
+original verdict tested only partial monetary expectations and must not be read as full quality
+approval. The final harness run matched all 24 ordered line amounts and the 3279-cent total, but
+used O instead of 0 in the milk label. Manual review against the photograph also found one 25-cent
+positive deposit in the sweets group contrary to the default rule. In the preceding run the order
+of a 25-cent deposit and a 255-cent drink was reversed, and five positive deposit lines were
+assigned to sweets. Matching sums prove neither OCR labels nor semantic grouping.
+The live harness now fails rather than passing on money totals alone. The local transcription was
+visually checked but is not separately human-certified. No provider, device or release qualification
+is claimed. Exact original responses remain in ignored `output/receipt-live/` runs
+`2026-10-21T19-15-50.005Z`, `2026-10-21T19-20-48.571Z`, `2026-10-21T19-25-25.692Z` and
+`2026-10-21T19-32-36.836Z`; the local comparison is
+`output/receipt-optimization/comparison.json`.

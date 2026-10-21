@@ -126,6 +126,9 @@ describe('createOpenRouterChatCompletionClient', () => {
   });
 
   it.each([
+    [404, 'model_not_found', 'model_unavailable'],
+    [400, 'no_available_endpoints', 'model_unavailable'],
+    [502, 'provider_unavailable', 'provider_error'],
     [401, 'authentication', 'auth_error'],
     [403, 'permission_denied', 'auth_error'],
     [429, 'rate_limit_exceeded', 'rate_limited'],

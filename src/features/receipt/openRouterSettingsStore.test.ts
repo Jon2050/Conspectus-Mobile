@@ -1,6 +1,7 @@
 // Verifies schema-versioned account isolation and deletion for locally stored receipt AI settings.
 import { describe, expect, it } from 'vitest';
 
+import { toStoredReadyOpenRouterReceiptConfiguration } from './openRouterReceiptConfiguration';
 import type { StoredOpenRouterReceiptSettings } from './openRouterReceiptConfiguration';
 import {
   OpenRouterSettingsStorageError,
@@ -39,12 +40,83 @@ describe('createOpenRouterSettingsStore', () => {
     expect(store.read('account-one')).toEqual(accountOne);
     expect(store.read('account-two')).toEqual(accountTwo);
     expect(JSON.parse(values.get('settings-key') ?? '')).toEqual({
-      version: 1,
+      version: 2,
       settingsByAccountId: {
         'account-one': accountOne,
         'account-two': accountTwo,
       },
     });
+  });
+
+  it('reads schema 1 without discarding selections, writes schema 2 on the next update', () => {
+    const { storage, values } = createMemoryStorage();
+    const original = settings('secret', 'model');
+    values.set(
+      'settings-key',
+      JSON.stringify({ version: 1, settingsByAccountId: { one: original } }),
+    );
+    const store = createOpenRouterSettingsStore({ storage, storageKey: 'settings-key' });
+    expect(store.read('one')).toEqual(original);
+    const ready = toStoredReadyOpenRouterReceiptConfiguration(store.read('one')!);
+    expect(ready).not.toBeNull();
+    expect(ready?.visionReasoning).toBeUndefined();
+    expect(ready?.transferReasoning).toBeUndefined();
+    store.write('two', settings('other-secret', 'other-model'));
+    expect(JSON.parse(values.get('settings-key')!).version).toBe(2);
+    expect(store.read('one')).toEqual(original);
+  });
+
+  it('preserves minimum and binary reasoning after restart for each account and role', () => {
+    const { storage } = createMemoryStorage();
+    const store = createOpenRouterSettingsStore({ storage });
+    const one = {
+      ...settings('one-secret', 'model'),
+      visionReasoning: {
+        modelId: 'model',
+        capabilities: {
+          mandatory: false,
+          supportedEfforts: ['high', 'minimal', 'none'] as const,
+          defaultEnabled: false,
+        },
+      },
+      transferReasoning: { modelId: 'model', capabilities: { mandatory: true } },
+    };
+    store.write('one', one);
+    store.write('two', settings('two-secret', 'other'));
+    const restarted = createOpenRouterSettingsStore({ storage });
+    expect(toStoredReadyOpenRouterReceiptConfiguration(restarted.read('one')!)).toMatchObject({
+      visionReasoning: { enabled: true, effort: 'minimal' },
+      transferReasoning: { enabled: true },
+    });
+    expect(
+      toStoredReadyOpenRouterReceiptConfiguration(restarted.read('two')!)?.visionReasoning,
+    ).toBeUndefined();
+  });
+
+  it('drops only damaged or mismatched capability snapshots, keeping valid settings', () => {
+    const { storage, values } = createMemoryStorage();
+    for (const capabilities of [
+      { mandatory: 'yes' },
+      { mandatory: false, supportedEfforts: ['invented'] },
+    ]) {
+      values.set(
+        'settings-key',
+        JSON.stringify({
+          version: 2,
+          settingsByAccountId: {
+            one: {
+              ...settings('secret', 'model'),
+              visionReasoning: { modelId: 'model', capabilities },
+              transferReasoning: { modelId: 'other', capabilities: { mandatory: true } },
+            },
+          },
+        }),
+      );
+      const read = createOpenRouterSettingsStore({ storage, storageKey: 'settings-key' }).read(
+        'one',
+      );
+      expect(read).toEqual(settings('secret', 'model'));
+    }
   });
 
   it('deletes only the requested account and removes storage after the final deletion', () => {

@@ -120,7 +120,9 @@ identity.
 
 Receipt AI uses a user-owned OpenRouter API key stored only in the browser. The configuration record
 is schema-versioned and keyed by the active Microsoft `homeAccountId`; it contains the key, an
-independent model ID for each AI role, and only a user override of the receipt-item grouping rules.
+independent model ID and optional gateway-declared reasoning capabilities for each AI role, and a
+user override of the receipt-item grouping rules. Schema 2 reads schema-1 settings without discarding
+keys, model selections or rules; the next successful settings write migrates the payload.
 It is never synchronized to OneDrive. Both complete stage prompts and the current default grouping
 rules remain versioned application assets instead of persisted user data.
 
@@ -130,7 +132,8 @@ The Settings catalog contract is:
    authenticated `/api/v1/models/user` endpoint. This account-filtered endpoint keeps the user's
    OpenRouter provider preferences, privacy settings, and guardrails effective.
 2. Also fetch `/api/v1/benchmarks?source=artificial-analysis&task_type=intelligence` from OpenRouter
-   with the same key and no-store settings. Both GETs share one 30-second whole-load deadline.
+   with the same key and no-store settings. The independent GETs start in parallel and share one 30-second whole-load deadline;
+   caller cancellation or failure aborts outstanding work.
    Treat the visit as validated only after both responses are parseable. Never use a bundled or
    previously fetched model list or an external AA service. Join the model's `canonical_slug`
    exactly to the benchmark's `model_permaslug`; both roles require a finite Intelligence Index
@@ -171,21 +174,26 @@ storage for native `File` and canvas APIs; the application neither requests nor 
 
 Receipt analysis is an abortable, two-stage feature workflow behind typed OpenRouter interfaces:
 
-Both stages choose the lowest positive reasoning effort advertised in the freshly loaded model
-metadata and explicitly enable reasoning. Models with only an on/off control use on; a model
+Both stages use the reasoning capabilities saved on a successful Settings catalog load/model
+selection, independently bound to each role/model within the account/key settings record. A new
+validated key or catalog replaces both capability snapshots; changing a model replaces its snapshot.
+Late catalog responses cannot cross account/request boundaries. Both stages choose the lowest
+positive advertised effort and explicitly enable reasoning, including after an app restart. Models with only an on/off control use on; a model
 without reasoning capabilities receives no invented reasoning parameter. Production never selects
-`none` or the benchmark's optional off mode.
+`none` or the benchmark's optional off mode. Legacy selections lacking metadata remain usable
+without a Settings visit. Unknown or damaged capabilities leave the provider default untouched:
+minimum active reasoning cannot be guaranteed until a successful Settings catalog visit supplies
+capabilities. No effort is guessed and no analysis-time metadata request is introduced.
 
-1. Immediately before stage 1, fetch the authenticated account-specific model catalog and verify
-   together with live OpenRouter benchmarks and verify that the configured vision model is still
-   free, image/text compatible and has an Intelligence Index >= 20. Only then send the
-   versioned app-owned extraction prompt and normalized JPEG to that exact model.
+1. Send the versioned app-owned extraction prompt and normalized JPEG directly to the configured
+   vision model. Receipt analysis makes no catalog/benchmark GET, hidden refresh or other metadata
+   request. Free pricing, modalities and Intelligence Index >= 20 are checked in Settings only.
+   Complete stored settings work immediately after restart without visiting Settings.
 2. Parse bounded non-streaming JSON. A successful extraction requires complete EUR fields and exact
    integer-cent line arithmetic. An error response retains typed readable metadata and items;
    unknown fields may be null. Preserve these suggestions for manual review without treating them
    as a successful extraction. Release image bytes as soon as stage one finishes.
-3. Immediately before stage 2, fetch the catalog again and verify that the independently configured
-   text model remains free, text-compatible and has an Intelligence Index >= 20. Send the typed
+3. Send directly to the independently configured text model, without catalog revalidation, the typed
    extraction (possibly partial when readable items exist) and the app-owned derivation prompt.
    Its visible `{{CUSTOM_PROMPT}}` slot is replaced once with the opaque user rules in the system
    message; extraction JSON is a separate user message. Never send the image or Microsoft
@@ -196,18 +204,31 @@ without reasoning capabilities receives no invented reasoning parameter. Product
    rules are opaque prompt text: the app inserts them verbatim and does not parse, interpret,
    or validate their transfer/category mapping. The second model creates the transfer names and
    category arrays and one shared `buyplace`, allowing merchant-name normalization according to
-   the user's rules. Stage 2 returns neither `receiptDate` nor `receiptTotalCents`; the parser copies
+   the user's rules. Stage 2 (derivation prompt version 8) returns only status, errorReason, shared buyplace and
+   transfers with name, categoryNames and sourceItemIndexes. It returns no `amountCents`,
+   `receiptDate` or `receiptTotalCents`; the parser copies
    the validated extraction date to every local transfer and retains the extraction total locally.
    The shared purchase location is expanded into each local transfer command. Both prompts require
    German model-declared error reasons for display. Local validation proves bounded output structure, positive integer-cent transfer
-   amounts, exact once-only source-line coverage, per-group arithmetic, and an exact receipt-total
-   match. Model-declared errors retain bounded partial groups and metadata. A model's incorrect
+   amounts calculated locally from the referenced signed `lineTotalCents`, exact once-only
+   source-line coverage, overflow-checked intermediate sums and an exact receipt-total match.
+   Discounts/returns retain their signs. Legacy model-supplied amounts are rejected as unknown keys.
+   Partial groups also require nonempty, known, unique references and overflow-safe local sums;
+   missing/invalid references never produce zero or an invented valid group. Nonpositive groups
+   cannot be a complete success. Model-declared errors retain bounded partial groups and metadata. A model's incorrect
    "ok" remains rejected, but typed fields can still seed the manual draft after local validation fails.
 5. While processing, animate the active step marker and show a localized waiting message without
    invented percentages. Respect reduced-motion preferences and stop the activity indicator when
    waiting for review or after a failure. Show the valid source accounts without preselection, then one shared date and purchase location,
    followed by editable transfer names, up to three categories and amounts. Users can add/remove
-   rows. All data is transient and cleared on route/context replacement; ordinary options refresh
+   rows. Each row has a collapsed list of assigned article names, without quantities or prices.
+   A numbered button for every other current row moves that source item to the selected group;
+   numbers follow the displayed order after adding/removing rows. Moves recalculate both affected
+   amounts from the signed source lines with safe-cent overflow checks, replacing manual amounts
+   on those two rows only. A row can be removed only when it contains no items. Item data stays
+   transient and is released with the draft at command handoff or context reset. There is no
+   photograph-again action inside an active receipt form; close and reopen Add to start anew.
+   All data is transient and cleared on route/context replacement; ordinary options refresh
    and offline transitions preserve the review draft. Stage 2 never receives the source selection.
    Display both the entered sum and any extracted receipt total. A difference is informational:
    the user may be correcting an OCR mistake, so the manual batch is validated against entered
@@ -236,12 +257,16 @@ verified OneDrive snapshot before enabling another write, preventing an unreport
 entering a later upload.
 
 Both calls use the explicitly selected model without model or provider fallback and a 90-second
-completion deadline. Use the lowest positive reasoning effort declared by the current catalog;
+whole-response completion deadline. Availability is diagnosed by the actual request: HTTP 404
+or explicit model/endpoint-unavailable types map to a localized role-specific Settings hint.
+Authentication (401/403), rate limiting, network, timeout and malformed responses remain distinct;
+generic provider failures do not imply a missing model. These failures never clear saved selections
+or known review data. Use the lowest positive reasoning effort from the saved capabilities;
 models exposing only a binary switch use enabled reasoning. Unknown capabilities leave the provider
 default untouched. Mandatory reasoning is never disabled. The opt-in benchmark compares these
 settings with `enabled: false` where allowed. Both calls add no app
 owned ZDR or data-collection routing restriction, so stricter OpenRouter account preferences and
-guardrails remain effective. Any catalog, transport, model, parsing, validation, cancellation, or
+guardrails remain effective. Any transport, model, parsing, validation, cancellation, or
 supersession failure performs no SQLite, cache, Graph, or OneDrive mutation. Provider and analysis
 errors preserve known typed data for manual review; cancellation or context replacement clears it.
 A completed

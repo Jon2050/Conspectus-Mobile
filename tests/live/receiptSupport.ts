@@ -1,4 +1,11 @@
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { dirname } from 'node:path';
+import {
+  resolveOpenRouterReasoning,
+  type OpenRouterReasoningConfiguration,
+} from '../../src/openrouter/reasoning';
+import type { OpenRouterCompatibleModelCatalog } from '../../src/openrouter/modelCatalog';
 import { resolve } from 'node:path';
 import { parseEnv } from 'node:util';
 
@@ -71,3 +78,84 @@ export const canonicalReceiptGroups = (value: Record<string, unknown>) =>
       sourceItemIndexes: [...(sourceItemIndexes as number[])].sort((a, b) => a - b),
     }))
     .sort((a, b) => (a.sourceItemIndexes[0] ?? 0) - (b.sourceItemIndexes[0] ?? 0));
+
+const REASONING_SNAPSHOT_PATH = 'output/receipt-live/model-reasoning.local.json';
+const keyDigest = (apiKey: string) => createHash('sha256').update(apiKey.trim()).digest('hex');
+
+// Explicit catalog command simulates Settings; live receipt analysis never refreshes this file.
+export const writeReceiptReasoningSnapshot = (
+  apiKey: string,
+  catalog: OpenRouterCompatibleModelCatalog,
+  metadataLatencyMs: number,
+  path = REASONING_SNAPSHOT_PATH,
+) => {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(
+    path,
+    JSON.stringify(
+      {
+        version: 1,
+        keyDigest: keyDigest(apiKey),
+        capturedAt: new Date().toISOString(),
+        metadataLatencyMs,
+        models: Object.fromEntries(
+          [...catalog.visionModels, ...catalog.transferModels].map((model) => [
+            model.id,
+            resolveOpenRouterReasoning(model.reasoning, 'lowest') ?? null,
+          ]),
+        ),
+      },
+      null,
+      2,
+    ),
+  );
+};
+
+export const readReceiptReasoningSnapshot = (
+  apiKey: string,
+  visionModelId: string,
+  transferModelId: string,
+  path = REASONING_SNAPSHOT_PATH,
+): {
+  configuration: {
+    visionReasoning?: OpenRouterReasoningConfiguration;
+    transferReasoning?: OpenRouterReasoningConfiguration;
+  };
+  capturedAt: string | null;
+  priorMetadataLatencyMs: number | null;
+} => {
+  const unknown = { configuration: {}, capturedAt: null, priorMetadataLatencyMs: null };
+  try {
+    const data = JSON.parse(readFileSync(path, 'utf8'));
+    if (
+      data?.version !== 1 ||
+      data.keyDigest !== keyDigest(apiKey) ||
+      !data.models ||
+      typeof data.models !== 'object'
+    )
+      return unknown;
+    const readModel = (id: string): OpenRouterReasoningConfiguration | undefined => {
+      const config = data.models[id];
+      if (
+        config?.enabled !== true ||
+        (config.effort !== undefined &&
+          !['minimal', 'low', 'medium', 'high', 'xhigh', 'max'].includes(config.effort))
+      )
+        return undefined;
+      return config.effort ? { enabled: true, effort: config.effort } : { enabled: true };
+    };
+    const vision = readModel(visionModelId);
+    const transfer = readModel(transferModelId);
+    return {
+      configuration: {
+        ...(vision ? { visionReasoning: vision } : {}),
+        ...(transfer ? { transferReasoning: transfer } : {}),
+      },
+      capturedAt: typeof data.capturedAt === 'string' ? data.capturedAt : null,
+      priorMetadataLatencyMs:
+        typeof data.metadataLatencyMs === 'number' ? data.metadataLatencyMs : null,
+    };
+  } catch {
+    return unknown;
+  }
+};

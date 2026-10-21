@@ -184,12 +184,18 @@
       : receiptCommitState.error.preparationError !== null
         ? translateReceiptPreparationError(receiptCommitState.error.preparationError)
         : $_(`addTransfer.receipt.commit.errors.${receiptCommitState.error.code}`);
+  $: receiptAnalysisMessage =
+    receiptAnalysisState.errorCode === null
+      ? null
+      : $_(
+          `addTransfer.receipt.analysisErrors.${receiptAnalysisState.errorCode === 'model_unavailable' && receiptAnalysisState.stage !== null ? `model_unavailable_${receiptAnalysisState.stage}` : receiptAnalysisState.errorCode}`,
+        );
   $: receiptAnalysisError =
-    receiptAnalysisState.phase !== 'error' || receiptAnalysisState.errorCode === null
+    receiptAnalysisState.phase !== 'error'
       ? null
       : receiptAnalysisState.errorReason === null
-        ? $_(`addTransfer.receipt.analysisErrors.${receiptAnalysisState.errorCode}`)
-        : `${$_(`addTransfer.receipt.analysisErrors.${receiptAnalysisState.errorCode}`)} ${receiptAnalysisState.errorReason}`;
+        ? receiptAnalysisMessage
+        : `${receiptAnalysisMessage} ${receiptAnalysisState.errorReason}`;
   $: receiptCaptureError =
     translateReceiptPreparationError(receiptSetupError) ??
     receiptCommitError ??
@@ -578,13 +584,13 @@
         on:change={clearValidation}
       >
         <TransferCommitStatus
+          {receiptCommitState}
           {isOptionsLoading}
           {effectiveFormError}
           {isOffline}
           {saveState}
           {remoteCommitRecoveryIsRequired}
           {validationErrors}
-          {receiptCommitState}
           {receiptSummary}
           {optionsState}
           {retryReceiptUpload}
@@ -602,7 +608,6 @@
           {receiptCaptureController}
           {displayedReceiptSteps}
           {receiptSourceAccountOptions}
-          {receiptCommitState}
           {handleReceiptFileChange}
           {handleReceiptFileCancel}
           {openReceiptCapture}

@@ -94,7 +94,11 @@ export const createReceiptTransferPreparationController =
               ...draft,
               transfers: Object.freeze(
                 draft.transfers.map((row) =>
-                  Object.freeze({ ...row, categoryNames: Object.freeze([...row.categoryNames]) }),
+                  Object.freeze({
+                    ...row,
+                    items: Object.freeze(row.items.map((item) => Object.freeze({ ...item }))),
+                    categoryNames: Object.freeze([...row.categoryNames]),
+                  }),
                 ),
               ),
             })

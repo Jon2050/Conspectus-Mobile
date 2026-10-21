@@ -2,7 +2,8 @@
 
 All images are generated SVG text fixtures with fictional transactions dated 2026-10-20; they contain
 no personal data. `gold.json` separately records expected stage-one extraction and stage-two groups
-or rejection. The corpus covers mixed groups, discount, deposit/return, restaurant precedence,
+or rejection. Derivation wire groups have no amounts; expected amounts are calculated locally
+from the independently transcribed signed source lines. The corpus covers mixed groups, discount, deposit/return, restaurant precedence,
 quantity/tax/payment, shared/normalized merchant names, plausible abbreviations, unsupported goods,
 items without plausible context, refunds, zero total,
 negative groups, long receipts, unreadable fields and non-EUR currency.
@@ -30,7 +31,7 @@ For recorded provider evaluation, prepare a JSON array with one object per model
     "sourceRevision": "40-character source Git SHA",
     "capturedAt": "2026-10-20T20:00:00Z",
     "extractionPromptVersion": 6,
-    "derivationPromptVersion": 7,
+    "derivationPromptVersion": 8,
     "rulesVersion": 5,
     "cases": [
       {

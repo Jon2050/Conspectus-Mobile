@@ -4,6 +4,7 @@ import { PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID } from '@db';
 
 import type { AddTransferOptionsState } from '../transfers/transferOptions';
 import type { ReceiptAnalysisState } from './receiptAnalysisController';
+import { moveReceiptReviewItem } from './receiptReviewDraft';
 import { createReceiptTransferPreparationController } from './receiptTransferPreparationController';
 
 const OPTIONS: AddTransferOptionsState = {
@@ -70,6 +71,55 @@ describe('receipt transfer preparation controller', () => {
       });
     },
   );
+  it('retains immutable item assignments through review and saves the moved amounts once', () => {
+    const controller = ready(true);
+    controller.handleAnalysisState(
+      {
+        ...SUCCEEDED,
+        review: {
+          receiptDate: '2026-07-31',
+          buyplace: 'Shop',
+          currency: 'EUR',
+          receiptTotalCents: 350,
+          transfers: [
+            {
+              name: 'Food',
+              amountCents: 350,
+              categoryNames: ['Einkauf'],
+              items: [
+                { index: 0, name: 'Bread', lineTotalCents: 250 },
+                { index: 1, name: 'Apple', lineTotalCents: 100 },
+              ],
+            },
+          ],
+        },
+      },
+      OPTIONS,
+    );
+    const draft = controller.getState().draft!;
+    expect(Object.isFrozen(draft.transfers[0]?.items)).toBe(true);
+    expect(Object.isFrozen(draft.transfers[0]?.items[0])).toBe(true);
+    const moved = moveReceiptReviewItem(
+      {
+        ...draft,
+        transfers: [
+          ...draft.transfers,
+          { id: 1, name: 'New food', amount: '', categoryNames: ['Einkauf'], items: [] },
+        ],
+      },
+      0,
+      0,
+      1,
+    )!;
+    controller.updateDraft(moved);
+    expect(controller.getState().readyForCommit).toBeNull();
+    controller.prepareForSave(OPTIONS);
+    const commands = controller.claimReadyForCommit()!;
+    expect(commands.map((command) => command.amountCents)).toEqual([100, 250]);
+    expect(controller.getState().draft).toBeNull();
+    expect(controller.claimReadyForCommit()).toBeNull();
+  });
+
   it('books edited shared metadata and partial amounts only on Save, with a single immutable handoff', () => {
     const controller = ready(true);
     const draft = controller.getState().draft!;
@@ -79,7 +129,7 @@ describe('receipt transfer preparation controller', () => {
       buyplace: 'Rewe',
       transfers: [
         { ...draft.transfers[0]!, name: 'Edited food', amount: '2,00€' },
-        { id: 1, name: 'Added food', amount: '1,50€', categoryNames: ['Einkauf'] },
+        { id: 1, items: [], name: 'Added food', amount: '1,50€', categoryNames: ['Einkauf'] },
       ],
     });
     controller.prepareForSave(OPTIONS);

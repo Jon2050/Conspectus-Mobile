@@ -8,6 +8,7 @@ import {
 
 import {
   createOpenRouterSettingsStore,
+  toStoredReadyOpenRouterReceiptConfiguration,
   type OpenRouterSettingsStore,
   type StoredOpenRouterReceiptSettings,
 } from '../../receipt';
@@ -57,6 +58,71 @@ const createClient = (
 });
 
 describe('createSettingsOpenRouterController', () => {
+  it('replaces capabilities on key, model and account changes and persists refreshed metadata', async () => {
+    const store = createStore();
+    store.write('one', storedSettings());
+    store.write(
+      'two',
+      storedSettings({
+        apiKey: 'account-two',
+        visionModelId: 'new-model',
+        transferModelId: 'new-model',
+      }),
+    );
+    const richCatalog: OpenRouterCompatibleModelCatalog = {
+      visionModels: [
+        {
+          id: 'shared-model',
+          name: 'Shared',
+          label: 'Shared',
+          reasoning: { mandatory: false, supportedEfforts: ['high', 'minimal', 'none'] },
+        },
+        {
+          id: 'new-model',
+          name: 'New',
+          label: 'New',
+          reasoning: { mandatory: false, supportedEfforts: ['medium', 'low'] },
+        },
+      ],
+      transferModels: [
+        { id: 'shared-model', name: 'Shared', label: 'Shared', reasoning: { mandatory: true } },
+        { id: 'new-model', name: 'New', label: 'New' },
+      ],
+    };
+    const load = vi.fn().mockResolvedValue(richCatalog);
+    const controller = createSettingsOpenRouterController({
+      settingsStore: store,
+      catalogClient: { load },
+    });
+    await controller.activateAccount('one');
+    expect(toStoredReadyOpenRouterReceiptConfiguration(store.read('one')!)).toMatchObject({
+      visionReasoning: { enabled: true, effort: 'minimal' },
+      transferReasoning: { enabled: true },
+    });
+    controller.selectVisionModel('new-model');
+    expect(
+      toStoredReadyOpenRouterReceiptConfiguration(store.read('one')!)?.visionReasoning,
+    ).toEqual({ enabled: true, effort: 'low' });
+    controller.selectVisionModel('');
+    expect(store.read('one')?.visionReasoning).toBeUndefined();
+    controller.selectVisionModel('shared-model');
+    load.mockResolvedValueOnce(compatibleCatalog());
+    await controller.validateAndSaveApiKey('replacement-key-without-metadata');
+    expect(store.read('one')).toMatchObject({
+      apiKey: 'replacement-key-without-metadata',
+      visionModelId: 'shared-model',
+    });
+    expect(store.read('one')?.visionReasoning).toBeUndefined();
+    expect(store.read('one')?.transferReasoning).toBeUndefined();
+    await controller.activateAccount('two');
+    expect(controller.getReadyConfiguration()?.visionReasoning).toEqual({
+      enabled: true,
+      effort: 'low',
+    });
+    expect(controller.getReadyConfiguration()?.transferReasoning).toBeUndefined();
+    expect(store.read('one')?.visionReasoning).toBeUndefined();
+  });
+
   it('keeps controls empty until a new key validates, then never exposes that key in state', async () => {
     const settingsStore = createStore();
     const load = vi.fn(async () => compatibleCatalog());

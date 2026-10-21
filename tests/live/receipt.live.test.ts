@@ -13,6 +13,7 @@ import {
   createOpenRouterModelCatalogClient,
 } from '../../src/openrouter';
 import { createReceiptAnalysisController } from '../../src/features/receipt/receiptAnalysisController';
+import type { ReadyOpenRouterReceiptConfiguration } from '../../src/features/receipt/openRouterReceiptConfiguration';
 import { RECEIPT_IMAGE_JPEG_QUALITY } from '../../src/features/receipt/receiptImageNormalization';
 import {
   receiptExtractionMessages,
@@ -33,6 +34,8 @@ import gold from '../fixtures/receipts/gold.json';
 import { evaluateReceiptImageSizeResponse } from './receiptImageSizeEvaluation';
 import {
   canonicalReceiptGroups,
+  readReceiptReasoningSnapshot,
+  writeReceiptReasoningSnapshot,
   readReceiptCases,
   readReceiptEnvironment,
   redactReceiptText,
@@ -114,6 +117,10 @@ const analyze = async (
   transferModelId: string,
   fetchImpl: typeof fetch = fetch,
   onProgress: (phase: string) => void = () => {},
+  reasoning: Pick<
+    ReadyOpenRouterReceiptConfiguration,
+    'visionReasoning' | 'transferReasoning'
+  > = {},
 ) => {
   const started = performance.now();
   const completions: { raw: string; validation: unknown; latencyMs: number }[] = [];
@@ -148,17 +155,15 @@ const analyze = async (
   };
   const client = createOpenRouterChatCompletionClient({ fetch: observedFetch });
   const controller = createReceiptAnalysisController({
-    catalogClient: createOpenRouterModelCatalogClient({ fetch: observedFetch }),
     completionClient: {
       async complete(request, signal) {
         const start = performance.now();
         const raw = await client.complete(request, signal);
         const extraction = completions[0];
         const parsedExtraction = extraction ? parseReceiptExtractionResponse(extraction.raw) : null;
-        const validation =
-          parsedExtraction?.ok && parsedExtraction.value.status === 'ok'
-            ? parseReceiptTransferDerivationResponse(raw, parsedExtraction.value)
-            : parseReceiptExtractionResponse(raw);
+        const validation = parsedExtraction?.ok
+          ? parseReceiptTransferDerivationResponse(raw, parsedExtraction.value)
+          : parseReceiptExtractionResponse(raw);
         completions.push({ raw, validation, latencyMs: Math.round(performance.now() - start) });
         return raw;
       },
@@ -180,6 +185,7 @@ const analyze = async (
         {
           image: { ...image, bytes: new Uint8Array(image.bytes) },
           configuration: {
+            ...reasoning,
             apiKey,
             visionModelId,
             transferModelId,
@@ -219,30 +225,8 @@ const analyze = async (
 const offlineProvider = (...completions: (string | Response)[]): typeof fetch => {
   let completionIndex = 0;
   return async (url) => {
-    if (String(url).includes('/benchmarks?'))
-      return Response.json({
-        data: [
-          {
-            source: 'artificial-analysis',
-            model_permaslug: 'offline-model-snapshot',
-            intelligence_index: 25,
-          },
-        ],
-      });
-    if (String(url).endsWith('/models/user')) {
-      return Response.json({
-        data: [
-          {
-            id: 'offline-model',
-            canonical_slug: 'offline-model-snapshot',
-            name: 'Offline model',
-            architecture: { input_modalities: ['image', 'text'], output_modalities: ['text'] },
-            pricing: { prompt: '0', completion: '0', image: '0' },
-            supported_parameters: [],
-          },
-        ],
-      });
-    }
+    if (!String(url).endsWith('/chat/completions'))
+      throw new Error('Unexpected metadata request during analysis.');
     const content = completions[completionIndex++];
     if (content instanceof Response) return content;
     return Response.json({
@@ -276,14 +260,7 @@ it('offline: normalizes a photograph and exercises both real clients and parsers
       2,
     ),
   );
-  expect(result.requests.map(({ endpoint }) => endpoint)).toEqual([
-    'catalog',
-    'benchmarks',
-    'completion',
-    'catalog',
-    'benchmarks',
-    'completion',
-  ]);
+  expect(result.requests.map(({ endpoint }) => endpoint)).toEqual(['completion', 'completion']);
 });
 
 it('offline: retains malformed extraction and identifies its parser failure without stage two', async () => {
@@ -299,7 +276,7 @@ it('offline: retains malformed extraction and identifies its parser failure with
   expect(result.completions).toMatchObject([
     { raw: '{broken-json', validation: { ok: false, error: { code: 'MALFORMED_JSON' } } },
   ]);
-  expect(result.requests).toHaveLength(3);
+  expect(result.requests).toHaveLength(1);
 });
 
 it('offline: records HTTP rate limiting as a provider failure without fabricated model results', async () => {
@@ -313,12 +290,12 @@ it('offline: records HTTP rate limiting as a provider failure without fabricated
   expect(result.failure, result.failureDetail ?? undefined).toBe('rate_limited');
   expect(result.state.phase).toBe('error');
   expect(result.completions).toEqual([]);
-  expect(result.requests.map(({ status }) => status)).toEqual([200, 200, 429]);
+  expect(result.requests.map(({ status }) => status)).toEqual([429]);
 });
 
-it('offline: retains the failing second-stage answer with exact arithmetic diagnostics', async () => {
+it('offline: retains the failing second-stage answer with exact source-reference diagnostics', async () => {
   const derivation = structuredClone(gold[0]!.derivation)!;
-  derivation.transfers[0]!.amountCents += 1;
+  derivation.transfers[0]!.sourceItemIndexes.push(999);
   const result = await analyze(
     readReceiptCases('tests/fixtures/receipts/gold.json')[0]!,
     'offline-key',
@@ -331,13 +308,42 @@ it('offline: retains the failing second-stage answer with exact arithmetic diagn
   expect(result.completions).toHaveLength(2);
   expect(result.completions[1]?.validation).toMatchObject({
     ok: false,
-    error: { code: 'TRANSFER_ITEM_TOTAL_MISMATCH' },
+    error: { code: 'UNKNOWN_SOURCE_ITEM_INDEX' },
+  });
+});
+
+it('offline: preserves partial-stage diagnostics and derives only known signed lines', async () => {
+  const extraction = {
+    ...gold[0]!.extraction,
+    status: 'error',
+    errorReason: 'Summe fehlt.',
+    receiptTotalCents: null,
+  };
+  const derivation = { ...gold[0]!.derivation, status: 'error', errorReason: 'Teilantwort.' };
+  const result = await analyze(
+    readReceiptCases('tests/fixtures/receipts/gold.json')[0]!,
+    'offline-key',
+    'offline-model',
+    'offline-model',
+    offlineProvider(JSON.stringify(extraction), JSON.stringify(derivation)),
+  );
+  expect(result.failure).toBe('model_error');
+  expect(result.requests.map(({ endpoint }) => endpoint)).toEqual(['completion', 'completion']);
+  expect(result.completions[1]?.validation).toMatchObject({
+    ok: true,
+    value: {
+      status: 'error',
+      receiptTotalCents: null,
+      transfers: [{ amountCents: 275 }, { amountCents: 100 }, { amountCents: 200 }],
+    },
   });
 });
 
 it('catalog: lists currently eligible model IDs using the production account-filtered catalog', async () => {
   const apiKey = requireReceiptSetting(environment, 'OPENROUTER_API_KEY');
+  const metadataStarted = performance.now();
   const catalog = await createOpenRouterModelCatalogClient().load(apiKey);
+  writeReceiptReasoningSnapshot(apiKey, catalog, Math.round(performance.now() - metadataStarted));
   console.log(JSON.stringify(catalog, null, 2));
   expect(
     catalog.visionModels.length,
@@ -713,7 +719,15 @@ it('live: evaluates real receipt images through the production two-stage analysi
   const cases = readReceiptCases(manifestPath);
   const output = resolve('output/receipt-live', new Date().toISOString().replaceAll(':', '-'));
   mkdirSync(output, { recursive: true });
+  const snapshot = readReceiptReasoningSnapshot(apiKey, visionModelId, transferModelId);
+  const reasoning = snapshot.configuration;
   const report = {
+    metadataLatencyMs: 0,
+    priorSettingsMetadata: {
+      capturedAt: snapshot.capturedAt,
+      latencyMs: snapshot.priorMetadataLatencyMs,
+    },
+    reasoning,
     visionModelId,
     transferModelId,
     sourceRevision: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
@@ -728,9 +742,18 @@ it('live: evaluates real receipt images through the production two-stage analysi
   };
   const failures: string[] = [];
   for (const entry of cases) {
-    const result = await analyze(entry, apiKey, visionModelId, transferModelId, fetch, (phase) =>
-      console.log(`${entry.id}: ${phase}`),
+    const result = await analyze(
+      entry,
+      apiKey,
+      visionModelId,
+      transferModelId,
+      fetch,
+      (phase) => console.log(`${entry.id}: ${phase}`),
+      reasoning,
     );
+    const photoQuality = result.completions[0]
+      ? evaluateReceiptImageSizeResponse(result.completions[0].raw, entry).quality
+      : null;
     let verdict = 'partial_expectations_passed_requires_grouping_review';
     let expectationFailure: string | null = null;
     try {
@@ -767,6 +790,11 @@ it('live: evaluates real receipt images through the production two-stage analysi
           expect(extraction.value.items.map(({ lineTotalCents }) => lineTotalCents)).toEqual(
             entry.expectedLineTotalsCents,
           );
+        if (entry.expectedItems)
+          expect(
+            photoQuality?.allCorrect,
+            'Item names, quantities and their amounts must match the photograph transcription.',
+          ).toBe(true);
         if (entry.derivation) {
           expect(
             canonicalReceiptGroups(result.state.derivation! as unknown as Record<string, unknown>),
@@ -789,7 +817,7 @@ it('live: evaluates real receipt images through the production two-stage analysi
         error instanceof Error ? error.message.slice(0, 8_000) : 'Expectation failed.';
       failures.push(`${entry.id}: ${result.failure ?? 'gold_expectation_mismatch'}`);
     }
-    report.cases.push({ ...result, verdict, expectationFailure });
+    report.cases.push({ ...result, photoQuality, verdict, expectationFailure });
     // Flush after every case so an interrupted corpus run retains completed evidence.
     writeFileSync(
       `${output}/report.json`,

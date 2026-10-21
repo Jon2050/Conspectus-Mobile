@@ -241,7 +241,7 @@ export const createSettingsOpenRouterController = (
       return;
     }
 
-    if (!persistSettings(nextSettings)) {
+    if (!persistSettings(reconcileOpenRouterModelSelections(nextSettings, validatedCatalog))) {
       publishState('ready', 'storage_error');
       return;
     }

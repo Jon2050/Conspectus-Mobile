@@ -1,8 +1,11 @@
 // Persists schema-versioned OpenRouter receipt settings separately for each Microsoft account.
-import type { StoredOpenRouterReceiptSettings } from './openRouterReceiptConfiguration';
+import type {
+  StoredModelReasoning,
+  StoredOpenRouterReceiptSettings,
+} from './openRouterReceiptConfiguration';
 
 const OPENROUTER_SETTINGS_STORAGE_KEY = 'conspectus.openRouterReceiptSettings';
-const OPENROUTER_SETTINGS_SCHEMA_VERSION = 1;
+const OPENROUTER_SETTINGS_SCHEMA_VERSION = 2;
 
 export interface OpenRouterSettingsStorageAdapter {
   getItem(key: string): string | null;
@@ -47,10 +50,55 @@ const isStoredSettings = (value: unknown): value is StoredOpenRouterReceiptSetti
   isNullableNonEmptyString(value.transferModelId) &&
   (value.transferRulesOverride === null || typeof value.transferRulesOverride === 'string');
 
+// Metadata is optional: legacy or damaged capabilities must not discard otherwise valid settings.
+const readReasoning = (
+  value: unknown,
+  modelId: string | null,
+): StoredModelReasoning | undefined => {
+  if (
+    !isRecord(value) ||
+    value.modelId !== modelId ||
+    typeof value.modelId !== 'string' ||
+    !isRecord(value.capabilities)
+  )
+    return undefined;
+  const capabilities = value.capabilities;
+  const efforts = ['minimal', 'low', 'medium', 'high', 'xhigh', 'max', 'none'];
+  if (
+    typeof capabilities.mandatory !== 'boolean' ||
+    (capabilities.supportedEfforts !== undefined &&
+      (!Array.isArray(capabilities.supportedEfforts) ||
+        capabilities.supportedEfforts.some((effort) => !efforts.includes(effort)))) ||
+    (capabilities.defaultEnabled !== undefined &&
+      typeof capabilities.defaultEnabled !== 'boolean') ||
+    (capabilities.defaultEffort !== undefined && typeof capabilities.defaultEffort !== 'string')
+  )
+    return undefined;
+  return {
+    modelId: value.modelId,
+    capabilities: {
+      mandatory: capabilities.mandatory,
+      ...(Array.isArray(capabilities.supportedEfforts)
+        ? {
+            supportedEfforts: capabilities.supportedEfforts as NonNullable<
+              StoredModelReasoning['capabilities']['supportedEfforts']
+            >,
+          }
+        : {}),
+      ...(typeof capabilities.defaultEnabled === 'boolean'
+        ? { defaultEnabled: capabilities.defaultEnabled }
+        : {}),
+      ...(typeof capabilities.defaultEffort === 'string'
+        ? { defaultEffort: capabilities.defaultEffort }
+        : {}),
+    },
+  };
+};
+
 const parsePayload = (value: unknown): OpenRouterSettingsPayload | null => {
   if (
     !isRecord(value) ||
-    value.version !== OPENROUTER_SETTINGS_SCHEMA_VERSION ||
+    (value.version !== 1 && value.version !== OPENROUTER_SETTINGS_SCHEMA_VERSION) ||
     !isRecord(value.settingsByAccountId)
   ) {
     return null;
@@ -61,7 +109,22 @@ const parsePayload = (value: unknown): OpenRouterSettingsPayload | null => {
     if (!accountId.trim() || !isStoredSettings(settings)) {
       return null;
     }
-    settingsByAccountId[accountId] = settings;
+    const base = { ...settings };
+    delete base.visionReasoning;
+    delete base.transferReasoning;
+    const vision =
+      value.version === 2
+        ? readReasoning(settings.visionReasoning, settings.visionModelId)
+        : undefined;
+    const transfer =
+      value.version === 2
+        ? readReasoning(settings.transferReasoning, settings.transferModelId)
+        : undefined;
+    settingsByAccountId[accountId] = {
+      ...base,
+      ...(vision ? { visionReasoning: vision } : {}),
+      ...(transfer ? { transferReasoning: transfer } : {}),
+    };
   }
 
   return {

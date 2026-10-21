@@ -219,8 +219,11 @@
 
   .bottom-sheet__content {
     min-height: 0;
+    overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;
+    overscroll-behavior-x: none;
+    touch-action: pan-y pinch-zoom;
     /* Hide scrollbar for clean mobile look but keeps functionality */
     scrollbar-width: none;
   }

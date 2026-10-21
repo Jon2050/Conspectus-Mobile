@@ -79,7 +79,6 @@
       "normalizing": "Foto wird sicher vorbereitet...",
       "stageOne": "Foto auslesen",
       "stageTwo": "Transferdaten erstellen",
-      "freshAction": "Neuen Kassenbon fotografieren",
       "sourceAccount": "Quellkonto für alle Transfers",
       "accountRequired": "Wähle das Quellkonto für alle Teiltransfers. Gespeichert wird erst mit „Speichern“.",
       "progressLabel": "Fortschritt der Kassenbonverarbeitung",
@@ -120,7 +119,9 @@
         "stage_one_failed": "Die Beleganalyse ist fehlgeschlagen. Starte mit einem neuen Foto erneut."
       },
       "analysisErrors": {
-        "model_unavailable": "Das ausgewählte kostenlose Modell ist nicht mehr kompatibel. Prüfe die Beleg-KI-Einstellungen und starte mit einem neuen Foto.",
+        "model_unavailable_extraction": "Das Visionmodell oder sein Endpoint ist nicht verfügbar. Wähle in den Beleg-KI-Einstellungen ein anderes Visionmodell.",
+        "model_unavailable_derivation": "Das Textmodell oder sein Endpoint ist nicht verfügbar. Wähle in den Beleg-KI-Einstellungen ein anderes Textmodell.",
+        "model_unavailable": "Das ausgewählte Modell oder sein Endpoint ist nicht verfügbar. Wähle in den Beleg-KI-Einstellungen ein anderes Modell für den fehlgeschlagenen Schritt.",
         "auth_error": "OpenRouter hat den API-Schlüssel oder die Berechtigung abgelehnt. Prüfe die Beleg-KI-Einstellungen und starte mit einem neuen Foto.",
         "rate_limited": "OpenRouter begrenzt derzeit die Anfragen. Warte etwas und starte dann mit einem neuen Foto.",
         "network_error": "OpenRouter konnte nicht erreicht werden. Prüfe die Verbindung und starte mit einem neuen Foto.",
@@ -165,10 +166,15 @@
           "remote_commit_recovery_failed": "Die Transfers sind in OneDrive gespeichert, aber die geprüfte lokale Aktualisierung ist fehlgeschlagen. Speichere sie nicht erneut."
         }
       },
-      "duplicateWarning": "Prüfe vor einer weiteren Aufnahme, ob dieser Beleg bereits gebucht wurde. Wiederholte Fotos können Duplikate erzeugen.",
+      "duplicateWarning": "",
       "correction": "Prüfe Datum, Händler, Beträge und Kategorien. Zur Korrektur schließe die Mobile-App, bearbeite die Datenbank in Conspectus Desktop und öffne und aktualisiere danach die Mobile-App. Nutze beide Apps nicht gleichzeitig mit dieser Datenbank.",
-      "imageGuidance": "Fotografiere den gesamten Beleg scharf mit lesbarem Datum und Gesamtbetrag. Bei HEIC-Leseproblemen wähle stattdessen ein JPEG. Sehr lange Bons und hochauflösende Fotos können unlesbar sein oder den Gerätespeicher überfordern.",
+      "imageGuidance": "Fotografiere den gesamten Beleg scharf mit lesbarem Datum und Gesamtbetrag. Bei HEIC-Leseproblemen wähle stattdessen ein JPEG.",
       "review": {
+        "items": "Zugeordnete Artikel ({count})",
+        "noItems": "Keine Artikel zugeordnet.",
+        "moveItem": "Teiltransfer {number} zuordnen",
+        "moveFailed": "Der Artikel konnte nicht verschoben werden, weil der Gruppenbetrag den unterstützten Wertebereich überschreitet.",
+
         "hint": "Prüfe die erkannten Daten. Du kannst alle Angaben vor dem Speichern bearbeiten. Das Zielkonto ist immer AUSGABEN.",
         "transfer": "Teiltransfer {number}",
         "category": "Kategorie {number}",
