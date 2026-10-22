@@ -33,6 +33,9 @@
   const SWIPE_DRAG_LOCK_THRESHOLD_PX = 10;
   const SWIPE_DRAG_MAX_OFFSET_PX = 56;
 
+  export let onEditTransfer: (transferId: number, bookingDateEpochDay: number) => void = () => {};
+  let suppressTransferClick = false;
+
   export let syncStateStore: SyncStateStore = appSyncStateStore;
   export let controller: TransfersRouteController = createTransfersRouteController(
     appTransferMonthQueryService,
@@ -95,10 +98,14 @@
   const handleNextMonthClick = (): void => shiftMonth(1);
 
   const handleTouchStart = (event: TouchEvent): void => {
-    if (event.target instanceof Element && event.target.closest('button') !== null) {
+    if (
+      event.target instanceof Element &&
+      event.target.closest('button:not(.transfer-card__edit)') !== null
+    ) {
       clearSwipeStart();
       return;
     }
+    suppressTransferClick = false;
     const touch = event.touches.item(0) ?? event.touches[0];
     if (touch == null) {
       clearSwipeStart();
@@ -150,6 +157,7 @@
       endX: touch.clientX,
       endY: touch.clientY,
     });
+    suppressTransferClick = swipeLockedHorizontally || swipeIntent !== null;
     if (swipeIntent === 'previous') shiftMonth(-1);
     else if (swipeIntent === 'next') shiftMonth(1);
     clearSwipeStart();
@@ -246,6 +254,16 @@
                 data-testid={`transfer-card-${transfer.transferId}`}
                 data-transfer-id={transfer.transferId}
               >
+                <button
+                  type="button"
+                  class="transfer-card__edit"
+                  aria-label={$_('editTransfer.open', { values: { name: transfer.name } })}
+                  on:click={() => {
+                    if (!suppressTransferClick)
+                      onEditTransfer(transfer.transferId, transfer.bookingDateEpochDay);
+                    suppressTransferClick = false;
+                  }}
+                ></button>
                 <div class="transfer-card__header">
                   <div class="transfer-card__heading">
                     <p class="transfer-card__date">
@@ -286,7 +304,7 @@
                   </div>
                   {#if transfer.categoryNames.length > 0}
                     <ul class="transfer-card__categories">
-                      {#each transfer.categoryNames as category (category)}
+                      {#each transfer.categoryNames as category, index (index)}
                         <li class="transfer-card__category">
                           <span class="app-badge">{category}</span>
                         </li>
@@ -304,6 +322,20 @@
 </section>
 
 <style>
+  .transfer-card__edit {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    border: none;
+    border-radius: inherit;
+    background: transparent;
+    cursor: pointer;
+  }
+  .transfer-card__edit:focus-visible {
+    outline: 2px solid var(--text-primary);
+    outline-offset: 2px;
+  }
+
   .transfers-route {
     --transfers-amount-positive: #0f6b43;
     --transfers-amount-negative: #b42318;
@@ -416,6 +448,7 @@
   }
 
   .transfer-card {
+    position: relative;
     --transfer-card-row-gap: 0.25rem;
     display: flex;
     flex-direction: column;

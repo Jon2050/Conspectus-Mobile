@@ -4,6 +4,13 @@
   import { get, type Readable } from 'svelte/store';
   import { _ } from 'svelte-i18n';
   import type { DriveItemBinding } from '@graph';
+  import { appTransferMonthQueryService, type TransferRecord } from '@db';
+  import EditTransferSheet from './routes/EditTransferSheet.svelte';
+  import {
+    createEditTransferController,
+    type EditTransferController,
+  } from './routes/editTransferController';
+  import type { TransferCommitState } from './transferCommitController';
   import {
     measurePhase,
     appSelectedDriveItemBindingStore,
@@ -110,6 +117,37 @@
   export let receiptCommitController: ReceiptTransferCommitController =
     createReceiptTransferCommitController();
   export let showLoadingPlaceholder = true;
+
+  let editedTransfer: TransferRecord | null = null;
+  let editController: EditTransferController | null = null;
+  let editState: TransferCommitState | null = null;
+  let editIsOpen = false;
+  let unsubscribeEdit: (() => void) | null = null;
+  const openTransferEditor = (transferId: number, day: number): void => {
+    if (
+      editController !== null &&
+      editState !== null &&
+      !['idle', 'failed', 'saved', 'invalidated', 'remote_commit_recovery_failed'].includes(
+        editState.phase,
+      )
+    ) {
+      editIsOpen = true;
+      return;
+    }
+    if (!appDatabaseSession.isReadable()) return;
+    const transfer = appTransferMonthQueryService
+      .listTransfersByMonth(day)
+      .find((item) => item.transferId === transferId);
+    if (transfer === undefined) return;
+    unsubscribeEdit?.();
+    editedTransfer = transfer;
+    editController = createEditTransferController(transfer);
+    unsubscribeEdit = editController.subscribe((state) => {
+      editState = state;
+      if (state.phase === 'saved') editIsOpen = false;
+    });
+    editIsOpen = true;
+  };
 
   let currentRoute: AppRouteKey = DEFAULT_ROUTE;
   let addTransferFields: AddTransferFormFields = createInitialFormFields();
@@ -378,6 +416,8 @@
     if (bindingRepairPersistenceIsRunning) return;
     refreshController.cancel();
     abandonReceiptContext();
+    editController?.invalidate();
+    editIsOpen = false;
     addTransferSaveController.invalidate?.();
     appDatabaseSession.invalidate();
 
@@ -486,6 +526,8 @@
 
   onDestroy(() => {
     unsubscribe();
+    unsubscribeEdit?.();
+    editController?.invalidate();
     unsubscribeAddTransferSaveController();
     unsubscribeReceiptCommitController();
     unsubscribeSelectedBinding();
@@ -506,6 +548,20 @@
     resolveAppDbRuntime().close();
   });
 </script>
+
+{#if editedTransfer !== null && editController !== null}
+  {#key editController}
+    <EditTransferSheet
+      transfer={editedTransfer}
+      controller={editController}
+      bind:isOpen={editIsOpen}
+      {networkStateStore}
+      onClose={() => {
+        editIsOpen = false;
+      }}
+    />
+  {/key}
+{/if}
 
 <div class="app-shell" data-testid="app-shell">
   <header class="app-header">
@@ -605,6 +661,19 @@
     </section>
   {/if}
 
+  {#if !editIsOpen && editState !== null && !['idle', 'failed', 'saved', 'invalidated'].includes(editState.phase)}
+    <section class="pending-transfer-sync" role="status" data-testid="pending-transfer-edit">
+      <p>{$_('editTransfer.pending')}</p>
+      <button
+        type="button"
+        class="app-button app-button--secondary"
+        on:click={() => {
+          editIsOpen = true;
+        }}>{$_('editTransfer.title')}</button
+      >
+    </section>
+  {/if}
+
   {#if pendingReceiptNeedsAttention}
     <section class="pending-transfer-sync" role="alert" data-testid="pending-receipt-sync">
       <div>
@@ -675,7 +744,7 @@
       {:else if currentRoute === 'accounts'}
         <AccountsRoute {syncStateStore} />
       {:else if currentRoute === 'transfers'}
-        <TransfersRoute {syncStateStore} />
+        <TransfersRoute onEditTransfer={openTransferEditor} {syncStateStore} />
       {:else if currentRoute === 'add'}
         <AddRoute
           bind:fields={addTransferFields}

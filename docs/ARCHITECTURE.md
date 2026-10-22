@@ -363,6 +363,15 @@ application's business and database behavior:
 6. Upload the full file to OneDrive with `If-Match` using the opened runtime's original eTag.
 7. After remote success, persist the uploaded bytes and returned eTag and refresh visible data.
 
+Editing and deletion use the same commit, export, eTag upload and recovery boundary. Tapping a
+transfer opens the shared manual fields in a bottom sheet without receipt capture. An edit keeps
+the transfer ID, reverses the original balance effects and applies the replacement in one SQLite
+transaction. Deletion removes the row and reverses its balance effects in one transaction. Both
+operations compare the original booking with the current row before writing; a changed or missing
+booking must be reopened rather than overwritten after a refresh or conflict. The shell retains
+pending mutations across sheet closure and route navigation; retries upload the original exported
+bytes without repeating balance changes.
+
 Safety invariants:
 
 - Manual input and receipt command preparation consume the same form/amount/date/account/type

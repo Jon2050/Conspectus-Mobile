@@ -86,7 +86,7 @@ const findAccount = (
 ): AddTransferAccountOption | null =>
   accountId === null ? null : (accounts.find((account) => account.accountId === accountId) ?? null);
 
-const toCreateTransferInput = (
+export const toCreateTransferInput = (
   fields: AddTransferFormFields,
   optionsState: AddTransferOptionsState,
 ): CreateTransferInput => {
