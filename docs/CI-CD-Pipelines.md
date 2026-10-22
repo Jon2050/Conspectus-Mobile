@@ -23,7 +23,7 @@ After these pinned workflows reach the default branch, repository administrators
 ```mermaid
 flowchart TD
   Push[Push to any non-gh-pages branch] --> Quality[Quality]
-  PR[Pull request] --> Audit[Dependency Audit]
+  Audit[Dependency Audit]
   Schedule[Weekly schedule] --> Audit
   Quality --> Audit
   Quality -->|success + reusable preview artifact| Preview[Deploy Preview]
@@ -52,8 +52,8 @@ flowchart TD
 ### `Dependency Audit`
 
 - File: [`.github/workflows/dependency-audit.yml`](../.github/workflows/dependency-audit.yml)
-- Trigger: pull requests that change `package.json` or `package-lock.json`, weekly schedule, manual
-  dispatch, and reusable calls from `Quality`
+- Trigger: weekly schedule, manual dispatch, and reusable calls from every push-triggered `Quality`
+  run. Opening or updating a pull request does not duplicate the push audit.
 - Purpose:
   - scan the complete npm dependency tree, including development tooling
   - fail when npm reports a high or critical vulnerability
@@ -77,12 +77,13 @@ flowchart TD
   - `Format, Lint, Typecheck, and Dead Code`, `Unit Tests`, and `Build App (Preview)` fan out after
     change detection
   - bundle and channel verification run inside the build job before its artifact is uploaded
-  - isolated Chromium, Pixel 5 and iPhone WebKit E2E jobs fan out after the verified build
+  - isolated Chromium, Pixel 5 and three iPhone WebKit E2E shards fan out after the verified build
   - `Quality Gate` joins every result
 - Protected `main` merge graph:
   - dependency audit and change detection
   - exact-SHA preview build with bundle and channel verification
-  - Chromium critical-user-journey smoke and the full iPhone WebKit suite, including offline reload
+  - five `@smoke` tests in both Chromium and iPhone WebKit: critical user journeys and the PWA
+    manifest/service-worker/offline reload test
   - `Quality Gate`
 - Depends on: none
 - Downstream dependencies:
@@ -97,17 +98,46 @@ flowchart TD
     binaries and OS libraries, avoiding per-job APT updates and package installations. The workflow
     contract test requires the image version to match the locked `@playwright/test` version; update
     the image tag and verified digest together when upgrading Playwright. E2E jobs have a 20-minute
-    timeout and retain the complete browser matrix and existing test retries.
+    timeout and retain the complete browser matrix and existing test retries. WebKit uses three
+    test-level shards (`--fully-parallel --shard=N/3 --workers=1`), each with its own artifact copy
+    and server. This balances the large app-shell spec without concurrent writes to the same `dist`.
+    Extra container startups can increase runner minutes while reducing elapsed time.
+    Keep Chromium on one worker inside a shared build: its PWA update tests mutate the files.
+  - successful tests do not record video or traces; failure screenshots and first-retry traces
+    provide diagnostics without paying the recording cost on every successful browser context
   - cancels in-progress runs for the same ref via workflow concurrency
   - the build job checks `dist` against the JS/CSS bundle budgets before validating base-path
     correctness, manifest `start_url` and `scope`, install icons, service worker scope, document CSP,
     artifact-owned Apache security headers, and root-path leakage, then uploads the verified artifact
   - the active no-bypass, strict, rebase-only main ruleset requires the full branch `Quality Gate` to
     be current before merging; the lighter main run therefore verifies the exact merged build and
-    critical runtime path; WebKit repeats its full suite on the merged artifact. The default local
+    critical runtime path in Chromium and WebKit, including real service-worker offline reload.
+    The full WebKit suite remains required before merge. The default local
     Playwright configuration also includes WebKit, with no environment opt-in. No extra retries or
     skips mask offline reload failures. Physical Safari/PWA QA remains a separate required gate.
   - `Quality Gate` is the single branch-protection check that should be required on `main`
+
+#### Fast development feedback
+
+The sequence is local focused checks → one full branch push gate → protected merge → exact-SHA
+build and Chromium/WebKit smoke → main preview. Opening a pull request adds no extra test run.
+`Deploy Preview` reuses the verified build and runs live availability/Lighthouse checks; it does
+not repeat Vitest or Playwright. GitHub's `pages build and deployment` publishes `gh-pages` and
+does not run the application test suite either.
+
+Use `npm run test:changed` and `npm run test:e2e:smoke` locally for small changes, supplemented by
+the affected browser specs. `npm run test:e2e:webkit` runs the complete WebKit suite with two local
+workers; the build-mutating Chromium tests are excluded from that project. Changes to test
+infrastructure or broad shared behavior still warrant the complete local suite. Release
+qualification retains its full local and device gates.
+
+Observed baseline on 2026-10-22: [branch run 39776949818](https://github.com/Jon2050/Conspectus-Mobile/actions/runs/39776949818)
+took 7m44s, with 6m18s spent executing WebKit tests; unit and build jobs took 33s and 24s.
+[Main run 39789199369](https://github.com/Jon2050/Conspectus-Mobile/actions/runs/39789199369)
+took 7m44s and repeated 6m20s of WebKit tests, while Chromium smoke took 8s.
+Sharding targets the branch bottleneck; the focused main gate removes the full post-merge repeat.
+Runner queues, container startup and Pages publication still add latency. Measure new hosted runs
+after rollout before assigning a guaranteed end-to-end time.
 
 #### Bundle size budgets
 

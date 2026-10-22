@@ -38,9 +38,10 @@ layout. Use `docs/CONTRIBUTING.md` for the contribution and delivery workflow.
 
 ## Verification
 
-- Choose verification that matches the risk and surface area of the change. For code changes,
-  the usual local gate is `npm run format`, `npm run lint`, `npm run typecheck`,
-  `npm run test`, `npm run build`, and `npm run test:e2e` when browser behavior is relevant.
+- Choose verification that matches the risk and surface area of the change, following
+  `docs/CONTRIBUTING.md`. Small changes may use `npm run test:changed`, focused browser specs, and
+  `npm run test:e2e:smoke`; CI runs the complete pre-merge gate. Use the full local gate for
+  cross-cutting changes, test/configuration changes, or release qualification.
 - Add or update focused tests beside changed behavior. Use `src/shared/testUtils/` when an
   existing helper fits.
 - For documentation-only changes, run the relevant formatting or reference checks that are

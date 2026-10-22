@@ -159,6 +159,8 @@ Local quality scripts:
 - `npm run typecheck` - runs Svelte + TypeScript checks in strict mode.
 - `npm run check:dead-code` - checks for unused files, exports, and dependencies with Knip.
 - `npm run test` - runs app Vitest tests plus script Vitest tests.
+- `npm run test:changed` - runs Vitest tests affected by the diff against `origin/main`, including
+  uncommitted changes. Fetch `origin/main` first; this is a development shortcut, not a release gate.
 - `npm run build` - creates a production build in `dist/`.
 - `npm run check:bundle-size` - checks an existing `dist/` against the committed JS/CSS raw and
   gzip budgets; run `npm run build` first.
@@ -167,24 +169,31 @@ Local quality scripts:
   and enforces the committed score and PWA deployment budgets. A local Chrome/Chromium install is
   required.
 - `npm run test:e2e` - runs Playwright browser tests.
+- `npm run test:e2e:smoke` - runs the five `@smoke` journeys in Chromium and iPhone WebKit:
+  sign-in/database selection, reads, transfer creation, upload retry, offline startup, and PWA
+  manifest/service-worker/offline reload. Use this for quick local browser feedback.
+- `npm run test:e2e:webkit` - runs the complete iPhone WebKit suite with two local workers.
+  Build-mutating tests are Chromium-only, so this WebKit-only parallel run is safe.
 - `npm run check:local` - runs formatting, linting, type checking, dead-code analysis, and tests
   concurrently, then creates the production build and verifies its bundle size.
 
 Playwright release-gate policy:
 
 - Local runs use zero retries so deterministic failures surface immediately.
-- CI uses one retry for transient browser or runner noise and one worker per isolated browser-project
-  job because the suite shares the served build and service-worker files inside each job.
-- CI rejects focused tests, retains traces/screenshots/videos on failure, and uploads the HTML
-  report plus raw test results when the E2E job fails.
+- CI uses one retry for transient browser or runner noise. The default full matrix and each CI
+  shard use one worker because Chromium PWA tests modify the served build and service-worker files.
+- CI rejects focused tests, records a trace on the first retry, captures failure screenshots, and
+  uploads the HTML report plus raw test results when the E2E job fails. Successful tests do not
+  record video or traces. Locally, use `--trace on` to diagnose a failing test.
 - A test that still fails after the CI retry blocks `Quality`; repeated flaky behavior must be
   fixed at its root cause instead of increasing retries.
 
 The `Quality` workflow runs on every push to non-`gh-pages` branches. Code-bearing non-main branches
-run full checks with Chromium, Pixel 5 and iPhone WebKit E2E jobs in parallel. Protected `main`
-merges reuse the strict, up-to-date branch gate and run the exact-SHA build verification plus a
-Chromium critical-journey smoke and the full WebKit gate. WebKit is also included in the default
-local `npm run test:e2e`; install the locked browsers with `npx playwright install chromium webkit`.
+run full checks with Chromium, Pixel 5 and three isolated iPhone WebKit shards in parallel. Opening
+a PR does not repeat that run. Protected `main` merges reuse the strict, up-to-date branch gate and
+run the exact-SHA build verification plus the five `@smoke` tests in Chromium and WebKit. WebKit is
+also included in the default local `npm run test:e2e`; install the locked browsers with
+`npx playwright install chromium webkit`.
 Browser emulation supplements the required physical-device QA. Branches whose effective diff is
 docs-only skip the heavy jobs.
 

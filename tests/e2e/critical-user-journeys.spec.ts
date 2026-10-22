@@ -58,7 +58,7 @@ const fillValidTransfer = async (page: Page, name: string, amountDigits: string)
   await page.getByTestId('add-transfer-category-1').selectOption({ label: 'Lebensmittel' });
 };
 
-test('critical journey: signs in, binds a OneDrive DB, and reads accounts and transfers', async ({
+test('@smoke critical journey: signs in, binds a OneDrive DB, and reads accounts and transfers', async ({
   page,
 }) => {
   await installMockAuthClient(page);
@@ -111,7 +111,7 @@ test('critical journey: signs in, binds a OneDrive DB, and reads accounts and tr
   await expect(page.getByTestId('selected-db-file-summary')).toContainText('budget.db');
 });
 
-test('critical journey: adds a transfer and observes updated transfers and balances', async ({
+test('@smoke critical journey: adds a transfer and observes updated transfers and balances', async ({
   page,
 }) => {
   await installWritableJourneyState(page);
@@ -140,7 +140,7 @@ test('critical journey: adds a transfer and observes updated transfers and balan
   ).toHaveAttribute('data-amount-cents', '1550');
 });
 
-test('critical journey: retries a failed upload without repeating the local write', async ({
+test('@smoke critical journey: retries a failed upload without repeating the local write', async ({
   page,
 }) => {
   await installWritableJourneyState(page, [
@@ -167,7 +167,7 @@ test('critical journey: retries a failed upload without repeating the local writ
   expect(await getLocalTransferWriteCallCount(page)).toBe(1);
 });
 
-test('critical journey: offline startup fails closed without cached account or transfer reads', async ({
+test('@smoke critical journey: offline startup fails closed without cached account or transfer reads', async ({
   page,
 }) => {
   await installMockAuthClient(page, { startAuthenticated: true });

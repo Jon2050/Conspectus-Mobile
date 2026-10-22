@@ -277,7 +277,7 @@ jobs:
           retention-days: 7
 
   e2e-tests:
-    name: E2E Critical Journeys (${{ matrix.project }})
+    name: E2E Critical Journeys (${{ matrix.project }}, shard ${{ matrix.shard }})
     needs:
       - detect-code-changes
       - build
@@ -293,7 +293,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        project: ${{ fromJSON(github.ref_name == github.event.repository.default_branch && '["chromium", "iphone-13-safari"]' || '["chromium", "pixel-5", "iphone-13-safari"]') }}
+        include: ${{ fromJSON(github.ref_name == github.event.repository.default_branch && '[{"project":"chromium","shard":"1/1","id":"chromium"},{"project":"iphone-13-safari","shard":"1/1","id":"webkit"}]' || '[{"project":"chromium","shard":"1/1","id":"chromium"},{"project":"pixel-5","shard":"1/1","id":"pixel"},{"project":"iphone-13-safari","shard":"1/3","id":"webkit-1"},{"project":"iphone-13-safari","shard":"2/3","id":"webkit-2"},{"project":"iphone-13-safari","shard":"3/3","id":"webkit-3"}]') }}
     permissions:
       actions: read
       contents: read
@@ -332,17 +332,19 @@ jobs:
           PLAYWRIGHT_APP_BASE_PATH: /${{ github.event.repository.name }}/previews/${{ github.ref_name == 'main' && 'main' || 'test' }}/
           PLAYWRIGHT_WEB_SERVER_BUILD: '0'
         run: |
-          if [ "${GITHUB_REF_NAME}" = "${{ github.event.repository.default_branch }}" ] && [ "${{ matrix.project }}" = 'chromium' ]; then
-            npx playwright test tests/e2e/critical-user-journeys.spec.ts --project="${{ matrix.project }}"
+          if [ "${GITHUB_REF_NAME}" = "${{ github.event.repository.default_branch }}" ]; then
+            npx playwright test --project="${{ matrix.project }}" --grep @smoke
           else
-            npm run test:e2e -- --project="${{ matrix.project }}"
+            # Test-level sharding balances the large app-shell file. One worker per
+            # isolated job prevents races when PWA tests change the served build.
+            npm run test:e2e -- --project="${{ matrix.project }}" --fully-parallel --workers=1 --shard="${{ matrix.shard }}"
           fi
 
       - name: Upload Playwright failure diagnostics
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: playwright-diagnostics-${{ matrix.project }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: playwright-diagnostics-${{ matrix.id }}-${{ github.run_id }}-${{ github.run_attempt }}
           if-no-files-found: warn
           path: |
             playwright-report
@@ -354,7 +356,7 @@ jobs:
         if: always()
         run: >-
           node scripts/publish-test-summary.mjs
-          --title "E2E Test Report (${{ matrix.project }})"
+          --title "E2E Test Report (${{ matrix.project }}, shard ${{ matrix.shard }})"
           --files reports/playwright/junit.xml
 
   quality-gate:
@@ -400,10 +402,10 @@ jobs:
 
           if [ "${GITHUB_REF_NAME}" = "${{ github.event.repository.default_branch }}" ]; then
             if [ "${BUILD_RESULT}" != 'success' ] || [ "${E2E_RESULT}" != 'success' ]; then
-              echo "Post-merge build, Chromium smoke or WebKit gate did not succeed (build=${BUILD_RESULT}, e2e=${E2E_RESULT})." >&2
+              echo "Post-merge build or Chromium/WebKit smoke did not succeed (build=${BUILD_RESULT}, e2e=${E2E_RESULT})." >&2
               exit 1
             fi
-            echo "Protected main merge completed the exact-SHA build verification, Chromium smoke and WebKit gate."
+            echo "Protected main merge completed the exact-SHA build verification and Chromium/WebKit smoke including PWA offline reload."
             exit 0
           fi
 
