@@ -64,7 +64,9 @@ test('defaults manual accounts by type, preserves the draft and restores default
   await expect(to).toHaveValue('2');
 });
 
-test('right-aligns categories beside accounts and on their own wrapped rows', async ({ page }) => {
+test('keeps transfer rows evenly spaced and categories right-aligned when content wraps', async ({
+  page,
+}, testInfo) => {
   await page.clock.setFixedTime(new Date('2026-10-21T12:00:00Z'));
   await installReadyAddTransferTestDb(page, {
     forceAlwaysOpen: true,
@@ -72,7 +74,7 @@ test('right-aligns categories beside accounts and on their own wrapped rows', as
     categoryRows: [
       { categoryId: 1, name: 'Food' },
       { categoryId: 2, name: 'Household supplies' },
-      { categoryId: 3, name: 'Shopping' },
+      { categoryId: 3, name: 'Everyday household and cleaning essentials' },
     ],
     transferRows: [
       {
@@ -88,41 +90,80 @@ test('right-aligns categories beside accounts and on their own wrapped rows', as
       {
         transferId: 2,
         bookingDateEpochDay: 20747,
-        name: 'Long categories',
+        name: 'Pfand, Brötchen, Aufstrich, Milch, Skyr, Joghurt',
         amountCents: 500,
         fromAccountId: 3,
         toAccountId: 2,
         categoryIds: [1, 2, 3],
         buyplace: null,
       },
+      {
+        transferId: 3,
+        bookingDateEpochDay: 20747,
+        name: 'A longer transfer without categories that also wraps across several lines',
+        amountCents: 500,
+        fromAccountId: 1,
+        toAccountId: 3,
+        categoryIds: [],
+        buyplace: null,
+      },
     ],
   });
+  await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto(appPath('#/transfers'));
   for (const width of [320, 390, 720]) {
     await page.setViewportSize({ width, height: 844 });
-    for (const id of [1, 2]) {
+    for (const id of [1, 2, 3]) {
       const card = page.getByTestId(`transfer-card-${id}`);
       await expect(card).toBeVisible();
       const geometry = await card.evaluate((element) => {
         const details = element.querySelector('.transfer-card__details')!.getBoundingClientRect();
-        const categories = element
-          .querySelector('.transfer-card__categories')!
-          .getBoundingClientRect();
-        const last = element
-          .querySelector('.transfer-card__category:last-child')!
-          .getBoundingClientRect();
+        const header = element.querySelector('.transfer-card__header')!.getBoundingClientRect();
+        const date = element.querySelector('.transfer-card__date')!.getBoundingClientRect();
+        const name = element.querySelector('.transfer-card__name')!.getBoundingClientRect();
+        const amount = element.querySelector('.transfer-card__amount')!.getBoundingClientRect();
         const accounts = element.querySelector('.transfer-card__accounts')!.getBoundingClientRect();
+        const categories = element
+          .querySelector('.transfer-card__categories')
+          ?.getBoundingClientRect();
+        const badges = [...element.querySelectorAll('.transfer-card__category')].map((badge) =>
+          badge.getBoundingClientRect(),
+        );
+        const rows = badges.filter(
+          (badge, index) => index === 0 || badge.top > badges[index - 1].top + 1,
+        );
         return {
-          edge: details.right - categories.right,
-          last: details.right - last.right,
-          wrapped: categories.top >= accounts.bottom,
+          dateToName: name.top - date.bottom,
+          headerToDetails: details.top - header.bottom,
+          nameToAmount: amount.top >= name.bottom ? amount.top - name.bottom : null,
+          edge: categories ? details.right - categories.right : null,
+          last: badges.length ? details.right - badges[badges.length - 1].right : null,
+          wrapped: categories ? categories.top >= accounts.bottom : false,
+          accountsToCategories: categories ? categories.top - accounts.bottom : null,
+          categoryRowGaps: rows.slice(1).map((row, index) => row.top - rows[index].bottom),
+          overflowing: element.scrollWidth > element.clientWidth,
         };
       });
-      expect(Math.abs(geometry.edge)).toBeLessThan(2);
-      expect(Math.abs(geometry.last)).toBeLessThan(2);
-      if (width === 320 && id === 2) expect(geometry.wrapped).toBe(true);
-      if (width === 720 && id === 1) expect(geometry.wrapped).toBe(false);
+      expect(Math.abs(geometry.dateToName - 4)).toBeLessThan(1);
+      expect(Math.abs(geometry.headerToDetails - 4)).toBeLessThan(1);
+      if (geometry.nameToAmount !== null)
+        expect(Math.abs(geometry.nameToAmount - 4)).toBeLessThan(1);
+      expect(geometry.overflowing).toBe(false);
+      if (id === 3) {
+        expect(geometry.edge).toBeNull();
+      } else {
+        expect(Math.abs(geometry.edge!)).toBeLessThan(2);
+        expect(Math.abs(geometry.last!)).toBeLessThan(2);
+        if (geometry.wrapped) expect(Math.abs(geometry.accountsToCategories! - 4)).toBeLessThan(1);
+        for (const gap of geometry.categoryRowGaps) expect(Math.abs(gap - 4)).toBeLessThan(1);
+        if (width <= 390 && id === 2) expect(geometry.categoryRowGaps.length).toBeGreaterThan(0);
+        if (width === 320 && id === 2) expect(geometry.wrapped).toBe(true);
+        if (width === 720 && id === 1) expect(geometry.wrapped).toBe(false);
+      }
     }
+    await page.getByTestId('transfers-route-cards').screenshot({
+      path: testInfo.outputPath(`transfer-row-spacing-${width}.png`),
+    });
   }
 });
 

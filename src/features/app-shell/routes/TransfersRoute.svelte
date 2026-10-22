@@ -247,7 +247,7 @@
                 data-transfer-id={transfer.transferId}
               >
                 <div class="transfer-card__header">
-                  <div>
+                  <div class="transfer-card__heading">
                     <p class="transfer-card__date">
                       {formatEpochDayToDate(transfer.bookingDateEpochDay, $locale)}
                     </p>
@@ -416,9 +416,10 @@
   }
 
   .transfer-card {
+    --transfer-card-row-gap: 0.25rem;
     display: flex;
     flex-direction: column;
-    gap: 0;
+    gap: var(--transfer-card-row-gap);
     padding: 0.4rem 0.75rem;
     border-radius: var(--radius-lg);
     background: var(--surface-strong);
@@ -447,10 +448,17 @@
   .transfer-card__date {
     margin: 0;
     font-size: 0.7rem;
-    line-height: 1.1;
+    line-height: 1.25;
     color: var(--text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.02em;
+  }
+
+  .transfer-card__heading {
+    display: flex;
+    flex-direction: column;
+    gap: var(--transfer-card-row-gap);
+    min-width: 0;
   }
 
   .transfer-card__name {
@@ -486,11 +494,10 @@
   }
 
   .transfer-card__details {
-    margin-top: -1px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 0.35rem;
+    gap: var(--transfer-card-row-gap) 0.35rem;
     flex-wrap: wrap;
     min-width: 0;
   }
@@ -499,9 +506,9 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.4rem;
+    gap: var(--transfer-card-row-gap) 0.4rem;
     font-size: 0.85rem;
-    line-height: 0.9;
+    line-height: 1.25;
     color: var(--text-secondary);
     min-width: 0;
     flex: 1 1 12rem;
@@ -524,12 +531,13 @@
     margin-left: auto;
     display: flex;
     flex-wrap: wrap;
-    gap: 0.3rem;
+    gap: var(--transfer-card-row-gap) 0.3rem;
     justify-content: flex-end;
     min-width: 0;
   }
 
   .transfer-card__category {
+    display: flex;
     margin: 0;
   }
 
@@ -547,7 +555,7 @@
   @media (max-width: 380px) {
     .transfer-card__header {
       grid-template-columns: minmax(0, 1fr);
-      gap: 0.3rem;
+      gap: var(--transfer-card-row-gap);
     }
 
     .transfer-card__amount {
