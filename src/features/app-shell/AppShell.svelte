@@ -564,10 +564,6 @@
 {/if}
 
 <div class="app-shell" data-testid="app-shell">
-  <header class="app-header">
-    <h1>{$_('appShell.title')}</h1>
-  </header>
-
   <ServiceWorkerUpdateBanner updateController={serviceWorkerUpdateController} />
 
   {#if staleTokenRecoveryIsRequired}
@@ -714,6 +710,9 @@
     aria-live="polite"
     bind:this={appContentElement}
   >
+    <header class="app-header">
+      <h1>{$_('appShell.title')}</h1>
+    </header>
     <div class="app-content__page">
       {#if showLoadingPlaceholder}
         <LoadingPlaceholder />
@@ -779,7 +778,6 @@
       {:else}
         <div data-testid="route-settings"><LoadingPlaceholder /></div>
       {/if}
-      {#if !showLoadingPlaceholder}<DeploymentInfoFooter />{/if}
     </div>
   </main>
 
@@ -805,6 +803,7 @@
         </a>
       {/each}
     </nav>
+    <DeploymentInfoFooter />
   </div>
 
   <style>
