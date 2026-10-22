@@ -213,6 +213,8 @@
   .bottom-sheet__header {
     margin-bottom: 1rem;
     flex: none;
+    /* Initial focus announces the dialog; only interactive controls need a visible focus ring. */
+    outline: none;
   }
 
   .bottom-sheet__header h3 {
