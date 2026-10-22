@@ -11,8 +11,6 @@
   } from '@shared';
   import { _, locale } from 'svelte-i18n';
   import {
-    PRIMARY_INCOME_ACCOUNT_TYPE_ID,
-    PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID,
     appAccountQueryService,
     appCategoryQueryService,
     appTransferMonthQueryService,
@@ -272,25 +270,19 @@
                 </div>
                 <div class="transfer-card__details">
                   <div class="transfer-card__accounts">
-                    <span class="transfer-card__account transfer-card__account--from">
-                      {#if transfer.fromAccountTypeId === PRIMARY_INCOME_ACCOUNT_TYPE_ID}
-                        {$_('transfers.primaryIncome')}
-                      {:else if transfer.fromAccountTypeId === PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID}
-                        {$_('transfers.primarySpendings')}
-                      {:else}
+                    {#if transfer.amountSemantic !== 'positive'}
+                      <span class="transfer-card__account transfer-card__account--from">
                         {transfer.fromAccountName}
-                      {/if}
-                    </span>
-                    <span class="transfer-card__account-arrow">→</span>
-                    <span class="transfer-card__account transfer-card__account--to">
-                      {#if transfer.toAccountTypeId === PRIMARY_INCOME_ACCOUNT_TYPE_ID}
-                        {$_('transfers.primaryIncome')}
-                      {:else if transfer.toAccountTypeId === PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID}
-                        {$_('transfers.primarySpendings')}
-                      {:else}
+                      </span>
+                    {/if}
+                    {#if transfer.amountSemantic === 'neutral'}
+                      <span class="transfer-card__account-arrow">→</span>
+                    {/if}
+                    {#if transfer.amountSemantic !== 'negative'}
+                      <span class="transfer-card__account transfer-card__account--to">
                         {transfer.toAccountName}
-                      {/if}
-                    </span>
+                      </span>
+                    {/if}
                   </div>
                   {#if transfer.categoryNames.length > 0}
                     <ul class="transfer-card__categories">
@@ -441,7 +433,7 @@
     border-left-color: var(--negative);
   }
   .transfer-card--neutral {
-    border-left-color: var(--accent);
+    border-left-color: var(--text-secondary);
   }
 
   .transfer-card__header {

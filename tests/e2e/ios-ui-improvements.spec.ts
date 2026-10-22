@@ -125,3 +125,72 @@ test('right-aligns categories beside accounts and on their own wrapped rows', as
     }
   }
 });
+
+test('shows relevant transfer accounts and matches internal accents to neutral amounts', async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(new Date('2026-10-21T12:00:00Z'));
+  await installReadyAddTransferTestDb(page, {
+    forceAlwaysOpen: true,
+    accountRows: [
+      ...accounts,
+      { accountId: 4, name: 'Wallet', amountCents: 500, accountTypeId: 3 },
+    ],
+    transferRows: [
+      {
+        transferId: 1,
+        bookingDateEpochDay: 20747,
+        name: 'Income',
+        amountCents: 500,
+        fromAccountId: 1,
+        toAccountId: 3,
+        categoryIds: [],
+        buyplace: null,
+      },
+      {
+        transferId: 2,
+        bookingDateEpochDay: 20747,
+        name: 'Expense',
+        amountCents: 500,
+        fromAccountId: 3,
+        toAccountId: 2,
+        categoryIds: [],
+        buyplace: null,
+      },
+      {
+        transferId: 3,
+        bookingDateEpochDay: 20747,
+        name: 'Internal',
+        amountCents: 500,
+        fromAccountId: 3,
+        toAccountId: 4,
+        categoryIds: [],
+        buyplace: null,
+      },
+    ],
+  });
+  await page.goto(appPath('#/transfers'));
+  for (const id of [1, 2]) {
+    const labels = page.getByTestId(`transfer-card-${id}`).locator('.transfer-card__accounts');
+    await expect(labels.locator('.transfer-card__account')).toHaveText(['Checking account']);
+    await expect(labels.locator('.transfer-card__account-arrow')).toHaveCount(0);
+  }
+  const internal = page.getByTestId('transfer-card-3');
+  await expect(internal.locator('.transfer-card__account')).toHaveText([
+    'Checking account',
+    'Wallet',
+  ]);
+  await expect(internal.locator('.transfer-card__account-arrow')).toHaveText('→');
+  for (const colorScheme of ['light', 'dark'] as const) {
+    await page.emulateMedia({ colorScheme });
+    const colors = await internal.evaluate((element) => ({
+      border: getComputedStyle(element).borderLeftColor,
+      amount: getComputedStyle(element.querySelector('.transfer-card__amount')!).color,
+    }));
+    expect(colors.border).toBe(colors.amount);
+    const incomeBorder = await page
+      .getByTestId('transfer-card-1')
+      .evaluate((element) => getComputedStyle(element).borderLeftColor);
+    expect(colors.border).not.toBe(incomeBorder);
+  }
+});

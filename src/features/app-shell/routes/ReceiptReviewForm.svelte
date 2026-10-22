@@ -17,13 +17,11 @@
     categories,
     disabled,
     onChange,
-    onSave,
   }: {
     draft: ReceiptReviewDraft;
     categories: AddTransferOptionsState['categoryOptions'];
     disabled: boolean;
     onChange: (draft: ReceiptReviewDraft) => void;
-    onSave: () => void;
   } = $props();
   const updateRow = (id: number, patch: Partial<ReceiptReviewTransfer>) =>
     onChange({
@@ -233,13 +231,6 @@
       </p>
     {/if}
   {/if}
-  <button
-    type="button"
-    class="app-button app-button--primary"
-    data-testid="receipt-review-save"
-    {disabled}
-    onclick={onSave}>{$_('addTransfer.receipt.review.save')}</button
-  >
 </div>
 
 <style>

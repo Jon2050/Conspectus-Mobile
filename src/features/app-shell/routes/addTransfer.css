@@ -278,12 +278,6 @@
   width: 100%;
 }
 
-@media (max-width: 360px) {
-  .add-transfer-form__actions {
-    grid-template-columns: 1fr;
-  }
-}
-
 .add-transfer-form__field,
 .add-transfer-form__receipt {
   min-width: 0;

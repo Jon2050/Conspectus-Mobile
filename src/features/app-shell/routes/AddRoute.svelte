@@ -616,7 +616,6 @@
           reviewIsDisabled={submitIsDisabled || receiptCaptureIsBusy}
           sourceIsDisabled={sourceAccountIsDisabled || receiptCommitIsBusy || isOffline}
           {handleReceiptDraftChange}
-          {handleReceiptSave}
         />
 
         {#if !receiptWorkflowIsActive}
@@ -682,6 +681,19 @@
             >
               {$_('addTransfer.close')}
             </button>
+            {#if receiptPreparationState.draft && ['processing', 'waiting_for_source', 'reviewing', 'ready_for_commit'].includes(receiptPreparationState.phase)}
+              <button
+                type="button"
+                class="app-button app-button--primary add-transfer-form__action"
+                data-testid="receipt-review-save"
+                disabled={submitIsDisabled ||
+                  receiptCaptureIsBusy ||
+                  receiptPreparationState.phase === 'ready_for_commit'}
+                on:click={handleReceiptSave}
+              >
+                {$_('addTransfer.receipt.review.save')}
+              </button>
+            {/if}
           </div>
         {/if}
       </form>

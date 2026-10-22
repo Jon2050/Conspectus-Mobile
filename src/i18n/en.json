@@ -80,7 +80,7 @@
       "stageOne": "Read photo",
       "stageTwo": "Create transfer data",
       "sourceAccount": "Source account for all transfers",
-      "accountRequired": "Choose the source account for all transfers. Nothing is booked until you press Save.",
+      "accountRequired": "Choose the source account for all transfers. Nothing is booked until you press Save transfers.",
       "progressLabel": "Receipt processing progress",
       "processing": "Processing is ongoing. This may take a moment.",
       "steps": {
@@ -184,7 +184,7 @@
         "total": "Total",
         "receiptTotal": "Detected receipt total",
         "totalDifference": "The transfer amounts differ from the detected receipt total. Check the amounts before saving.",
-        "save": "Save",
+        "save": "Save transfers",
         "currencyUnsupported": "Only EUR amounts can be saved."
       }
     },
