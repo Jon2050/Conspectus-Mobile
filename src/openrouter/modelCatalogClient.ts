@@ -1,5 +1,5 @@
 import { withRequestDeadline } from '@shared';
-// Fetches OpenRouter's account-filtered catalog and intelligence benchmarks without exposing keys.
+// Fetches OpenRouter's account-filtered catalog without exposing keys.
 import {
   OpenRouterCatalogResponseError,
   parseOpenRouterCompatibleModelCatalog,
@@ -7,8 +7,6 @@ import {
 } from './modelCatalog';
 
 export const OPENROUTER_USER_MODELS_URL = 'https://openrouter.ai/api/v1/models/user';
-export const OPENROUTER_INTELLIGENCE_BENCHMARKS_URL =
-  'https://openrouter.ai/api/v1/benchmarks?source=artificial-analysis&task_type=intelligence';
 
 export type OpenRouterCatalogErrorCode =
   | 'invalid_key'
@@ -60,10 +58,6 @@ export const createOpenRouterModelCatalogClient = (
       try {
         return await withRequestDeadline(
           async (requestSignal) => {
-            const pending = new AbortController();
-            const abortPending = () => pending.abort(requestSignal.reason);
-            requestSignal.addEventListener('abort', abortPending, { once: true });
-            if (requestSignal.aborted) abortPending();
             const loadJson = async (url: string): Promise<unknown> => {
               let response: Response;
               try {
@@ -76,11 +70,11 @@ export const createOpenRouterModelCatalogClient = (
                   cache: 'no-store',
                   credentials: 'omit',
                   redirect: 'error',
-                  signal: pending.signal,
+                  signal: requestSignal,
                 });
               } catch (error) {
                 throw new OpenRouterCatalogError(
-                  isAbortError(error, pending.signal) ? 'aborted' : 'network_error',
+                  isAbortError(error, requestSignal) ? 'aborted' : 'network_error',
                 );
               }
 
@@ -101,23 +95,14 @@ export const createOpenRouterModelCatalogClient = (
               return payload;
             };
 
+            const payload = await loadJson(OPENROUTER_USER_MODELS_URL);
             try {
-              const [payload, benchmarks] = await Promise.all([
-                loadJson(OPENROUTER_USER_MODELS_URL),
-                loadJson(OPENROUTER_INTELLIGENCE_BENCHMARKS_URL),
-              ]);
-
-              try {
-                return parseOpenRouterCompatibleModelCatalog(payload, benchmarks);
-              } catch (error) {
-                if (error instanceof OpenRouterCatalogResponseError) {
-                  throw new OpenRouterCatalogError('invalid_response', 200);
-                }
-                throw error;
+              return parseOpenRouterCompatibleModelCatalog(payload);
+            } catch (error) {
+              if (error instanceof OpenRouterCatalogResponseError) {
+                throw new OpenRouterCatalogError('invalid_response', 200);
               }
-            } finally {
-              requestSignal.removeEventListener('abort', abortPending);
-              pending.abort();
+              throw error;
             }
           },
           options.timeoutMs ?? 30_000,

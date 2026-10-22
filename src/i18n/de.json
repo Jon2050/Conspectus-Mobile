@@ -184,8 +184,7 @@
         "total": "Gesamtbetrag",
         "receiptTotal": "Erkannter Bon-Gesamtbetrag",
         "totalDifference": "Die Summe der Teilbeträge weicht vom erkannten Bon-Gesamtbetrag ab. Prüfe die Beträge vor dem Speichern.",
-        "save": "Transfers speichern",
-        "currencyUnsupported": "Es können nur Beträge in EUR gespeichert werden."
+        "save": "Transfers speichern"
       }
     },
     "save": {
@@ -291,11 +290,11 @@
       "models": {
         "visionLabel": "Modell zum Auslesen des Belegs",
         "transferLabel": "Modell zum Ableiten der Transfers",
-        "placeholder": "Kompatibles kostenloses Modell wählen",
-        "noVisionModels": "Derzeit ist kein kostenloses Modell mit Bildeingabe, Textausgabe und einem Artificial Analysis Intelligence Index von mindestens 20 verfügbar.",
-        "noTransferModels": "Derzeit ist kein kostenloses Textmodell mit einem Artificial Analysis Intelligence Index von mindestens 20 verfügbar.",
-        "filterHelp": "Beide Auswahllisten enthalten kostenlose Modelle mit einem Artificial Analysis Intelligence Index von mindestens 20. Quelle: Artificial Analysis über den Live-Benchmarkkatalog von OpenRouter. Modelle ohne bestätigten Wert werden nicht angeboten.",
-        "benchmarkSource": "Benchmarkdaten bei OpenRouter"
+        "placeholder": "Kompatibles Modell wählen",
+        "paid": "kostenpflichtig",
+        "noVisionModels": "Derzeit ist kein kostenloses Modell mit Bildeingabe und Textausgabe verfügbar.",
+        "noTransferModels": "Derzeit ist kein kostenloses Textmodell verfügbar.",
+        "filterHelp": "Die Auswahllisten enthalten kostenlose Modelle mit den benötigten Bild- bzw. Textfähigkeiten aus deinem OpenRouter-Katalog. Zusätzlich ist Muse Spark 1.3 Contributor in beiden Listen als kostenpflichtiges Modell verfügbar."
       },
       "prompt": {
         "label": "Regeln zum Gruppieren der Bonpositionen",
@@ -369,7 +368,7 @@
   },
   "loadingPlaceholder": {
     "title": "Lade...",
-    "description": "Dein mobiler Arbeitsplatz wird vorbereitet."
+    "description": "Conspectus wird vorbereitet."
   },
   "sync": {
     "startup": {
@@ -417,7 +416,7 @@
     "balanceHintTitle": "Hinweis zu Kontobeträgen",
     "balanceHint": "Beim Speichern oder Löschen werden die Beträge der beteiligten Konten entsprechend angepasst.",
     "confirmDeleteTitle": "Transfer wirklich löschen?",
-    "confirmDeleteDescription": "Der Transfer „{name}“ wird gelöscht. Die Kontobeträge werden entsprechend angepasst.",
+    "confirmDeleteDescription": "Der Transfer „{name}“ wird gelöscht. Kontobeträge werden entsprechend angepasst.",
     "cancelDelete": "Abbrechen"
   }
 }

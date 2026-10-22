@@ -25,14 +25,18 @@ describe('gateway-declared reasoning controls', () => {
     });
     expect(resolveOpenRouterReasoning(capabilities, 'off')).toEqual({ enabled: false });
   });
-  it('uses the binary switch when no effort control is exposed and leaves unknown models alone', () => {
+  it('disables optional reasoning without advertised efforts and leaves unknown models alone', () => {
     expect(
       resolveOpenRouterReasoning(
         parseOpenRouterReasoningCapabilities({ mandatory: false, supported_efforts: null }),
         'lowest',
       ),
     ).toEqual({ enabled: true, effort: 'minimal' });
-    expect(resolveOpenRouterReasoning({ mandatory: false }, 'lowest')).toEqual({ enabled: true });
+    expect(resolveOpenRouterReasoning({ mandatory: false }, 'lowest')).toEqual({ enabled: false });
+    expect(resolveOpenRouterReasoning({ mandatory: true }, 'lowest')).toEqual({ enabled: true });
+    expect(
+      resolveOpenRouterReasoning({ mandatory: false, supportedEfforts: ['none'] }, 'lowest'),
+    ).toEqual({ enabled: false });
     expect(resolveOpenRouterReasoning({ mandatory: false }, 'off')).toEqual({ enabled: false });
     expect(resolveOpenRouterReasoning(undefined, 'lowest')).toBeUndefined();
     expect(parseOpenRouterReasoningCapabilities({ mandatory: 'false' })).toBeUndefined();

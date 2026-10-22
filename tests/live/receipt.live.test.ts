@@ -22,6 +22,7 @@ import {
 import type { ReceiptExtraction } from '../../src/features/receipt/receiptAnalysisContracts';
 import type { OpenRouterChatMessage } from '../../src/openrouter';
 import {
+  receiptExtractionData,
   parseReceiptExtractionResponse,
   parseReceiptTransferDerivationResponse,
 } from '../../src/features/receipt/receiptAnalysisContracts';
@@ -295,7 +296,7 @@ it('offline: records HTTP rate limiting as a provider failure without fabricated
 
 it('offline: retains the failing second-stage answer with exact source-reference diagnostics', async () => {
   const derivation = structuredClone(gold[0]!.derivation)!;
-  derivation.transfers[0]!.sourceItemIndexes.push(999);
+  derivation.groups[0]!.sourceItemIndexes.push(999);
   const result = await analyze(
     readReceiptCases('tests/fixtures/receipts/gold.json')[0]!,
     'offline-key',
@@ -317,7 +318,7 @@ it('offline: preserves partial-stage diagnostics and derives only known signed l
     ...gold[0]!.extraction,
     status: 'error',
     errorReason: 'Summe fehlt.',
-    receiptTotalCents: null,
+    receiptTotal: null,
   };
   const derivation = { ...gold[0]!.derivation, status: 'error', errorReason: 'Teilantwort.' };
   const result = await analyze(
@@ -351,12 +352,14 @@ it('catalog: lists currently eligible model IDs using the production account-fil
   ).toBeGreaterThan(0);
   expect(
     catalog.transferModels.length,
-    'No compatible free text model with an AA Intelligence Index of at least 20 in this account.',
+    'No compatible free text model in this account.',
   ).toBeGreaterThan(0);
 });
 
-it('benchmark: compares eligible models once per receipt role and reasoning mode', async () => {
+it('benchmark: compares eligible models per receipt role and reasoning mode', async () => {
   const stage = environment.RECEIPT_BENCHMARK_STAGE || 'all';
+  const repetitions = Number(environment.RECEIPT_BENCHMARK_REPETITIONS || '1');
+  expect(Number.isInteger(repetitions) && repetitions >= 1 && repetitions <= 10).toBe(true);
   const modes: ('lowest' | 'off')[] =
     environment.RECEIPT_BENCHMARK_REASONING === 'compare'
       ? ['lowest', 'off']
@@ -387,6 +390,14 @@ it('benchmark: compares eligible models once per receipt role and reasoning mode
     configuredTransfer,
     stage,
     modes,
+    repetitions,
+    photoExpectations: {
+      metadata: entry.expectedExtraction,
+      amounts: entry.expectedLineTotalsCents,
+      items: entry.expectedItems,
+    },
+    photoComparison:
+      'Exact merchant/date/total/ordered final amounts with correct article association; typography and 0/O tolerated.',
     referenceModel: null as string | null,
     rows,
   };
@@ -401,6 +412,7 @@ it('benchmark: compares eligible models once per receipt role and reasoning mode
     messages: readonly OpenRouterChatMessage[],
     extraction: ReceiptExtraction | undefined,
     mode: 'lowest' | 'off',
+    round: number,
   ) => {
     const model = modelOption.id;
     const reasoning = resolveOpenRouterReasoning(modelOption.reasoning, mode);
@@ -410,6 +422,7 @@ it('benchmark: compares eligible models once per receipt role and reasoning mode
         model,
         mode,
         skipped: 'reasoning_mandatory',
+        round,
         capabilities: modelOption.reasoning,
       };
       rows.push(row);
@@ -423,6 +436,7 @@ it('benchmark: compares eligible models once per receipt role and reasoning mode
       mode,
       reasoning,
       capabilities: modelOption.reasoning,
+      round,
     };
     let payloadTask: Promise<void> | undefined;
     const stem = `${rows.length + 1}-${stage}`;
@@ -464,6 +478,11 @@ it('benchmark: compares eligible models once per receipt role and reasoning mode
       row.validation = extraction
         ? parseReceiptTransferDerivationResponse(raw, extraction)
         : parseReceiptExtractionResponse(raw);
+      if (!extraction && entry.expectedExtraction)
+        row.photoQuality = evaluateReceiptImageSizeResponse(raw, entry, {
+          exactStoreName: true,
+          allowZeroLetter: true,
+        });
       await payloadTask;
     } catch (error) {
       row.latencyMs = Math.round(performance.now() - started);
@@ -482,40 +501,46 @@ it('benchmark: compares eligible models once per receipt role and reasoning mode
     return row;
   };
   let reference: ReceiptExtraction | undefined;
-  const visionModels = [...catalog.visionModels].sort(
-    (a, b) => Number(b.id === configuredVision) - Number(a.id === configuredVision),
-  );
-  for (const model of stage === 'derivation' ? [] : visionModels)
-    for (const mode of modes) {
-      const row = await run(
-        'extraction',
-        model,
-        receiptExtractionMessages(
-          RECEIPT_EXTRACTION_SYSTEM_PROMPT.text,
-          Buffer.from(image.bytes).toString('base64'),
-        ),
-        undefined,
-        mode,
-      );
-      const result = row.validation as
-        | ReturnType<typeof parseReceiptExtractionResponse>
-        | undefined;
-      if (!reference && result?.ok && result.value.status === 'ok') {
-        try {
-          if (entry.expectedExtraction)
-            expect(result.value).toMatchObject(entry.expectedExtraction);
-          if (entry.expectedLineTotalsCents)
-            expect(result.value.items.map((item) => item.lineTotalCents)).toEqual(
-              entry.expectedLineTotalsCents,
-            );
-          reference = result.value;
-          report.referenceModel = model.id;
-        } catch {
-          row.referenceExpectationMismatch = true;
-          save();
+  const visionModels = catalog.visionModels
+    .filter((model) => !model.paid)
+    .sort((a, b) => Number(b.id === configuredVision) - Number(a.id === configuredVision));
+  for (let round = 1; round <= repetitions; round++)
+    for (const model of stage === 'derivation'
+      ? []
+      : round % 2
+        ? visionModels
+        : [...visionModels].reverse())
+      for (const mode of modes) {
+        const row = await run(
+          'extraction',
+          model,
+          receiptExtractionMessages(
+            RECEIPT_EXTRACTION_SYSTEM_PROMPT.text,
+            Buffer.from(image.bytes).toString('base64'),
+          ),
+          undefined,
+          mode,
+          round,
+        );
+        const result = row.validation as
+          | ReturnType<typeof parseReceiptExtractionResponse>
+          | undefined;
+        if (!reference && result?.ok && result.value.status === 'ok') {
+          try {
+            if (entry.expectedExtraction)
+              expect(result.value).toMatchObject(entry.expectedExtraction);
+            if (entry.expectedLineTotalsCents)
+              expect(result.value.items.map((item) => item.lineTotalCents)).toEqual(
+                entry.expectedLineTotalsCents,
+              );
+            reference = result.value;
+            report.referenceModel = model.id;
+          } catch {
+            row.referenceExpectationMismatch = true;
+            save();
+          }
         }
       }
-    }
   // An optional reviewed/recorded reference allows text benchmarking even if every vision provider fails.
   if (!reference && (entry.benchmarkExtraction || entry.extraction)) {
     const parsed = parseReceiptExtractionResponse(
@@ -535,7 +560,7 @@ it('benchmark: compares eligible models once per receipt role and reasoning mode
   }
   if (stage === 'extraction') {
     save();
-    expect(rows).toHaveLength(catalog.visionModels.length * modes.length);
+    expect(rows).toHaveLength(visionModels.length * modes.length * repetitions);
     return;
   }
   expect(
@@ -548,13 +573,16 @@ it('benchmark: compares eligible models once per receipt role and reasoning mode
     DEFAULT_TRANSFER_DERIVATION_RULES.text,
     reference!,
   );
-  for (const model of catalog.transferModels)
-    for (const mode of modes) await run('derivation', model, messages, reference!, mode);
+  for (let round = 1; round <= repetitions; round++)
+    for (const model of catalog.transferModels.filter((model) => !model.paid))
+      for (const mode of modes) await run('derivation', model, messages, reference!, mode, round);
   save();
   console.log(`Model comparison: ${output}/report.json`);
   expect(rows).toHaveLength(
-    ((stage === 'derivation' ? 0 : catalog.visionModels.length) + catalog.transferModels.length) *
-      modes.length,
+    ((stage === 'derivation' ? 0 : visionModels.length) +
+      catalog.transferModels.filter((model) => !model.paid).length) *
+      modes.length *
+      repetitions,
   );
   // Provider/quality failures are data, never silently skipped or retried by a latency comparison.
 });
@@ -783,7 +811,8 @@ it('live: evaluates real receipt images through the production two-stage analysi
         expect(extraction?.ok).toBe(true);
         if (!extraction?.ok || extraction.value.status !== 'ok')
           throw new Error('Missing extraction.');
-        if (entry.extraction) expect(extraction.value).toEqual(entry.extraction);
+        if (entry.extraction)
+          expect(receiptExtractionData(extraction.value)).toEqual(entry.extraction);
         if (entry.expectedExtraction)
           expect(extraction.value).toMatchObject(entry.expectedExtraction);
         if (entry.expectedLineTotalsCents)
@@ -793,7 +822,7 @@ it('live: evaluates real receipt images through the production two-stage analysi
         if (entry.expectedItems)
           expect(
             photoQuality?.allCorrect,
-            'Item names, quantities and their amounts must match the photograph transcription.',
+            'Item names and their final amounts must match the photograph transcription.',
           ).toBe(true);
         if (entry.derivation) {
           expect(

@@ -8,50 +8,40 @@
       "errorReason": null,
       "storeName": "REWE Maik Seiler",
       "receiptDate": "2026-10-20",
-      "currency": "EUR",
-      "receiptTotalCents": 575,
       "items": [
         {
           "index": 0,
           "name": "Brot",
-          "quantityText": null,
-          "lineTotalCents": 300,
-          "kind": "item"
+          "lineTotal": "3,00"
         },
         {
           "index": 1,
           "name": "Cola",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 2,
           "name": "Pfand",
-          "quantityText": null,
-          "lineTotalCents": 25,
-          "kind": "deposit"
+          "lineTotal": "0,25"
         },
         {
           "index": 3,
           "name": "Reiniger",
-          "quantityText": null,
-          "lineTotalCents": 200,
-          "kind": "item"
+          "lineTotal": "2,00"
         },
         {
           "index": 4,
           "name": "Rabatt Brot",
-          "quantityText": null,
-          "lineTotalCents": -50,
-          "kind": "discount"
+          "lineTotal": "-0,50"
         }
-      ]
+      ],
+      "receiptTotal": "5,75"
     },
     "derivation": {
       "status": "ok",
       "errorReason": null,
-      "transfers": [
+      "buyplace": "REWE Maik Seiler",
+      "groups": [
         {
           "name": "Brot und Pfand",
           "categoryNames": ["Einkauf", "Lebensmittel"],
@@ -59,16 +49,15 @@
         },
         {
           "name": "Cola",
-          "categoryNames": ["Einkauf", "Lebensmittel", "SÃ¼ÃŸigkeiten"],
+          "categoryNames": ["Einkauf", "Lebensmittel", "Süßigkeiten"],
           "sourceItemIndexes": [1]
         },
         {
           "name": "Reiniger",
-          "categoryNames": ["Einkauf", "Haushalt, VerbrauchsgÃ¼ter, Reinigung"],
+          "categoryNames": ["Einkauf", "Haushalt, Verbrauchsgüter, Reinigung"],
           "sourceItemIndexes": [3]
         }
-      ],
-      "buyplace": "REWE Maik Seiler"
+      ]
     }
   },
   {
@@ -80,36 +69,31 @@
       "errorReason": null,
       "storeName": "Markt",
       "receiptDate": "2026-10-20",
-      "currency": "EUR",
-      "receiptTotalCents": 275,
       "items": [
         {
           "index": 0,
           "name": "Brot",
-          "quantityText": null,
-          "lineTotalCents": 300,
-          "kind": "item"
+          "lineTotal": "3,00"
         },
         {
           "index": 1,
-          "name": "PfandrÃ¼ckgabe",
-          "quantityText": null,
-          "lineTotalCents": -25,
-          "kind": "deposit"
+          "name": "Pfandrückgabe",
+          "lineTotal": "-0,25"
         }
-      ]
+      ],
+      "receiptTotal": "2,75"
     },
     "derivation": {
       "status": "ok",
       "errorReason": null,
-      "transfers": [
+      "buyplace": "Markt",
+      "groups": [
         {
-          "name": "Brot und PfandrÃ¼ckgabe",
+          "name": "Brot und Pfandrückgabe",
           "categoryNames": ["Einkauf", "Lebensmittel"],
           "sourceItemIndexes": [0, 1]
         }
-      ],
-      "buyplace": "Markt"
+      ]
     }
   },
   {
@@ -121,50 +105,41 @@
       "errorReason": null,
       "storeName": "Cafe Beispiel",
       "receiptDate": "2026-10-20",
-      "currency": "EUR",
-      "receiptTotalCents": 650,
       "items": [
         {
           "index": 0,
           "name": "Kaffee",
-          "quantityText": null,
-          "lineTotalCents": 300,
-          "kind": "item"
+          "lineTotal": "3,00"
         },
         {
           "index": 1,
           "name": "Kuchen",
-          "quantityText": null,
-          "lineTotalCents": 400,
-          "kind": "item"
+          "lineTotal": "4,00"
         },
         {
           "index": 2,
           "name": "Pfand",
-          "quantityText": null,
-          "lineTotalCents": 50,
-          "kind": "deposit"
+          "lineTotal": "0,50"
         },
         {
           "index": 3,
           "name": "Rabatt",
-          "quantityText": null,
-          "lineTotalCents": -100,
-          "kind": "discount"
+          "lineTotal": "-1,00"
         }
-      ]
+      ],
+      "receiptTotal": "6,50"
     },
     "derivation": {
       "status": "ok",
       "errorReason": null,
-      "transfers": [
+      "buyplace": "Cafe Beispiel",
+      "groups": [
         {
           "name": "Kaffee und Kuchen",
-          "categoryNames": ["Restaurant, Bar, BÃ¤cker"],
+          "categoryNames": ["Restaurant, Bar, Bäcker"],
           "sourceItemIndexes": [0, 1, 2, 3]
         }
-      ],
-      "buyplace": "Cafe Beispiel"
+      ]
     }
   },
   {
@@ -176,29 +151,26 @@
       "errorReason": null,
       "storeName": "Markt",
       "receiptDate": "2026-10-20",
-      "currency": "EUR",
-      "receiptTotalCents": 360,
       "items": [
         {
           "index": 0,
           "name": "3 x Milch 1,20",
-          "quantityText": "3 x 1,20",
-          "lineTotalCents": 360,
-          "kind": "item"
+          "lineTotal": "3,60"
         }
-      ]
+      ],
+      "receiptTotal": "3,60"
     },
     "derivation": {
       "status": "ok",
       "errorReason": null,
-      "transfers": [
+      "buyplace": "Markt",
+      "groups": [
         {
           "name": "Milch",
           "categoryNames": ["Einkauf", "Lebensmittel"],
           "sourceItemIndexes": [0]
         }
-      ],
-      "buyplace": "Markt"
+      ]
     }
   },
   {
@@ -210,85 +182,88 @@
       "errorReason": null,
       "storeName": "Bauhaus GmbH",
       "receiptDate": "2026-10-20",
-      "currency": "EUR",
-      "receiptTotalCents": 250,
       "items": [
         {
           "index": 0,
           "name": "Schwamm",
-          "quantityText": null,
-          "lineTotalCents": 250,
-          "kind": "item"
+          "lineTotal": "2,50"
         }
-      ]
+      ],
+      "receiptTotal": "2,50"
     },
     "derivation": {
       "status": "ok",
       "errorReason": null,
-      "transfers": [
+      "buyplace": "Bauhaus GmbH",
+      "groups": [
         {
           "name": "Schwamm",
-          "categoryNames": ["Einkauf", "Haushalt, VerbrauchsgÃ¼ter, Reinigung"],
+          "categoryNames": ["Einkauf", "Haushalt, Verbrauchsgüter, Reinigung"],
           "sourceItemIndexes": [0]
         }
-      ],
-      "buyplace": "Bauhaus GmbH"
+      ]
     }
   },
   {
     "id": "unsupported",
     "image": "unsupported.svg",
-    "note": "No default rule for pharmacy purchases",
+    "note": "Default uncategorized Sonstiges fallback for pharmacy goods",
     "extraction": {
       "status": "ok",
       "errorReason": null,
       "storeName": "Apotheke Beispiel",
       "receiptDate": "2026-10-20",
-      "currency": "EUR",
-      "receiptTotalCents": 500,
       "items": [
         {
           "index": 0,
           "name": "Medikament",
-          "quantityText": null,
-          "lineTotalCents": 500,
-          "kind": "item"
+          "lineTotal": "5,00"
         }
-      ]
+      ],
+      "receiptTotal": "5,00"
     },
     "derivation": {
-      "status": "error",
-      "errorReason": "Die Waren sind durch keine Gruppierungsregel abgedeckt.",
-      "transfers": [],
-      "buyplace": null
+      "status": "ok",
+      "errorReason": null,
+      "buyplace": "Apotheke Beispiel",
+      "groups": [
+        {
+          "name": "Sonstiges",
+          "categoryNames": [],
+          "sourceItemIndexes": [0]
+        }
+      ]
     }
   },
   {
     "id": "ambiguous",
     "image": "ambiguous.svg",
-    "note": "No contextual evidence for a plausible grouping; ambiguity alone is not a rejection reason",
+    "note": "Default uncategorized Sonstiges fallback for items without a plausible matching group",
     "extraction": {
       "status": "ok",
       "errorReason": null,
       "storeName": "Markt",
       "receiptDate": "2026-10-20",
-      "currency": "EUR",
-      "receiptTotalCents": 500,
       "items": [
         {
           "index": 0,
           "name": "ART 4711",
-          "quantityText": null,
-          "lineTotalCents": 500,
-          "kind": "item"
+          "lineTotal": "5,00"
         }
-      ]
+      ],
+      "receiptTotal": "5,00"
     },
     "derivation": {
-      "status": "error",
-      "errorReason": "Für ART 4711 fehlt jeder plausible Hinweis auf eine passende Warengruppe.",
-      "transfers": [],
-      "buyplace": null
+      "status": "ok",
+      "errorReason": null,
+      "buyplace": "Markt",
+      "groups": [
+        {
+          "name": "Sonstiges",
+          "categoryNames": [],
+          "sourceItemIndexes": [0]
+        }
+      ]
     }
   },
   {
@@ -300,9 +275,8 @@
       "errorReason": "Der Bon hat einen negativen Gesamtbetrag.",
       "storeName": null,
       "receiptDate": null,
-      "currency": null,
-      "receiptTotalCents": null,
-      "items": []
+      "items": [],
+      "receiptTotal": null
     },
     "derivation": null
   },
@@ -315,9 +289,8 @@
       "errorReason": "Der Bon hat einen Gesamtbetrag von null.",
       "storeName": null,
       "receiptDate": null,
-      "currency": null,
-      "receiptTotalCents": null,
-      "items": []
+      "items": [],
+      "receiptTotal": null
     },
     "derivation": null
   },
@@ -330,37 +303,30 @@
       "errorReason": null,
       "storeName": "Markt",
       "receiptDate": "2026-10-20",
-      "currency": "EUR",
-      "receiptTotalCents": 200,
       "items": [
         {
           "index": 0,
           "name": "Brot",
-          "quantityText": null,
-          "lineTotalCents": 300,
-          "kind": "item"
+          "lineTotal": "3,00"
         },
         {
           "index": 1,
-          "name": "PfandrÃ¼ckgabe",
-          "quantityText": null,
-          "lineTotalCents": -500,
-          "kind": "deposit"
+          "name": "Pfandrückgabe",
+          "lineTotal": "-5,00"
         },
         {
           "index": 2,
           "name": "Cola",
-          "quantityText": null,
-          "lineTotalCents": 400,
-          "kind": "item"
+          "lineTotal": "4,00"
         }
-      ]
+      ],
+      "receiptTotal": "2,00"
     },
     "derivation": {
       "status": "error",
       "errorReason": "Eine resultierende Warengruppe hat keinen positiven Betrag.",
-      "transfers": [],
-      "buyplace": null
+      "buyplace": null,
+      "groups": []
     }
   },
   {
@@ -372,505 +338,365 @@
       "errorReason": null,
       "storeName": "Markt",
       "receiptDate": "2026-10-20",
-      "currency": "EUR",
-      "receiptTotalCents": 7000,
       "items": [
         {
           "index": 0,
           "name": "Brot 1",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 1,
           "name": "Brot 2",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 2,
           "name": "Brot 3",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 3,
           "name": "Brot 4",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 4,
           "name": "Brot 5",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 5,
           "name": "Brot 6",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 6,
           "name": "Brot 7",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 7,
           "name": "Brot 8",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 8,
           "name": "Brot 9",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 9,
           "name": "Brot 10",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 10,
           "name": "Brot 11",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 11,
           "name": "Brot 12",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 12,
           "name": "Brot 13",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 13,
           "name": "Brot 14",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 14,
           "name": "Brot 15",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 15,
           "name": "Brot 16",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 16,
           "name": "Brot 17",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 17,
           "name": "Brot 18",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 18,
           "name": "Brot 19",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 19,
           "name": "Brot 20",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 20,
           "name": "Brot 21",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 21,
           "name": "Brot 22",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 22,
           "name": "Brot 23",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 23,
           "name": "Brot 24",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 24,
           "name": "Brot 25",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 25,
           "name": "Brot 26",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 26,
           "name": "Brot 27",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 27,
           "name": "Brot 28",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 28,
           "name": "Brot 29",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 29,
           "name": "Brot 30",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 30,
           "name": "Brot 31",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 31,
           "name": "Brot 32",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 32,
           "name": "Brot 33",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 33,
           "name": "Brot 34",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 34,
           "name": "Brot 35",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 35,
           "name": "Brot 36",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 36,
           "name": "Brot 37",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 37,
           "name": "Brot 38",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 38,
           "name": "Brot 39",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 39,
           "name": "Brot 40",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 40,
           "name": "Brot 41",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 41,
           "name": "Brot 42",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 42,
           "name": "Brot 43",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 43,
           "name": "Brot 44",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 44,
           "name": "Brot 45",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 45,
           "name": "Brot 46",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 46,
           "name": "Brot 47",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 47,
           "name": "Brot 48",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 48,
           "name": "Brot 49",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 49,
           "name": "Brot 50",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 50,
           "name": "Brot 51",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 51,
           "name": "Brot 52",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 52,
           "name": "Brot 53",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 53,
           "name": "Brot 54",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 54,
           "name": "Brot 55",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 55,
           "name": "Brot 56",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 56,
           "name": "Brot 57",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 57,
           "name": "Brot 58",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 58,
           "name": "Brot 59",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 59,
           "name": "Brot 60",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 60,
           "name": "Brot 61",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 61,
           "name": "Brot 62",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 62,
           "name": "Brot 63",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 63,
           "name": "Brot 64",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 64,
           "name": "Brot 65",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 65,
           "name": "Brot 66",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 66,
           "name": "Brot 67",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 67,
           "name": "Brot 68",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 68,
           "name": "Brot 69",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         },
         {
           "index": 69,
           "name": "Brot 70",
-          "quantityText": null,
-          "lineTotalCents": 100,
-          "kind": "item"
+          "lineTotal": "1,00"
         }
-      ]
+      ],
+      "receiptTotal": "70,00"
     },
     "derivation": {
       "status": "ok",
       "errorReason": null,
-      "transfers": [
+      "buyplace": "Markt",
+      "groups": [
         {
           "name": "Brot",
           "categoryNames": ["Einkauf", "Lebensmittel"],
@@ -881,8 +707,7 @@
             68, 69
           ]
         }
-      ],
-      "buyplace": "Markt"
+      ]
     }
   },
   {
@@ -894,26 +719,41 @@
       "errorReason": "Der Bon ist nicht zuverlässig lesbar.",
       "storeName": null,
       "receiptDate": null,
-      "currency": null,
-      "receiptTotalCents": null,
-      "items": []
+      "items": [],
+      "receiptTotal": null
     },
     "derivation": null
   },
   {
     "id": "foreign-currency",
     "image": "foreign-currency.svg",
-    "note": "Unsupported currency",
+    "note": "Currency is not checked; transcribe printed amounts using decimal commas.",
     "extraction": {
-      "status": "error",
-      "errorReason": "Der Bon kann nicht vollständig und regelkonform verarbeitet werden.",
-      "storeName": null,
-      "receiptDate": null,
-      "currency": null,
-      "receiptTotalCents": null,
-      "items": []
+      "status": "ok",
+      "errorReason": null,
+      "storeName": "Market",
+      "receiptDate": "2026-10-20",
+      "receiptTotal": "3,00",
+      "items": [
+        {
+          "index": 0,
+          "name": "Bread",
+          "lineTotal": "3,00"
+        }
+      ]
     },
-    "derivation": null
+    "derivation": {
+      "status": "ok",
+      "errorReason": null,
+      "buyplace": "Market",
+      "groups": [
+        {
+          "name": "Lebensmittel",
+          "categoryNames": ["Einkauf", "Lebensmittel"],
+          "sourceItemIndexes": [0]
+        }
+      ]
+    }
   },
   {
     "id": "plausible-abbreviation",
@@ -924,23 +764,20 @@
       "errorReason": null,
       "storeName": "REWE",
       "receiptDate": "2026-10-20",
-      "currency": "EUR",
-      "receiptTotalCents": 111,
       "items": [
         {
           "index": 0,
           "name": "NATUR",
-          "quantityText": null,
-          "lineTotalCents": 111,
-          "kind": "item"
+          "lineTotal": "1,11"
         }
-      ]
+      ],
+      "receiptTotal": "1,11"
     },
     "derivation": {
       "status": "ok",
       "errorReason": null,
       "buyplace": "Rewe",
-      "transfers": [
+      "groups": [
         {
           "name": "Lebensmittel",
           "categoryNames": ["Einkauf", "Lebensmittel"],

@@ -2,10 +2,10 @@
 import { expect, test, type Page, type Request } from '@playwright/test';
 
 import { appPath, installMockAuthClient, expandSettingsSections } from './support/app-test-harness';
-import { installOpenRouterBenchmarkFixture } from './support/openrouter-benchmarks';
 
-test.use({ viewport: { width: 390, height: 844 } });
-test.beforeEach(async ({ page }) => installOpenRouterBenchmarkFixture(page));
+// Catalog mocks must remain effective after reload, including in WebKit.
+// Service-worker lifecycle is exercised separately by the PWA suite.
+test.use({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
 
 interface CatalogReply {
   readonly status: number;
@@ -105,38 +105,13 @@ const openAuthenticatedSettings = async (page: Page): Promise<void> => {
   await expect(page.getByTestId('openrouter-settings')).toBeVisible();
 };
 
-test('filters both roles by live intelligence scores and accepts text models without structured outputs', async ({
+test('offers both roles without benchmark metadata and accepts text models without structured outputs', async ({
   page,
 }) => {
+  const benchmarkRequests: string[] = [];
   await page.route('https://openrouter.ai/api/v1/benchmarks?**', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'authorization',
-        'Access-Control-Allow-Methods': 'GET,OPTIONS',
-      },
-      body: JSON.stringify({
-        data: [
-          {
-            source: 'artificial-analysis',
-            model_permaslug: 'provider/shared-snapshot',
-            intelligence_index: 19.99,
-          },
-          {
-            source: 'artificial-analysis',
-            model_permaslug: 'provider/text-snapshot',
-            intelligence_index: 20,
-          },
-          {
-            source: 'artificial-analysis',
-            model_permaslug: 'provider/vision-snapshot',
-            intelligence_index: 25,
-          },
-        ],
-      }),
-    });
+    benchmarkRequests.push(route.request().url());
+    await route.abort();
   });
   await installCatalogRoute(page, [
     {
@@ -146,20 +121,30 @@ test('filters both roles by live intelligence scores and accepts text models wit
         transferOnlyModel,
         visionOnlyModel,
         { ...sharedModel, id: 'provider/unknown:free', canonical_slug: 'unknown-snapshot' },
+        { ...sharedModel, id: 'provider/unmarked-zero-prices' },
+        {
+          ...sharedModel,
+          id: 'provider/audio:free',
+          architecture: {
+            input_modalities: ['text', 'image'],
+            output_modalities: ['text', 'audio'],
+          },
+        },
       ],
     },
   ]);
   await openAuthenticatedSettings(page);
-  await page.getByTestId('openrouter-api-key-input').fill('sk-or-test-intelligence');
+  await page.getByTestId('openrouter-api-key-input').fill('sk-or-test-catalog');
   await page.getByTestId('openrouter-save-key-button').click();
   await expect(page.getByTestId('openrouter-key-configured')).toBeVisible();
   const vision = page.getByTestId('openrouter-vision-model');
   const text = page.getByTestId('openrouter-transfer-model');
-  await expect(vision.locator('option')).toHaveCount(2);
-  await expect(text.locator('option')).toHaveCount(2);
+  await expect(vision.locator('option')).toHaveCount(5);
+  await expect(text.locator('option')).toHaveCount(5);
   await vision.selectOption('provider/vision:free');
   await text.selectOption('provider/text:free');
-  await expect(page.getByTestId('openrouter-model-filter-help')).toContainText('at least 20');
+  expect(benchmarkRequests).toEqual([]);
+  await expect(page.getByTestId('openrouter-model-filter-help')).not.toContainText('Intelligence');
 });
 
 test('validates a write-only key and configures both receipt roles from the live catalog', async ({
@@ -191,15 +176,22 @@ test('validates a write-only key and configures both receipt roles from the live
   await expect(page.getByTestId('openrouter-api-key-input')).toHaveValue('');
   await expect(visionSelect).toBeEnabled();
   await expect(transferSelect).toBeEnabled();
-  for (const select of [visionSelect, transferSelect]) {
-    await expect(select.locator('option')).toHaveText([
-      'Select a compatible free model',
-      'Shared Free Model',
-    ]);
-    await expect(select.locator('option').last()).toHaveAttribute('value', 'provider/shared:free');
-  }
+  await expect(transferSelect.locator('option')).toHaveText([
+    'Select a compatible model',
+    'Shared Free Model',
+    'Meta: Muse Spark 1.3 Contributor (paid)',
+  ]);
+  await expect(visionSelect.locator('option')).toHaveText([
+    'Select a compatible model',
+    'Shared Free Model',
+    'Meta: Muse Spark 1.3 Contributor (paid)',
+  ]);
+  await expect(visionSelect.locator('option').last()).toHaveAttribute(
+    'value',
+    'meta/muse-spark-1.3-contributor',
+  );
   await expect(page.getByTestId('openrouter-transfer-prompt')).toHaveValue(
-    /Als Transfernamen erstellst du eine Zusammenfassung/u,
+    /Einkaufsort\/Geschäft/u,
   );
 
   await visionSelect.selectOption('provider/shared:free');
@@ -211,7 +203,7 @@ test('validates a write-only key and configures both receipt roles from the live
   const prompt = page.getByTestId('openrouter-transfer-prompt');
   await prompt.fill('Custom group and category rules');
   await page.getByTestId('openrouter-reset-prompt-button').click();
-  await expect(prompt).toHaveValue(/Als Transfernamen erstellst du eine Zusammenfassung/u);
+  await expect(prompt).toHaveValue(/Einkaufsort\/Geschäft/u);
 
   expect(capture.requests).toHaveLength(1);
   const catalogRequest = capture.requests[0];
@@ -222,6 +214,32 @@ test('validates a write-only key and configures both receipt roles from the live
   expect(page.url()).not.toContain(apiKey);
   expect(await page.locator('body').innerText()).not.toContain(apiKey);
   expect(consoleMessages.join('\n')).not.toContain(apiKey);
+});
+
+test('persists the manually appended Muse model in both roles across catalog refresh and reload', async ({
+  page,
+}) => {
+  const capture = await installCatalogRoute(page, [{ status: 200, data: [transferOnlyModel] }]);
+  await openAuthenticatedSettings(page);
+  await page.getByTestId('openrouter-api-key-input').fill('sk-or-manual-muse');
+  await page.getByTestId('openrouter-save-key-button').click();
+  const vision = page.getByTestId('openrouter-vision-model');
+  const text = page.getByTestId('openrouter-transfer-model');
+  await expect(vision).toBeEnabled();
+  await vision.selectOption('meta/muse-spark-1.3-contributor');
+  await text.selectOption('meta/muse-spark-1.3-contributor');
+  await expect(text.locator('option').last()).toHaveText('Meta: Muse Spark 1.3 Contributor (paid)');
+  await expect(page.getByTestId('openrouter-configuration-status')).toContainText(
+    'configuration is ready',
+  );
+  await page.reload();
+  await expandSettingsSections(page);
+  await expect(vision).toHaveValue('meta/muse-spark-1.3-contributor');
+  await expect(text).toHaveValue('meta/muse-spark-1.3-contributor');
+  await expect(page.getByTestId('openrouter-configuration-status')).toContainText(
+    'configuration is ready',
+  );
+  expect(capture.requests).toHaveLength(2);
 });
 
 test('keeps model and prompt controls unavailable when OpenRouter rejects the key', async ({
@@ -246,9 +264,7 @@ test('keeps model and prompt controls unavailable when OpenRouter rejects the ke
   expect(await page.locator('body').innerText()).not.toContain(apiKey);
 });
 
-test('shows accessible role-specific empty states for a valid key with no free candidates', async ({
-  page,
-}) => {
+test('offers manual paid Muse in both lists when no free candidates exist', async ({ page }) => {
   await installCatalogRoute(page, [{ status: 200, data: [] }]);
   await openAuthenticatedSettings(page);
 
@@ -256,10 +272,17 @@ test('shows accessible role-specific empty states for a valid key with no free c
   await page.getByTestId('openrouter-save-key-button').click();
 
   await expect(page.getByTestId('openrouter-key-configured')).toBeVisible();
-  await expect(page.getByText(/No current free image-input/u)).toBeVisible();
-  await expect(page.getByText(/No current free text model/u)).toBeVisible();
-  await expect(page.getByTestId('openrouter-vision-model')).toBeDisabled();
-  await expect(page.getByTestId('openrouter-transfer-model')).toBeDisabled();
+  await expect(page.getByTestId('openrouter-vision-model').locator('option')).toHaveText([
+    'Select a compatible model',
+    'Meta: Muse Spark 1.3 Contributor (paid)',
+  ]);
+  await expect(page.getByTestId('openrouter-transfer-model').locator('option')).toHaveText([
+    'Select a compatible model',
+    'Meta: Muse Spark 1.3 Contributor (paid)',
+  ]);
+  await expect(page.getByTestId('openrouter-vision-model')).toBeEnabled();
+  await expect(page.getByTestId('openrouter-vision-model')).toHaveValue('');
+  await expect(page.getByTestId('openrouter-transfer-model')).toBeEnabled();
   await expect(page.getByTestId('openrouter-transfer-prompt-field')).toBeVisible();
   await expect(page.getByTestId('openrouter-configuration-status')).toContainText('not ready');
 });
@@ -354,45 +377,4 @@ test('does not expose one Microsoft account configuration to another and support
   expect(
     await page.evaluate(() => localStorage.getItem('conspectus.openRouterReceiptSettings')),
   ).toBeNull();
-});
-
-test('starts both Settings metadata GETs before either response finishes', async ({ page }) => {
-  const started = new Set<string>();
-  let release: () => void = () => {};
-  const gate = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  await page.route(
-    /https:\/\/openrouter\.ai\/api\/v1\/(?:models\/user|benchmarks\?.*)$/,
-    async (route) => {
-      if (route.request().method() === 'OPTIONS') {
-        await route.fulfill({
-          status: 204,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'authorization,content-type',
-            'Access-Control-Allow-Methods': 'GET,OPTIONS',
-          },
-        });
-        return;
-      }
-      started.add(route.request().url().includes('/models/') ? 'models' : 'benchmarks');
-      await gate;
-      await route.fulfill({
-        status: 200,
-        headers: { 'Access-Control-Allow-Origin': '*' },
-        contentType: 'application/json',
-        body: JSON.stringify({ data: [] }),
-      });
-    },
-  );
-  await openAuthenticatedSettings(page);
-  await page.getByTestId('openrouter-api-key-input').fill('sk-or-test-parallel');
-  await page.getByTestId('openrouter-save-key-button').click();
-  try {
-    await expect.poll(() => started.size).toBe(2);
-  } finally {
-    release();
-  }
-  await expect(page.getByTestId('openrouter-key-configured')).toBeVisible();
 });

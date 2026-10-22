@@ -184,8 +184,7 @@
         "total": "Total",
         "receiptTotal": "Detected receipt total",
         "totalDifference": "The transfer amounts differ from the detected receipt total. Check the amounts before saving.",
-        "save": "Save transfers",
-        "currencyUnsupported": "Only EUR amounts can be saved."
+        "save": "Save transfers"
       }
     },
     "save": {
@@ -291,11 +290,11 @@
       "models": {
         "visionLabel": "Receipt extraction model",
         "transferLabel": "Transfer derivation model",
-        "placeholder": "Select a compatible free model",
-        "noVisionModels": "No current free image-input and text-output model with an Artificial Analysis Intelligence Index of at least 20 is available.",
-        "noTransferModels": "No current free text model with an Artificial Analysis Intelligence Index of at least 20 is available.",
-        "filterHelp": "Both lists contain free models with an Artificial Analysis Intelligence Index of at least 20. Source: Artificial Analysis via OpenRouter's live benchmark catalog. Models without a confirmed score are excluded.",
-        "benchmarkSource": "Benchmark data on OpenRouter"
+        "placeholder": "Select a compatible model",
+        "paid": "paid",
+        "noVisionModels": "No current free image-input and text-output model is available.",
+        "noTransferModels": "No current free text model is available.",
+        "filterHelp": "The lists contain free models with the required image or text capabilities from your OpenRouter catalog. Muse Spark 1.3 Contributor is also available as a paid model in both lists."
       },
       "prompt": {
         "label": "Receipt-item grouping rules",

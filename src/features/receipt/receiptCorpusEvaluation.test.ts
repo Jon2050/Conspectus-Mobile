@@ -4,6 +4,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import gold from '../../../tests/fixtures/receipts/gold.json';
 import {
+  receiptExtractionData,
   parseReceiptExtractionResponse,
   parseReceiptTransferDerivationResponse,
   type ReceiptTransferDerivation,
@@ -44,7 +45,10 @@ const evaluate = (expected: GoldCase, observed: Observation) => {
     extraction.value,
   );
   if (!derivation.ok || derivation.value.status === 'error') return rejection;
-  if (!shouldAccept || !isDeepStrictEqual(extraction.value, expected.extraction))
+  if (
+    !shouldAccept ||
+    !isDeepStrictEqual(receiptExtractionData(extraction.value), expected.extraction)
+  )
     return 'unsafe_acceptance';
   return isDeepStrictEqual(
     groups(derivation.value),
@@ -87,7 +91,7 @@ describe('synthetic receipt gold corpus and evaluation', () => {
   it('detects arithmetically consistent but semantically wrong groups and OCR', () => {
     const entry = gold.find(({ id }) => id === 'mixed-discount')!;
     const derivation = structuredClone(entry.derivation)!;
-    derivation.transfers[1]!.categoryNames = ['Einkauf', 'Lebensmittel'];
+    derivation.groups[1]!.categoryNames = ['Einkauf', 'Lebensmittel'];
     expect(evaluate(entry, { ...entry, derivation, latencyMs: 1 })).toBe('unsafe_acceptance');
     const extraction = { ...entry.extraction, receiptDate: '2026-10-19' };
 

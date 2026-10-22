@@ -60,6 +60,7 @@ export const resolveOpenRouterReasoning = (
   if (!capabilities) return undefined;
   if (mode === 'off') return capabilities.mandatory ? undefined : { enabled: false };
   const effort = EFFORTS.find((level) => capabilities.supportedEfforts?.includes(level));
-  // Without an effort list the gateway exposes a binary on/off switch only.
-  return effort ? { enabled: true, effort } : { enabled: true };
+  // Enabling a model without advertised efforts selects its provider default, not a minimum.
+  // Keep fixed mandatory reasoning; disable optional reasoning when no active level is declared.
+  return effort ? { enabled: true, effort } : { enabled: capabilities.mandatory };
 };

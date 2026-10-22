@@ -17,13 +17,18 @@ const normalizedLabel = (value: unknown) =>
 export const evaluateReceiptImageSizeExtraction = (
   value: ReceiptExtractionResult,
   entry: ReceiptLiveCase,
+  options: { exactStoreName?: boolean; allowZeroLetter?: boolean } = {},
 ) => {
-  const metadataMismatches = Object.entries(entry.expectedExtraction ?? entry.extraction ?? {})
+  const gold = entry.extraction
+    ? parseReceiptExtractionResponse(JSON.stringify(entry.extraction))
+    : null;
+  const expectedMetadata = entry.expectedExtraction ?? (gold?.ok ? gold.value : {});
+  const metadataMismatches = Object.entries(expectedMetadata)
     .filter(([key]) => !['items', 'status', 'errorReason'].includes(key))
     .flatMap(([field, expected]) => {
       const actual = value[field as keyof ReceiptExtractionResult];
       const equal =
-        field === 'storeName'
+        field === 'storeName' && !options.exactStoreName
           ? normalizedLabel(actual) === normalizedLabel(expected)
           : actual === expected;
       return equal ? [] : [{ field, expected, actual }];
@@ -36,19 +41,19 @@ export const evaluateReceiptImageSizeExtraction = (
     }) ?? [];
   const expectedItems = entry.expectedItems;
   const nameMismatches: { index: number; expected: string; actual: string | null }[] = [];
-  const quantityMismatches: { index: number; expected: number | null; actual: number | null }[] =
-    [];
   const typographyDifferences: { index: number; expected: string; actual: string }[] = [];
+  const itemLabel = (label: unknown) => {
+    const normalized = normalizedLabel(label);
+    return options.allowZeroLetter && typeof normalized === 'string'
+      ? normalized.replaceAll('0', 'O')
+      : normalized;
+  };
   expectedItems?.forEach((expected, index) => {
     const actual = value.items[index];
-    if (normalizedLabel(actual?.name) !== normalizedLabel(expected.name))
+    if (itemLabel(actual?.name) !== itemLabel(expected.name))
       nameMismatches.push({ index, expected: expected.name, actual: actual?.name ?? null });
     else if (actual && actual.name !== expected.name)
       typographyDifferences.push({ index, expected: expected.name, actual: actual.name });
-    const quantity = actual?.quantityText?.match(/\d+(?:[,.]\d+)?/u)?.[0];
-    const actualQuantity = quantity ? Number(quantity.replace(',', '.')) : null;
-    if (actualQuantity !== expected.quantityValue)
-      quantityMismatches.push({ index, expected: expected.quantityValue, actual: actualQuantity });
   });
   const monetaryExact = Boolean(
     expectedAmounts &&
@@ -60,7 +65,6 @@ export const evaluateReceiptImageSizeExtraction = (
     expectedItems &&
     expectedItems.length === value.items.length &&
     !nameMismatches.length &&
-    !quantityMismatches.length &&
     !metadataMismatches.some(({ field }) => field === 'storeName'),
   );
   return {
@@ -72,17 +76,23 @@ export const evaluateReceiptImageSizeExtraction = (
     metadataMismatches,
     amountMismatches,
     nameMismatches,
-    quantityMismatches,
     typographyDifferences,
   };
 };
 
 // For invalid success arithmetic, still diagnose the unchanged answer against the photo gold.
 // Structural validation is reused only to read bounded suggestions; it never changes the verdict.
-export const evaluateReceiptImageSizeResponse = (raw: string, entry: ReceiptLiveCase) => {
+export const evaluateReceiptImageSizeResponse = (
+  raw: string,
+  entry: ReceiptLiveCase,
+  options: { exactStoreName?: boolean; allowZeroLetter?: boolean } = {},
+) => {
   const validation = parseReceiptExtractionResponse(raw);
   if (validation.ok)
-    return { validation, quality: evaluateReceiptImageSizeExtraction(validation.value, entry) };
+    return {
+      validation,
+      quality: evaluateReceiptImageSizeExtraction(validation.value, entry, options),
+    };
   try {
     const candidate: unknown = JSON.parse(raw);
     if (
@@ -102,7 +112,10 @@ export const evaluateReceiptImageSizeResponse = (raw: string, entry: ReceiptLive
     if (partial.ok)
       return {
         validation,
-        quality: { ...evaluateReceiptImageSizeExtraction(partial.value, entry), allCorrect: false },
+        quality: {
+          ...evaluateReceiptImageSizeExtraction(partial.value, entry, options),
+          allCorrect: false,
+        },
       };
   } catch {
     /* Original validation retains the actual response error. */

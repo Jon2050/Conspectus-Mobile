@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   RECEIPT_ANALYSIS_LIMITS,
+  receiptExtractionData,
   parseReceiptExtractionResponse,
   parseReceiptTransferDerivationResponse,
 } from './receiptAnalysisContracts';
@@ -13,29 +14,22 @@ const extractionJson = {
   errorReason: null,
   storeName: 'Testmarkt',
   receiptDate: '2024-02-29',
-  currency: 'EUR',
-  receiptTotalCents: 700,
+  receiptTotal: '7,00',
   items: [
     {
       index: 0,
       name: 'Äpfel',
-      quantityText: '1 kg',
-      lineTotalCents: 500,
-      kind: 'item',
+      lineTotal: '5,00',
     },
     {
       index: 8,
       name: 'Bonbons',
-      quantityText: null,
-      lineTotalCents: 250,
-      kind: 'item',
+      lineTotal: '2,50',
     },
     {
       index: 12,
       name: 'Rabatt Äpfel',
-      quantityText: null,
-      lineTotalCents: -50,
-      kind: 'discount',
+      lineTotal: '-0,50',
     },
   ],
 };
@@ -51,7 +45,7 @@ const derivationJson = {
   errorReason: null,
 
   buyplace: 'Testmarkt',
-  transfers: [
+  groups: [
     {
       name: 'Lebensmittel',
       categoryNames: ['Einkauf', 'Lebensmittel'],
@@ -74,9 +68,53 @@ function derivationWith(overrides: Record<string, unknown>): string {
 }
 
 describe('stage-one receipt extraction parser', () => {
-  it('accepts a complete EUR extraction with signed cent lines and a real leap date', () => {
+  it('accepts a complete extraction with signed decimal-comma amounts and a real leap date', () => {
     expect(extraction).toEqual({ ok: true, value: validExtraction });
     expect(validExtraction.items.map((item) => item.index)).toEqual([0, 8, 12]);
+  });
+
+  it.each([
+    '5.46',
+    '5,4',
+    '5,460',
+    '5,46 €',
+    ' 5,46',
+    '1.000,00',
+    '1e2',
+    '+5,46',
+    5.46,
+    '90071992547409,92',
+  ])('rejects noncanonical or unsafe amounts: %s', (amount) => {
+    expect(parseReceiptExtractionResponse(extractionWith({ receiptTotal: amount }))).toMatchObject({
+      ok: false,
+      error: { code: 'INVALID_AMOUNT' },
+    });
+    expect(
+      parseReceiptExtractionResponse(
+        extractionWith({ items: [{ ...extractionJson.items[0], lineTotal: amount }] }),
+      ),
+    ).toMatchObject({ ok: false, error: { code: 'INVALID_AMOUNT' } });
+  });
+
+  it('converts signed final amounts exactly and round-trips the reduced wire contract', () => {
+    expect(validExtraction.receiptTotalCents).toBe(700);
+    expect(validExtraction.items.map((item) => item.lineTotalCents)).toEqual([500, 250, -50]);
+    expect(receiptExtractionData(validExtraction)).toEqual(extractionJson);
+    for (const [field, value] of [
+      ['currency', 'EUR'],
+      ['receiptTotalCents', 700],
+    ]) {
+      expect(
+        parseReceiptExtractionResponse(extractionWith({ [field as string]: value })),
+      ).toMatchObject({ ok: false, error: { code: 'UNKNOWN_KEY' } });
+    }
+    for (const field of ['quantityText', 'quantityLine', 'kind', 'lineTotalCents']) {
+      expect(
+        parseReceiptExtractionResponse(
+          extractionWith({ items: [{ ...extractionJson.items[0], [field]: null }] }),
+        ),
+      ).toMatchObject({ ok: false, error: { code: 'UNKNOWN_KEY' } });
+    }
   });
 
   it('accepts a bounded error result even when no fields could be read', () => {
@@ -86,8 +124,7 @@ describe('stage-one receipt extraction parser', () => {
         errorReason: 'Der Gesamtbetrag ist nicht sicher lesbar.',
         storeName: null,
         receiptDate: null,
-        currency: null,
-        receiptTotalCents: null,
+        receiptTotal: null,
         items: [],
       }),
     );
@@ -102,9 +139,8 @@ describe('stage-one receipt extraction parser', () => {
     ['', 'MALFORMED_JSON'],
     ['[]', 'INVALID_STRUCTURE'],
     [extractionWith({ status: 'partial' }), 'INVALID_STATUS'],
-    [extractionWith({ currency: 'USD' }), 'INVALID_CURRENCY'],
     [extractionWith({ receiptDate: '2023-02-29' }), 'INVALID_DATE'],
-    [extractionWith({ receiptTotalCents: 700.5 }), 'INVALID_CENTS'],
+    [extractionWith({ receiptTotal: 7.005 }), 'INVALID_AMOUNT'],
     [extractionWith({ items: [] }), 'INVALID_ITEM_COUNT'],
   ])('rejects invalid extraction output with %s', (raw, code) => {
     expect(parseReceiptExtractionResponse(raw)).toMatchObject({ ok: false, error: { code } });
@@ -145,9 +181,7 @@ describe('stage-one receipt extraction parser', () => {
       error: { code: 'INVALID_STRUCTURE' },
     });
 
-    expect(
-      parseReceiptExtractionResponse(extractionWith({ receiptTotalCents: 701 })),
-    ).toMatchObject({
+    expect(parseReceiptExtractionResponse(extractionWith({ receiptTotal: '7,01' }))).toMatchObject({
       ok: false,
       error: { code: 'ITEM_TOTAL_MISMATCH' },
     });
@@ -155,12 +189,12 @@ describe('stage-one receipt extraction parser', () => {
 
   it('fails closed when an intermediate signed-cent sum leaves the safe range', () => {
     const items = [
-      { ...extractionJson.items[0], lineTotalCents: Number.MAX_SAFE_INTEGER },
-      { ...extractionJson.items[1], lineTotalCents: 1 },
-      { ...extractionJson.items[2], lineTotalCents: -Number.MAX_SAFE_INTEGER },
+      { ...extractionJson.items[0], lineTotal: '90071992547409,91' },
+      { ...extractionJson.items[1], lineTotal: '0,01' },
+      { ...extractionJson.items[2], lineTotal: '-90071992547409,91' },
     ];
     expect(
-      parseReceiptExtractionResponse(extractionWith({ receiptTotalCents: 1, items })),
+      parseReceiptExtractionResponse(extractionWith({ receiptTotal: '0,01', items })),
     ).toMatchObject({ ok: false, error: { code: 'ARITHMETIC_OVERFLOW' } });
   });
 
@@ -179,8 +213,7 @@ describe('stage-one receipt extraction parser', () => {
       errorReason: ' ',
       storeName: null,
       receiptDate: null,
-      currency: null,
-      receiptTotalCents: null,
+      receiptTotal: null,
       items: [],
     };
     expect(parseReceiptExtractionResponse(JSON.stringify(baseError))).toMatchObject({
@@ -204,12 +237,51 @@ describe('stage-one receipt extraction parser', () => {
 });
 
 describe('stage-two transfer derivation contract', () => {
+  it('accepts a single complete group and converts it into one local booking entry', () => {
+    const raw = derivationWith({
+      groups: [
+        { name: 'Eine Gruppe', categoryNames: ['Eigene Kategorie'], sourceItemIndexes: [0, 8, 12] },
+      ],
+    });
+    const parsed = parseReceiptTransferDerivationResponse(raw, validExtraction);
+    expect(parsed).toMatchObject({
+      ok: true,
+      value: {
+        transfers: [
+          {
+            name: 'Eine Gruppe',
+            amountCents: 700,
+            categoryNames: ['Eigene Kategorie'],
+            sourceItemIndexes: [0, 8, 12],
+          },
+        ],
+      },
+    });
+    if (!parsed.ok) throw new Error('Expected a complete group');
+    expect(parsed.value.transfers).toHaveLength(1);
+  });
+
+  it.each(['ok', 'error'])('rejects the old transfers wire key for status %s', (status) => {
+    const { groups, ...metadata } = derivationJson;
+    expect(
+      parseReceiptTransferDerivationResponse(
+        JSON.stringify({
+          ...metadata,
+          status,
+          errorReason: status === 'ok' ? null : 'Teilantwort.',
+          transfers: groups,
+        }),
+        validExtraction,
+      ),
+    ).toMatchObject({ ok: false, error: { code: 'UNKNOWN_KEY', path: '$.transfers' } });
+  });
+
   it('retains typed partial extraction metadata and incomplete groups without promoting them to successful output', () => {
     const partial = parseReceiptExtractionResponse(
       extractionWith({
         status: 'error',
         errorReason: 'Ein Betrag fehlt.',
-        receiptTotalCents: null,
+        receiptTotal: null,
       }),
     );
     expect(partial).toMatchObject({
@@ -219,7 +291,7 @@ describe('stage-two transfer derivation contract', () => {
         storeName: 'Testmarkt',
         receiptDate: '2024-02-29',
         receiptTotalCents: null,
-        items: extractionJson.items,
+        items: validExtraction.items,
       },
     });
     if (!partial.ok) throw new Error('Expected partial extraction');
@@ -227,7 +299,7 @@ describe('stage-two transfer derivation contract', () => {
       derivationWith({
         status: 'error',
         errorReason: 'Unvollstaendig.',
-        transfers: [derivationJson.transfers[0]],
+        groups: [derivationJson.groups[0]],
       }),
       partial.value,
     );
@@ -255,8 +327,8 @@ describe('stage-two transfer derivation contract', () => {
         status: 'ok',
         receiptTotalCents: 700,
         transfers: [
-          { ...derivationJson.transfers[0], amountCents: 450 },
-          { ...derivationJson.transfers[1], amountCents: 250 },
+          { ...derivationJson.groups[0], amountCents: 450 },
+          { ...derivationJson.groups[1], amountCents: 250 },
         ],
       },
     });
@@ -296,7 +368,7 @@ describe('stage-two transfer derivation contract', () => {
   it('accepts LLM-generated transfer names and categories without interpreting user rules', () => {
     const custom = {
       ...derivationJson,
-      transfers: [
+      groups: [
         {
           name: 'Eigene Gruppe',
           categoryNames: ['Benutzerdefiniert'],
@@ -315,7 +387,7 @@ describe('stage-two transfer derivation contract', () => {
   it('rejects duplicate category names for custom prompt groups', () => {
     const custom = {
       ...derivationJson,
-      transfers: [
+      groups: [
         {
           name: 'Eigene Gruppe',
           categoryNames: ['Benutzerdefiniert', 'Benutzerdefiniert'],
@@ -330,79 +402,58 @@ describe('stage-two transfer derivation contract', () => {
   });
 
   it('does not compare category names or ordering against app-owned mappings', () => {
-    const reversed = derivationJson.transfers.map((transfer, index) =>
+    const reversed = derivationJson.groups.map((transfer, index) =>
       index === 0
         ? { ...transfer, categoryNames: [...transfer.categoryNames].reverse() }
         : transfer,
     );
     expect(
-      parseReceiptTransferDerivationResponse(
-        derivationWith({ transfers: reversed }),
-        validExtraction,
-      ),
+      parseReceiptTransferDerivationResponse(derivationWith({ groups: reversed }), validExtraction),
     ).toMatchObject({ ok: true });
 
-    const renamed = derivationJson.transfers.map((transfer, index) =>
+    const renamed = derivationJson.groups.map((transfer, index) =>
       index === 0 ? { ...transfer, name: 'Unbekannt' } : transfer,
     );
     expect(
-      parseReceiptTransferDerivationResponse(
-        derivationWith({ transfers: renamed }),
-        validExtraction,
-      ),
+      parseReceiptTransferDerivationResponse(derivationWith({ groups: renamed }), validExtraction),
     ).toMatchObject({ ok: true });
   });
 
   it('rejects duplicate, missing, and unknown source item indexes', () => {
-    const duplicate = derivationJson.transfers.map((transfer, index) =>
+    const duplicate = derivationJson.groups.map((transfer, index) =>
       index === 1 ? { ...transfer, sourceItemIndexes: [8, 12] } : transfer,
     );
     expect(
       parseReceiptTransferDerivationResponse(
-        derivationWith({ transfers: duplicate }),
+        derivationWith({ groups: duplicate }),
         validExtraction,
       ),
     ).toMatchObject({ ok: false, error: { code: 'DUPLICATE_SOURCE_ITEM_INDEX' } });
 
-    const missing = [derivationJson.transfers[0]];
+    const missing = [derivationJson.groups[0]];
     expect(
-      parseReceiptTransferDerivationResponse(
-        derivationWith({ transfers: missing }),
-        validExtraction,
-      ),
+      parseReceiptTransferDerivationResponse(derivationWith({ groups: missing }), validExtraction),
     ).toMatchObject({ ok: false, error: { code: 'INCOMPLETE_SOURCE_COVERAGE' } });
 
-    const unknown = derivationJson.transfers.map((transfer, index) =>
+    const unknown = derivationJson.groups.map((transfer, index) =>
       index === 1 ? { ...transfer, sourceItemIndexes: [999] } : transfer,
     );
     expect(
-      parseReceiptTransferDerivationResponse(
-        derivationWith({ transfers: unknown }),
-        validExtraction,
-      ),
+      parseReceiptTransferDerivationResponse(derivationWith({ groups: unknown }), validExtraction),
     ).toMatchObject({ ok: false, error: { code: 'UNKNOWN_SOURCE_ITEM_INDEX' } });
   });
 
   it('rejects legacy model amounts and computes positive groups locally', () => {
-    const legacy = [
-      { ...derivationJson.transfers[0], amountCents: 450 },
-      derivationJson.transfers[1],
-    ];
+    const legacy = [{ ...derivationJson.groups[0], amountCents: 450 }, derivationJson.groups[1]];
     expect(
-      parseReceiptTransferDerivationResponse(
-        derivationWith({ transfers: legacy }),
-        validExtraction,
-      ),
+      parseReceiptTransferDerivationResponse(derivationWith({ groups: legacy }), validExtraction),
     ).toMatchObject({ ok: false, error: { code: 'UNKNOWN_KEY' } });
     const negative = [
-      { ...derivationJson.transfers[0], sourceItemIndexes: [12] },
-      { ...derivationJson.transfers[1], sourceItemIndexes: [0, 8] },
+      { ...derivationJson.groups[0], sourceItemIndexes: [12] },
+      { ...derivationJson.groups[1], sourceItemIndexes: [0, 8] },
     ];
     expect(
-      parseReceiptTransferDerivationResponse(
-        derivationWith({ transfers: negative }),
-        validExtraction,
-      ),
+      parseReceiptTransferDerivationResponse(derivationWith({ groups: negative }), validExtraction),
     ).toMatchObject({ ok: false, error: { code: 'INVALID_CENTS' } });
   });
 
@@ -412,7 +463,7 @@ describe('stage-two transfer derivation contract', () => {
       const raw = derivationWith({
         status: 'error',
         errorReason: 'Teilantwort.',
-        transfers: [{ ...derivationJson.transfers[0], sourceItemIndexes: indexes }],
+        groups: [{ ...derivationJson.groups[0], sourceItemIndexes: indexes }],
       });
       expect(parseReceiptTransferDerivationResponse(raw, validExtraction)).toMatchObject({
         ok: false,
@@ -431,15 +482,15 @@ describe('stage-two transfer derivation contract', () => {
       ],
     };
     const transfers = [
-      { ...derivationJson.transfers[0], sourceItemIndexes: [0, 1] },
-      { ...derivationJson.transfers[1], sourceItemIndexes: [2] },
+      { ...derivationJson.groups[0], sourceItemIndexes: [0, 1] },
+      { ...derivationJson.groups[1], sourceItemIndexes: [2] },
     ];
     expect(
-      parseReceiptTransferDerivationResponse(derivationWith({ transfers }), receipt),
+      parseReceiptTransferDerivationResponse(derivationWith({ groups: transfers }), receipt),
     ).toMatchObject({ ok: false, error: { code: 'INVALID_CENTS' } });
     expect(
       parseReceiptTransferDerivationResponse(
-        derivationWith({ transfers, status: 'error', errorReason: 'Nullgruppe.' }),
+        derivationWith({ groups: transfers, status: 'error', errorReason: 'Nullgruppe.' }),
         receipt,
       ),
     ).toMatchObject({
@@ -448,7 +499,7 @@ describe('stage-two transfer derivation contract', () => {
     });
     expect(
       parseReceiptTransferDerivationResponse(
-        derivationWith({ transfers: [{ ...transfers[0], sourceItemIndexes: [0, 1, 2] }] }),
+        derivationWith({ groups: [{ ...transfers[0], sourceItemIndexes: [0, 1, 2] }] }),
         { ...receipt, receiptTotalCents: 101 },
       ),
     ).toMatchObject({ ok: false, error: { code: 'RECEIPT_TOTAL_MISMATCH' } });
@@ -468,7 +519,7 @@ describe('stage-two transfer derivation contract', () => {
       const raw = derivationWith({
         status,
         errorReason: status === 'ok' ? null : 'Teilantwort.',
-        transfers: [{ ...derivationJson.transfers[0], sourceItemIndexes: [0, 2, 1] }],
+        groups: [{ ...derivationJson.groups[0], sourceItemIndexes: [0, 2, 1] }],
       });
       expect(parseReceiptTransferDerivationResponse(raw, huge)).toMatchObject({
         ok: false,
@@ -476,7 +527,7 @@ describe('stage-two transfer derivation contract', () => {
       });
     }
     const raw = derivationWith({
-      transfers: [{ ...derivationJson.transfers[0], sourceItemIndexes: [0, 1, 2] }],
+      groups: [{ ...derivationJson.groups[0], sourceItemIndexes: [0, 1, 2] }],
     });
     expect(parseReceiptTransferDerivationResponse(raw, huge)).toMatchObject({
       ok: true,
@@ -493,14 +544,17 @@ describe('stage-two transfer derivation contract', () => {
     ).toMatchObject({ ok: false, error: { code: 'UNKNOWN_KEY' } });
 
     for (const changed of [
-      { ...derivationJson.transfers[0], buyplace: 'Anderer Markt' },
-      { ...derivationJson.transfers[0], receiptDate: '2024-02-30' },
-      { ...derivationJson.transfers[0], categoryNames: ['A', 'B', 'C', 'D'] },
-      { ...derivationJson.transfers[0], ignored: true },
+      { ...derivationJson.groups[0], buyplace: 'Anderer Markt' },
+      { ...derivationJson.groups[0], receiptDate: '2024-02-30' },
+      { ...derivationJson.groups[0], categoryNames: ['A', 'B', 'C', 'D'] },
+      { ...derivationJson.groups[0], ignored: true },
     ]) {
-      const transfers = [changed, derivationJson.transfers[1]];
+      const transfers = [changed, derivationJson.groups[1]];
       expect(
-        parseReceiptTransferDerivationResponse(derivationWith({ transfers }), validExtraction),
+        parseReceiptTransferDerivationResponse(
+          derivationWith({ groups: transfers }),
+          validExtraction,
+        ),
       ).toMatchObject({ ok: false });
     }
   });
@@ -511,7 +565,7 @@ describe('stage-two transfer derivation contract', () => {
       errorReason: 'Eine Position kann nicht sicher zugeordnet werden.',
 
       buyplace: null,
-      transfers: [],
+      groups: [],
     };
     expect(
       parseReceiptTransferDerivationResponse(JSON.stringify(error), validExtraction),
@@ -521,7 +575,7 @@ describe('stage-two transfer derivation contract', () => {
     });
     expect(
       parseReceiptTransferDerivationResponse(
-        JSON.stringify({ ...error, errorReason: '', transfers: derivationJson.transfers }),
+        JSON.stringify({ ...error, errorReason: '', groups: derivationJson.groups }),
         validExtraction,
       ),
     ).toMatchObject({ ok: false, error: { code: 'INVALID_ERROR_REASON' } });

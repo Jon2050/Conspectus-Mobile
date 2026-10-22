@@ -58,6 +58,30 @@ const DERIVATION: ReceiptTransferDerivation = {
 };
 
 describe('receipt transfer command builder', () => {
+  it('prepares the uncategorized Sonstiges fallback with empty category slots', () => {
+    const result = buildReceiptTransferCommands(
+      {
+        ...DERIVATION,
+        transfers: [
+          {
+            ...DERIVATION.transfers[0]!,
+            name: 'Sonstiges',
+            amountCents: 500,
+            categoryNames: [],
+            sourceItemIndexes: [0, 1, 2],
+          },
+        ],
+      },
+      [0, 1, 2],
+      11,
+      OPTIONS,
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      commands: [{ name: 'Sonstiges', categoryIds: [] }],
+    });
+  });
+
   it('offers only sources valid for the primary spendings destination', () => {
     expect(listReceiptSourceAccountOptions(OPTIONS)).toEqual([
       { accountId: 11, name: 'Checking', accountTypeId: 3 },

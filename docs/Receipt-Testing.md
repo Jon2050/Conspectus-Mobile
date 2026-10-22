@@ -23,18 +23,18 @@ Copy [`.env.receipt.example`](../.env.receipt.example) to `.env.receipt.local`. 
 
 First fill in only the API key and run `npm run test:receipt:models`; then set both model IDs.
 The same model may serve both roles if eligible. Eligibility follows the app's current free pricing,
-image/text modalities and an Artificial Analysis Intelligence Index of at least 20, including the
-account's catalog restrictions. Both data sources are fetched directly from OpenRouter with the
-existing key: `/api/v1/models/user` and
-`/api/v1/benchmarks?source=artificial-analysis&task_type=intelligence`. The join uses exact
-`canonical_slug`/`model_permaslug` identity. Unknown scores are excluded; benchmark failures fail the
-load. No additional AA key or external AA request is needed. Structured-output support is not a
-filter or request requirement; the prompt requests JSON and the app checks it locally.
+image/text modalities and account catalog restrictions, with the explicit manual paid
+addition `meta/muse-spark-1.3-contributor`. A successful catalog load appends it once, marks it paid
+and supplies live reasoning metadata or the verified minimum `minimal`. It is not automatically selected. The catalog is fetched directly from
+OpenRouter's `/api/v1/models/user` using the existing key. Intelligence scores and canonical-version
+matches are not required; no benchmark metadata request is made. The explicit router/harness
+exclusions remain in effect. Structured-output support is not a filter or request requirement;
+the prompt requests JSON and the app checks it locally.
 Catalog selection belongs to Settings. The explicit `test:receipt:models` command simulates that
 prior visit and saves resolved minimum reasoning in ignored
 `output/receipt-live/model-reasoning.local.json`, bound to a SHA-256 digest of the key and exact model
 IDs; the key itself is not copied there. The live command reads that snapshot locally and makes no
-catalog/benchmark request, before or during photo analysis. Missing, damaged or key/model-mismatched
+catalog request, before or during photo analysis. Missing, damaged or key/model-mismatched
 metadata leaves the provider default untouched, just like migrated app settings; minimum active
 reasoning is then not guaranteed. Run the catalog command explicitly to refresh known capabilities.
 Reports record `metadataLatencyMs: 0` for live analysis and the prior snapshot timestamp/setup
@@ -53,7 +53,7 @@ settings do not configure the app's account-scoped Settings screen.
 | `npm run test:receipt:check`       | Check the local image setup using synthetic provider replies; no OpenRouter call.           |
 | `npm run test:receipt:models`      | Request the live account-filtered model catalog; needs only the key.                        |
 | `npm run test:receipt:live`        | Send configured receipt images through both actual OpenRouter stages.                       |
-| `npm run test:receipt:benchmark`   | Compare every currently eligible model once per suitable role on the first manifest image.  |
+| `npm run test:receipt:benchmark`   | Compare current free models once per suitable role on the first manifest image.             |
 | `npm run test:receipt:image-sizes` | Compare five image sizes with three sequential extraction requests per size and photo gold. |
 
 The live command sends each normalized image to the selected vision model and the extracted data to
@@ -77,7 +77,6 @@ manifest. A minimal first case looks like this:
     "image": "receipt.jpg",
     "expectedExtraction": {
       "receiptDate": "2026-10-19",
-      "currency": "EUR",
       "receiptTotalCents": 3279
     }
   }
@@ -85,7 +84,7 @@ manifest. A minimal first case looks like this:
 ```
 
 For the supplied IMG_6633 photo, the local manifest contains the complete 24-line monetary
-transcription, including quantity totals, positive deposits and three deposit returns; its sum is
+transcription, including final position totals, positive deposits and three deposit returns; its sum is
 3279 cents. Merchant spelling, exact item strings and semantic grouping still require independent
 review. Abbreviations such as `NATUR`, `TRINKM. BE CHOCO` and `KIRSCH SAKURA SF` are now assigned by
 plausibility using receipt context. Do not declare model-generated grouping to be independent gold.
@@ -129,13 +128,19 @@ parser diagnostics and failures. An HTTP 200 header alone is not a completed res
 has a 90-second whole-body deadline, matching the production budget. Failures are comparison data;
 the benchmark itself passing means every planned request ran, not that every model passed quality
 checks. One observation per role/model is not an average or a reliability ranking.
+Set `RECEIPT_BENCHMARK_REPETITIONS=3` for three sequential rounds per model; the default is one.
+For a vision-only photo comparison, also set `RECEIPT_BENCHMARK_STAGE=extraction`. Reports include
+independent photo quality checks: merchant/date/total and ordered line final amounts must match
+exactly; article labels permit typography differences and 0/O confusion. Quantities remain exact.
 
 Exact request bodies (including image data), raw responses and the normalized image are saved
 beside the comparison report, without authorization headers. These files contain private receipt
 data and must remain ignored. Production request construction is shared with this harness.
 Production selects the lowest positive reasoning effort exposed in the live model metadata;
 requests explicitly set `enabled: true` together with that effort. `none` is never selected by
-production. Models with a binary switch use enabled reasoning; models without declared reasoning
+production. Without advertised active efforts, optional reasoning is disabled; fixed mandatory
+reasoning remains enabled. Token-budget support alone does not declare a minimum active budget.
+Models without declared reasoning
 capabilities leave the provider default untouched rather than inventing support.
 The [OpenRouter reasoning documentation](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens)
 defines the catalog's supported efforts and enable/disable semantics.
@@ -146,8 +151,9 @@ MiniMax currently declares default `max`, minimum `low`, mandatory; NVIDIA Ultra
 `medium` and optional reasoning. Super VL exposes a binary switch. These are live metadata, not a
 hardcoded capability table. Hiding reasoning with `exclude` would not reduce its generation time.
 
-Stage-two wire answers contain `status`, `errorReason`, one `buyplace` and `transfers` with name,
-amount, categories and source indexes. The parser attaches the stage-one date and total locally
+Stage-two wire answers contain `status`, `errorReason`, one `buyplace` and `groups` with name,
+category names and source indexes, without amounts. The parser attaches locally calculated amounts,
+the stage-one date and total
 and expands the shared purchase location into every local command. No echoed date/total is trusted.
 
 Live runs write `output/receipt-live/<timestamp>/report.json`, flushing after each case. Reports
@@ -175,7 +181,7 @@ memory pressure, real Microsoft/OneDrive access and correction in Desktop remain
 Run `npm run test:receipt:image-sizes` to compare the configured vision model at 2560, 1920, 1600,
 1280 and 960 pixels on the long edge. The first manifest case must provide independently transcribed
 `expectedExtraction` metadata, all `expectedLineTotalsCents` and `expectedItems` containing each
-printed `name` and `quantityValue` (a number for explicit quantities, otherwise null). Recorded
+printed `name`; quantities and unit prices are outside the extraction contract. Recorded
 model answers are not used as independent gold. The private sample manifest includes this reference.
 
 Each variant is encoded directly from the original photograph using the production browser codec
@@ -186,7 +192,7 @@ use the configured model, current production eligibility checks, active minimum 
 by running this experiment.
 
 Reports and exact request/response files are saved under ignored `output/receipt-image-sizes/`.
-They separate exact metadata and line amounts from item-label/quantity agreement, retain errors,
+They separate exact metadata and line amounts from item-label agreement, retain errors,
 provider and token usage, and record typography differences. Label comparison ignores punctuation,
 whitespace and case and equates umlauts with AE/OE/UE; changed letters or digits remain mismatches.
 Quantities compare the first printed number numerically, rather than requiring identical unit/price
@@ -225,7 +231,7 @@ the common SQL/conditional-upload/recovery controller. The destination is always
 The extracted total and entered sum are shown independently; a difference warns the reviewer and
 does not prevent deliberately correcting an OCR error. No stale OCR coverage proof is claimed for
 manually edited rows. Context replacement/reset clears the draft; unchanged refresh and temporary
-offline transitions retain it. Known non-EUR data cannot be booked as EUR.
+offline transitions retain it. Currency is not checked.
 
 ## Provider investigation on 2026-10-21
 
@@ -244,7 +250,7 @@ Gemma's error metadata explicitly identified Google AI Studio and
 `limit_source: upstream_provider_shared_pool`. The same failure occurs without app-specific provider
 settings or image data; this evidence identifies an upstream shared-capacity limit rather than a
 malformed app request. Inkling's response restricted its free endpoint to approved agentic harnesses.
-A catalog entry and sufficient intelligence score do not guarantee that an endpoint will accept
+A catalog entry does not guarantee that an endpoint will accept
 this app's inference request. There is no automatic model fallback or automatic receipt retry.
 
 The full IMG_6633 run with MiniMax extraction and Nemotron derivation received HTTP 200 for the
@@ -261,8 +267,8 @@ do not establish average latency or general semantic accuracy.
 
 ## Local arithmetic and stored reasoning contract
 
-Derivation prompt version 8 removes `amountCents` from every wire transfer. Gold responses and
-provider mocks contain only `name`, `categoryNames` and `sourceItemIndexes`; local parsed results
+Derivation system prompt version 12 uses `groups` without model-supplied amounts. Gold responses and
+provider mocks contain only `name`, `categoryNames` and `sourceItemIndexes` within each group; local parsed results
 still contain amounts, date and purchase location for existing review/commit consumers. The parser
 sums signed extraction lines using safe integer cents, rejects overflow (including intermediate
 sums), duplicate/unknown/missing source references and nonpositive complete groups, and requires
@@ -271,17 +277,19 @@ known references; no missing line becomes zero. Arithmetic consistency proves no
 
 Settings schema 2 persists optional gateway capabilities per account and selected role/model.
 Successful catalog validation and model selection replace these snapshots; key/model/account changes
-cannot reuse an unrelated snapshot. Both independent Settings GETs run in parallel under the same
-30-second deadline and cancellation boundary. Neither GET belongs to receipt analysis.
+cannot reuse an unrelated snapshot. The Settings catalog GET uses a 30-second deadline and cancellation boundary.
+This GET does not belong to receipt analysis.
 Schema-1 configurations are still usable directly after restart: absent/invalid capabilities use
 the provider default without an invented effort. This migration fallback cannot guarantee active
 minimum reasoning. A successful Settings visit supplies known capabilities for subsequent runs and
-restarts; known efforts use enabled plus the lowest positive level, binary models use enabled.
-Production never requests `none` or disabled reasoning.
+restarts; known efforts use enabled plus the lowest positive level. Without advertised active
+efforts, optional reasoning is disabled while mandatory reasoning remains enabled. In particular,
+Dots3 currently declares optional reasoning without effort selection, so the app requests off;
+the previous `enabled: true` selected a default and did not guarantee minimal reasoning.
 
 Offline browser tests cover restart with schema 1 and 2, zero metadata GETs, only two POSTs,
 role-specific unavailable-model hints, completion rate limiting, unchanged settings/review data and
-no writes before Save. Settings tests verify both GETs start before either response completes.
+no writes before Save. Settings tests verify model selection works without benchmark requests.
 Real HTTP/provider failures remain failures, never successful quality evidence. Local report fields
 separate prior snapshot setup latency, each whole completion latency and total receipt-analysis latency;
 raw model contents and parser diagnostics are retained unchanged (apart from key redaction).
@@ -316,3 +324,32 @@ is claimed. Exact original responses remain in ignored `output/receipt-live/` ru
 `2026-10-21T19-15-50.005Z`, `2026-10-21T19-20-48.571Z`, `2026-10-21T19-25-25.692Z` and
 `2026-10-21T19-32-36.836Z`; the local comparison is
 `output/receipt-optimization/comparison.json`.
+
+Stage-one prompt version 7 uses `receiptTotal` and item `lineTotal` strings with decimal commas
+and exactly two fractional digits, without currency symbols (for example `"5,46"` and `"-0,25"`).
+Items contain only `index`, `name` and `lineTotal`; deposits/returns are normal signed positions.
+The model neither converts to cents nor sums/checks amounts. The production parser performs
+integer-only conversion, overflow checks and the exact total comparison locally. Internal gold
+metadata (`expectedExtraction`, `expectedLineTotalsCents`) continues to use integer cents; complete
+`extraction` and `benchmarkExtraction` fixtures use the provider wire format. Historical reports
+retain their original prompt/schema and must not be replayed as current-contract responses.
+
+The grouping prompt (version 12) defines the receipt context, storeName, items and their fields,
+and the corresponding groups/buyplace output. lineTotal is only an optional price-context hint,
+never a model calculation or output amount. It asks only for `groups` with `name`, `categoryNames` and
+`sourceItemIndexes`, plus shared `buyplace`, status and errorReason. One complete group is valid.
+The local parser enriches groups into internal booking data and keeps all arithmetic/coverage checks.
+Only `storeName` and `items` (`index`, `name`, `lineTotal`) are sent to grouping. Extraction
+`status`, `errorReason`, `receiptDate` and `receiptTotal` stay local and are not described as input
+fields in the prompt. Output `status` and `errorReason` still describe grouping success/failure.
+Legacy wire `transfers` are rejected. Business categories and assignments are defined only in the
+editable default grouping rules (version 9), inserted literally at the end of the system template.
+The gastronomic group has priority and includes all positions; otherwise all deposits, discounts
+and returns belong to ordinary food, with separate sweets/sweet-drinks and household groups.
+The fallback for otherwise unassignable goods is `Sonstiges` with an empty `categoryNames` array.
+Dynamic free models require an explicit `:free` catalog variant, zero relevant token/request prices
+and exclusively text output. Models also outputting audio, images or video are excluded even with
+zero text prices. Zero text prices alone do not prove that a media generator is free.
+The automatic multi-model benchmark keeps its free-model scope; explicitly configured live/image-size
+tests may use the manual paid option available in both Settings roles. Both role loops in the
+automatic benchmark exclude paid options. Historical response reports keep their original schemas.

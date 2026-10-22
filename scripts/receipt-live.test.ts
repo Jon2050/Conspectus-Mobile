@@ -52,6 +52,12 @@ describe('receipt live test support', () => {
       ).toEqual({ transferReasoning: { enabled: true } });
       const saved = JSON.parse(readFileSync(path, 'utf8'));
       expect(readFileSync(path, 'utf8')).not.toContain('secret');
+      saved.models.vision = { enabled: false };
+      writeFileSync(path, JSON.stringify(saved));
+      expect(readReceiptReasoningSnapshot('secret', 'vision', 'text', path).configuration).toEqual({
+        visionReasoning: { enabled: false },
+        transferReasoning: { enabled: true },
+      });
       saved.models.vision = { enabled: false, effort: 'none' };
       writeFileSync(path, JSON.stringify(saved));
       expect(readReceiptReasoningSnapshot('secret', 'vision', 'text', path).configuration).toEqual({

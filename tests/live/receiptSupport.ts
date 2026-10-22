@@ -37,8 +37,8 @@ export interface ReceiptLiveCase {
   // Photographs can start with independently transcribed, partial expectations.
   expectedExtraction?: Record<string, unknown>;
   expectedLineTotalsCents?: number[];
-  // Independent visual transcription; typography may vary, quantities must remain exact.
-  expectedItems?: { name: string; quantityValue: number | null }[];
+  // Independent visual transcription; typography may vary; names must stay associated with their final amounts.
+  expectedItems?: { name: string }[];
   // Recorded extraction for isolated text benchmarks; never treated as independent OCR gold.
   benchmarkExtraction?: Record<string, unknown>;
   note?: string;
@@ -137,12 +137,13 @@ export const readReceiptReasoningSnapshot = (
     const readModel = (id: string): OpenRouterReasoningConfiguration | undefined => {
       const config = data.models[id];
       if (
-        config?.enabled !== true ||
+        typeof config?.enabled !== 'boolean' ||
+        (config.enabled === false && config.effort !== undefined) ||
         (config.effort !== undefined &&
           !['minimal', 'low', 'medium', 'high', 'xhigh', 'max'].includes(config.effort))
       )
         return undefined;
-      return config.effort ? { enabled: true, effort: config.effort } : { enabled: true };
+      return config.effort ? { enabled: true, effort: config.effort } : { enabled: config.enabled };
     };
     const vision = readModel(visionModelId);
     const transfer = readModel(transferModelId);
