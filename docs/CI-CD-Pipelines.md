@@ -92,8 +92,12 @@ flowchart TD
   - if any quality job, including the dependency audit, fails, no downstream preview deployment or manual production deployment can proceed for that commit
   - branches whose effective diff is docs-only skip the heavy jobs and therefore do not emit deployable artifacts
 - Notes:
-  - uses `actions/setup-node` npm cache and Playwright browser cache keyed by locked Playwright
-    version and project; each job installs the matching Chromium or WebKit binary and OS libraries
+  - uses `actions/setup-node` npm cache; browser jobs run on Ubuntu 24.04 inside the official
+    Playwright Noble container, pinned by version and image digest. The image includes browser
+    binaries and OS libraries, avoiding per-job APT updates and package installations. The workflow
+    contract test requires the image version to match the locked `@playwright/test` version; update
+    the image tag and verified digest together when upgrading Playwright. E2E jobs have a 20-minute
+    timeout and retain the complete browser matrix and existing test retries.
   - cancels in-progress runs for the same ref via workflow concurrency
   - the build job checks `dist` against the JS/CSS bundle budgets before validating base-path
     correctness, manifest `start_url` and `scope`, install icons, service worker scope, document CSP,
