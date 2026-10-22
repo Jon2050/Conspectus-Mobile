@@ -69,6 +69,30 @@ const openEditor = async (page: Page) => {
   await expect(page.getByRole('dialog', { name: 'Edit transfer', exact: true })).toBeVisible();
 };
 
+test('opens without a focus ring on the header and preserves keyboard focus on delete', async ({
+  page,
+  isMobile,
+}) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await setup(page);
+  const transfer = page.getByTestId('transfer-card-2');
+  if (isMobile) await transfer.tap();
+  else await transfer.click();
+  const dialog = page.getByRole('dialog', { name: 'Edit transfer', exact: true });
+  const header = dialog.locator('.bottom-sheet__header');
+  const remove = dialog.getByTestId('edit-transfer-delete');
+  await expect(header).toBeFocused();
+  await expect(remove).not.toBeFocused();
+  await page.screenshot({ path: test.info().outputPath('editor-initial-focus.png') });
+  await expect(header).toHaveCSS('outline-style', 'none');
+  await page.keyboard.press('Tab');
+  await expect(remove).toBeFocused();
+  expect(await remove.evaluate((element) => element.matches(':focus-visible'))).toBe(true);
+  await expect(remove).not.toHaveCSS('outline-style', 'none');
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('edit-transfer-delete-confirmation')).toBeVisible();
+});
+
 test('prefills every field and closing discards unsaved changes without receipt controls', async ({
   page,
 }) => {
