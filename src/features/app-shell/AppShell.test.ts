@@ -82,7 +82,7 @@ describe('AppShell component', () => {
     const { body } = render(AppShell);
 
     expect(body).toContain('data-testid="loading-placeholder"');
-    expect(body).not.toContain('data-testid="deployment-info-footer"');
+    expect(body).toContain('data-testid="deployment-info-footer"');
     expect(body).not.toContain('data-testid="route-accounts"');
     expect(body).not.toContain('data-testid="route-transfers"');
     expect(body).not.toContain('data-testid="route-add"');

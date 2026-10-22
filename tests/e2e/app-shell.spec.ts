@@ -1437,7 +1437,8 @@ test('shows deployment footer metadata immediately on short pages', async ({ pag
 
   expect(navBox).not.toBeNull();
   expect(footerBox).not.toBeNull();
-  expect(footerBox!.y + footerBox!.height).toBeLessThanOrEqual(navBox!.y);
+  expect(navBox!.y + navBox!.height).toBeLessThanOrEqual(footerBox!.y);
+  expect(844 - footerBox!.y - footerBox!.height).toBeLessThanOrEqual(3);
 });
 
 test('shows the running build identity in footer and Settings despite newer server metadata', async ({
@@ -1490,7 +1491,7 @@ test('shows the running build identity in footer and Settings despite newer serv
   expect(metadataRequests).toEqual([]);
 });
 
-test('keeps footer and navigation geometry stable while scrolling a long page', async ({
+test('scrolls the header away while keeping footer and navigation visible on a long page', async ({
   page,
 }) => {
   await installMockAuthClient(page, { startAuthenticated: true });
@@ -1505,17 +1506,23 @@ test('keeps footer and navigation geometry stable while scrolling a long page', 
   const bottom = page.getByTestId('app-shell-bottom');
   const initialBottom = await bottom.boundingBox();
   const initialHeight = await content.evaluate((element) => element.clientHeight);
-  await expect(footer).not.toBeInViewport();
+  await content.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  await expect(footer).toBeInViewport();
+  await expect(page.getByRole('heading', { level: 1 })).toBeInViewport();
   await content.evaluate((element) => {
     element.scrollTop = element.scrollHeight;
   });
   await expect(footer).toBeInViewport();
+  await expect(page.getByRole('heading', { level: 1 })).not.toBeInViewport();
   expect(await bottom.boundingBox()).toEqual(initialBottom);
   expect(await content.evaluate((element) => element.clientHeight)).toBe(initialHeight);
   await content.evaluate((element) => {
     element.scrollTop = 0;
   });
-  await expect(footer).not.toBeInViewport();
+  await expect(footer).toBeInViewport();
+  await expect(page.getByRole('heading', { level: 1 })).toBeInViewport();
   expect(await bottom.boundingBox()).toEqual(initialBottom);
 });
 
