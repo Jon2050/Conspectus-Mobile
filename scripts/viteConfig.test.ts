@@ -16,18 +16,33 @@ import {
 describe('build identity', () => {
   const commitSha = '1234567890abcdef1234567890abcdef12345678';
 
-  it('pairs the package version with the checked-out commit and actual UTC build time', () => {
-    expect(createBuildInfo('0.9.05', commitSha, new Date('2026-10-21T10:20:30.456Z'))).toEqual({
-      version: '0.9.05+12345678',
+  it('keeps a stable version clean with a separate commit and actual UTC build time', () => {
+    expect(
+      createBuildInfo('1.1.0', commitSha, new Date('2026-10-21T10:20:30.456Z'), 'production'),
+    ).toEqual({
+      version: '1.1.0',
       commitSha,
       buildTimeUtc: '2026-10-21T10:20:30Z',
     });
   });
 
   it('distinguishes builds of different commits without changing the release version', () => {
-    expect(createBuildInfo('0.9.05', 'a'.repeat(40)).version).not.toBe(
-      createBuildInfo('0.9.05', 'b'.repeat(40)).version,
+    expect(createBuildInfo('1.1.1-dev', 'a'.repeat(40)).version).not.toBe(
+      createBuildInfo('1.1.1-dev', 'b'.repeat(40)).version,
     );
+  });
+
+  it.each(['1.1.1-dev', '1.2.0-rc.1', '1.1.0+12345678'])(
+    'rejects production builds with version %s',
+    (version) => {
+      expect(() => createBuildInfo(version, commitSha, new Date(), 'production')).toThrow(
+        'Production builds require a stable package version',
+      );
+    },
+  );
+
+  it('keeps stable source archive versions clean', () => {
+    expect(createBuildInfo('1.1.0', null).version).toBe('1.1.0');
   });
 
   it('captures a fresh timestamp when the same commit is rebuilt', () => {

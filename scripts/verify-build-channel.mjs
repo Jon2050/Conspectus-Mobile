@@ -239,7 +239,7 @@ const collectJavaScriptAssets = (distDir) => {
     .map((entry) => readTextFile(path.join(assetsDirPath, entry)));
 };
 
-const verifyBuildInfo = (distDir, expectedCommit) => {
+const verifyBuildInfo = (distDir, expectedCommit, channel) => {
   const buildInfo = JSON.parse(readTextFile(path.join(distDir, 'build-info.json')));
   assert(
     typeof buildInfo.buildTimeUtc === 'string' &&
@@ -251,8 +251,11 @@ const verifyBuildInfo = (distDir, expectedCommit) => {
     typeof buildInfo.version === 'string' &&
       typeof buildInfo.commitSha === 'string' &&
       /^[a-f0-9]{40}$/u.test(buildInfo.commitSha) &&
-      buildInfo.version.endsWith(`+${buildInfo.commitSha.slice(0, 8)}`),
-    'Build version must identify the full Git commit recorded in build-info.json.',
+      (/^\d+\.\d+\.\d+$/u.test(buildInfo.version) ||
+        (channel !== 'production' &&
+          /^\d+\.\d+\.\d+-[\da-z.-]+\+[a-f0-9]{8}$/iu.test(buildInfo.version) &&
+          buildInfo.version.endsWith(`+${buildInfo.commitSha.slice(0, 8)}`))),
+    'Build metadata requires a full Git commit and a valid version; production requires X.Y.Z.',
   );
   assert(
     !expectedCommit || buildInfo.commitSha === expectedCommit,
@@ -347,7 +350,7 @@ const main = () => {
   verifyManifest(manifestText, args.base);
   verifyServiceWorkerRegistration(distDir, args.base);
   verifyServiceWorkerNavigationFallback(distDir);
-  verifyBuildInfo(distDir, args.commit);
+  verifyBuildInfo(distDir, args.commit, args.channel);
 
   console.log(
     `[verify-build-channel] ${args.channel} build output is valid for base path ${args.base}`,

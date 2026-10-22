@@ -59,6 +59,32 @@ const createClient = (
 });
 
 describe('createSettingsOpenRouterController', () => {
+  it('retains custom rules through activation, catalog refresh, key/model changes and restart', async () => {
+    const settingsStore = createStore();
+    const rules = '  Eigene Regeln\nObst immer [Wochenmarkt], auch bei neuen App-Regeln.\n';
+    settingsStore.write('one', storedSettings({ transferRulesOverride: rules }));
+    const options = {
+      settingsStore,
+      catalogClient: createClient(async () =>
+        compatibleCatalog(['shared-model', 'other'], ['shared-model', 'other']),
+      ),
+    };
+    const controller = createSettingsOpenRouterController(options);
+    await controller.activateAccount('one');
+    await controller.retryCatalog();
+    await controller.validateAndSaveApiKey('replacement-key');
+    controller.selectVisionModel('other');
+    controller.selectTransferModel('other');
+    expect(controller.getReadyConfiguration()?.transferRules).toBe(rules);
+    controller.dispose();
+
+    const restarted = createSettingsOpenRouterController(options);
+    await restarted.activateAccount('one');
+    expect(restarted.getReadyConfiguration()?.transferRules).toBe(rules);
+    expect(settingsStore.read('one')?.transferRulesOverride).toBe(rules);
+    restarted.dispose();
+  });
+
   it('stores manual Muse and restores its minimum reasoning without another catalog request', async () => {
     const store = createStore();
     const load = vi.fn().mockResolvedValue(

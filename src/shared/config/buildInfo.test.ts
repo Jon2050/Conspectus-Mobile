@@ -14,7 +14,7 @@ describe('buildInfo', () => {
       const buildInfo = getBuildInfo();
       expect(buildInfo).toEqual(__APP_BUILD_INFO__);
       expect(fetchImplementation).not.toHaveBeenCalled();
-      expect(buildInfo.version).toMatch(/\+(?:[a-f0-9]{8}|local)$/u);
+      expect(buildInfo.version).toMatch(/^\d+\.\d+\.\d+(?:-[\da-z.-]+\+(?:[a-f0-9]{8}|local))?$/iu);
     } finally {
       vi.unstubAllGlobals();
     }

@@ -6,27 +6,30 @@
   export let total: number | null;
   export let kind: 'download' | 'upload';
   export let statusText: string | null = null;
+  $: awaitingConfirmation = kind === 'upload' && total !== null && total > 0 && loaded >= total;
 
   $: progressText =
     statusText ??
-    (total !== null
-      ? $_(`appShell.${kind}Progress`, {
-          values: {
-            loaded: Math.round(loaded / 1024),
-            total: Math.round(total / 1024),
-          },
-        })
-      : $_(`appShell.${kind}edKb`, {
-          values: { kb: Math.round(loaded / 1024) },
-        }));
+    (awaitingConfirmation
+      ? $_('appShell.uploadAwaitingConfirmation')
+      : total !== null
+        ? $_(`appShell.${kind}Progress`, {
+            values: {
+              loaded: Math.round(loaded / 1024),
+              total: Math.round(total / 1024),
+            },
+          })
+        : $_(`appShell.${kind}edKb`, {
+            values: { kb: Math.round(loaded / 1024) },
+          }));
 </script>
 
 <div class="progress-indicator" data-testid="progress-indicator" data-kind={kind}>
-  <progress
-    max={total ?? undefined}
-    value={total !== null ? loaded : undefined}
-    data-testid="progress-bar"
-  ></progress>
+  {#if awaitingConfirmation || total === null}
+    <progress data-testid="progress-bar"></progress>
+  {:else}
+    <progress max={total} value={loaded} data-testid="progress-bar"></progress>
+  {/if}
   <span class="progress-text" data-testid="progress-text">
     {progressText}
   </span>

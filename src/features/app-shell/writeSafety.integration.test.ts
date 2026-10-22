@@ -324,17 +324,33 @@ describe('shared write safety with real SQLite', () => {
       expect(count(await h.remoteRuntime(), 'Remote accepted')).toBe(1);
     },
   );
-  it('distinguishes an unknown outcome and never replays SQL after a lost acceptance response', async () => {
-    const h = await harness();
-    const tab = await h.tab();
-    h.loseResponse();
-    await tab.manual.submit(fields('Lost acknowledgement'), options, t);
-    expect(tab.manual.getState().errorMessage).toContain('remote_outcome_unknown');
-    await tab.manual.retry(t);
-    expect(tab.manual.getState().canRetry).toBe(false);
-    expect(count(await h.remoteRuntime(), 'Lost acknowledgement')).toBe(1);
-    expect(count(tab.runtime, 'Lost acknowledgement')).toBe(1);
-  });
+  it.each(['manual', 'receipt'] as const)(
+    'confirms a lost %s acknowledgement against real SQLite without replaying SQL',
+    async (mode) => {
+      const h = await harness();
+      const tab = await h.tab();
+      h.loseResponse();
+      if (mode === 'manual') {
+        await tab.manual.submit(fields('Lost acknowledgement'), options, t);
+        expect(tab.manual.getState().phase).toBe('saved');
+        await tab.manual.retry(t);
+      } else {
+        await tab.receipt.commit(
+          Object.freeze([command('Lost acknowledgement')]),
+          tab.context(),
+          t,
+        );
+        expect(tab.receipt.getState().phase).toBe('saved');
+        await tab.receipt.retryUpload(tab.context(), t);
+      }
+      expect(h.graph.uploadFile).toHaveBeenCalledOnce();
+      expect(tab.session.isWritable()).toBe(true);
+      expect(count(await h.remoteRuntime(), 'Lost acknowledgement')).toBe(1);
+      expect(count(tab.runtime, 'Lost acknowledgement')).toBe(1);
+      expect(h.cache.writeSnapshot).toHaveBeenCalledOnce();
+      expect((await h.cache.readSnapshot()).metadata.eTag).toBe('v2');
+    },
+  );
   it('D6: two tabs keep their own basis even though they share the updated cache', async () => {
     const h = await harness();
     const a = await h.tab();

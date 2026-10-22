@@ -25,6 +25,9 @@ Expected public interfaces (`src/graph/index.ts`):
 - Read methods accept cancellation and bound the whole request, including response bodies, to
   30 seconds (120 seconds for downloads). Retry-After is exposed as a delay capped at 60 seconds;
   the feature layer owns retries. Conditional upload semantics remain separate.
+- Both upload transports bound the complete request/response to 120 seconds. A confirmed 2xx
+  response retains its successful status even if reading the response times out, so feature
+  recovery never repeats an already acknowledged write. XHR also rejects explicit aborts.
 
 M3 implementation target:
 

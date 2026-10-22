@@ -216,7 +216,7 @@ test('validates a write-only key and configures both receipt roles from the live
   expect(consoleMessages.join('\n')).not.toContain(apiKey);
 });
 
-test('persists the manually appended Muse model in both roles across catalog refresh and reload', async ({
+test('preserves custom rules and the manually appended Muse model across key changes and reload', async ({
   page,
 }) => {
   const capture = await installCatalogRoute(page, [{ status: 200, data: [transferOnlyModel] }]);
@@ -232,14 +232,23 @@ test('persists the manually appended Muse model in both roles across catalog ref
   await expect(page.getByTestId('openrouter-configuration-status')).toContainText(
     'configuration is ready',
   );
+  const rules = '  Meine Regeln\nObst vom Wochenmarkt immer [Eigene Kategorie].\n';
+  const prompt = page.getByTestId('openrouter-transfer-prompt');
+  await prompt.fill(rules);
+  await prompt.blur();
+  await page.getByTestId('openrouter-api-key-input').fill('sk-or-replacement-key');
+  await page.getByTestId('openrouter-save-key-button').click();
+  await expect(vision).toBeEnabled();
+  await expect(prompt).toHaveValue(rules);
   await page.reload();
   await expandSettingsSections(page);
   await expect(vision).toHaveValue('meta/muse-spark-1.3-contributor');
   await expect(text).toHaveValue('meta/muse-spark-1.3-contributor');
+  await expect(prompt).toHaveValue(rules);
   await expect(page.getByTestId('openrouter-configuration-status')).toContainText(
     'configuration is ready',
   );
-  expect(capture.requests).toHaveLength(2);
+  expect(capture.requests).toHaveLength(3);
 });
 
 test('keeps model and prompt controls unavailable when OpenRouter rejects the key', async ({

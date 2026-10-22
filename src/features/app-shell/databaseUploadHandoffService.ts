@@ -2,7 +2,12 @@
 import { get, type Readable } from 'svelte/store';
 import type { CacheStore } from '@cache';
 import type { DriveItemBinding, GraphClient } from '@graph';
-import { appSelectedDriveItemBindingStore, appSyncStateStore, type SyncStateStore } from '@shared';
+import {
+  appSelectedDriveItemBindingStore,
+  appSyncStateStore,
+  withRequestDeadline,
+  type SyncStateStore,
+} from '@shared';
 
 import { appDatabaseSession, type DatabaseSession, sameDatabaseIdentity } from './databaseSession';
 import { resolveAppCacheStore } from './cacheStoreResolver';
@@ -92,7 +97,8 @@ const toUploadError = (
 };
 
 export const createDatabaseUploadHandoffService = (
-  graphClient: Pick<GraphClient, 'uploadFile'>,
+  graphClient: Pick<GraphClient, 'uploadFile'> &
+    Partial<Pick<GraphClient, 'getFileMetadata' | 'getFileDownloadUrl' | 'downloadFile'>>,
   cacheStore: Pick<CacheStore, 'readSnapshot' | 'writeSnapshot'> & Pick<CacheStore, 'readMetadata'>,
   bindingProvider: BindingProvider,
   syncStateStore: SyncStateStore = appSyncStateStore,
@@ -165,6 +171,39 @@ export const createDatabaseUploadHandoffService = (
       let uploadResult: Awaited<ReturnType<GraphClient['uploadFile']>>;
       let expectedETag = context?.baseETag ?? uploadOptions?.expectedETag ?? null;
 
+      // A lost acknowledgement is not a failed commit. Prove the exact snapshot is current
+      // before treating it as saved; never issue another PUT or replay SQL during this check.
+      const confirmUnknownUpload = async (): Promise<typeof uploadResult | null> => {
+        const { getFileMetadata, getFileDownloadUrl, downloadFile } = graphClient;
+        if (!getFileMetadata || !downloadFile) return null;
+        try {
+          return await withRequestDeadline(async (signal) => {
+            assertContext();
+            const metadata = await getFileMetadata(binding, signal);
+            assertContext();
+            if (metadata.eTag === expectedETag || metadata.sizeBytes !== dbBytes.length)
+              return null;
+            const url = metadata.downloadUrl ?? (await getFileDownloadUrl?.(binding, signal));
+            assertContext();
+            if (!url) return null;
+            const remoteBytes = await downloadFile(url, undefined, signal);
+            assertContext();
+            if (
+              remoteBytes.length !== dbBytes.length ||
+              !remoteBytes.every((byte, index) => byte === dbBytes[index])
+            )
+              return null;
+            const verified = await getFileMetadata(binding, signal);
+            assertContext();
+            return verified.eTag === metadata.eTag && verified.sizeBytes === dbBytes.length
+              ? verified
+              : null;
+          }, 30_000);
+        } catch {
+          return null;
+        }
+      };
+
       try {
         const currentMetadata =
           cacheStore.readMetadata !== undefined
@@ -205,26 +244,41 @@ export const createDatabaseUploadHandoffService = (
           uploadWasInvoked,
         );
 
-        if (!contextIsCurrent()) throw uploadError;
-        if (
+        const confirmed =
           uploadError instanceof DatabaseUploadError &&
-          uploadError.code === 'missing_cached_snapshot'
-        ) {
-          syncStateStore.setError(uploadError.message, { branch: DEFAULT_UPLOAD_FAILED_BRANCH });
-        } else if (
-          uploadError instanceof DatabaseUploadError &&
-          uploadError.code === 'remote_commit_cache_failed'
-        ) {
-          syncStateStore.setStale(uploadError.message, {
-            branch: DEFAULT_UPLOAD_CACHE_RECOVERY_BRANCH,
-          });
-        } else if (uploadError instanceof DatabaseUploadError && uploadError.code === 'conflict') {
-          syncStateStore.setStale(uploadError.message, { branch: DEFAULT_UPLOAD_CONFLICT_BRANCH });
+          uploadError.code === 'remote_outcome_unknown' &&
+          contextIsCurrent()
+            ? await confirmUnknownUpload()
+            : null;
+        if (confirmed !== null) {
+          uploadResult = confirmed;
         } else {
-          syncStateStore.setError(uploadError.message, { branch: DEFAULT_UPLOAD_FAILED_BRANCH });
-        }
+          if (!contextIsCurrent()) throw uploadError;
+          if (
+            uploadError instanceof DatabaseUploadError &&
+            uploadError.code === 'missing_cached_snapshot'
+          ) {
+            syncStateStore.setError(uploadError.message, { branch: DEFAULT_UPLOAD_FAILED_BRANCH });
+          } else if (
+            uploadError instanceof DatabaseUploadError &&
+            uploadError.code === 'remote_commit_cache_failed'
+          ) {
+            syncStateStore.setStale(uploadError.message, {
+              branch: DEFAULT_UPLOAD_CACHE_RECOVERY_BRANCH,
+            });
+          } else if (
+            uploadError instanceof DatabaseUploadError &&
+            uploadError.code === 'conflict'
+          ) {
+            syncStateStore.setStale(uploadError.message, {
+              branch: DEFAULT_UPLOAD_CONFLICT_BRANCH,
+            });
+          } else {
+            syncStateStore.setError(uploadError.message, { branch: DEFAULT_UPLOAD_FAILED_BRANCH });
+          }
 
-        throw uploadError;
+          throw uploadError;
+        }
       }
 
       try {

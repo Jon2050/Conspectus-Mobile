@@ -50,6 +50,88 @@ const getFetchCall = (
   (fetchFn.mock.calls[0] as [string, RequestInit | undefined]) ?? ['', undefined];
 
 describe('createGraphClient', () => {
+  it.each([false, true])(
+    'bounds a stalled fetch upload, preserving HTTP acceptance=%s',
+    async (accepted) => {
+      vi.useFakeTimers();
+      try {
+        const response = new Response();
+        vi.spyOn(response, 'json').mockImplementation(() => new Promise(() => {}));
+        const fetchFn = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>(() =>
+          accepted ? Promise.resolve(response) : new Promise(() => {}),
+        );
+        const graph = createGraphClient({ authClient: createAuthClient(), fetchFn });
+        const request = graph.uploadFile(DRIVE_ITEM_BINDING, Uint8Array.of(1), 'v1');
+        const assertion = expect(request).rejects.toMatchObject(
+          accepted
+            ? { code: 'unknown', status: 200 }
+            : { code: 'network_error', cause: { name: 'TimeoutError' } },
+        );
+        await vi.advanceTimersByTimeAsync(30_000);
+        expect(fetchFn.mock.calls[0]?.[1]?.signal?.aborted).toBe(false);
+        await vi.advanceTimersByTimeAsync(90_000);
+        await assertion;
+        expect(fetchFn.mock.calls[0]?.[1]?.signal?.aborted).toBe(true);
+        expect(fetchFn).toHaveBeenCalledOnce();
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it.each([false, true])(
+    'allows a slow XHR upload beyond 30 seconds and bounds a stalled request=%s',
+    async (stalled) => {
+      vi.useFakeTimers();
+      try {
+        const xhr = {
+          timeout: 0,
+          status: 0,
+          responseText: '',
+          upload: { onprogress: null },
+          open: vi.fn(),
+          setRequestHeader: vi.fn(),
+          onload: null as null | (() => void),
+          ontimeout: null as null | (() => void),
+          send: vi.fn(() => {
+            if (!stalled)
+              setTimeout(() => {
+                xhr.status = 200;
+                xhr.responseText = JSON.stringify({
+                  eTag: 'v2',
+                  size: 720_000,
+                  lastModifiedDateTime: '2026-10-22T10:00:00Z',
+                });
+                xhr.onload?.();
+              }, 45_000);
+            setTimeout(() => xhr.ontimeout?.(), xhr.timeout);
+          }),
+        };
+        const graph = createGraphClient({
+          authClient: createAuthClient(),
+          createXhrFn: () => xhr as unknown as XMLHttpRequest,
+        });
+        const request = graph.uploadFile(
+          DRIVE_ITEM_BINDING,
+          new Uint8Array(720_000),
+          'v1',
+          vi.fn(),
+        );
+        const assertion = stalled
+          ? expect(request).rejects.toMatchObject({ code: 'network_error' })
+          : expect(request).resolves.toMatchObject({ eTag: 'v2' });
+        await vi.advanceTimersByTimeAsync(stalled ? 120_000 : 45_000);
+        await assertion;
+        expect(xhr.timeout).toBe(120_000);
+        expect(xhr.send).toHaveBeenCalledOnce();
+        expect(xhr.setRequestHeader).toHaveBeenCalledWith('If-Match', 'v1');
+      } finally {
+        vi.clearAllTimers();
+        vi.useRealTimers();
+      }
+    },
+  );
+
   it('bounds metadata body consumption and actually aborts the request', async () => {
     vi.useFakeTimers();
     try {
