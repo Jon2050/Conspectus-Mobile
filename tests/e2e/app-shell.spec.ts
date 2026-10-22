@@ -1963,7 +1963,7 @@ test('falls back safely on invalid hash routes', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 2, name: 'Accounts' })).toBeVisible();
 });
 
-test('exposes manifest and registers service worker', async ({ context, page }) => {
+test('@smoke exposes manifest and registers service worker', async ({ context, page }) => {
   await page.addInitScript(() => {
     const violations: string[] = [];
     Object.defineProperty(globalThis, '__conspectusCspViolations', { value: violations });

@@ -61,7 +61,14 @@ Localization and message constants:
 - Purpose-built language-specific LLM prompt assets are prompt content rather than application
   messages and may use the language required by their product contract.
 
-Choose verification according to the affected surface. The normal code gate is:
+Choose local verification according to the affected surface; CI owns the complete pre-merge gate.
+During development, fetch `origin/main` and use `npm run test:changed` for affected unit tests.
+Run focused browser specs with `npm run test:e2e -- tests/e2e/<file>.spec.ts --project=<browser>`
+and use `npm run test:e2e:smoke` for the critical Chromium/WebKit journeys and PWA offline reload.
+Do not automatically repeat the complete browser matrix locally for every small change.
+
+For broad changes, shared test/configuration changes, or when affected-test selection is uncertain,
+the full local code gate is:
 
 ```sh
 npm run format
@@ -73,8 +80,9 @@ npm run build
 
 Also run:
 
-- `npm run test:e2e` when browser, PWA, routing, authentication, synchronization, or user-visible
-  behavior is affected;
+- focused browser tests and `npm run test:e2e:smoke` when browser, PWA, routing, authentication,
+  synchronization, or user-visible behavior is affected; run the full `npm run test:e2e` matrix
+  for cross-cutting changes or release qualification;
 - `npm run audit:dependencies` for dependency or release work;
 - `npm run check:bundle-size` after a production build when bundle-sensitive code changes;
 - the relevant deployed-route or manual QA checks when a release or deployment contract changes.

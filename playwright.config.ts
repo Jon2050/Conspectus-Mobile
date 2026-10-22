@@ -39,7 +39,10 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  // PWA update tests mutate the served dist. Parallelize in isolated CI shards,
+  // not with multiple workers sharing that directory. The WebKit-only command
+  // can use two workers because the mutating tests are Chromium-only.
+  workers: 1,
   reporter: [
     ['list'],
     ['html', { open: 'never', outputFolder: 'playwright-report' }],
@@ -48,9 +51,9 @@ export default defineConfig({
   outputDir: 'test-results',
   use: {
     baseURL: 'http://127.0.0.1:4173',
-    trace: 'retain-on-failure',
+    trace: process.env.CI ? 'on-first-retry' : 'off',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    video: 'off',
   },
   projects,
   webServer: {

@@ -146,7 +146,7 @@ describe('quality workflow contract', () => {
     expect(workflowSource).not.toContain('pull_request:');
   });
 
-  it('fans lint, unit, and build out after detection and shards E2E by browser project', () => {
+  it('fans lint, unit, and build out and runs full branch coverage before main smoke', () => {
     const workflowSource = fs.readFileSync(qualityWorkflowPath, 'utf8');
     expect(workflowSource).toContain('run: npm run check:dead-code');
     expect(workflowSource).toContain('lint-typecheck:');
@@ -167,11 +167,34 @@ describe('quality workflow contract', () => {
     expect(workflowSource).toMatch(
       /e2e-tests:\n(?:.*\n)*?\s+needs:\n\s+- detect-code-changes\n\s+- build/,
     );
-    expect(workflowSource).toContain('project: ${{ fromJSON(');
-    expect(workflowSource).toContain('["chromium", "pixel-5", "iphone-13-safari"]');
-    expect(workflowSource).toContain('["chromium", "iphone-13-safari"]');
-    expect(workflowSource).toContain('[ "${{ matrix.project }}" = \'chromium\' ]');
-    expect(workflowSource).toContain('tests/e2e/critical-user-journeys.spec.ts');
+    expect(workflowSource).toContain('include: ${{ fromJSON(');
+    const matrixMatch = /include: \$\{\{ fromJSON\(.*?&& '([^']+)' \|\| '([^']+)'/u.exec(
+      workflowSource,
+    );
+    expect(matrixMatch).not.toBeNull();
+    const [mainMatrix, branchMatrix] = matrixMatch!
+      .slice(1)
+      .map((value) => JSON.parse(value) as { project: string; shard: string; id: string }[]);
+    expect(mainMatrix!.map(({ project }) => project).sort()).toEqual([
+      'chromium',
+      'iphone-13-safari',
+    ]);
+    const branchProjects = [...new Set(branchMatrix!.map(({ project }) => project))].sort();
+    expect(branchProjects).toEqual(['chromium', 'iphone-13-safari', 'pixel-5']);
+    for (const project of branchProjects) {
+      const shards = branchMatrix!
+        .filter((entry) => entry.project === project)
+        .map(({ shard }) => shard.split('/').map(Number));
+      expect(shards.map(([index]) => index).sort()).toEqual(
+        Array.from({ length: shards.length }, (_, index) => index + 1),
+      );
+      expect(shards.every(([, total]) => total === shards.length)).toBe(true);
+    }
+    expect(new Set(branchMatrix!.map(({ id }) => id)).size).toBe(branchMatrix!.length);
+    expect(workflowSource).toContain(
+      'npx playwright test --project="${{ matrix.project }}" --grep @smoke',
+    );
+    expect(workflowSource).toContain('--fully-parallel --workers=1 --shard="${{ matrix.shard }}"');
     expect(workflowSource).toContain('quality-gate:');
     expect(workflowSource).toMatch(
       /quality-gate:\n(?:.*\n)*?\s+needs:\n\s+- dependency-audit\n\s+- detect-code-changes\n\s+- lint-typecheck\n\s+- unit-tests\n\s+- build\n\s+- e2e-tests/,
@@ -185,7 +208,7 @@ describe('quality workflow contract', () => {
     );
     expect(workflowSource).toContain('PLAYWRIGHT_APP_BASE_PATH:');
     expect(workflowSource).toContain(
-      'Protected main merge completed the exact-SHA build verification, Chromium smoke and WebKit gate.',
+      'Protected main merge completed the exact-SHA build verification and Chromium/WebKit smoke including PWA offline reload.',
     );
     expect(workflowSource).toContain('github.ref_name != github.event.repository.default_branch');
   });
@@ -203,7 +226,9 @@ describe('quality workflow contract', () => {
     expect(e2eJob).toContain('timeout-minutes: 20');
     expect(e2eJob).toContain('shell: bash');
     expect(e2eJob).not.toContain('playwright install');
-    expect(e2eJob).toContain('npm run test:e2e -- --project="${{ matrix.project }}"');
+    expect(e2eJob).toContain(
+      'npm run test:e2e -- --project="${{ matrix.project }}" --fully-parallel --workers=1',
+    );
   });
 
   it('runs the local quality prerequisites concurrently before build verification', () => {
@@ -227,15 +252,14 @@ describe('quality workflow contract', () => {
 });
 
 describe('dependency audit workflow contract', () => {
-  it('runs for pull requests and weekly schedules and fails at the high threshold', () => {
+  it('avoids duplicate PR auditing while keeping reusable, scheduled and manual scans', () => {
     const workflowSource = fs.readFileSync(dependencyAuditWorkflowPath, 'utf8');
     const packageManifest = JSON.parse(fs.readFileSync(packageManifestPath, 'utf8')) as {
       scripts: Record<string, string>;
     };
 
     expect(workflowSource).toContain('workflow_call:');
-    expect(workflowSource).toContain('pull_request:');
-    expect(workflowSource).toContain('paths:\n      - package.json\n      - package-lock.json');
+    expect(workflowSource).not.toContain('pull_request:');
     expect(workflowSource).toContain('schedule:');
     expect(workflowSource).toMatch(/cron: '[^']+'/);
     expect(workflowSource).toContain('workflow_dispatch:');
