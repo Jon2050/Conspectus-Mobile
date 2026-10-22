@@ -167,6 +167,58 @@ test('keeps transfer rows evenly spaced and categories right-aligned when conten
   }
 });
 
+test('keeps categories beside the account whenever their natural widths fit', async ({
+  page,
+}, testInfo) => {
+  await page.clock.setFixedTime(new Date('2026-10-21T12:00:00Z'));
+  await installReadyAddTransferTestDb(page, {
+    forceAlwaysOpen: true,
+    accountRows: accounts.map((account) =>
+      account.accountId === 3 ? { ...account, name: 'N26 Girokonto' } : account,
+    ),
+    categoryRows: [
+      { categoryId: 1, name: 'Einkauf' },
+      { categoryId: 2, name: 'Nahrungsergänzung' },
+    ],
+    transferRows: [
+      {
+        transferId: 1,
+        bookingDateEpochDay: 20747,
+        name: 'Creatin, Vitamin, Magnesium',
+        amountCents: 2341,
+        fromAccountId: 3,
+        toAccountId: 2,
+        categoryIds: [1, 2],
+        buyplace: '247 Nutrition',
+      },
+    ],
+  });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto(appPath('#/transfers'));
+  const card = page.getByTestId('transfer-card-1');
+  for (const width of [320, 390, 441, 720]) {
+    await page.setViewportSize({ width, height: 844 });
+    await expect(card).toBeVisible();
+    const geometry = await card.evaluate((element) => {
+      const details = element.querySelector('.transfer-card__details')!;
+      const account = element.querySelector('.transfer-card__account')!.getBoundingClientRect();
+      const categories = element
+        .querySelector('.transfer-card__categories')!
+        .getBoundingClientRect();
+      const gap = parseFloat(getComputedStyle(details).columnGap);
+      return {
+        fits: account.width + categories.width + gap <= details.clientWidth,
+        sameRow: categories.top < account.bottom && categories.bottom > account.top,
+        overflowing: element.scrollWidth > element.clientWidth,
+      };
+    });
+    expect(geometry.overflowing).toBe(false);
+    if (width >= 390) expect(geometry.fits).toBe(true);
+    expect(geometry.sameRow).toBe(geometry.fits);
+    await card.screenshot({ path: testInfo.outputPath(`transfer-category-fit-${width}.png`) });
+  }
+});
+
 test('shows relevant transfer accounts and matches internal accents to neutral amounts', async ({
   page,
 }) => {
