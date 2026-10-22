@@ -403,5 +403,16 @@
       "query": "The database could not be read. Load it from OneDrive again.",
       "unexpected": "The operation could not be completed. Try again."
     }
+  },
+  "editTransfer": {
+    "title": "Edit transfer",
+    "open": "Edit transfer “{name}”",
+    "delete": "Delete transfer",
+    "save": "Save",
+    "saved": "Transfer updated and uploaded.",
+    "deleted": "Transfer deleted and uploaded.",
+    "pending": "A transfer change needs your attention.",
+    "conflictReady": "The latest database has been loaded. You can save again if the original transfer is unchanged.",
+    "localFailed": "The change could not be saved. If the transfer has changed or was deleted, close this menu and reopen it."
   }
 }

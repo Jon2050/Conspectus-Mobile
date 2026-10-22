@@ -56,3 +56,8 @@ export {
   validateOpenedConspectusDatabase,
   type CachedDatabaseSnapshotValidator,
 } from './snapshotValidation';
+export {
+  appTransferMutationService,
+  createTransferMutationService,
+  type TransferMutationService,
+} from './transferMutationService';

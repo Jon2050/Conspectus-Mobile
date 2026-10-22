@@ -24,6 +24,7 @@ Expected public interfaces (`src/db/index.ts`):
   cancellable worker; validation never changes the schema. WASM loads emit local performance entries.
 - `AccountRecord`: normalized account row shape for Accounts UI.
 - `createTransferMonthQueryService` + `getEpochDayMonthBounds`: inclusive epoch-day month filtering for transfer list reads.
+- `createTransferMutationService`: atomic replacement/deletion with original-row checks and balance reversal.
 - `TransferRecord`: normalized transfer row shape for Transfers UI.
 - `CreateTransferInput`, `CreateTransferResult`, and `CreateTransferBatchResult`: atomic write-path
   contracts for manual and receipt-created transfers.

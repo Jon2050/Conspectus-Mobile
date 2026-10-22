@@ -403,5 +403,16 @@
       "query": "Die Datenbank konnte nicht gelesen werden. Lade sie erneut von OneDrive.",
       "unexpected": "Der Vorgang konnte nicht abgeschlossen werden. Versuche es erneut."
     }
+  },
+  "editTransfer": {
+    "title": "Transfer bearbeiten",
+    "open": "Transfer „{name}“ bearbeiten",
+    "delete": "Transfer löschen",
+    "save": "Speichern",
+    "saved": "Transfer geändert und hochgeladen.",
+    "deleted": "Transfer gelöscht und hochgeladen.",
+    "pending": "Eine Transferänderung benötigt deine Aufmerksamkeit.",
+    "conflictReady": "Die aktuelle Datenbank wurde geladen. Die Änderung kann erneut gespeichert werden, sofern der ursprüngliche Transfer unverändert ist.",
+    "localFailed": "Die Änderung konnte nicht gespeichert werden. Falls der Transfer inzwischen geändert oder gelöscht wurde, schließe das Menü und öffne ihn erneut."
   }
 }

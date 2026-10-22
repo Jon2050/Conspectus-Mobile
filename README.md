@@ -12,6 +12,7 @@ Provide fast mobile access to a personal Conspectus SQLite database stored in On
 - View transfers for a selected month (default: current month).
 - Swipe to previous/next month.
 - Add a new transfer.
+- Tap a transfer to edit all booking fields or delete it, with matching balance updates.
 - Online read access with eTag-verified cached snapshot reuse.
 
 ## Non-Goals (MVP)
