@@ -697,6 +697,16 @@ test('edits shared fields and grouped transfers and saves the reviewed batch onc
     .evaluate((element) => ({ width: element.clientWidth, scroll: element.scrollWidth }));
   expect(reviewWidth.scroll).toBeLessThanOrEqual(reviewWidth.width);
   await page.getByTestId('receipt-review-save').scrollIntoViewIfNeeded();
+  for (const width of [320, 390, 720]) {
+    await page.setViewportSize({ width, height: 844 });
+    const close = await page.getByTestId('add-transfer-close').boundingBox();
+    const save = await page.getByTestId('receipt-review-save').boundingBox();
+    expect(close).not.toBeNull();
+    expect(save).not.toBeNull();
+    expect(Math.abs(close!.y - save!.y)).toBeLessThan(2);
+    expect(close!.x + close!.width).toBeLessThan(save!.x);
+    expect(save!.x + save!.width).toBeLessThanOrEqual(width);
+  }
   await page.screenshot({
     path: `output/receipt-review/review-bottom-${test.info().project.name}.png`,
     fullPage: true,
@@ -1206,3 +1216,38 @@ for (const pickerReturnsDuringRefresh of [false, true]) {
     expect(await getGraphUploadCallCount(page)).toBe(1);
   });
 }
+
+test('keeps German receipt footer actions side by side on narrow screens', async ({
+  page,
+}, testInfo) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'language', { get: () => 'de-DE' });
+  });
+  await installReadyReceiptConfiguration(page);
+  await installReceiptAnalysisRoutes(page, [EXTRACTION, DERIVATION]);
+  await installReadyAddTransferTestDb(page, READY_RECEIPT_DB);
+  await page.goto(appPath('#/add'));
+  await page.getByTestId('receipt-image-input').setInputFiles({
+    name: 'receipt.png',
+    mimeType: 'image/png',
+    buffer: RECEIPT_IMAGE,
+  });
+  await expect(page.getByTestId('receipt-review')).toBeVisible();
+  const closeButton = page.getByTestId('add-transfer-close');
+  const saveButton = page.getByTestId('receipt-review-save');
+  await expect(closeButton).toHaveText('Schließen');
+  await expect(saveButton).toHaveText('Transfers speichern');
+  for (const width of [320, 390, 720]) {
+    await page.setViewportSize({ width, height: 844 });
+    await saveButton.scrollIntoViewIfNeeded();
+    const close = await closeButton.boundingBox();
+    const save = await saveButton.boundingBox();
+    expect(close).not.toBeNull();
+    expect(save).not.toBeNull();
+    expect(Math.abs(close!.y - save!.y)).toBeLessThan(2);
+    expect(close!.x + close!.width).toBeLessThan(save!.x);
+    expect(save!.x + save!.width).toBeLessThanOrEqual(width);
+    if (width === 320)
+      await page.screenshot({ path: testInfo.outputPath('receipt-footer-german.png') });
+  }
+});

@@ -70,32 +70,54 @@ describe('TransfersRoute', () => {
     expect(body).toContain('Es gibt keine Transfers für diesen Monat.');
   });
 
-  it('renders primary system accounts with localized display names (EINNAHMEN / AUSGABEN)', () => {
-    const mockTransfer = {
-      transferId: 99,
-      bookingDateEpochDay: 20000,
-      name: 'Test Transfer',
-      amountCents: 5000,
-      amountSemantic: 'neutral',
-      fromAccountName: 'Original From Name',
-      toAccountName: 'Original To Name',
-      categoryNames: [],
-      buyplace: 'Local Market',
-      fromAccountTypeId: 2, // PRIMARY_SPENDINGS -> AUSGABEN
-      toAccountTypeId: 1, // PRIMARY_INCOME -> EINNAHMEN
-    };
+  it.each([
+    {
+      semantic: 'positive',
+      fromName: 'EINNAHMEN',
+      toName: 'Checking',
+      visible: ['Checking'],
+      hidden: ['EINNAHMEN'],
+    },
+    {
+      semantic: 'negative',
+      fromName: 'Checking',
+      toName: 'AUSGABEN',
+      visible: ['Checking'],
+      hidden: ['AUSGABEN'],
+    },
+    {
+      semantic: 'neutral',
+      fromName: 'Checking',
+      toName: 'Wallet',
+      visible: ['Checking', 'Wallet'],
+      hidden: [],
+    },
+  ])(
+    'renders only relevant accounts for $semantic transfers',
+    ({ semantic, fromName, toName, visible, hidden }) => {
+      const mockTransfer = {
+        transferId: 99,
+        bookingDateEpochDay: 20000,
+        name: 'Test Transfer',
+        amountCents: 5000,
+        amountSemantic: semantic,
+        fromAccountName: fromName,
+        toAccountName: toName,
+        categoryNames: [],
+        buyplace: 'Local Market',
+      };
 
-    const controller = createMockController('ready', [mockTransfer]);
-    const { body } = render(TransfersRoute, {
-      props: { controller: controller as unknown as TransfersRouteController },
-    });
+      const controller = createMockController('ready', [mockTransfer]);
+      const { body } = render(TransfersRoute, {
+        props: { controller: controller as unknown as TransfersRouteController },
+      });
 
-    expect(body).toContain('AUSGABEN');
-    expect(body).toContain('EINNAHMEN');
-    expect(body).toContain('(Local Market)</span>\u00a0');
-    expect(body).toContain('Test Transfer');
-    expect(body).not.toContain('Ort:');
-    expect(body).not.toContain('Original From Name');
-    expect(body).not.toContain('Original To Name');
-  });
+      for (const name of visible) expect(body).toContain(name);
+      for (const name of hidden) expect(body).not.toContain(name);
+      expect(body.includes('transfer-card__account-arrow')).toBe(semantic === 'neutral');
+      expect(body).toContain('(Local Market)</span>\u00a0');
+      expect(body).toContain('Test Transfer');
+      expect(body).not.toContain('Ort:');
+    },
+  );
 });

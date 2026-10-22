@@ -23,7 +23,6 @@
     reviewIsDisabled,
     sourceIsDisabled,
     handleReceiptDraftChange,
-    handleReceiptSave,
   }: {
     receiptFileInputElement?: HTMLInputElement | null;
     receiptCaptureIsDisabled: boolean;
@@ -41,7 +40,6 @@
     reviewIsDisabled: boolean;
     sourceIsDisabled: boolean;
     handleReceiptDraftChange: (draft: ReceiptReviewDraft) => void;
-    handleReceiptSave: () => void;
   } = $props();
 </script>
 
@@ -165,7 +163,6 @@
           categories={receiptCategoryOptions}
           disabled={reviewIsDisabled || receiptPreparationState.phase === 'ready_for_commit'}
           onChange={handleReceiptDraftChange}
-          onSave={handleReceiptSave}
         />
       {/if}
     {/if}

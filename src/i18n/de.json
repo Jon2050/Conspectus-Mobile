@@ -80,7 +80,7 @@
       "stageOne": "Foto auslesen",
       "stageTwo": "Transferdaten erstellen",
       "sourceAccount": "Quellkonto für alle Transfers",
-      "accountRequired": "Wähle das Quellkonto für alle Teiltransfers. Gespeichert wird erst mit „Speichern“.",
+      "accountRequired": "Wähle das Quellkonto für alle Teiltransfers. Gespeichert wird erst mit „Transfers speichern“.",
       "progressLabel": "Fortschritt der Kassenbonverarbeitung",
       "processing": "Die Verarbeitung läuft. Dies kann einen Moment dauern.",
       "steps": {
@@ -184,7 +184,7 @@
         "total": "Gesamtbetrag",
         "receiptTotal": "Erkannter Bon-Gesamtbetrag",
         "totalDifference": "Die Summe der Teilbeträge weicht vom erkannten Bon-Gesamtbetrag ab. Prüfe die Beträge vor dem Speichern.",
-        "save": "Speichern",
+        "save": "Transfers speichern",
         "currencyUnsupported": "Es können nur Beträge in EUR gespeichert werden."
       }
     },
