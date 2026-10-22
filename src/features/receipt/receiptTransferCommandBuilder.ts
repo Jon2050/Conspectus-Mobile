@@ -279,8 +279,6 @@ export const buildReviewedReceiptTransferCommands = (
   options: AddTransferOptionsState,
 ): ReceiptTransferCommandBuildResult => {
   const total = receiptReviewTotalCents(draft);
-  if (draft.currency !== null && draft.currency !== 'EUR')
-    return failure('invalid_transfer', 'addTransfer.receipt.review.currencyUnsupported');
   if (total === null || total <= 0 || draft.transfers.length === 0 || draft.transfers.length > 100)
     return failure('non_positive_amount');
   // This is an explicitly reviewed manual batch. Check its entered fields and local sum;

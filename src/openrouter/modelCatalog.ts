@@ -1,4 +1,4 @@
-// Parses OpenRouter model metadata and derives the free models eligible for each receipt AI role.
+// Derives free receipt models and appends the explicitly supported paid model to both roles.
 import {
   parseOpenRouterReasoningCapabilities,
   type OpenRouterReasoningCapabilities,
@@ -8,6 +8,7 @@ export interface OpenRouterModelOption {
   readonly name: string;
   readonly label: string;
   readonly reasoning?: OpenRouterReasoningCapabilities;
+  readonly paid?: boolean;
 }
 
 export interface OpenRouterCompatibleModelCatalog {
@@ -22,7 +23,16 @@ export class OpenRouterCatalogResponseError extends Error {
   }
 }
 
-const RECEIPT_MODEL_MIN_INTELLIGENCE_INDEX = 20;
+// Explicit addition for both receipt stages, verified with production requests on 2026-10-22.
+// Keep the minimum known effort when the live catalog omits this model or its capabilities.
+const MANUAL_MODEL = {
+  id: 'meta/muse-spark-1.3-contributor',
+  name: 'Meta: Muse Spark 1.3 Contributor',
+  label: 'Meta: Muse Spark 1.3 Contributor — meta/muse-spark-1.3-contributor',
+  paid: true,
+  reasoning: { mandatory: true, supportedEfforts: ['minimal'] },
+} satisfies OpenRouterModelOption;
+
 // Confirmed gateway 403 "Gate Free Endpoints by Agentic Harness". The current catalog and
 // endpoint metadata expose no capability flag for this access gate. Exclude only these variants.
 const HARNESS_RESTRICTED_MODELS = new Set([
@@ -32,7 +42,6 @@ const HARNESS_RESTRICTED_MODELS = new Set([
 
 interface ParsedCatalogModel {
   readonly id: string;
-  readonly canonicalSlug: string;
   readonly name: string;
   readonly inputModalities: ReadonlySet<string>;
   readonly outputModalities: ReadonlySet<string>;
@@ -63,15 +72,13 @@ const parseCatalogModel = (value: unknown): ParsedCatalogModel | null => {
 
   const id = typeof value.id === 'string' ? value.id.trim() : '';
   const name = typeof value.name === 'string' ? value.name.trim() : '';
-  const canonicalSlug = typeof value.canonical_slug === 'string' ? value.canonical_slug.trim() : '';
-  if (!id || !name || !canonicalSlug) {
+  if (!id || !name) {
     return null;
   }
 
   const reasoning = parseOpenRouterReasoningCapabilities(value.reasoning);
   return {
     id,
-    canonicalSlug,
     name,
     inputModalities: toStringSet(value.architecture.input_modalities),
     outputModalities: toStringSet(value.architecture.output_modalities),
@@ -98,52 +105,30 @@ const isZeroPrice = (value: unknown, optional: boolean): boolean => {
 };
 
 const hasFreeBasePricing = (model: ParsedCatalogModel): boolean =>
+  model.id.endsWith(':free') &&
   isZeroPrice(model.pricing.prompt, false) &&
   isZeroPrice(model.pricing.completion, false) &&
   isZeroPrice(model.pricing.request, true);
 
 const isRouterPseudoModel = (model: ParsedCatalogModel): boolean => model.id === 'openrouter/free';
 
+// Receipt requests need JSON text only. Zero text-token prices do not cover other output
+// modalities: audio generators can advertise free text while still charging for audio.
+const hasTextOnlyOutput = (model: ParsedCatalogModel): boolean =>
+  model.outputModalities.size === 1 && model.outputModalities.has('text');
+
 const isVisionModel = (model: ParsedCatalogModel): boolean =>
   !isRouterPseudoModel(model) &&
   hasFreeBasePricing(model) &&
   isZeroPrice(model.pricing.image, true) &&
   model.inputModalities.has('image') &&
-  model.outputModalities.has('text');
+  hasTextOnlyOutput(model);
 
 const isTransferModel = (model: ParsedCatalogModel): boolean =>
   !isRouterPseudoModel(model) &&
   hasFreeBasePricing(model) &&
   model.inputModalities.has('text') &&
-  model.outputModalities.has('text');
-
-const parseIntelligenceScores = (payload: unknown): ReadonlyMap<string, number> => {
-  if (!isRecord(payload) || !Array.isArray(payload.data)) {
-    throw new OpenRouterCatalogResponseError();
-  }
-  const scores = new Map<string, number>();
-  const seen = new Set<string>();
-  for (const entry of payload.data) {
-    if (
-      !isRecord(entry) ||
-      entry.source !== 'artificial-analysis' ||
-      typeof entry.model_permaslug !== 'string' ||
-      !entry.model_permaslug.trim()
-    )
-      continue;
-    const slug = entry.model_permaslug.trim();
-    const score = entry.intelligence_index;
-    if (seen.has(slug)) {
-      scores.delete(slug);
-      continue;
-    }
-    seen.add(slug);
-    if (typeof score === 'number' && Number.isFinite(score) && score >= 0) {
-      scores.set(slug, score);
-    }
-  }
-  return scores;
-};
+  hasTextOnlyOutput(model);
 
 const toOption = (model: ParsedCatalogModel): OpenRouterModelOption => ({
   id: model.id,
@@ -172,24 +157,37 @@ const toSortedUniqueOptions = (
 
 export const parseOpenRouterCompatibleModelCatalog = (
   value: unknown,
-  benchmarkPayload: unknown,
 ): OpenRouterCompatibleModelCatalog => {
   if (!isRecord(value) || !Array.isArray(value.data)) {
     throw new OpenRouterCatalogResponseError();
   }
 
-  const intelligenceScores = parseIntelligenceScores(benchmarkPayload);
   const parsedModels = value.data
     .map(parseCatalogModel)
     .filter((model): model is ParsedCatalogModel => model !== null)
-    .filter((model) => !HARNESS_RESTRICTED_MODELS.has(model.id))
-    .filter(
-      (model) =>
-        (intelligenceScores.get(model.canonicalSlug) ?? -1) >= RECEIPT_MODEL_MIN_INTELLIGENCE_INDEX,
-    );
+    .filter((model) => !HARNESS_RESTRICTED_MODELS.has(model.id));
+
+  const manualModel: OpenRouterModelOption = {
+    ...MANUAL_MODEL,
+    reasoning:
+      parsedModels.find((model) => model.id === MANUAL_MODEL.id)?.reasoning ??
+      MANUAL_MODEL.reasoning,
+  };
 
   return {
-    visionModels: toSortedUniqueOptions(parsedModels, isVisionModel),
-    transferModels: toSortedUniqueOptions(parsedModels, isTransferModel),
+    visionModels: [
+      ...toSortedUniqueOptions(
+        parsedModels,
+        (model) => model.id !== MANUAL_MODEL.id && isVisionModel(model),
+      ),
+      manualModel,
+    ],
+    transferModels: [
+      ...toSortedUniqueOptions(
+        parsedModels,
+        (model) => model.id !== MANUAL_MODEL.id && isTransferModel(model),
+      ),
+      manualModel,
+    ],
   };
 };

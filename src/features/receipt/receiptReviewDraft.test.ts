@@ -12,7 +12,6 @@ const seed = () =>
     receiptDate: '2026-10-19',
     buyplace: 'Shop',
     receiptTotalCents: 650,
-    currency: 'EUR',
     transfers: [
       {
         name: 'Food',

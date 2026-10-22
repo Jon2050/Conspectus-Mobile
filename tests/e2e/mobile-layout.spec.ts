@@ -5,7 +5,6 @@ import {
   expandSettingsSections,
   installReadyAddTransferTestDb,
 } from './support/app-test-harness';
-import { installOpenRouterBenchmarkFixture } from './support/openrouter-benchmarks';
 
 test.use({ locale: 'de-DE' });
 
@@ -40,7 +39,6 @@ for (const width of [320, 390, 430]) {
   }) => {
     await page.setViewportSize({ width, height: 844 });
     await installReadyAddTransferTestDb(page);
-    await installOpenRouterBenchmarkFixture(page);
     await page.route('https://openrouter.ai/api/v1/models/user', (route) =>
       route.fulfill({
         json: {

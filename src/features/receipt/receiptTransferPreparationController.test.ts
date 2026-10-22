@@ -79,7 +79,6 @@ describe('receipt transfer preparation controller', () => {
         review: {
           receiptDate: '2026-07-31',
           buyplace: 'Shop',
-          currency: 'EUR',
           receiptTotalCents: 350,
           transfers: [
             {
@@ -219,17 +218,6 @@ describe('receipt transfer preparation controller', () => {
       OPTIONS,
     );
     expect(controller.getState()).toMatchObject({ phase: 'error', draft: null });
-  });
-  it('does not book known non-EUR partial data as EUR', () => {
-    const controller = ready(true);
-    const draft = controller.getState().draft!;
-    controller.updateDraft({ ...draft, currency: 'USD' });
-    controller.prepareForSave(OPTIONS);
-    expect(controller.getState()).toMatchObject({
-      phase: 'reviewing',
-      readyForCommit: null,
-      error: { code: 'invalid_transfer', detail: 'addTransfer.receipt.review.currencyUnsupported' },
-    });
   });
   it('retains progress without a source selection during both model calls', () => {
     const controller = createReceiptTransferPreparationController();

@@ -179,9 +179,6 @@
 
   <p class="openrouter-settings__help" data-testid="openrouter-model-filter-help">
     {$_('settings.openRouter.models.filterHelp')}
-    <a href="https://openrouter.ai/rankings" target="_blank" rel="noopener noreferrer">
-      {$_('settings.openRouter.models.benchmarkSource')}
-    </a>
   </p>
 
   <div class="openrouter-settings__field">
@@ -196,7 +193,9 @@
     >
       <option value="">{$_('settings.openRouter.models.placeholder')}</option>
       {#each state.visionModels as model (model.id)}
-        <option value={model.id}>{model.name}</option>
+        <option value={model.id}>
+          {model.name}{model.paid ? ` (${$_('settings.openRouter.models.paid')})` : ''}
+        </option>
       {/each}
     </select>
     {#if state.catalogStatus === 'ready' && state.visionModels.length === 0}
@@ -218,7 +217,9 @@
     >
       <option value="">{$_('settings.openRouter.models.placeholder')}</option>
       {#each state.transferModels as model (model.id)}
-        <option value={model.id}>{model.name}</option>
+        <option value={model.id}>
+          {model.name}{model.paid ? ` (${$_('settings.openRouter.models.paid')})` : ''}
+        </option>
       {/each}
     </select>
     {#if state.catalogStatus === 'ready' && state.transferModels.length === 0}

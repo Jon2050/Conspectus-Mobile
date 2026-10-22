@@ -66,32 +66,35 @@ describe('createOpenRouterSettingsStore', () => {
     expect(store.read('one')).toEqual(original);
   });
 
-  it('preserves minimum and binary reasoning after restart for each account and role', () => {
-    const { storage } = createMemoryStorage();
-    const store = createOpenRouterSettingsStore({ storage });
-    const one = {
-      ...settings('one-secret', 'model'),
-      visionReasoning: {
-        modelId: 'model',
-        capabilities: {
-          mandatory: false,
-          supportedEfforts: ['high', 'minimal', 'none'] as const,
-          defaultEnabled: false,
+  it.each([true, false])(
+    'preserves minimum efforts and fixed mandatory=%s after restart',
+    (mandatory) => {
+      const { storage } = createMemoryStorage();
+      const store = createOpenRouterSettingsStore({ storage });
+      const one = {
+        ...settings('one-secret', 'model'),
+        visionReasoning: {
+          modelId: 'model',
+          capabilities: {
+            mandatory: false,
+            supportedEfforts: ['high', 'minimal', 'none'] as const,
+            defaultEnabled: false,
+          },
         },
-      },
-      transferReasoning: { modelId: 'model', capabilities: { mandatory: true } },
-    };
-    store.write('one', one);
-    store.write('two', settings('two-secret', 'other'));
-    const restarted = createOpenRouterSettingsStore({ storage });
-    expect(toStoredReadyOpenRouterReceiptConfiguration(restarted.read('one')!)).toMatchObject({
-      visionReasoning: { enabled: true, effort: 'minimal' },
-      transferReasoning: { enabled: true },
-    });
-    expect(
-      toStoredReadyOpenRouterReceiptConfiguration(restarted.read('two')!)?.visionReasoning,
-    ).toBeUndefined();
-  });
+        transferReasoning: { modelId: 'model', capabilities: { mandatory } },
+      };
+      store.write('one', one);
+      store.write('two', settings('two-secret', 'other'));
+      const restarted = createOpenRouterSettingsStore({ storage });
+      expect(toStoredReadyOpenRouterReceiptConfiguration(restarted.read('one')!)).toMatchObject({
+        visionReasoning: { enabled: true, effort: 'minimal' },
+        transferReasoning: { enabled: mandatory },
+      });
+      expect(
+        toStoredReadyOpenRouterReceiptConfiguration(restarted.read('two')!)?.visionReasoning,
+      ).toBeUndefined();
+    },
+  );
 
   it('drops only damaged or mismatched capability snapshots, keeping valid settings', () => {
     const { storage, values } = createMemoryStorage();

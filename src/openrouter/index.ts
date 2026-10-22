@@ -19,7 +19,6 @@ export type {
 } from './chatCompletionClient';
 export {
   OPENROUTER_USER_MODELS_URL,
-  OPENROUTER_INTELLIGENCE_BENCHMARKS_URL,
   OpenRouterCatalogError,
   createOpenRouterModelCatalogClient,
   openRouterModelCatalogClient,

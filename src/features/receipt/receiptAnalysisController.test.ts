@@ -11,19 +11,18 @@ const extraction = {
   errorReason: null,
   storeName: 'Markt',
   receiptDate: '2026-07-31',
-  currency: 'EUR',
-  receiptTotalCents: 350,
+  receiptTotal: '3,50',
   items: [
-    { index: 0, name: 'Brot', quantityText: null, lineTotalCents: 250, kind: 'item' },
-    { index: 1, name: 'Rabatt', quantityText: null, lineTotalCents: -50, kind: 'discount' },
-    { index: 2, name: 'Apfel', quantityText: '1 kg', lineTotalCents: 150, kind: 'item' },
+    { index: 0, name: 'Brot', lineTotal: '2,50' },
+    { index: 1, name: 'Rabatt', lineTotal: '-0,50' },
+    { index: 2, name: 'Apfel', lineTotal: '1,50' },
   ],
 };
 const derivation = {
   status: 'ok',
   errorReason: null,
   buyplace: 'Rewe',
-  transfers: [
+  groups: [
     {
       name: 'Brot und Äpfel',
       categoryNames: ['Einkauf', 'Lebensmittel'],
@@ -101,7 +100,12 @@ describe('receipt analysis controller', () => {
     expect(JSON.stringify(bodies[0])).toContain('data:image/jpeg;base64,');
     expect(JSON.stringify(bodies[1])).not.toContain('data:image/jpeg;base64,');
     expect(bodies[1].messages[0].content).toContain(config.transferRules);
-    expect(bodies[1].messages[1].content).toContain(JSON.stringify(extraction));
+    expect(bodies[1].messages[1].content).toContain(
+      JSON.stringify({ storeName: extraction.storeName, items: extraction.items }),
+    );
+    expect(bodies[1].messages[1].content).not.toMatch(
+      /receiptDate|receiptTotal|status|errorReason/u,
+    );
     expect(phases).toContain('extracting');
     expect(phases).toContain('deriving');
     expect(photo.bytes.every((byte) => byte === 0)).toBe(true);
@@ -113,50 +117,61 @@ describe('receipt analysis controller', () => {
       },
     });
     expect(controller.getState().review?.transfers[0]?.items).toEqual(
-      extraction.items.map(({ index, name, lineTotalCents }) => ({ index, name, lineTotalCents })),
+      extraction.items.map(({ index, name, lineTotal }) => ({
+        index,
+        name,
+        lineTotalCents: Number(lineTotal.replace(',', '')),
+      })),
     );
     controller.reset();
     expect(controller.getState().review).toBeNull();
   });
 
-  it('preserves readable partial results and locally computed sums without promoting them', async () => {
-    const complete = vi
-      .fn()
-      .mockResolvedValueOnce(
-        JSON.stringify({
-          ...extraction,
-          status: 'error',
-          errorReason: 'Summe fehlt.',
+  it.each(['ok', 'error'] as const)(
+    'preserves partial extraction even when grouping reports %s',
+    async (status) => {
+      const complete = vi
+        .fn()
+        .mockResolvedValueOnce(
+          JSON.stringify({
+            ...extraction,
+            status: 'error',
+            errorReason: 'Summe fehlt.',
+            receiptTotal: null,
+          }),
+        )
+        .mockResolvedValueOnce(
+          JSON.stringify({
+            ...derivation,
+            status,
+            errorReason: status === 'ok' ? null : 'Teilantwort.',
+          }),
+        );
+      const controller = createReceiptAnalysisController({ completionClient: { complete } });
+      await expect(controller.start(input(), new AbortController().signal)).rejects.toMatchObject({
+        code: status === 'ok' ? 'invalid_response' : 'model_error',
+        stage: 'derivation',
+      });
+      expect(controller.getState()).toMatchObject({
+        phase: 'error',
+        derivation: null,
+        review: {
+          receiptDate: '2026-07-31',
           receiptTotalCents: null,
-        }),
-      )
-      .mockResolvedValueOnce(
-        JSON.stringify({ ...derivation, status: 'error', errorReason: 'Teilantwort.' }),
-      );
-    const controller = createReceiptAnalysisController({ completionClient: { complete } });
-    await expect(controller.start(input(), new AbortController().signal)).rejects.toMatchObject({
-      code: 'model_error',
-      stage: 'derivation',
-    });
-    expect(controller.getState()).toMatchObject({
-      phase: 'error',
-      derivation: null,
-      review: {
-        receiptDate: '2026-07-31',
-        receiptTotalCents: null,
-        transfers: [
-          {
-            amountCents: 350,
-            items: [
-              { index: 0, name: 'Brot', lineTotalCents: 250 },
-              { index: 1, name: 'Rabatt', lineTotalCents: -50 },
-              { index: 2, name: 'Apfel', lineTotalCents: 150 },
-            ],
-          },
-        ],
-      },
-    });
-  });
+          transfers: [
+            {
+              amountCents: 350,
+              items: [
+                { index: 0, name: 'Brot', lineTotalCents: 250 },
+                { index: 1, name: 'Rabatt', lineTotalCents: -50 },
+                { index: 2, name: 'Apfel', lineTotalCents: 150 },
+              ],
+            },
+          ],
+        },
+      });
+    },
+  );
 
   it('retains valid incomplete groups in review after rejecting mistaken complete coverage', async () => {
     const complete = vi
@@ -165,7 +180,7 @@ describe('receipt analysis controller', () => {
       .mockResolvedValueOnce(
         JSON.stringify({
           ...derivation,
-          transfers: [{ ...derivation.transfers[0], sourceItemIndexes: [0] }],
+          groups: [{ ...derivation.groups[0], sourceItemIndexes: [0] }],
         }),
       );
     const controller = createReceiptAnalysisController({ completionClient: { complete } });
@@ -185,7 +200,7 @@ describe('receipt analysis controller', () => {
       .mockResolvedValueOnce(
         JSON.stringify({
           ...derivation,
-          transfers: [{ ...derivation.transfers[0], sourceItemIndexes: [999] }],
+          groups: [{ ...derivation.groups[0], sourceItemIndexes: [999] }],
         }),
       );
     const controller = createReceiptAnalysisController({ completionClient: { complete } });

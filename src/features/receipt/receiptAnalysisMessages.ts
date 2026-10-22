@@ -1,6 +1,6 @@
 // Shares the exact production prompts/message construction with opt-in provider evaluation.
 import type { OpenRouterChatMessage } from '@openrouter';
-import type { ReceiptExtractionResult } from './receiptAnalysisContracts';
+import { receiptExtractionData, type ReceiptExtractionResult } from './receiptAnalysisContracts';
 import {
   RECEIPT_EXTRACTION_IMAGE_INSTRUCTION,
   TRANSFER_DERIVATION_EXTRACTION_HEADING,
@@ -32,6 +32,12 @@ export const receiptDerivationMessages = (
   },
   {
     role: 'user',
-    content: TRANSFER_DERIVATION_EXTRACTION_HEADING + '\n' + JSON.stringify(extraction),
+    content:
+      TRANSFER_DERIVATION_EXTRACTION_HEADING +
+      '\n' +
+      JSON.stringify({
+        storeName: extraction.storeName,
+        items: receiptExtractionData(extraction).items,
+      }),
   },
 ];

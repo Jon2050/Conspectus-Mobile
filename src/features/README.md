@@ -37,13 +37,21 @@ Receipt AI settings:
   orientation and canvas-re-encodes pixels so source EXIF/GPS/device metadata is not copied.
 - `receipt/receiptCaptureController.ts` owns a single in-memory capture while
   `receipt/receiptAnalysisController.ts` orchestrates the two OpenRouter stages. The analysis
-  controller directly uses each stored model without catalog/benchmark requests, releases image bytes after
+  controller directly uses each stored model without catalog requests, releases image bytes after
   stage 1, passes the editable grouping rules verbatim to stage 2 without parsing them, and retains
   typed partial metadata/groups for manual review as well as validated complete derivations.
-  Stage-two wire groups contain no amounts; the parser calculates signed cent sums from valid
+  Stage one transcribes only names and signed final amounts as decimal-comma strings (`"5,46"`),
+  without currency checks, quantities or item kinds. The parser converts amounts to safe integer
+  cents and checks the total locally; stage two receives only `storeName` and `items` with
+  `index`, `name` and decimal-comma `lineTotal`. Extraction status/errorReason/date/total stay local.
+  The second model knows only groups: its wire response uses `groups`, including a single group
+  when appropriate. Generic system instructions and JSON precede the final editable rule text;
+  concrete categories and business assignments appear only in that rule text. Internally the parser
+  maps these groups to the existing booking data. Stage-two wire groups contain no amounts; the parser calculates signed cent sums from valid
   references locally, checks overflow, positive complete groups and exact source coverage.
   Settings persists reasoning capabilities on successful catalog refresh and model selection;
-  production enables the lowest known positive effort after restart too. Request availability
+  production enables the lowest known positive effort after restart too. Without advertised active
+  efforts it disables optional reasoning and retains fixed mandatory reasoning. Request availability
   failures retain known drafts/settings and identify the failing role with a Settings hint.
   Mistaken model success is still rejected; readable suggestions may remain editable.
 - `receipt/receiptTransferPreparationController.ts` owns the deliberate per-run source selection,

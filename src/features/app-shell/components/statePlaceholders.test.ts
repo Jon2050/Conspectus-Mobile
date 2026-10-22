@@ -11,7 +11,7 @@ describe('app-shell state placeholder components', () => {
     expect(body).toContain('data-testid="loading-placeholder"');
     expect(body).toContain('aria-live="polite"');
     expect(body).toContain('<h2>Lade...</h2>');
-    expect(body).toContain('<p>Dein mobiler Arbeitsplatz wird vorbereitet.</p>');
+    expect(body).toContain('<p>Conspectus wird vorbereitet.</p>');
   });
 
   it('renders default error placeholder message in assertive alert region', () => {

@@ -6,21 +6,16 @@ export const RECEIPT_ANALYSIS_LIMITS = Object.freeze({
   errorReasonCharacters: 500,
   storeNameCharacters: 200,
   itemNameCharacters: 300,
-  quantityTextCharacters: 100,
   transferNameCharacters: 200,
   categoryNameCharacters: 100,
   buyplaceCharacters: 200,
   categoriesPerTransfer: 3,
 });
 
-export type ReceiptItemKind = 'item' | 'discount' | 'deposit' | 'other';
-
 export interface ReceiptExtractionItem {
   readonly index: number;
   readonly name: string;
-  readonly quantityText: string | null;
   readonly lineTotalCents: number;
-  readonly kind: ReceiptItemKind;
 }
 
 export interface ReceiptExtraction {
@@ -28,7 +23,6 @@ export interface ReceiptExtraction {
   readonly errorReason: null;
   readonly storeName: string;
   readonly receiptDate: string;
-  readonly currency: 'EUR';
   readonly receiptTotalCents: number;
   readonly items: readonly ReceiptExtractionItem[];
 }
@@ -38,7 +32,6 @@ export interface ReceiptExtractionError {
   readonly errorReason: string;
   readonly storeName: string | null;
   readonly receiptDate: string | null;
-  readonly currency: string | null;
   readonly receiptTotalCents: number | null;
   readonly items: readonly ReceiptExtractionItem[];
 }
@@ -87,7 +80,7 @@ export type ReceiptAnalysisValidationErrorCode =
   | 'INVALID_ERROR_REASON'
   | 'INVALID_STRING'
   | 'INVALID_DATE'
-  | 'INVALID_CURRENCY'
+  | 'INVALID_AMOUNT'
   | 'INVALID_CENTS'
   | 'ARITHMETIC_OVERFLOW'
   | 'INVALID_ITEM_COUNT'
@@ -116,22 +109,19 @@ const EXTRACTION_KEYS = [
   'errorReason',
   'storeName',
   'receiptDate',
-  'currency',
-  'receiptTotalCents',
+  'receiptTotal',
   'items',
 ] as const;
-const EXTRACTION_ITEM_KEYS = ['index', 'name', 'quantityText', 'lineTotalCents', 'kind'] as const;
-// Wire format shares one purchase location; trusted extraction metadata is attached locally.
-const DERIVATION_KEYS = ['status', 'errorReason', 'buyplace', 'transfers'] as const;
-const TRANSFER_KEYS = ['name', 'categoryNames', 'sourceItemIndexes'] as const;
-const ITEM_KINDS: readonly ReceiptItemKind[] = ['item', 'discount', 'deposit', 'other'];
+const EXTRACTION_ITEM_KEYS = ['index', 'name', 'lineTotal'] as const;
+// Wire groups share one purchase location; only local output becomes booking transfers.
+const DERIVATION_KEYS = ['status', 'errorReason', 'buyplace', 'groups'] as const;
+const GROUP_KEYS = ['name', 'categoryNames', 'sourceItemIndexes'] as const;
 
 type JsonObject = Record<string, unknown>;
 
 export type ReceiptReviewItem = Pick<ReceiptExtractionItem, 'index' | 'name' | 'lineTotalCents'>;
 
 export interface ReceiptReviewSeed {
-  readonly currency?: string | null;
   readonly receiptDate: string | null;
   readonly buyplace: string | null;
   readonly receiptTotalCents: number | null;
@@ -158,9 +148,7 @@ export function parseReceiptExtractionResponse(
     (value.storeName !== null &&
       boundedString(value.storeName, RECEIPT_ANALYSIS_LIMITS.storeNameCharacters) === null) ||
     (value.receiptDate !== null && !isRealIsoDate(value.receiptDate)) ||
-    (value.currency !== null &&
-      (typeof value.currency !== 'string' || !/^[A-Z]{3}$/u.test(value.currency))) ||
-    (value.receiptTotalCents !== null && !isSafeInteger(value.receiptTotalCents))
+    (value.receiptTotal !== null && parseReceiptAmount(value.receiptTotal) === null)
   ) {
     return failure('INVALID_STRUCTURE', 'Partial receipt fields must be well-formed or null.');
   }
@@ -177,15 +165,15 @@ export function parseReceiptExtractionResponse(
       item.index < 0 ||
       indexes.has(item.index) ||
       boundedString(item.name, RECEIPT_ANALYSIS_LIMITS.itemNameCharacters) === null ||
-      (item.quantityText !== null &&
-        boundedString(item.quantityText, RECEIPT_ANALYSIS_LIMITS.quantityTextCharacters) ===
-          null) ||
-      !isSafeInteger(item.lineTotalCents) ||
-      !ITEM_KINDS.includes(item.kind as ReceiptItemKind)
+      parseReceiptAmount(item.lineTotal) === null
     )
       return failure('INVALID_STRUCTURE', 'Invalid partial item fields.');
     indexes.add(item.index);
-    items.push({ ...item } as unknown as ReceiptExtractionItem);
+    items.push({
+      index: item.index,
+      name: item.name as string,
+      lineTotalCents: parseReceiptAmount(item.lineTotal)!,
+    });
   }
   return {
     ok: true,
@@ -194,8 +182,7 @@ export function parseReceiptExtractionResponse(
       errorReason: reason,
       storeName: value.storeName as string | null,
       receiptDate: value.receiptDate as string | null,
-      currency: value.currency as string | null,
-      receiptTotalCents: value.receiptTotalCents as number | null,
+      receiptTotalCents: parseReceiptAmount(value.receiptTotal),
       items,
     },
   };
@@ -223,16 +210,16 @@ export function parseReceiptTransferDerivationResponse(
   if (
     (value.buyplace !== null &&
       boundedString(value.buyplace, RECEIPT_ANALYSIS_LIMITS.buyplaceCharacters) === null) ||
-    !Array.isArray(value.transfers) ||
-    value.transfers.length > RECEIPT_ANALYSIS_LIMITS.transfers
+    !Array.isArray(value.groups) ||
+    value.groups.length > RECEIPT_ANALYSIS_LIMITS.transfers
   )
     return failure('INVALID_STRUCTURE', 'Invalid partial derivation.');
   const itemByIndex = new Map(extraction.items.map((item) => [item.index, item]));
   const coveredIndexes = new Set<number>();
   const transfers: ReceiptTransferDerivationError['transfers'][number][] = [];
-  for (const transfer of value.transfers) {
-    if (!isObject(transfer)) return failure('INVALID_STRUCTURE', 'Invalid partial transfer.');
-    const error = validateExactKeys(transfer, TRANSFER_KEYS, '$.transfers');
+  for (const transfer of value.groups) {
+    if (!isObject(transfer)) return failure('INVALID_STRUCTURE', 'Invalid partial group.');
+    const error = validateExactKeys(transfer, GROUP_KEYS, '$.groups');
     if (error) return { ok: false, error };
     if (
       boundedString(transfer.name, RECEIPT_ANALYSIS_LIMITS.transferNameCharacters) === null ||
@@ -246,7 +233,7 @@ export function parseReceiptTransferDerivationResponse(
       transfer.sourceItemIndexes.length > RECEIPT_ANALYSIS_LIMITS.items ||
       transfer.sourceItemIndexes.some((index) => !isSafeInteger(index) || index < 0)
     )
-      return failure('INVALID_STRUCTURE', 'Invalid partial transfer fields.');
+      return failure('INVALID_STRUCTURE', 'Invalid partial group fields.');
     const amounts: number[] = [];
     for (const index of transfer.sourceItemIndexes as number[]) {
       if (coveredIndexes.has(index))
@@ -293,6 +280,33 @@ function failure(
 
 function isObject(value: unknown): value is JsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+// Parse fixed two-digit decimal-comma strings using integer digits only: no float rounding.
+function parseReceiptAmount(value: unknown): number | null {
+  if (typeof value !== 'string' || !/^-?\d{1,14},\d{2}$/u.test(value)) return null;
+  const cents = Number(value.replace(',', ''));
+  return Number.isSafeInteger(cents) ? cents : null;
+}
+
+// Keep the provider contract separate from trusted internal integer-cent arithmetic.
+export function receiptExtractionData(extraction: ReceiptExtractionResult) {
+  const amount = (cents: number | null): string | null =>
+    cents === null
+      ? null
+      : `${cents < 0 ? '-' : ''}${Math.floor(Math.abs(cents) / 100)},${String(Math.abs(cents) % 100).padStart(2, '0')}`;
+  return {
+    status: extraction.status,
+    errorReason: extraction.errorReason,
+    storeName: extraction.storeName,
+    receiptDate: extraction.receiptDate,
+    receiptTotal: amount(extraction.receiptTotalCents),
+    items: extraction.items.map(({ index, name, lineTotalCents }) => ({
+      index,
+      name,
+      lineTotal: amount(lineTotalCents)!,
+    })),
+  };
 }
 
 function isSafeInteger(value: unknown): value is number {
@@ -405,14 +419,12 @@ function parseCompleteReceiptExtractionResponse(
       '$.receiptDate',
     );
   }
-  if (parsed.value.currency !== 'EUR') {
-    return failure('INVALID_CURRENCY', 'Only EUR receipts are supported.', '$.currency');
-  }
-  if (!isSafeInteger(parsed.value.receiptTotalCents) || parsed.value.receiptTotalCents <= 0) {
+  const receiptTotalCents = parseReceiptAmount(parsed.value.receiptTotal);
+  if (receiptTotalCents === null || receiptTotalCents <= 0) {
     return failure(
-      'INVALID_CENTS',
-      'The receipt total must be a positive safe integer-cent value.',
-      '$.receiptTotalCents',
+      'INVALID_AMOUNT',
+      'The receipt total must be a positive decimal-comma amount.',
+      '$.receiptTotal',
     );
   }
   if (
@@ -450,38 +462,20 @@ function parseCompleteReceiptExtractionResponse(
     if (name === null) {
       return failure('INVALID_STRING', 'The item name is missing or too long.', `${path}.name`);
     }
-    const quantityText =
-      candidate.quantityText === null
-        ? null
-        : boundedString(candidate.quantityText, RECEIPT_ANALYSIS_LIMITS.quantityTextCharacters);
-    if (candidate.quantityText !== null && quantityText === null) {
+    const lineTotalCents = parseReceiptAmount(candidate.lineTotal);
+    if (lineTotalCents === null) {
       return failure(
-        'INVALID_STRING',
-        'The quantity text is empty or too long.',
-        `${path}.quantityText`,
+        'INVALID_AMOUNT',
+        'The line total must be a signed decimal-comma amount.',
+        `${path}.lineTotal`,
       );
-    }
-    if (!isSafeInteger(candidate.lineTotalCents)) {
-      return failure(
-        'INVALID_CENTS',
-        'The line total must be a safe signed integer-cent value.',
-        `${path}.lineTotalCents`,
-      );
-    }
-    if (
-      typeof candidate.kind !== 'string' ||
-      !ITEM_KINDS.includes(candidate.kind as ReceiptItemKind)
-    ) {
-      return failure('INVALID_STRUCTURE', 'The item kind is invalid.', `${path}.kind`);
     }
 
     indexes.add(candidate.index);
     items.push({
       index: candidate.index,
       name,
-      quantityText,
-      lineTotalCents: candidate.lineTotalCents,
-      kind: candidate.kind as ReceiptItemKind,
+      lineTotalCents,
     });
   }
 
@@ -493,7 +487,7 @@ function parseCompleteReceiptExtractionResponse(
       '$.items',
     );
   }
-  if (itemTotal !== parsed.value.receiptTotalCents) {
+  if (itemTotal !== receiptTotalCents) {
     return failure(
       'ITEM_TOTAL_MISMATCH',
       'The receipt item sum does not match the receipt total.',
@@ -508,8 +502,7 @@ function parseCompleteReceiptExtractionResponse(
       errorReason: null,
       storeName,
       receiptDate: parsed.value.receiptDate,
-      currency: 'EUR',
-      receiptTotalCents: parsed.value.receiptTotalCents,
+      receiptTotalCents,
       items,
     },
   };
@@ -522,7 +515,7 @@ function parseCompleteReceiptTransferDerivationResponse(
   const parsed = parseJson(raw);
   if (!parsed.ok) return parsed;
   if (!isObject(parsed.value)) {
-    return failure('INVALID_STRUCTURE', 'The transfer response must be a JSON object.', '$');
+    return failure('INVALID_STRUCTURE', 'The grouping response must be a JSON object.', '$');
   }
 
   const keysError = validateExactKeys(parsed.value, DERIVATION_KEYS, '$');
@@ -547,15 +540,11 @@ function parseCompleteReceiptTransferDerivationResponse(
     );
   }
   if (
-    !Array.isArray(parsed.value.transfers) ||
-    parsed.value.transfers.length === 0 ||
-    parsed.value.transfers.length > RECEIPT_ANALYSIS_LIMITS.transfers
+    !Array.isArray(parsed.value.groups) ||
+    parsed.value.groups.length === 0 ||
+    parsed.value.groups.length > RECEIPT_ANALYSIS_LIMITS.transfers
   ) {
-    return failure(
-      'INVALID_TRANSFER_COUNT',
-      'The number of derived transfers is invalid.',
-      '$.transfers',
-    );
+    return failure('INVALID_TRANSFER_COUNT', 'The number of groups is invalid.', '$.groups');
   }
 
   const itemByIndex = new Map(extraction.items.map((item) => [item.index, item]));
@@ -563,21 +552,21 @@ function parseCompleteReceiptTransferDerivationResponse(
   const usedGroups = new Set<string>();
   const transfers: ReceiptDerivedTransfer[] = [];
 
-  for (const [position, candidate] of parsed.value.transfers.entries()) {
-    const path = `$.transfers[${position}]`;
+  for (const [position, candidate] of parsed.value.groups.entries()) {
+    const path = `$.groups[${position}]`;
     if (!isObject(candidate)) {
-      return failure('INVALID_STRUCTURE', 'Each transfer must be an object.', path);
+      return failure('INVALID_STRUCTURE', 'Each group must be an object.', path);
     }
-    const transferKeysError = validateExactKeys(candidate, TRANSFER_KEYS, path);
+    const transferKeysError = validateExactKeys(candidate, GROUP_KEYS, path);
     if (transferKeysError !== null) return { ok: false, error: transferKeysError };
     const name = boundedString(candidate.name, RECEIPT_ANALYSIS_LIMITS.transferNameCharacters);
     if (name === null) {
-      return failure('INVALID_STRING', 'The transfer name is missing or too long.', `${path}.name`);
+      return failure('INVALID_STRING', 'The group name is missing or too long.', `${path}.name`);
     }
     if (usedGroups.has(name)) {
       return failure(
         'DUPLICATE_TRANSFER_GROUP',
-        'Each transfer name may occur only once.',
+        'Each group name may occur only once.',
         `${path}.name`,
       );
     }
@@ -598,7 +587,7 @@ function parseCompleteReceiptTransferDerivationResponse(
     if (new Set(candidate.categoryNames).size !== candidate.categoryNames.length) {
       return failure(
         'DUPLICATE_CATEGORY',
-        'A category may occur only once per transfer.',
+        'A category may occur only once per group.',
         `${path}.categoryNames`,
       );
     }
@@ -609,7 +598,7 @@ function parseCompleteReceiptTransferDerivationResponse(
     ) {
       return failure(
         'INVALID_STRUCTURE',
-        'A transfer must contain at least one valid source item index.',
+        'A group must contain at least one valid source item index.',
         `${path}.sourceItemIndexes`,
       );
     }
@@ -648,7 +637,7 @@ function parseCompleteReceiptTransferDerivationResponse(
     if (sourceTotal === null) {
       return failure(
         'ARITHMETIC_OVERFLOW',
-        'The transfer source-item sum exceeds safe integer-cent bounds.',
+        'The group source-item sum exceeds safe integer-cent bounds.',
         `${path}.sourceItemIndexes`,
       );
     }
@@ -676,22 +665,22 @@ function parseCompleteReceiptTransferDerivationResponse(
     return failure(
       'INCOMPLETE_SOURCE_COVERAGE',
       'Not every receipt item was assigned exactly once.',
-      '$.transfers',
+      '$.groups',
     );
   }
   const transferTotal = safeCentSum(transfers.map((transfer) => transfer.amountCents));
   if (transferTotal === null) {
     return failure(
       'ARITHMETIC_OVERFLOW',
-      'The transfer sum exceeds safe integer-cent bounds.',
-      '$.transfers',
+      'The group sum exceeds safe integer-cent bounds.',
+      '$.groups',
     );
   }
   if (transferTotal !== extraction.receiptTotalCents) {
     return failure(
       'RECEIPT_TOTAL_MISMATCH',
-      'The sum of all transfers does not match the receipt total.',
-      '$.transfers',
+      'The sum of all groups does not match the receipt total.',
+      '$.groups',
     );
   }
 

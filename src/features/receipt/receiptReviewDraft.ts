@@ -17,7 +17,6 @@ export interface ReceiptReviewDraft {
   readonly date: string;
   readonly buyplace: string;
   readonly receiptTotalCents: number | null;
-  readonly currency: string | null;
   readonly transfers: readonly ReceiptReviewTransfer[];
 }
 
@@ -25,7 +24,6 @@ export const createReceiptReviewDraft = (seed: ReceiptReviewSeed): ReceiptReview
   date: seed.receiptDate ?? '',
   buyplace: seed.buyplace ?? '',
   receiptTotalCents: seed.receiptTotalCents,
-  currency: seed.currency ?? null,
   transfers: (seed.transfers.length
     ? seed.transfers
     : [{ name: '', amountCents: seed.receiptTotalCents ?? 0, categoryNames: [] }]

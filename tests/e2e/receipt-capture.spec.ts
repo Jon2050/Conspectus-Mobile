@@ -1,7 +1,6 @@
 // Verifies the browser-visible native receipt capture boundary without simulating OS camera UI.
 import { expect, test, type Page, type Request } from '@playwright/test';
 import fs from 'node:fs';
-import { installOpenRouterBenchmarkFixture } from './support/openrouter-benchmarks';
 
 import {
   appPath,
@@ -11,7 +10,6 @@ import {
 } from './support/app-test-harness';
 
 test.use({ viewport: { width: 320, height: 720 } });
-test.beforeEach(async ({ page }) => installOpenRouterBenchmarkFixture(page));
 
 const RECEIPT_IMAGE = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
@@ -222,15 +220,12 @@ const EXTRACTION = {
   errorReason: null,
   storeName: 'Markt',
   receiptDate: '2026-07-31',
-  currency: 'EUR',
-  receiptTotalCents: 350,
+  receiptTotal: '3,50',
   items: [
     {
       index: 0,
       name: 'Brot',
-      quantityText: null,
-      lineTotalCents: 350,
-      kind: 'item',
+      lineTotal: '3,50',
     },
   ],
 };
@@ -239,7 +234,7 @@ const DERIVATION = {
   status: 'ok',
   errorReason: null,
   buyplace: 'Markt',
-  transfers: [
+  groups: [
     {
       name: 'Brot',
       categoryNames: ['Einkauf', 'Lebensmittel'],
@@ -250,17 +245,17 @@ const DERIVATION = {
 
 const MULTI_EXTRACTION = {
   ...EXTRACTION,
-  receiptTotalCents: 500,
+  receiptTotal: '5,00',
   items: [
-    { index: 0, name: 'Brot', quantityText: null, lineTotalCents: 300, kind: 'item' },
-    { index: 1, name: 'Reiniger', quantityText: null, lineTotalCents: 200, kind: 'item' },
+    { index: 0, name: 'Brot', lineTotal: '3,00' },
+    { index: 1, name: 'Reiniger', lineTotal: '2,00' },
   ],
 };
 
 const MULTI_DERIVATION = {
   ...DERIVATION,
   buyplace: 'Rewe',
-  transfers: [
+  groups: [
     {
       name: 'Brot',
       categoryNames: ['Einkauf', 'Lebensmittel'],
@@ -311,30 +306,27 @@ const installReceiptAnalysisRoutes = async (
   const catalogRequests: Request[] = [];
   const completionRequests: Request[] = [];
 
-  await page.route(
-    /https:\/\/openrouter\.ai\/api\/v1\/(?:models\/user|benchmarks\?.*)$/,
-    async (route) => {
-      const request = route.request();
-      if (request.method() === 'OPTIONS') {
-        await route.fulfill({
-          status: 204,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'authorization,content-type',
-            'Access-Control-Allow-Methods': 'GET,OPTIONS',
-          },
-        });
-        return;
-      }
-      catalogRequests.push(request);
+  await page.route('https://openrouter.ai/api/v1/models/user', async (route) => {
+    const request = route.request();
+    if (request.method() === 'OPTIONS') {
       await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        headers: { 'Access-Control-Allow-Origin': '*' },
-        body: JSON.stringify({ data: [MODEL] }),
+        status: 204,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'authorization,content-type',
+          'Access-Control-Allow-Methods': 'GET,OPTIONS',
+        },
       });
-    },
-  );
+      return;
+    }
+    catalogRequests.push(request);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: { 'Access-Control-Allow-Origin': '*' },
+      body: JSON.stringify({ data: [MODEL] }),
+    });
+  });
 
   await page.route('https://openrouter.ai/api/v1/chat/completions', async (route) => {
     const request = route.request();
@@ -530,6 +522,9 @@ test('uploads an existing photo through the picker and saves only after explicit
   expect(stageTwoBody.reasoning).toEqual({ enabled: true, effort: 'low' });
   expect(JSON.stringify(stageOneBody)).toContain('data:image/jpeg;base64,');
   expect(JSON.stringify(stageTwoBody)).not.toContain('data:image/jpeg;base64,');
+  expect(String((stageTwoBody.messages as { content: unknown }[])[1]?.content)).not.toMatch(
+    /receiptDate|receiptTotal|status|errorReason/u,
+  );
   expect(JSON.stringify(stageTwoBody)).not.toContain('accountId');
   expect(JSON.stringify(stageOneBody)).not.toContain('accountId');
   expect(stageOneBody.provider).toEqual({ allow_fallbacks: false });
@@ -554,24 +549,24 @@ test('regroups named items with dynamic transfer buttons, recalculates amounts a
   await installReadyReceiptConfiguration(page);
   const extraction = {
     ...EXTRACTION,
-    receiptTotalCents: 650,
+    receiptTotal: '6,50',
     items: [
-      { index: 0, name: 'Brot', quantityText: '2 Stk x 1,50', lineTotalCents: 300, kind: 'item' },
-      { index: 1, name: 'Pfand', quantityText: null, lineTotalCents: 25, kind: 'deposit' },
-      { index: 2, name: 'Rabatt', quantityText: null, lineTotalCents: -50, kind: 'discount' },
-      { index: 3, name: 'Apfel', quantityText: null, lineTotalCents: 150, kind: 'item' },
-      { index: 4, name: 'Pfand', quantityText: null, lineTotalCents: 25, kind: 'deposit' },
-      { index: 5, name: 'Reiniger', quantityText: null, lineTotalCents: 200, kind: 'item' },
+      { index: 0, name: 'Brot', lineTotal: '3,00' },
+      { index: 1, name: 'Pfand', lineTotal: '0,25' },
+      { index: 2, name: 'Rabatt', lineTotal: '-0,50' },
+      { index: 3, name: 'Apfel', lineTotal: '1,50' },
+      { index: 4, name: 'Pfand', lineTotal: '0,25' },
+      { index: 5, name: 'Reiniger', lineTotal: '2,00' },
     ],
   };
   const derivation = {
     ...MULTI_DERIVATION,
-    transfers: [
-      { ...MULTI_DERIVATION.transfers[0], sourceItemIndexes: [0, 1, 2, 3, 4] },
-      MULTI_DERIVATION.transfers[1],
+    groups: [
+      { ...MULTI_DERIVATION.groups[0], sourceItemIndexes: [0, 1, 2, 3, 4] },
+      MULTI_DERIVATION.groups[1],
     ],
   };
-  derivation.transfers[1] = { ...derivation.transfers[1]!, sourceItemIndexes: [5] };
+  derivation.groups[1] = { ...derivation.groups[1]!, sourceItemIndexes: [5] };
   await installReceiptAnalysisRoutes(page, [extraction, derivation]);
   await installReadyAddTransferTestDb(page, READY_RECEIPT_DB);
   await page.goto(appPath('#/add'));
@@ -763,7 +758,7 @@ test('reviews and corrects partial responses without any booking before Save', a
       ...MULTI_EXTRACTION,
       status: 'error',
       errorReason: 'Der Gesamtbetrag ist unleserlich.',
-      receiptTotalCents: null,
+      receiptTotal: null,
     },
     { ...MULTI_DERIVATION, status: 'error', errorReason: 'Der Gesamtbetrag fehlt.' },
   ]);
@@ -911,8 +906,7 @@ test('starts again after a model-declared failure by closing and reopening Add',
       errorReason: 'Der Gesamtbetrag ist nicht eindeutig lesbar.',
       storeName: null,
       receiptDate: null,
-      currency: null,
-      receiptTotalCents: null,
+      receiptTotal: null,
       items: [],
     },
     EXTRACTION,

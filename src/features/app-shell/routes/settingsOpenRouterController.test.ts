@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   OpenRouterCatalogError,
+  parseOpenRouterCompatibleModelCatalog,
   type OpenRouterCompatibleModelCatalog,
   type OpenRouterModelCatalogClient,
 } from '@openrouter';
@@ -58,6 +59,57 @@ const createClient = (
 });
 
 describe('createSettingsOpenRouterController', () => {
+  it('stores manual Muse and restores its minimum reasoning without another catalog request', async () => {
+    const store = createStore();
+    const load = vi.fn().mockResolvedValue(
+      parseOpenRouterCompatibleModelCatalog({
+        data: [
+          {
+            id: 'text:free',
+            name: 'Text',
+            pricing: { prompt: '0', completion: '0' },
+            architecture: { input_modalities: ['text'], output_modalities: ['text'] },
+          },
+        ],
+      }),
+    );
+    const controller = createSettingsOpenRouterController({
+      settingsStore: store,
+      catalogClient: { load },
+    });
+    await controller.activateAccount('one');
+    await controller.validateAndSaveApiKey('key');
+    controller.selectVisionModel('meta/muse-spark-1.3-contributor');
+    controller.selectTransferModel('meta/muse-spark-1.3-contributor');
+    expect(controller.getReadyConfiguration()?.transferReasoning).toEqual({
+      enabled: true,
+      effort: 'minimal',
+    });
+    expect(controller.getReadyConfiguration()?.visionReasoning).toEqual({
+      enabled: true,
+      effort: 'minimal',
+    });
+    const saved = store.read('one')!;
+    expect(toStoredReadyOpenRouterReceiptConfiguration(saved)?.visionReasoning).toEqual({
+      enabled: true,
+      effort: 'minimal',
+    });
+    expect(toStoredReadyOpenRouterReceiptConfiguration(saved)?.transferReasoning).toEqual({
+      enabled: true,
+      effort: 'minimal',
+    });
+    expect(load).toHaveBeenCalledTimes(1);
+    await controller.activateAccount(null);
+    await controller.activateAccount('one');
+    expect(controller.getState().selectedVisionModelId).toBe('meta/muse-spark-1.3-contributor');
+    expect(controller.getState().selectedTransferModelId).toBe('meta/muse-spark-1.3-contributor');
+    expect(controller.getReadyConfiguration()?.visionReasoning).toEqual({
+      enabled: true,
+      effort: 'minimal',
+    });
+    controller.dispose();
+  });
+
   it('replaces capabilities on key, model and account changes and persists refreshed metadata', async () => {
     const store = createStore();
     store.write('one', storedSettings());

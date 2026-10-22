@@ -61,9 +61,9 @@ describe('OpenRouter receipt configuration', () => {
       apiKey: 'secret-key',
       visionModelId: 'shared-model',
       transferModelId: 'shared-model',
-      transferPrompt: { version: 8 },
+      transferPrompt: { version: 12 },
       transferRules: DEFAULT_TRANSFER_DERIVATION_RULES.text,
-      extractionPrompt: { version: 6 },
+      extractionPrompt: { version: 7 },
     });
   });
 
@@ -72,7 +72,7 @@ describe('OpenRouter receipt configuration', () => {
       apiKey: 'secret-key',
       visionModelId: 'shared-model',
       transferModelId: 'shared-model',
-      extractionPrompt: { version: 6 },
+      extractionPrompt: { version: 7 },
     });
     expect(
       toStoredReadyOpenRouterReceiptConfiguration(settings({ visionModelId: null })),

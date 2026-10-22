@@ -97,7 +97,6 @@ const reviewSeed = (
   const result = derivation?.ok ? derivation.value : null;
   return {
     receiptDate: extraction.receiptDate,
-    currency: extraction.currency,
     buyplace:
       result?.status === 'error'
         ? (result.buyplace ?? extraction.storeName)
@@ -280,15 +279,10 @@ export const createReceiptAnalysisController = (
               receiptDate: extraction.receiptDate,
               buyplace: extraction.storeName,
               receiptTotalCents: extraction.receiptTotalCents,
-              currency: extraction.currency,
               transfers: [],
             },
           });
-          if (
-            extraction.status === 'error' &&
-            (extraction.items.length === 0 ||
-              (extraction.currency !== null && extraction.currency !== 'EUR'))
-          ) {
+          if (extraction.status === 'error' && extraction.items.length === 0) {
             throw new ReceiptAnalysisError('model_error', 'extraction', extraction.errorReason);
           }
         } finally {

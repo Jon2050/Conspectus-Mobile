@@ -131,21 +131,25 @@ The Settings catalog contract is:
 1. Send the key only in the `Authorization` header of a bodyless, no-store request to OpenRouter's
    authenticated `/api/v1/models/user` endpoint. This account-filtered endpoint keeps the user's
    OpenRouter provider preferences, privacy settings, and guardrails effective.
-2. Also fetch `/api/v1/benchmarks?source=artificial-analysis&task_type=intelligence` from OpenRouter
-   with the same key and no-store settings. The independent GETs start in parallel and share one 30-second whole-load deadline;
-   caller cancellation or failure aborts outstanding work.
-   Treat the visit as validated only after both responses are parseable. Never use a bundled or
-   previously fetched model list or an external AA service. Join the model's `canonical_slug`
-   exactly to the benchmark's `model_permaslug`; both roles require a finite Intelligence Index
-   of at least 20. Missing, invalid or duplicate benchmark identities are excluded. A failed
-   benchmark request fails the complete load without invalidating saved selections.
-3. Offer receipt extraction only from current models with image input, text output, zero prompt and
-   completion prices, and no nonzero request or image surcharge.
-4. Offer transfer derivation only from current models with text input/output, zero prompt and
+2. Bound the catalog GET and response body by a 30-second deadline, with caller cancellation and
+   no automatic retry. No intelligence benchmark request, score threshold or canonical-version
+   match is required. A failed catalog load does not invalidate saved selections.
+3. Offer receipt extraction only from current `:free` catalog variants with image input, exclusively text output, zero prompt and
+   completion prices, and no nonzero request or image surcharge. Append the explicit paid
+   option `meta/muse-spark-1.3-contributor` once, even if absent from a successfully loaded catalog.
+   Mark it as paid in Settings; it is never auto-selected. Prefer its live reasoning metadata,
+   otherwise use the verified minimum active effort `minimal`. This manual addition is not a
+   provider-availability or account-policy guarantee and is unavailable while catalog validation fails.
+4. Offer transfer derivation only from current `:free` catalog variants with text input and exclusively text output, zero prompt and
    completion prices and no nonzero request surcharge. Structured-output support is not required.
+   Append the same explicit paid Muse option once after the free choices, with the same paid label
+   and reasoning metadata/fallback as the vision role. It remains a deliberate independent selection.
    Exclude the confirmed harness-restricted `thinkingmachines/inkling:free` and
    `thinkingmachines/inkling-small:free` variants. Current catalog/endpoint metadata do not expose
    that restriction as a capability, so this is a narrow explicit exclusion based on their 403s.
+   Dynamic options in both roles exclude all additional output modalities. Audio generators can
+   declare zero prompt/completion prices while still billing generated audio; text prices alone
+   are insufficient. No intelligence threshold or exact canonical-version join is reintroduced.
 5. Keep the two selections independent and allow the same eligible model in both roles. A successful
    refresh removes a saved role selection that is no longer eligible without choosing a replacement.
    Authentication, network, parse, and provider failures disable the controls but do not prove the
@@ -179,34 +183,51 @@ Both stages use the reasoning capabilities saved on a successful Settings catalo
 selection, independently bound to each role/model within the account/key settings record. A new
 validated key or catalog replaces both capability snapshots; changing a model replaces its snapshot.
 Late catalog responses cannot cross account/request boundaries. Both stages choose the lowest
-positive advertised effort and explicitly enable reasoning, including after an app restart. Models with only an on/off control use on; a model
-without reasoning capabilities receives no invented reasoning parameter. Production never selects
-`none` or the benchmark's optional off mode. Legacy selections lacking metadata remain usable
+positive advertised effort and explicitly enable reasoning, including after an app restart. Without
+advertised active efforts they disable optional reasoning and retain fixed mandatory reasoning.
+Token-budget support alone does not declare a minimum active effort/budget. A model without
+reasoning capabilities receives no invented reasoning parameter. Legacy selections lacking metadata remain usable
 without a Settings visit. Unknown or damaged capabilities leave the provider default untouched:
 minimum active reasoning cannot be guaranteed until a successful Settings catalog visit supplies
 capabilities. No effort is guessed and no analysis-time metadata request is introduced.
 
 1. Send the versioned app-owned extraction prompt and normalized JPEG directly to the configured
-   vision model. Receipt analysis makes no catalog/benchmark GET, hidden refresh or other metadata
-   request. Free pricing, modalities and Intelligence Index >= 20 are checked in Settings only.
+   vision model. Receipt analysis makes no catalog GET, hidden refresh or other metadata
+   request. Free pricing and modalities are checked in Settings only.
    Complete stored settings work immediately after restart without visiting Settings.
-2. Parse bounded non-streaming JSON. A successful extraction requires complete EUR fields and exact
-   integer-cent line arithmetic. An error response retains typed readable metadata and items;
+2. Parse bounded non-streaming JSON. Stage-one prompt version 7 requests only store/date, the final receipt total and ordered
+   positions with index, name and final amount. `receiptTotal`/`lineTotal` are signed decimal-comma
+   strings with exactly two decimal digits (e.g. `"5,46"`, `"-0,25"`), without currency symbols
+   or thousands separators. It requests no currency check, quantity, unit price, `kind`, conversion
+   or arithmetic from the model. Deposits and returns remain normal signed positions. The parser
+   converts digit strings into safe integer cents without rounding and checks the sum against
+   the total locally. An error response retains typed readable metadata and items;
    unknown fields may be null. Preserve these suggestions for manual review without treating them
    as a successful extraction. Release image bytes as soon as stage one finishes.
-3. Send directly to the independently configured text model, without catalog revalidation, the typed
-   extraction (possibly partial when readable items exist) and the app-owned derivation prompt.
-   Its visible `{{CUSTOM_PROMPT}}` slot is replaced once with the opaque user rules in the system
+3. Send directly to the independently configured text model, without catalog revalidation, only
+   `storeName` and `items` (`index`, `name`, decimal-comma `lineTotal`), possibly partial when
+   readable items exist, and the app-owned derivation prompt. Do not send extraction status,
+   errorReason, receiptDate or receiptTotal. These remain local for validation and review.
+   Its final `{{CUSTOM_PROMPT}}` slot is replaced once with the opaque grouping rules in the system
    message; extraction JSON is a separate user message. Never send the image or Microsoft
    account, Conspectus account, balance,
    transfer-history, category-table, database, or OneDrive data.
 4. Request the app-owned JSON format in the versioned prompt without `response_format` or
    `require_parameters`. Validate the returned JSON locally. The editable grouping
    rules are opaque prompt text: the app inserts them verbatim and does not parse, interpret,
-   or validate their transfer/category mapping. The second model creates the transfer names and
-   category arrays and one shared `buyplace`, allowing merchant-name normalization according to
-   the user's rules. Stage 2 (derivation prompt version 8) returns only status, errorReason, shared buyplace and
-   transfers with name, categoryNames and sourceItemIndexes. It returns no `amountCents`,
+   or validate their group/category mapping. The second model only assigns positions to groups
+   with summary names and category arrays and one shared `buyplace`, allowing merchant-name normalization according to
+   the grouping rules. Stage 2 (prompt version 12) returns only status, errorReason, shared buyplace and
+   `groups` with name, categoryNames and sourceItemIndexes. Exactly one group is valid. The system
+   template explains the receipt context and input/output fields: storeName is the printed
+   merchant, items are receipt positions, groups contain assignments, and buyplace derives from
+   storeName. lineTotal is only an optional price-context hint; the model never calculates, modifies,
+   sums or outputs amounts. The template otherwise contains only the generic task and JSON structure; the editable default rules (version 9)
+   define the named categories and business assignments. Rules replace the final placeholder once,
+   without a separate user-rules wrapper or any mention of transfers/users in the model instruction.
+   Gastronomy has priority and groups all positions together; otherwise ordinary food plus all
+   deposits/discounts/returns, sweets/sweet drinks, and household goods have separate rule sections.
+   Only the local parser converts wire groups to the existing internal transfer data. It returns no `amountCents`,
    `receiptDate` or `receiptTotalCents`; the parser copies
    the validated extraction date to every local transfer and retains the extraction total locally.
    The shared purchase location is expanded into each local transfer command. Both prompts require
@@ -233,7 +254,7 @@ capabilities. No effort is guessed and no analysis-time metadata request is intr
    and offline transitions preserve the review draft. Stage 2 never receives the source selection.
    Display both the entered sum and any extracted receipt total. A difference is informational:
    the user may be correcting an OCR mistake, so the manual batch is validated against entered
-   amounts rather than the old OCR coverage proof. Known non-EUR results cannot be booked as EUR.
+   amounts rather than the old OCR coverage proof. Currency is not checked.
 6. Only an explicit Save (including deliberate form submission) validates the reviewed inputs,
    resolves category names uniquely against current local options and targets the sole primary
    spendings account. It reuses Add Transfer validation and type derivation, freezes the resulting
@@ -263,7 +284,7 @@ or explicit model/endpoint-unavailable types map to a localized role-specific Se
 Authentication (401/403), rate limiting, network, timeout and malformed responses remain distinct;
 generic provider failures do not imply a missing model. These failures never clear saved selections
 or known review data. Use the lowest positive reasoning effort from the saved capabilities;
-models exposing only a binary switch use enabled reasoning. Unknown capabilities leave the provider
+models without advertised active efforts disable optional reasoning and retain mandatory reasoning. Unknown capabilities leave the provider
 default untouched. Mandatory reasoning is never disabled. The opt-in benchmark compares these
 settings with `enabled: false` where allowed. Both calls add no app
 owned ZDR or data-collection routing restriction, so stricter OpenRouter account preferences and
@@ -279,9 +300,10 @@ risk before analysis; users maintain the grouping and category rules in Settings
 
 Receipt derivation may simplify the merchant name according to the user's rules. The shipped
 default rules classify abbreviated or ambiguous items by plausibility using receipt context;
-unsupported items without a plausible matching rule are rejected. Grocery deposits/returns belong to normal
-food, and the whole-receipt restaurant rule takes precedence. Discounts/returns reduce only their
-identifiable group. Nonpositive receipts or groups fail closed. Custom rules remain opaque prompt
+items without a plausible matching rule belong to the uncategorized fallback group `Sonstiges`.
+Grocery deposits/returns belong to normal
+food, and the whole-receipt restaurant rule takes precedence. All grocery discounts/returns belong
+to the normal-food group under the default rules. Nonpositive receipts or groups fail closed. Custom rules remain opaque prompt
 text. Before capture and again on picker return, local preflight requires valid account topology;
 the default rules additionally require all five referenced category names to exist uniquely.
 Temporary same-context options loading suspends saving. Options errors disable Save while keeping
