@@ -61,7 +61,8 @@ const fillValidTransfer = async (page: Page, name: string, amountDigits: string)
 test('@smoke critical journey: signs in, binds a OneDrive DB, and reads accounts and transfers', async ({
   page,
 }) => {
-  await installMockAuthClient(page);
+  // Keep sign-in asynchronous so the journey cannot rely on an immediately rendered DB section.
+  await installMockAuthClient(page, { signInDelayMs: 150 });
   await installMockGraphClient(page, {
     downloadBytes: fixtureBytes,
     metadataETag: '"journey-etag"',
@@ -73,10 +74,10 @@ test('@smoke critical journey: signs in, binds a OneDrive DB, and reads accounts
   await page.goto(appPath('#/settings'));
   await expandSettingsSections(page);
   await page.getByRole('button', { name: 'Sign in with Microsoft' }).click();
-  await expandSettingsSections(page);
 
   await expect(page.getByTestId('auth-status-message')).toContainText('Signed in.');
   await expect(page.getByText('mock-user@example.com')).toBeVisible();
+  await expandSettingsSections(page);
 
   await page.getByRole('button', { name: 'Select DB File' }).click();
   await page.getByTestId('open-folder-folder-finance').click();
