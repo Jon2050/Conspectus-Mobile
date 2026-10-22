@@ -170,13 +170,7 @@ describe('quality workflow contract', () => {
     expect(workflowSource).toContain('project: ${{ fromJSON(');
     expect(workflowSource).toContain('["chromium", "pixel-5", "iphone-13-safari"]');
     expect(workflowSource).toContain('["chromium", "iphone-13-safari"]');
-    expect(workflowSource).toContain(
-      "matrix.project == 'iphone-13-safari' && 'webkit' || 'chromium'",
-    );
     expect(workflowSource).toContain('[ "${{ matrix.project }}" = \'chromium\' ]');
-    expect(workflowSource).toContain(
-      'key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}-${{ matrix.project }}',
-    );
     expect(workflowSource).toContain('tests/e2e/critical-user-journeys.spec.ts');
     expect(workflowSource).toContain('quality-gate:');
     expect(workflowSource).toMatch(
@@ -194,6 +188,22 @@ describe('quality workflow contract', () => {
       'Protected main merge completed the exact-SHA build verification, Chromium smoke and WebKit gate.',
     );
     expect(workflowSource).toContain('github.ref_name != github.event.repository.default_branch');
+  });
+
+  it('pins the E2E container to the locked Playwright version and bounds job duration', () => {
+    const workflowSource = fs.readFileSync(qualityWorkflowPath, 'utf8');
+    const e2eJob = workflowSource.split('  e2e-tests:')[1]!.split('  quality-gate:')[0]!;
+    const lock = JSON.parse(
+      fs.readFileSync(path.join(repositoryRootPath, 'package-lock.json'), 'utf8'),
+    ) as { packages: Record<string, { version: string }> };
+    const version = lock.packages['node_modules/@playwright/test']!.version;
+    expect(e2eJob).toContain(`image: mcr.microsoft.com/playwright:v${version}-noble@sha256:`);
+    expect(e2eJob).toMatch(/-noble@sha256:[a-f0-9]{64}\b/);
+    expect(e2eJob).toContain('runs-on: ubuntu-24.04');
+    expect(e2eJob).toContain('timeout-minutes: 20');
+    expect(e2eJob).toContain('shell: bash');
+    expect(e2eJob).not.toContain('playwright install');
+    expect(e2eJob).toContain('npm run test:e2e -- --project="${{ matrix.project }}"');
   });
 
   it('runs the local quality prerequisites concurrently before build verification', () => {
