@@ -46,6 +46,109 @@ const createCacheStore = (
 });
 
 describe('database upload handoff service', () => {
+  it.each([
+    'matching',
+    'different_bytes',
+    'different_size',
+    'unchanged_etag',
+    'changed_during_read',
+    'changed_binding',
+    'read_failed',
+  ] as const)(
+    'proves a lost upload acknowledgement only from the exact current bytes: %s',
+    async (scenario) => {
+      const bytes = Uint8Array.of(9, 8, 7);
+      let selected = DRIVE_ITEM_BINDING;
+      const metadata = {
+        eTag: '"etag-2"',
+        sizeBytes: scenario === 'different_size' ? bytes.length + 1 : bytes.length,
+        lastModifiedDateTime: '2026-10-22T10:00:00Z',
+        downloadUrl: 'https://synthetic.invalid/db',
+      };
+      const graph = {
+        ...createGraphClient(),
+        getFileMetadata: vi.fn(async () =>
+          scenario === 'unchanged_etag' ? { ...metadata, eTag: '"etag-1"' } : metadata,
+        ),
+        downloadFile: vi.fn(async () => {
+          if (scenario === 'read_failed') throw new Error('Injected read failure');
+          if (scenario === 'changed_binding') selected = { ...DRIVE_ITEM_BINDING, itemId: 'other' };
+          if (scenario === 'changed_during_read')
+            graph.getFileMetadata.mockResolvedValue({ ...metadata, eTag: '"etag-3"' });
+          return scenario === 'different_bytes' ? Uint8Array.of(1, 2, 3) : bytes.slice();
+        }),
+      };
+      vi.mocked(graph.uploadFile).mockRejectedValue({ code: 'network_error' });
+      const cache = createCacheStore(createSnapshot());
+      const service = createDatabaseUploadHandoffService(
+        graph,
+        cache,
+        () => selected,
+        createSyncStateStore(),
+      );
+      if (scenario === 'matching') {
+        await service.uploadExportedDatabase(bytes);
+        expect(cache.writeSnapshot).toHaveBeenCalledWith(
+          expect.objectContaining({
+            dbBytes: bytes,
+            metadata: expect.objectContaining({ eTag: '"etag-2"' }),
+          }),
+        );
+      } else if (scenario === 'changed_binding') {
+        // The non-session path still must not promote another binding's result.
+        await expect(
+          service.uploadExportedDatabase(bytes, {
+            context: {
+              accountId: 'one',
+              binding: DRIVE_ITEM_BINDING,
+              baseETag: '"etag-1"',
+              runtimeGeneration: 1,
+              generation: 1,
+            },
+          }),
+        ).rejects.toMatchObject({ code: 'remote_outcome_unknown' });
+        expect(cache.writeSnapshot).not.toHaveBeenCalled();
+      } else {
+        await expect(service.uploadExportedDatabase(bytes)).rejects.toMatchObject({
+          code: 'remote_outcome_unknown',
+        });
+        expect(cache.writeSnapshot).not.toHaveBeenCalled();
+      }
+      expect(graph.uploadFile).toHaveBeenCalledOnce();
+      if (scenario === 'unchanged_etag' || scenario === 'different_size') {
+        expect(graph.downloadFile).not.toHaveBeenCalled();
+      }
+    },
+  );
+
+  it('bounds unknown-result confirmation and aborts stalled reads without promoting the cache', async () => {
+    vi.useFakeTimers();
+    try {
+      const graph = {
+        ...createGraphClient(),
+        getFileMetadata: vi.fn<GraphClient['getFileMetadata']>(() => new Promise(() => {})),
+        downloadFile: vi.fn(),
+      };
+      vi.mocked(graph.uploadFile).mockRejectedValue({ code: 'network_error' });
+      const cache = createCacheStore(createSnapshot());
+      const service = createDatabaseUploadHandoffService(
+        graph,
+        cache,
+        () => DRIVE_ITEM_BINDING,
+        createSyncStateStore(),
+      );
+      const result = service.uploadExportedDatabase(Uint8Array.of(9, 8, 7));
+      const assertion = expect(result).rejects.toMatchObject({ code: 'remote_outcome_unknown' });
+      await vi.advanceTimersByTimeAsync(30_000);
+      await assertion;
+      expect(graph.getFileMetadata.mock.calls[0]?.[1]?.aborted).toBe(true);
+      expect(cache.writeSnapshot).not.toHaveBeenCalled();
+      expect(graph.uploadFile).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('uploads exported bytes with the cached eTag and refreshes cached sync metadata', async () => {
     const graphClient = createGraphClient();
     const cacheStore = createCacheStore(createSnapshot());

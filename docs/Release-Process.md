@@ -47,7 +47,14 @@ comment. Do not maintain a second release checklist elsewhere.
 - [ ] Pull the current `main`, confirm its `Quality Gate` is successful, and create
       `release/v<version>` from that exact commit.
 - [ ] Update `package.json` and both root version fields in `package-lock.json` to the same unused
-      semantic version. Do not create the tag yet.
+      stable semantic version (`X.Y.Z`, without `-dev` or build suffixes). Production builds reject
+      prerelease versions. Do not create the tag yet.
+- [ ] Verify receipt Settings upgrade compatibility: a previously customized grouping prompt must
+      remain byte-for-byte unchanged after update/relaunch, catalog refresh, and storage migration.
+      Only a null override adopts new default rules; never replace custom rules based on the app or
+      prompt version. Confirm explicit Reset still restores the current default. Retain regression
+      coverage in `openRouterSettingsStore.test.ts`, `settingsOpenRouterController.test.ts` and
+      `openrouter-settings.spec.ts` when changing settings schemas or prompt assets.
 - [ ] Prepare release notes using the template below, including all included issues, user-visible
       changes, operational changes, and known limitations.
 - [ ] Run `npm ci`, `npm run audit:dependencies`, `npm run format`, `npm run lint`,

@@ -189,6 +189,9 @@
   const navIconBaseUrl = import.meta.env.BASE_URL;
   const unsubscribe = routeStore.subscribe((route) => {
     if (currentRoute === 'add' && route !== 'add') {
+      if (addTransferSaveController.getState().phase === 'saved') {
+        addTransferSaveController.reset();
+      }
       effectiveReceiptCaptureController?.cancel();
       effectiveReceiptAnalysisController?.reset();
       receiptPreparationController.reset();
@@ -210,6 +213,9 @@
     addTransferSaveState = state;
     if (state.phase === 'saved' && !wasSaved) {
       addTransferFields = createInitialFormFields();
+      if (currentRoute !== 'add') {
+        addTransferSaveController.reset();
+      }
     }
   });
   const unsubscribeReceiptCommitController = receiptCommitController.subscribe((state) => {

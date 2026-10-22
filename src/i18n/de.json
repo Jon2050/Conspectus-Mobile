@@ -18,6 +18,7 @@
     "downloadProgress": "{loaded} KB / {total} KB",
     "uploadedKb": "{kb} KB hochgeladen...",
     "uploadProgress": "{loaded} KB / {total} KB hochgeladen",
+    "uploadAwaitingConfirmation": "Daten gesendet. Bestätigung von OneDrive wird abgewartet …",
     "title": "Conspectus Mobile"
   },
   "appUpdate": {

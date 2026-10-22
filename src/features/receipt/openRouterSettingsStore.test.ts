@@ -7,6 +7,7 @@ import {
   OpenRouterSettingsStorageError,
   createOpenRouterSettingsStore,
 } from './openRouterSettingsStore';
+import { DEFAULT_TRANSFER_DERIVATION_RULES } from './prompts';
 
 const createMemoryStorage = () => {
   const values = new Map<string, string>();
@@ -28,6 +29,39 @@ const settings = (apiKey: string, modelId: string): StoredOpenRouterReceiptSetti
 });
 
 describe('createOpenRouterSettingsStore', () => {
+  it.each([1, 2])(
+    'preserves custom rules from schema %s across an update and migration',
+    (version) => {
+      const { storage, values } = createMemoryStorage();
+      const customRules = '  Meine eigenen Regeln\n[Eigene Kategorie]: Alles vom Wochenmarkt.\n';
+      const original = { ...settings('secret', 'model'), transferRulesOverride: customRules };
+      values.set(
+        'settings-key',
+        JSON.stringify({
+          version,
+          settingsByAccountId: {
+            custom: original,
+            defaults: { ...original, transferRulesOverride: null },
+          },
+        }),
+      );
+
+      const restarted = createOpenRouterSettingsStore({ storage, storageKey: 'settings-key' });
+      expect(
+        toStoredReadyOpenRouterReceiptConfiguration(restarted.read('custom')!)?.transferRules,
+      ).toBe(customRules);
+      expect(
+        toStoredReadyOpenRouterReceiptConfiguration(restarted.read('defaults')!)?.transferRules,
+      ).toBe(DEFAULT_TRANSFER_DERIVATION_RULES.text);
+      restarted.write('defaults', { ...restarted.read('defaults')!, apiKey: 'new-key' });
+      const migrated = createOpenRouterSettingsStore({ storage, storageKey: 'settings-key' });
+      expect(migrated.read('custom')).toEqual(original);
+      expect(
+        toStoredReadyOpenRouterReceiptConfiguration(migrated.read('custom')!)?.transferRules,
+      ).toBe(customRules);
+    },
+  );
+
   it('persists a versioned payload and isolates configurations by Microsoft account', () => {
     const { storage, values } = createMemoryStorage();
     const store = createOpenRouterSettingsStore({ storage, storageKey: 'settings-key' });

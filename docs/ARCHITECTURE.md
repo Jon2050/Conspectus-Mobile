@@ -125,6 +125,10 @@ user override of the receipt-item grouping rules. Schema 2 reads schema-1 settin
 keys, model selections or rules; the next successful settings write migrates the payload.
 It is never synchronized to OneDrive. Both complete stage prompts and the current default grouping
 rules remain versioned application assets instead of persisted user data.
+An existing `transferRulesOverride` is user-owned opaque text and must survive app releases,
+prompt/default-rule updates, storage migrations, catalog refreshes, and key/model changes verbatim.
+Only accounts with a null override follow new application defaults. Replacing a custom override
+with the current default requires the user's explicit Reset action (or configuration/local deletion).
 
 The Settings catalog contract is:
 
@@ -425,13 +429,21 @@ Safety invariants:
   unrelated export.
 - A cache failure after remote success is a reconciliation problem, not a retryable remote write.
 - A lost response or server failure can leave the remote outcome unknown. The UI identifies that
-  uncertainty; only the original bytes and eTag may be retried. A subsequent conflict discards
+  uncertainty. Before offering a retry, the upload handoff attempts a read-only confirmation for
+  up to 30 seconds: the remote eTag must have advanced, the size and downloaded bytes must exactly
+  match the exported snapshot, and a metadata recheck must confirm the same eTag. Account, file and
+  runtime context must remain current throughout. A proven match completes the normal cache/session
+  update without another PUT or SQL write. Failed or inconclusive checks retain the original error;
+  only the original bytes and eTag may be retried. A subsequent conflict discards
   those bytes and refreshes without replaying commands or claiming the transfer was not saved.
 - An eTag conflict discards stale pending bytes, closes the current sql.js runtime, downloads and
   validates the latest OneDrive snapshot, and reopens the runtime. Manual entry then allows review
   and resubmission of its draft; receipt creation revalidates immutable commands and requires an
   explicit save-again action without exposing a review surface or rerunning either model.
 - The application never silently overwrites a remotely changed database.
+- Both XHR and fetch uploads allow up to 120 seconds for the request and response, rather than
+  aborting XHR after 30 seconds. After the browser reports all bytes sent, progress becomes
+  indeterminate and explicitly waits for OneDrive confirmation; sent bytes alone never mean saved.
 
 ## Data compatibility
 
@@ -480,8 +492,10 @@ Updates that activate immediately on an uncontrolled page are also offered visib
 leaving the old in-memory bundle running without a prompt.
 
 Footer and Settings identify the running JavaScript bundle using immutable build-time metadata.
-The displayed version combines the package release version and the first eight characters of the
-checked-out Git commit (for example, `1.0.1-dev+8c81c40a`). The UTC timestamp records the actual build,
+Stable builds display only the package release version (for example, `1.1.0`); production requires
+a stable version without prerelease or commit suffixes. Prerelease local/preview builds retain the
+short commit suffix. The full checked-out Git commit remains in the embedded metadata and
+`build-info.json` for deployment verification. The UTC timestamp records the actual build,
 not commit or deployment time. The app never overwrites these values with separately fetched server
 metadata, which could belong to another build while a PWA update is waiting for confirmation.
 

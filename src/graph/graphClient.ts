@@ -56,6 +56,7 @@ interface CreateGraphClientOptions {
   readonly createXhrFn?: () => XMLHttpRequest;
   readonly readTimeoutMs?: number;
   readonly downloadTimeoutMs?: number;
+  readonly uploadTimeoutMs?: number;
 }
 
 class GraphClientError extends Error {
@@ -664,7 +665,7 @@ export const createGraphClient = (options: CreateGraphClientOptions): GraphClien
           xhr.setRequestHeader('Authorization', `Bearer ${accessToken}`);
           xhr.setRequestHeader('Content-Type', 'application/octet-stream');
           xhr.setRequestHeader('If-Match', expectedETag);
-          xhr.timeout = 30000;
+          xhr.timeout = options.uploadTimeoutMs ?? 120_000;
 
           xhr.upload.onprogress = (event) => {
             if (event.lengthComputable) {
@@ -727,41 +728,63 @@ export const createGraphClient = (options: CreateGraphClientOptions): GraphClien
               ),
             );
           };
+          xhr.onabort = xhr.onerror;
 
           xhr.send(toRequestBody(bytes));
         });
       }
 
-      const response = await executeRequest(
-        url,
-        {
-          method: 'PUT',
-          body: toRequestBody(bytes),
-          headers: {
-            'Content-Type': 'application/octet-stream',
-            'If-Match': expectedETag,
-          },
-        },
-        assertContext,
-      );
+      let acceptedStatus: number | undefined;
       try {
-        const payload = await readJsonPayload(
-          response,
-          'Microsoft Graph upload response did not include the required file fields.',
-        );
-        return normalizeUploadResult(
-          payload,
-          'Microsoft Graph upload response did not include the required file fields.',
-        );
+        return await withRequestDeadline(async (signal) => {
+          const response = await executeRequest(
+            url,
+            {
+              method: 'PUT',
+              signal,
+              body: toRequestBody(bytes),
+              headers: {
+                'Content-Type': 'application/octet-stream',
+                'If-Match': expectedETag,
+              },
+            },
+            assertContext,
+          );
+          acceptedStatus = response.status;
+          try {
+            const payload = await readJsonPayload(
+              response,
+              'Microsoft Graph upload response did not include the required file fields.',
+            );
+            return normalizeUploadResult(
+              payload,
+              'Microsoft Graph upload response did not include the required file fields.',
+            );
+          } catch (error) {
+            // The successful HTTP status already confirms remote acceptance, even if
+            // reading or validating the response fails. Callers must reconcile, not PUT again.
+            throw new GraphClientError(
+              'unknown',
+              'Microsoft Graph upload response did not include the required file fields.',
+              response.status,
+              error,
+            );
+          }
+        }, options.uploadTimeoutMs ?? 120_000);
       } catch (error) {
-        // The successful HTTP status already confirms remote acceptance, even if
-        // reading or validating the response fails. Callers must reconcile, not PUT again.
-        throw new GraphClientError(
-          'unknown',
-          'Microsoft Graph upload response did not include the required file fields.',
-          response.status,
-          error,
-        );
+        if (error instanceof GraphClientError) throw error;
+        if (acceptedStatus !== undefined && acceptedStatus >= 200 && acceptedStatus < 300) {
+          throw new GraphClientError(
+            'unknown',
+            'Microsoft Graph accepted the upload but its response could not be read.',
+            acceptedStatus,
+            error,
+          );
+        }
+        if (error instanceof DOMException && error.name === 'TimeoutError') {
+          throw normalizeNetworkError(error);
+        }
+        throw error;
       }
     },
   };

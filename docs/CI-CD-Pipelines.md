@@ -347,15 +347,17 @@ npm run check:lighthouse -- https://jon2050.github.io/Conspectus-Mobile/previews
 ### Build identity (`build-info.json`)
 
 Every Vite build generates one identity object, embeds it in the JavaScript bundle, and emits the
-same object as `build-info.json`. Its fields are `version` (package version plus eight-character
-commit suffix), `commitSha` (full checked-out Git SHA), and `buildTimeUtc` (UTC build time).
+same object as `build-info.json`. Its fields are `version` (the package version, with no suffix for
+stable versions), `commitSha` (full checked-out Git SHA), and `buildTimeUtc` (UTC build time).
 Release versions in `package.json` and `package-lock.json` remain governed by the release process;
-ordinary commits do not require a package-version bump. Source archives without Git are labelled
-`+local` for local use; CI fails if the checked-out commit cannot be resolved.
+ordinary commits do not require a package-version bump. Prerelease versions in local/preview builds
+retain an eight-character commit suffix (`+local` for source archives without Git). CI fails if the
+checked-out commit cannot be resolved. Production builds and artifact verification require a stable
+`X.Y.Z` version, rejecting `-dev`, other prerelease labels and commit suffixes.
 Build jobs fetch complete Git history and release tags. A package version below a stable published
 `vX.Y.Z` tag fails the build, including a prerelease below an already released identical core
-version. The current development version is `1.0.1-dev`, correcting the historical M9 downgrade
-from published `1.0.0` to `0.9.01` through `0.9.05`; it does not claim a new production release.
+version. The current package version is `1.1.0`. Commit identity remains a separate metadata field
+and is checked against the expected deployment SHA and embedded bundle even for stable versions.
 
 `verify-build-channel.mjs` rejects missing or invalid metadata, an unexpected commit (`--commit`),
 and metadata whose identity is absent from the app bundle. `Quality` and `Deploy Production` supply

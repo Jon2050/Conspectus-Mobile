@@ -36,7 +36,7 @@ const VALID_HTACCESS = `DirectoryIndex index.html
 const VALID_SERVICE_WORKER = 'createHandlerBoundToURL("index.html")';
 const VALID_PREVIEW_SERVICE_WORKER = 'createHandlerBoundToURL("index.html")';
 const VALID_BUILD_INFO = {
-  version: '1.0.1-dev+12345678',
+  version: '1.1.0',
   commitSha: '1234567890abcdef1234567890abcdef12345678',
   buildTimeUtc: '2026-10-21T10:20:30Z',
 };
@@ -109,6 +109,37 @@ const runVerifier = (args: string[]) =>
   });
 
 describe('verify-build-channel script', () => {
+  it.each(['1.1.1-dev+12345678', '1.1.0+12345678'])(
+    'rejects production version suffixes even when metadata matches the bundle: %s',
+    (version) => {
+      const fixturePath = createFixtureDirectory();
+      try {
+        const distPath = createDistFixture(
+          fixturePath,
+          "navigator.serviceWorker.register('/test-app/sw.js', { scope: '/test-app/' });",
+        );
+        const info = { ...VALID_BUILD_INFO, version };
+        writeText(path.join(distPath, 'build-info.json'), JSON.stringify(info));
+        writeText(
+          path.join(distPath, 'assets', 'identity.js'),
+          `const info = ${JSON.stringify(info)};`,
+        );
+        const result = runVerifier([
+          '--dist',
+          distPath,
+          '--channel',
+          'production',
+          '--base',
+          '/test-app/',
+        ]);
+        expect(result.status).toBe(1);
+        expect(result.stderr).toContain('production requires X.Y.Z');
+      } finally {
+        rmSync(fixturePath, { force: true, recursive: true });
+      }
+    },
+  );
+
   it.each([
     {
       name: 'timestamp from another build',
@@ -121,9 +152,9 @@ describe('verify-build-channel script', () => {
       expected: 'valid UTC build timestamp',
     },
     {
-      name: 'version unrelated to the commit',
-      overrides: { version: '0.9.05' },
-      expected: 'Build version must identify',
+      name: 'prerelease version unrelated to the commit',
+      overrides: { version: '1.1.1-dev+aaaaaaaa' },
+      expected: 'Build metadata requires',
     },
   ])('rejects $name', ({ overrides, expected }) => {
     const fixturePath = createFixtureDirectory();

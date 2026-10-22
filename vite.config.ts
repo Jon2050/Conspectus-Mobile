@@ -21,14 +21,20 @@ export const createBuildInfo = (
   version: string,
   commitSha: string | null,
   buildDate: Date = new Date(),
+  deployChannel: string = '',
 ) => {
   if (commitSha !== null && !/^[a-f0-9]{40}$/u.test(commitSha)) {
     throw new Error('Build commit SHA must be a full lowercase Git SHA.');
   }
 
+  const isStableVersion = /^\d+\.\d+\.\d+$/u.test(version);
+  if (deployChannel.trim().toLowerCase() === 'production' && !isStableVersion) {
+    throw new Error('Production builds require a stable package version (X.Y.Z).');
+  }
+
   const buildTime = buildDate.toISOString();
   return {
-    version: `${version}+${commitSha?.slice(0, 8) ?? 'local'}`,
+    version: isStableVersion ? version : `${version}+${commitSha?.slice(0, 8) ?? 'local'}`,
     commitSha,
     buildTimeUtc: buildTime.replace(/\.\d{3}Z$/u, 'Z'),
   };
@@ -122,7 +128,12 @@ export default defineConfig(({ command, mode }) => {
   if (command === 'build' && commitSha !== null) {
     verifyReleaseVersion(packageJson.version, readGit(['tag', '--list', 'v*']).split(/\r?\n/u));
   }
-  const buildInfo = createBuildInfo(packageJson.version, commitSha);
+  const buildInfo = createBuildInfo(
+    packageJson.version,
+    commitSha,
+    new Date(),
+    environment.DEPLOY_CHANNEL,
+  );
   return {
     base: basePath,
     define: {

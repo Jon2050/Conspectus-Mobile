@@ -1462,7 +1462,7 @@ test('shows the running build identity in footer and Settings despite newer serv
   await page.goto(appPath('#/settings'));
   await expandSettingsSections(page);
   await expect(page.getByTestId('settings-build-version')).toHaveText(buildInfo.version);
-  expect(buildInfo.version).toMatch(/\+[a-f0-9]{8}$/u);
+  expect(buildInfo.version).toMatch(/^\d+\.\d+\.\d+$/u);
   const expected = await page.evaluate(({ version, buildTimeUtc }) => {
     const date = new Date(buildTimeUtc);
     const settingsTime = new Intl.DateTimeFormat(undefined, {
@@ -2183,7 +2183,7 @@ for (const keepControlledTab of [false, true]) {
     );
     const nextSettingsAssetName = 'SettingsRoute-update-regression.js';
     const nextSettingsAssetPath = path.join(distDirectory, 'assets', nextSettingsAssetName);
-    const nextVersion = currentBuild.version.replace(/\+[a-f0-9]{8}$/u, '+bbbbbbbb');
+    const nextVersion = currentBuild.version.replace(/\d+$/u, (patch) => String(Number(patch) + 1));
     const nextBuildTime = new Date(Date.parse(currentBuild.buildTimeUtc) + 60_000)
       .toISOString()
       .replace(/\.\d{3}Z$/u, 'Z');
@@ -2401,6 +2401,12 @@ test('saves transfer happy path, transitions through upload states, and updates 
   await expect(
     page.locator('[data-testid^="account-amount-"][data-account-id="4"]'),
   ).toHaveAttribute('data-amount-cents', '1550');
+
+  await page.goto(appPath('#/add'));
+  await expect(page.getByTestId('add-transfer-date')).toBeVisible();
+  await expect(page.getByTestId('add-transfer-success-status')).toHaveCount(0);
+  await expect(page.getByTestId('add-transfer-name')).toHaveValue('');
+  expect(await getLocalTransferWriteCallCount(page)).toBe(1);
 });
 
 test('scrolls add transfer validation errors into view after submit', async ({ page }) => {
@@ -2447,8 +2453,8 @@ test('blocks a cleared transfer date before any local write or upload', async ({
   expect(await getGraphUploadCallCount(page)).toBe(0);
 });
 
-test('shows determinate upload progress during slow upload', async ({ page }) => {
-  await seedAndBindTestDb(page, { uploadDelayMs: 2000 });
+test('distinguishes sent bytes from OneDrive confirmation during slow upload', async ({ page }) => {
+  await seedAndBindTestDb(page, { uploadDelayMs: 4000 });
   await page.goto(appPath('#/add'));
   await expect(page.getByTestId('add-transfer-date')).toBeVisible();
 
@@ -2468,6 +2474,14 @@ test('shows determinate upload progress during slow upload', async ({ page }) =>
   await expect(
     page.getByTestId('add-transfer-upload-status').getByTestId('progress-bar'),
   ).toHaveAttribute('max', '20');
+  await expect(page.getByTestId('add-transfer-success-status')).toHaveCount(0);
+
+  await expect(
+    page.getByTestId('add-transfer-upload-status').getByTestId('progress-text'),
+  ).toHaveText('Data sent. Waiting for confirmation from OneDrive …');
+  await expect(
+    page.getByTestId('add-transfer-upload-status').getByTestId('progress-bar'),
+  ).not.toHaveAttribute('value');
   await expect(page.getByTestId('add-transfer-success-status')).toHaveCount(0);
 
   await expect(page.locator('.toast-container')).toContainText('Transfer saved and uploaded.', {
@@ -2549,6 +2563,12 @@ test('keeps a failed upload retryable after hash navigation without a second loc
   await expect(page.locator('.toast-container')).toContainText('Transfer saved and uploaded.');
   await expect(page.getByTestId('pending-transfer-sync')).not.toBeVisible();
   expect(await getLocalTransferWriteCallCount(page)).toBe(1);
+
+  await page.evaluate(() => {
+    window.location.hash = '#/add';
+  });
+  await expect(page.getByTestId('add-transfer-date')).toBeVisible();
+  await expect(page.getByTestId('add-transfer-success-status')).toHaveCount(0);
 });
 
 test('recovers from OneDrive upload conflict by refreshing the DB before resubmitting', async ({
