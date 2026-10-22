@@ -413,6 +413,11 @@
     "deleted": "Transfer gelöscht und hochgeladen.",
     "pending": "Eine Transferänderung benötigt deine Aufmerksamkeit.",
     "conflictReady": "Die aktuelle Datenbank wurde geladen. Die Änderung kann erneut gespeichert werden, sofern der ursprüngliche Transfer unverändert ist.",
-    "localFailed": "Die Änderung konnte nicht gespeichert werden. Falls der Transfer inzwischen geändert oder gelöscht wurde, schließe das Menü und öffne ihn erneut."
+    "localFailed": "Die Änderung konnte nicht gespeichert werden. Falls der Transfer inzwischen geändert oder gelöscht wurde, schließe das Menü und öffne ihn erneut.",
+    "balanceHintTitle": "Hinweis zu Kontobeträgen",
+    "balanceHint": "Beim Speichern oder Löschen werden die Beträge der beteiligten Konten entsprechend angepasst.",
+    "confirmDeleteTitle": "Transfer wirklich löschen?",
+    "confirmDeleteDescription": "Der Transfer „{name}“ wird gelöscht. Die Kontobeträge werden entsprechend angepasst.",
+    "cancelDelete": "Abbrechen"
   }
 }

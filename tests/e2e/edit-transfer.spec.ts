@@ -18,6 +18,7 @@ const setup = async (
   page: Page,
   failUpload: boolean | 'conflict' = false,
   initialBytes = fixtureBytes,
+  uploadDelayMs = 100,
 ) => {
   await installMockAuthClient(page, { startAuthenticated: true });
   await installMockGraphClient(page, {
@@ -30,7 +31,7 @@ const setup = async (
           },
         ]
       : [],
-    uploadDelayMs: 100,
+    uploadDelayMs,
   });
   await installMockCacheStore(page);
   await installPersistedBinding(page);
@@ -71,8 +72,34 @@ const openEditor = async (page: Page) => {
 test('prefills every field and closing discards unsaved changes without receipt controls', async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 320, height: 720 });
   await setup(page);
   await openEditor(page);
+  const dialog = page.getByRole('dialog');
+  const header = dialog.locator('.bottom-sheet__heading');
+  const remove = header.getByTestId('edit-transfer-delete');
+  await expect(remove).toBeVisible();
+  await expect(dialog.getByTestId('bottom-sheet-close')).toHaveCount(0);
+  const titleBounds = await header.getByRole('heading').boundingBox();
+  const deleteBounds = await remove.boundingBox();
+  expect(titleBounds).not.toBeNull();
+  expect(deleteBounds).not.toBeNull();
+  expect(deleteBounds!.x).toBeGreaterThanOrEqual(titleBounds!.x + titleBounds!.width);
+  const hint = dialog.getByTestId('edit-transfer-balance-hint');
+  await expect(hint).not.toHaveAttribute('open');
+  await expect(hint.locator('p')).not.toBeVisible();
+  await hint.locator('summary').click();
+  await expect(hint.locator('p')).toContainText('updates the balances');
+  await expect(hint.locator('p')).toBeVisible();
+  await hint.locator('summary').click();
+  const actions = dialog.locator('.add-transfer-form__actions');
+  await actions.scrollIntoViewIfNeeded();
+  const closeBounds = await actions.getByTestId('edit-transfer-close').boundingBox();
+  const saveBounds = await actions.getByTestId('edit-transfer-submit').boundingBox();
+  expect(closeBounds).not.toBeNull();
+  expect(saveBounds).not.toBeNull();
+  expect(closeBounds!.x + closeBounds!.width).toBeLessThanOrEqual(saveBounds!.x);
+  expect(Math.abs(closeBounds!.y - saveBounds!.y)).toBeLessThan(2);
   await expect(page.getByTestId('add-transfer-date')).toHaveValue('2024-04-07');
   await expect(page.getByTestId('add-transfer-name')).toHaveValue('Groceries');
   await expect(page.getByTestId('add-transfer-buyplace')).toHaveValue('Market');
@@ -83,9 +110,12 @@ test('prefills every field and closing discards unsaved changes without receipt 
   await expect(page.getByTestId('add-transfer-category-2')).toHaveValue('-1');
   await expect(page.getByTestId('add-transfer-category-3')).toHaveValue('-1');
   await expect(page.locator('input[type="file"]')).toHaveCount(0);
+  await dialog.locator('.bottom-sheet__content').evaluate((element) => {
+    element.scrollTop = 0;
+  });
   await page.screenshot({ path: test.info().outputPath('transfer-editor.png') });
   await page.getByTestId('add-transfer-name').fill('Unsaved change');
-  await page.getByTestId('bottom-sheet-close').click();
+  await page.getByTestId('edit-transfer-close').click();
   await expect(page.getByTestId('transfer-card-2')).toContainText('Groceries');
   expect(await getGraphUploadCallCount(page)).toBe(0);
   await openEditor(page);
@@ -145,6 +175,20 @@ test('deletes the complete transfer even with invalid unsaved fields and reverse
   await page.getByTestId('add-transfer-name').fill('');
   await page.getByTestId('add-transfer-amount').fill('');
   await page.getByTestId('edit-transfer-delete').click();
+  const confirmation = page.getByRole('dialog', { name: 'Delete transfer?', exact: true });
+  await expect(confirmation).toBeVisible();
+  await expect(confirmation).toContainText('Groceries');
+  expect(await getGraphUploadCallCount(page)).toBe(0);
+  await page.getByTestId('edit-transfer-delete-cancel').click();
+  await expect(confirmation).toHaveCount(0);
+  await expect(page.getByTestId('add-transfer-name')).toHaveValue('');
+  expect(await getGraphUploadCallCount(page)).toBe(0);
+  await page.getByTestId('edit-transfer-delete').click();
+  await page.keyboard.press('Escape');
+  await expect(confirmation).toHaveCount(0);
+  await expect(page.getByTestId('edit-transfer-form')).toBeVisible();
+  await page.getByTestId('edit-transfer-delete').click();
+  await page.getByTestId('edit-transfer-delete-confirm').click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByTestId('transfer-card-2')).toHaveCount(0);
   await expect(page.getByTestId('transfer-card-3')).toBeVisible();
@@ -187,7 +231,7 @@ test('retains a failed edit across closing and navigation and retries exactly th
   await expect(page.getByTestId('edit-transfer-retry')).toBeVisible();
   await expect(page.getByTestId('edit-transfer-submit')).toHaveCount(0);
   await expect(page.getByTestId('edit-transfer-delete')).toBeDisabled();
-  await page.getByTestId('bottom-sheet-close').click();
+  await page.getByTestId('edit-transfer-close').click();
   await page.getByRole('link', { name: 'Accounts', exact: true }).click();
   await page.getByTestId('pending-transfer-edit').getByRole('button').click();
   await page.getByTestId('edit-transfer-retry').click();
@@ -248,7 +292,7 @@ test('refuses to overwrite a transfer changed remotely during conflict recovery'
     'close this menu and reopen it',
   );
   expect(await getGraphUploadCallCount(page)).toBe(1);
-  await page.getByTestId('bottom-sheet-close').click();
+  await page.getByTestId('edit-transfer-close').click();
   await expect(page.getByTestId('transfer-card-2')).toContainText('Changed remotely');
   await openEditor(page);
   await expect(page.getByTestId('add-transfer-name')).toHaveValue('Changed remotely');
@@ -260,7 +304,7 @@ test('supports keyboard entry and keeps month swipes on transfer cards', async (
   await button.focus();
   await button.press('Enter');
   await expect(page.getByTestId('edit-transfer-form')).toBeVisible();
-  await page.getByTestId('bottom-sheet-close').click();
+  await page.getByTestId('edit-transfer-close').click();
   await button.evaluate((target) => {
     const dispatch = (type: string, x: number) => {
       const touch = { clientX: x, clientY: 300 };
@@ -305,4 +349,17 @@ test('keeps the original hidden account selectable when editing historical trans
     saved.exec('SELECT from_account FROM transfer WHERE transfer_id = 2;')[0]?.values[0],
   ).toEqual([7]);
   saved.close();
+});
+
+test('keeps footer close and header delete disabled during upload', async ({ page }) => {
+  await setup(page, false, fixtureBytes, 2500);
+  await openEditor(page);
+  await page.getByTestId('add-transfer-name').fill('Saving edit');
+  await page.getByTestId('edit-transfer-submit').click();
+  await expect(page.getByTestId('edit-transfer-close')).toBeDisabled();
+  await expect(page.getByTestId('edit-transfer-delete')).toBeDisabled();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByTestId('transfer-card-2')).toContainText('Saving edit');
 });

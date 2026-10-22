@@ -18,6 +18,7 @@
     showCloseButton = true,
     onClose = () => {},
     children,
+    headerActions,
   }: {
     isOpen?: boolean;
     title?: string;
@@ -27,6 +28,7 @@
     showCloseButton?: boolean;
     onClose?: () => void;
     children?: Snippet;
+    headerActions?: Snippet;
   } = $props();
   let dialogElement = $state<HTMLDialogElement | null>(null);
   let contentElement = $state<HTMLDivElement | null>(null);
@@ -135,7 +137,9 @@
       </div>
       <div class="bottom-sheet__heading">
         {#if title}<h3 id={titleId}>{title}</h3>{/if}
-        {#if showCloseButton}
+        {#if headerActions}
+          {@render headerActions()}
+        {:else if showCloseButton}
           <button
             type="button"
             class="app-button app-button--secondary"
