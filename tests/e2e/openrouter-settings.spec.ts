@@ -191,10 +191,13 @@ test('validates a write-only key and configures both receipt roles from the live
   await expect(page.getByTestId('openrouter-api-key-input')).toHaveValue('');
   await expect(visionSelect).toBeEnabled();
   await expect(transferSelect).toBeEnabled();
-  await expect(visionSelect.locator('option')).toContainText([
-    'Select a compatible free model',
-    'Shared Free Model — provider/shared:free',
-  ]);
+  for (const select of [visionSelect, transferSelect]) {
+    await expect(select.locator('option')).toHaveText([
+      'Select a compatible free model',
+      'Shared Free Model',
+    ]);
+    await expect(select.locator('option').last()).toHaveAttribute('value', 'provider/shared:free');
+  }
   await expect(page.getByTestId('openrouter-transfer-prompt')).toHaveValue(
     /Als Transfernamen erstellst du eine Zusammenfassung/u,
   );

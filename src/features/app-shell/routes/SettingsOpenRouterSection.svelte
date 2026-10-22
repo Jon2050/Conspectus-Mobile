@@ -196,7 +196,7 @@
     >
       <option value="">{$_('settings.openRouter.models.placeholder')}</option>
       {#each state.visionModels as model (model.id)}
-        <option value={model.id}>{model.label}</option>
+        <option value={model.id}>{model.name}</option>
       {/each}
     </select>
     {#if state.catalogStatus === 'ready' && state.visionModels.length === 0}
@@ -218,7 +218,7 @@
     >
       <option value="">{$_('settings.openRouter.models.placeholder')}</option>
       {#each state.transferModels as model (model.id)}
-        <option value={model.id}>{model.label}</option>
+        <option value={model.id}>{model.name}</option>
       {/each}
     </select>
     {#if state.catalogStatus === 'ready' && state.transferModels.length === 0}

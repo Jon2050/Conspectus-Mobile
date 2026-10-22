@@ -511,7 +511,7 @@
     line-height: 1.25;
     color: var(--text-secondary);
     min-width: 0;
-    flex: 1 1 12rem;
+    flex: 0 1 auto;
   }
 
   .transfer-card__account {

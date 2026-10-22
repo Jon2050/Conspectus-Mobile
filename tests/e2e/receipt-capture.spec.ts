@@ -718,6 +718,31 @@ test('edits shared fields and grouped transfers and saves the reviewed batch onc
   await expect(page.locator('[data-testid*="receipt-review"]')).toHaveCount(0);
   expect(await getLocalTransferWriteCallCount(page)).toBe(1);
   expect(await getGraphUploadCallCount(page)).toBe(1);
+  const summary = page.getByTestId('receipt-saved-summary');
+  await expect(page.getByTestId('receipt-saved-context')).toHaveText(
+    'July 30, 2026 — Rewe korrigiert — Checking',
+  );
+  const items = summary.locator('li');
+  await expect(items).toHaveCount(2);
+  await expect(items.nth(0)).toHaveText(
+    /Brot korrigiert \(Einkauf \/ Haushalt, Verbrauchsgüter, Reinigung\) — €4\.00/u,
+  );
+  await expect(items.nth(1)).toHaveText(
+    /Reiniger \(Einkauf \/ Haushalt, Verbrauchsgüter, Reinigung\) — €1\.00/u,
+  );
+  await expect(summary.locator('ul')).not.toContainText('July 30, 2026');
+  await expect(summary.locator('ul')).not.toContainText('Rewe korrigiert');
+  await expect(summary.locator('ul')).not.toContainText('Checking');
+  for (const width of [320, 390, 720]) {
+    await page.setViewportSize({ width, height: 844 });
+    expect(await summary.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+      true,
+    );
+  }
+  await page.screenshot({
+    path: test.info().outputPath('receipt-shared-summary.png'),
+    fullPage: true,
+  });
   await page.evaluate(() => {
     window.location.hash = '#/transfers';
   });
