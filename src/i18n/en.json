@@ -413,6 +413,11 @@
     "deleted": "Transfer deleted and uploaded.",
     "pending": "A transfer change needs your attention.",
     "conflictReady": "The latest database has been loaded. You can save again if the original transfer is unchanged.",
-    "localFailed": "The change could not be saved. If the transfer has changed or was deleted, close this menu and reopen it."
+    "localFailed": "The change could not be saved. If the transfer has changed or was deleted, close this menu and reopen it.",
+    "balanceHintTitle": "About account balances",
+    "balanceHint": "Saving or deleting a transfer updates the balances of the accounts involved accordingly.",
+    "confirmDeleteTitle": "Delete transfer?",
+    "confirmDeleteDescription": "The transfer “{name}” will be deleted. The account balances will be adjusted accordingly.",
+    "cancelDelete": "Cancel"
   }
 }

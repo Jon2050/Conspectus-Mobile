@@ -50,6 +50,7 @@
   let optionsState = optionsController.getState();
   let state = controller.getState();
   let validationErrors: readonly string[] = [];
+  let deleteConfirmationIsOpen = false;
   const unsubscribe = controller.subscribe((next) => {
     state = next;
   });
@@ -63,6 +64,7 @@
     unsubscribe();
     unsubscribeOptions();
   });
+  $: if (!isOpen) deleteConfirmationIsOpen = false;
   $: offline = !$networkStateStore;
   $: busy = [
     'validating',
@@ -74,6 +76,16 @@
   ].includes(state.phase);
   $: editable = ['idle', 'failed'].includes(state.phase);
   $: disabled = offline || !editable || optionsState.operation !== 'ready';
+  const close = () => {
+    if (busy || deleteConfirmationIsOpen) return;
+    isOpen = false;
+    onClose();
+  };
+  const confirmDelete = () => {
+    if (disabled) return;
+    deleteConfirmationIsOpen = false;
+    void controller.remove(optionsState, $_, offline);
+  };
   const submit = async () => {
     validationErrors = await controller.submit(fields, optionsState, $_, offline);
   };
@@ -88,23 +100,31 @@
 <BottomSheet
   bind:isOpen
   title={$_('editTransfer.title')}
+  showCloseButton={false}
   closeLabel={$_('addTransfer.close')}
-  canClose={!busy}
+  canClose={!busy && !deleteConfirmationIsOpen}
   {onClose}
 >
-  <form
-    class="add-transfer-form"
-    data-testid="edit-transfer-form"
-    on:submit|preventDefault={submit}
-  >
+  {#snippet headerActions()}
     <button
       type="button"
       class="app-button edit-transfer-delete"
       data-testid="edit-transfer-delete"
       {disabled}
-      on:click={() => controller.remove(optionsState, $_, offline)}
-      >{$_('editTransfer.delete')}</button
+      on:click={() => {
+        deleteConfirmationIsOpen = true;
+      }}>{$_('editTransfer.delete')}</button
     >
+  {/snippet}
+  <form
+    class="add-transfer-form"
+    data-testid="edit-transfer-form"
+    on:submit|preventDefault={submit}
+  >
+    <details class="edit-transfer-hint" data-testid="edit-transfer-balance-hint">
+      <summary>{$_('editTransfer.balanceHintTitle')}</summary>
+      <p>{$_('editTransfer.balanceHint')}</p>
+    </details>
     <ManualTransferForm
       bind:fields
       {optionsState}
@@ -157,59 +177,116 @@
           total={state.recoveryProgress.totalBytes}
         />{/if}
     {/if}
-    {#if state.phase === 'upload_failed'}
-      <button
-        type="button"
-        class="app-button app-button--primary"
-        data-testid="edit-transfer-retry"
-        disabled={offline}
-        on:click={() => controller.retry($_, offline)}>{$_('addTransfer.save.retry')}</button
-      >
-    {:else if state.phase === 'conflict'}
-      <button
-        type="button"
-        class="app-button app-button--primary"
-        disabled={offline}
-        data-testid="edit-transfer-conflict-refresh"
-        on:click={refreshConflict}>{$_('addTransfer.save.conflictAction')}</button
-      >
-    {:else if state.phase === 'conflict_ready'}
+    {#if state.phase === 'conflict_ready'}
       <p class="add-transfer-form__status">{$_('editTransfer.conflictReady')}</p>
-      <button
-        type="button"
-        class="app-button app-button--primary"
-        disabled={offline}
-        data-testid="edit-transfer-conflict-retry"
-        on:click={() => controller.retryAfterConflict($_, offline)}
-        >{$_('addTransfer.receipt.commit.retryAfterConflict')}</button
-      >
-    {:else if state.phase === 'local_commit_recovery_failed'}
-      <button
-        type="button"
-        class="app-button app-button--primary"
-        disabled={offline}
-        on:click={() => controller.retryLocalRecovery($_)}
-        >{$_('addTransfer.receipt.commit.retryLocalRecovery')}</button
-      >
     {:else if state.phase === 'remote_commit_recovery_failed'}
       <p class="add-transfer-form__error" role="alert">
         {$_('addTransfer.receipt.commit.remoteCommitRecoveryFailed')}
       </p>
-    {:else}
-      <button
-        type="submit"
-        class="app-button app-button--primary add-transfer-form__action"
-        data-testid="edit-transfer-submit"
-        {disabled}>{$_('editTransfer.save')}</button
-      >
     {/if}
+    <div class="add-transfer-form__actions">
+      <button
+        type="button"
+        class="app-button app-button--secondary add-transfer-form__action"
+        data-testid="edit-transfer-close"
+        disabled={busy}
+        on:click={close}>{$_('addTransfer.close')}</button
+      >
+      {#if state.phase === 'upload_failed'}
+        <button
+          type="button"
+          class="app-button app-button--primary"
+          data-testid="edit-transfer-retry"
+          disabled={offline}
+          on:click={() => controller.retry($_, offline)}>{$_('addTransfer.save.retry')}</button
+        >
+      {:else if state.phase === 'conflict'}
+        <button
+          type="button"
+          class="app-button app-button--primary"
+          disabled={offline}
+          data-testid="edit-transfer-conflict-refresh"
+          on:click={refreshConflict}>{$_('addTransfer.save.conflictAction')}</button
+        >
+      {:else if state.phase === 'conflict_ready'}
+        <button
+          type="button"
+          class="app-button app-button--primary"
+          disabled={offline}
+          data-testid="edit-transfer-conflict-retry"
+          on:click={() => controller.retryAfterConflict($_, offline)}
+          >{$_('addTransfer.receipt.commit.retryAfterConflict')}</button
+        >
+      {:else if state.phase === 'local_commit_recovery_failed'}
+        <button
+          type="button"
+          class="app-button app-button--primary"
+          disabled={offline}
+          on:click={() => controller.retryLocalRecovery($_)}
+          >{$_('addTransfer.receipt.commit.retryLocalRecovery')}</button
+        >
+      {:else if state.phase !== 'remote_commit_recovery_failed'}
+        <button
+          type="submit"
+          class="app-button app-button--primary add-transfer-form__action"
+          data-testid="edit-transfer-submit"
+          {disabled}>{$_('editTransfer.save')}</button
+        >
+      {/if}
+    </div>
   </form>
 </BottomSheet>
 
+<BottomSheet
+  bind:isOpen={deleteConfirmationIsOpen}
+  title={$_('editTransfer.confirmDeleteTitle')}
+  showCloseButton={false}
+  canClose={!busy}
+>
+  <div
+    class="add-transfer-form edit-transfer-confirmation"
+    data-testid="edit-transfer-delete-confirmation"
+  >
+    <p>{$_('editTransfer.confirmDeleteDescription', { values: { name: transfer.name } })}</p>
+    <div class="add-transfer-form__actions">
+      <button
+        type="button"
+        class="app-button app-button--secondary add-transfer-form__action"
+        data-testid="edit-transfer-delete-cancel"
+        on:click={() => {
+          deleteConfirmationIsOpen = false;
+        }}>{$_('editTransfer.cancelDelete')}</button
+      >
+      <button
+        type="button"
+        class="app-button app-button--danger add-transfer-form__action"
+        data-testid="edit-transfer-delete-confirm"
+        {disabled}
+        on:click={confirmDelete}>{$_('editTransfer.delete')}</button
+      >
+    </div>
+  </div>
+</BottomSheet>
+
 <style>
+  .edit-transfer-confirmation p {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+  .edit-transfer-hint {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+  }
+  .edit-transfer-hint summary {
+    cursor: pointer;
+    padding-block: 0.35rem;
+  }
+  .edit-transfer-hint p {
+    margin: 0.35rem 0;
+  }
   .edit-transfer-delete {
     color: var(--amount-negative);
     border: 1px solid currentColor;
-    align-self: flex-start;
+    flex: none;
   }
 </style>
