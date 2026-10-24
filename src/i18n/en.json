@@ -36,6 +36,9 @@
     "emptyState": "No accounts match the visible non-primary filter yet. If you have not selected a DB file, open Settings and bind your OneDrive database."
   },
   "transfers": {
+    "newestFirst": "Newest first",
+    "oldestFirst": "Oldest first",
+    "toggleSortOrder": "Sort order: {order}. Reverse order",
     "title": "Transfers",
     "previousMonth": "Previous month",
     "previousMonthButton": "‹",

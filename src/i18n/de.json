@@ -36,6 +36,9 @@
     "emptyState": "Es wurden noch keine passenden Konten gefunden. Bitte verknüpfe unter 'Einstellungen' eine Datenbank."
   },
   "transfers": {
+    "newestFirst": "Neueste oben",
+    "oldestFirst": "Älteste oben",
+    "toggleSortOrder": "Sortierung: {order}. Reihenfolge umkehren",
     "title": "Transfers",
     "previousMonth": "Vorheriger Monat",
     "previousMonthButton": "‹",

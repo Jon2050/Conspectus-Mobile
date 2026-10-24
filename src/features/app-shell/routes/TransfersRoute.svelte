@@ -8,6 +8,7 @@
     type SyncStateStore,
     formatEpochDayToDate,
     formatAmountDisplay,
+    appToastStore,
   } from '@shared';
   import { _, locale } from 'svelte-i18n';
   import {
@@ -29,12 +30,19 @@
     shiftMonthAnchorEpochDay,
     toMonthKey,
   } from './transfersMonthNavigation';
+  import {
+    readTransfersSortOrder,
+    saveTransfersSortOrder,
+    sortTransfers,
+  } from './transfersSortOrder';
 
   const SWIPE_DRAG_LOCK_THRESHOLD_PX = 10;
   const SWIPE_DRAG_MAX_OFFSET_PX = 56;
 
   export let onEditTransfer: (transferId: number, bookingDateEpochDay: number) => void = () => {};
   let suppressTransferClick = false;
+  let sortOrder = readTransfersSortOrder();
+  let sortToastId: string | null = null;
 
   export let syncStateStore: SyncStateStore = appSyncStateStore;
   export let controller: TransfersRouteController = createTransfersRouteController(
@@ -53,6 +61,20 @@
 
   $: monthKey = toMonthKey(monthAnchorEpochDay);
   $: monthLabel = formatMonthLabel(monthAnchorEpochDay, $locale);
+  $: sortOrderLabel = $_(
+    sortOrder === 'newest-first' ? 'transfers.newestFirst' : 'transfers.oldestFirst',
+  );
+
+  const toggleSortOrder = (): void => {
+    sortOrder = sortOrder === 'oldest-first' ? 'newest-first' : 'oldest-first';
+    saveTransfersSortOrder(sortOrder);
+    if (sortToastId !== null) appToastStore.remove(sortToastId);
+    sortToastId = appToastStore.show(
+      get(_)(sortOrder === 'newest-first' ? 'transfers.newestFirst' : 'transfers.oldestFirst'),
+      'info',
+      2000,
+    );
+  };
 
   $: {
     const syncSnapshot = get(syncStateStore);
@@ -82,6 +104,7 @@
   onDestroy(() => {
     unsubscribeController();
     unsubscribeSyncState();
+    if (sortToastId !== null) appToastStore.remove(sortToastId);
   });
 
   const clearSwipeStart = (): void => {
@@ -169,7 +192,32 @@
   data-testid="route-transfers"
   aria-busy={state.operation === 'loading'}
 >
-  <h2>{$_('transfers.title')}</h2>
+  <div class="transfers-route__heading">
+    <h2>{$_('transfers.title')}</h2>
+    <button
+      type="button"
+      class="app-button app-button--secondary transfers-route__sort-button"
+      data-testid="transfers-sort-button"
+      aria-label={$_('transfers.toggleSortOrder', { values: { order: sortOrderLabel } })}
+      title={$_('transfers.toggleSortOrder', { values: { order: sortOrderLabel } })}
+      on:click={toggleSortOrder}
+    >
+      <svg
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M8 20V4m-4 4 4-4 4 4" opacity={sortOrder === 'newest-first' ? 1 : 0.35} />
+        <path d="M16 4v16m-4-4 4 4 4-4" opacity={sortOrder === 'oldest-first' ? 1 : 0.35} />
+      </svg>
+    </button>
+  </div>
   <div class="transfers-route__month-navigation" data-testid="transfers-month-navigation">
     <button
       type="button"
@@ -247,7 +295,7 @@
         </div>
       {:else if state.operation === 'ready'}
         <ul class="transfers-route__cards" data-testid="transfers-route-cards">
-          {#each state.transfers as transfer (transfer.transferId)}
+          {#each sortTransfers(state.transfers, sortOrder) as transfer (transfer.transferId)}
             <li class="transfers-route__card-item">
               <article
                 class={`transfer-card transfer-card--${transfer.amountSemantic}`}
@@ -358,6 +406,24 @@
     grid-template-columns: 2.5rem minmax(0, 1fr) 2.5rem;
     gap: 0.5rem;
     align-items: center;
+  }
+
+  .transfers-route__heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .transfers-route__heading h2 {
+    margin: 0;
+  }
+
+  .transfers-route__sort-button {
+    width: 2.5rem;
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+    padding: 0;
   }
 
   .transfers-route__month-button {
