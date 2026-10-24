@@ -469,6 +469,8 @@ reuse, and application operation:
 - MSAL-managed authentication state;
 - the token-free authentication restoration hint described above;
 - PWA/service-worker caches and short-lived UI state.
+- the browser-wide transfer-list sort preference (oldest first by default or newest first),
+  applied only to presentation and retained across app restarts.
 
 Confirmed local reset clears app-owned bindings, database snapshots, and app cache data after
 closing active Dexie connections. It also clears OpenRouter receipt settings and their in-memory UI

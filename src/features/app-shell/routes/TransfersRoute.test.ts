@@ -26,7 +26,9 @@ describe('TransfersRoute', () => {
     });
 
     expect(body).toContain('data-testid="route-transfers"');
-    expect(body).toContain('<h2>Transfers</h2>');
+    expect(body).toMatch(/<h2[^>]*>Transfers<\/h2>/u);
+    expect(body).toContain('data-testid="transfers-sort-button"');
+    expect(body).toContain('Sortierung: Älteste oben. Reihenfolge umkehren');
     expect(body).toContain('data-testid="transfers-month-navigation"');
     expect(body).toContain('data-testid="transfers-month-previous-button"');
     expect(body).toContain('data-testid="transfers-month-next-button"');
