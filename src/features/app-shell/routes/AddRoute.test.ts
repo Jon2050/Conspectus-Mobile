@@ -179,12 +179,15 @@ describe('AddRoute component', () => {
     expect(body).toContain('<form');
   });
 
-  it('renders one accessible native image picker for camera and existing photos', () => {
+  it('keeps the default photo button connected directly to the native image picker', () => {
     const { body } = renderAddRoute({
       receiptCaptureController: createMockReceiptCaptureController(),
     });
 
     expect(body).toContain('data-testid="receipt-photo-button"');
+    expect(body).toContain('aria-controls="receipt-image-capture"');
+    expect(body).not.toContain('data-testid="receipt-photo-menu"');
+    expect(body).not.toContain('data-testid="receipt-camera-input"');
     expect(body).toContain('Foto aufnehmen oder hochladen');
     expect(body).toMatch(
       /data-testid="receipt-image-input"[^>]*type="file"[^>]*accept="image\/\*"/,

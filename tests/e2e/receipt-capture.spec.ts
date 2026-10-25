@@ -46,8 +46,23 @@ const READY_RECEIPT_DB = {
   ].map((name, index) => ({ categoryId: 20 + index, name })),
 };
 
+const openReceiptPhotoPicker = async (
+  page: Page,
+  android: boolean,
+  source: 'camera' | 'existing' = 'existing',
+) => {
+  const chooserPromise = page.waitForEvent('filechooser');
+  await page.getByTestId('receipt-photo-button').click();
+  if (android) {
+    await page
+      .getByTestId(source === 'camera' ? 'receipt-camera-action' : 'receipt-upload-action')
+      .click();
+  }
+  return chooserPromise;
+};
+
 for (const failure of ['missing_destination', 'missing_category', 'ambiguous_category'] as const) {
-  test(`rejects receipt setup before remote calls: ${failure}`, async ({ page }) => {
+  test(`rejects receipt setup before remote calls: ${failure}`, async ({ page }, testInfo) => {
     await installReadyReceiptConfiguration(page);
     const requests = await installReceiptAnalysisRoutes(page, [EXTRACTION, DERIVATION]);
     await installReadyAddTransferTestDb(page, {
@@ -63,9 +78,19 @@ for (const failure of ['missing_destination', 'missing_category', 'ambiguous_cat
     await page.goto(appPath('#/add'));
     await expect(page.getByTestId('receipt-photo-button')).toBeEnabled();
     await page.getByTestId('receipt-photo-button').click();
+    if (testInfo.project.name === 'pixel-5') {
+      await page.getByTestId('receipt-camera-action').click();
+    }
     await expect(page.getByTestId('add-transfer-form-error')).toContainText(
       failure === 'missing_destination' ? 'primary spendings account' : 'category "Einkauf"',
     );
+    if (testInfo.project.name === 'pixel-5') {
+      await page.getByTestId('receipt-photo-button').click();
+      await page.getByTestId('receipt-upload-action').click();
+      await expect(page.getByTestId('add-transfer-form-error')).toContainText(
+        failure === 'missing_destination' ? 'primary spendings account' : 'category "Einkauf"',
+      );
+    }
     // Native picker return is checked again, independently of the button path.
     await page
       .getByTestId('receipt-image-input')
@@ -364,7 +389,9 @@ const installReceiptAnalysisRoutes = async (
   return { catalogRequests, completionRequests };
 };
 
-test('offers camera and existing photos through one native image picker', async ({ page }) => {
+test('keeps the native picker except for an Android-only source menu', async ({
+  page,
+}, testInfo) => {
   await installReadyAddTransferTestDb(page, {
     fromAccountOptionRows: [
       { accountId: 1, name: 'Primary Income', amountCents: 0, accountTypeId: 1 },
@@ -387,12 +414,53 @@ test('offers camera and existing photos through one native image picker', async 
   await page.goto(appPath('#/add'));
 
   const photoButton = page.getByTestId('receipt-photo-button');
+  const menu = page.getByTestId('receipt-photo-menu');
+  const cameraAction = page.getByTestId('receipt-camera-action');
+  const uploadAction = page.getByTestId('receipt-upload-action');
+  const cameraInput = page.getByTestId('receipt-camera-input');
   const nativeInput = page.getByTestId('receipt-image-input');
   await expect(photoButton).toBeVisible();
   await expect(page.getByTestId('receipt-semantic-risk')).toContainText(
     'Review the suggested data before saving',
   );
   await expect(photoButton).toHaveAccessibleName('Take or upload receipt photo');
+  await page.screenshot({
+    path: `output/receipt-camera/dialog-${testInfo.project.name}.png`,
+  });
+  if (testInfo.project.name === 'pixel-5') {
+    await expect(menu).toBeHidden();
+    await expect(cameraAction).toBeHidden();
+    await expect(uploadAction).toBeHidden();
+    await photoButton.click();
+    await expect(menu).toBeVisible();
+    await expect(cameraAction).toHaveText('Take receipt photo');
+    await expect(uploadAction).toHaveText('Select existing photo');
+    const menuSize = await menu.boundingBox();
+    expect(menuSize).not.toBeNull();
+    expect(menuSize!.x).toBeGreaterThanOrEqual(0);
+    expect(menuSize!.x + menuSize!.width).toBeLessThanOrEqual(320);
+    await page.screenshot({
+      path: `output/receipt-camera/source-menu-${test.info().project.name}.png`,
+    });
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeHidden();
+    await expect(page.getByTestId('add-transfer-form')).toBeVisible();
+    await photoButton.click();
+    await page.getByRole('heading', { name: 'New Transfer', exact: true }).click();
+    await expect(menu).toBeHidden();
+    await expect(cameraInput).toHaveAttribute('type', 'file');
+    await expect(cameraInput).toHaveAttribute('accept', 'image/*');
+    await expect(cameraInput).toHaveAttribute('capture', 'environment');
+    await expect(cameraInput).not.toHaveAttribute('multiple');
+  } else {
+    await expect(menu).toHaveCount(0);
+    await expect(cameraInput).toHaveCount(0);
+    const chooser = await openReceiptPhotoPicker(page, false);
+    expect(await chooser.element().getAttribute('data-testid')).toBe('receipt-image-input');
+    expect(await chooser.element().getAttribute('capture')).toBeNull();
+    await chooser.setFiles([]);
+    await expect(page.getByTestId('add-transfer-form')).toBeVisible();
+  }
   await expect(nativeInput).toHaveAttribute('type', 'file');
   await expect(nativeInput).toHaveAttribute('accept', 'image/*');
   await expect(nativeInput).not.toHaveAttribute('capture');
@@ -411,9 +479,57 @@ test('offers camera and existing photos through one native image picker', async 
   expect(captureSectionSize.scrollWidth).toBeLessThanOrEqual(captureSectionSize.clientWidth);
 });
 
+for (const source of ['camera', 'existing'] as const) {
+  test(`opens the ${source} input, preserves the manual draft on cancellation and analyzes the returned photo`, async ({
+    page,
+  }, testInfo) => {
+    const android = testInfo.project.name === 'pixel-5';
+    test.skip(source === 'camera' && !android, 'Native camera choices are owned by the OS picker.');
+    await installReadyReceiptConfiguration(page);
+    const requests = await installReceiptAnalysisRoutes(page, [EXTRACTION, DERIVATION]);
+    await installReadyAddTransferTestDb(page, READY_RECEIPT_DB);
+    await page.goto(appPath('#/add'));
+    await page.getByTestId('add-transfer-name').fill('Manual draft');
+
+    const input = page.getByTestId(
+      source === 'camera' ? 'receipt-camera-input' : 'receipt-image-input',
+    );
+    const chooser = await openReceiptPhotoPicker(page, android, source);
+    expect(await chooser.element().getAttribute('data-testid')).toBe(
+      await input.getAttribute('data-testid'),
+    );
+    expect(await chooser.element().getAttribute('capture')).toBe(
+      source === 'camera' ? 'environment' : null,
+    );
+    await chooser.setFiles([]);
+    await input.dispatchEvent('cancel');
+    await expect(page.getByTestId('add-transfer-name')).toHaveValue('Manual draft');
+    await expect(page.getByTestId('receipt-photo-menu')).toBeHidden();
+    await expect(page.getByTestId('receipt-photo-button')).toBeEnabled();
+    await expect(page.getByTestId('receipt-progress')).toHaveCount(0);
+    expect(requests.completionRequests).toHaveLength(0);
+
+    const secondChooser = await openReceiptPhotoPicker(page, android, source);
+    await secondChooser.setFiles({
+      name: 'receipt.png',
+      mimeType: 'image/png',
+      buffer: RECEIPT_IMAGE,
+    });
+    await expect(page.getByTestId('receipt-review')).toBeVisible();
+    await expect(page.getByTestId('receipt-photo-button')).toHaveCount(0);
+    await expect(page.getByTestId('receipt-photo-menu')).toHaveCount(0);
+    await expect(input).toHaveValue('');
+    expect(requests.completionRequests).toHaveLength(2);
+    const stageOneBody = requests.completionRequests[0]!.postDataJSON();
+    expect(stageOneBody.messages[1].content[1].image_url.url).toMatch(/^data:image\/jpeg;base64,/);
+    expect(await getLocalTransferWriteCallCount(page)).toBe(0);
+    expect(await getGraphUploadCallCount(page)).toBe(0);
+  });
+}
+
 test('uploads an existing photo through the picker and saves only after explicit review', async ({
   page,
-}) => {
+}, testInfo) => {
   await installReadyReceiptConfiguration(page);
   let releaseExtraction!: () => void;
   const extractionGate = new Promise<void>((resolve) => {
@@ -453,9 +569,7 @@ test('uploads an existing photo through the picker and saves only after explicit
   );
   await page.goto(appPath('#/add'));
 
-  const fileChooserPromise = page.waitForEvent('filechooser');
-  await page.getByTestId('receipt-photo-button').click();
-  const fileChooser = await fileChooserPromise;
+  const fileChooser = await openReceiptPhotoPicker(page, testInfo.project.name === 'pixel-5');
   expect(fileChooser.isMultiple()).toBe(false);
   await fileChooser.setFiles({
     name: 'receipt.png',
@@ -1245,7 +1359,25 @@ test('keeps German receipt footer actions side by side on narrow screens', async
   await installReadyReceiptConfiguration(page);
   await installReceiptAnalysisRoutes(page, [EXTRACTION, DERIVATION]);
   await installReadyAddTransferTestDb(page, READY_RECEIPT_DB);
+  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(appPath('#/add'));
+  await expect(page.getByTestId('receipt-photo-button')).toBeEnabled();
+  await page.screenshot({
+    path: `output/receipt-camera/dialog-de-${testInfo.project.name}.png`,
+    scale: 'css',
+  });
+  if (testInfo.project.name === 'pixel-5') {
+    await page.getByTestId('receipt-photo-button').click();
+    await expect(page.getByTestId('receipt-camera-action')).toHaveText('Foto aufnehmen');
+    await expect(page.getByTestId('receipt-upload-action')).toHaveText(
+      'Vorhandenes Foto auswählen',
+    );
+    await page.screenshot({
+      path: 'output/receipt-camera/source-menu-de-pixel-5.png',
+      scale: 'css',
+    });
+    await page.getByRole('heading', { name: 'Neuer Transfer', exact: true }).click();
+  }
   await page.getByTestId('receipt-image-input').setInputFiles({
     name: 'receipt.png',
     mimeType: 'image/png',

@@ -165,9 +165,14 @@ diagnostics. Browser storage is not equivalent to a server-held secret; code run
 controlling the same browser profile may be able to access it. Confirmed local reset removes the
 record, and explicit OpenRouter deletion removes the complete record for the active account.
 
-Receipt capture uses one native file input with `accept="image/*"` and no `capture` restriction so
-supported mobile operating systems offer both the camera and existing photos in their native picker.
-The app does not create a camera stream, preview, shutter, or separate gallery flow.
+Receipt capture keeps one photo button in New Transfer. On iOS and desktop it directly opens the
+existing native image picker with `accept="image/*"` and no `capture` hint; iOS owns its camera/photo
+choices. Only Android (identified by the browser user agent's Android token) opens a dismissible
+source menu backed by two native file inputs: Take photo requests the outward-facing camera with
+`accept="image/*" capture="environment"`; Select existing photo uses the image picker without a
+capture hint. This avoids relying on Android image pickers to offer a camera option. Both inputs use the
+same preflight, cancellation, normalization and analysis flow. The app does not create a camera
+stream, preview, shutter, or custom gallery. Browsers without capture support may use a file picker.
 Selected images are decoded with their browser-applied
 orientation, limited to a 20 MiB source, resized without upscaling to a maximum 2560-pixel long edge,
 and canvas-encoded once as JPEG at quality `0.85`; encoded output above 4 MiB is rejected. Canvas

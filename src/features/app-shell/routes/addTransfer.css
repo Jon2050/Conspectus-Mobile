@@ -74,6 +74,21 @@
   font-size: 0.84rem;
 }
 
+.receipt-photo-menu {
+  width: min(20rem, calc(100vw - 2rem));
+  padding: 0.75rem;
+  border: 1px solid var(--text-secondary);
+  border-radius: var(--radius-md);
+  background: var(--surface-strong);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.receipt-photo-menu:popover-open {
+  display: grid;
+  gap: 0.6rem;
+}
+
 .receipt-progress {
   display: grid;
   gap: 0.55rem;
