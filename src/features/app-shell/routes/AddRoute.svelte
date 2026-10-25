@@ -90,7 +90,6 @@
   let componentHasMounted = false;
   let hasRequestedOptionsLoad = false;
   let formElement: HTMLFormElement | null = null;
-  let receiptFileInputElement: HTMLInputElement | null = null;
   let receiptSetupError: ReceiptTransferPreparationError | null = null;
   let receiptSummary: readonly CreateTransferInput[] = [];
   let optionsState: AddTransferOptionsState = controller.getState();
@@ -292,9 +291,9 @@
     return receiptSetupError === null;
   };
 
-  const openReceiptCapture = (): void => {
+  const openReceiptCapture = (input: HTMLInputElement | null): void => {
     if (!receiptCaptureIsDisabled && checkReceiptSetup()) {
-      receiptFileInputElement?.click();
+      input?.click();
     }
   };
 
@@ -340,6 +339,8 @@
   };
 
   const handleReceiptFileCancel = (event: Event): void => {
+    // File-input cancellation bubbles; it must not close the surrounding dialog.
+    event.stopPropagation();
     (event.currentTarget as HTMLInputElement).value = '';
   };
 
@@ -600,7 +601,6 @@
         />
 
         <ReceiptCapturePanel
-          bind:receiptFileInputElement
           {receiptCaptureIsDisabled}
           {receiptFileSelectionIsDisabled}
           {receiptWorkflowIsActive}

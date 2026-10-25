@@ -79,6 +79,8 @@
       "description": "Take a receipt photo or select an existing photo on your device.",
       "semanticRisk": "AI can misread fields or classify items incorrectly. Review the suggested data before saving.",
       "action": "Take or upload receipt photo",
+      "captureAction": "Take receipt photo",
+      "uploadAction": "Select existing photo",
       "integrationPending": "Receipt processing is currently unavailable.",
       "normalizing": "Preparing the photo securely...",
       "stageOne": "Read photo",

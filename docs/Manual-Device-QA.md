@@ -250,8 +250,14 @@ data.
    and the shipped prompt/rule versions, never the key. Use the independently reviewed synthetic
    corpus from [`tests/fixtures/receipts`](../tests/fixtures/receipts/README.md) and anonymized camera
    photographs with separately checked expected dates, merchant names, groups and cent totals.
-2. Open the camera, cancel without taking a photo, then take a portrait and an EXIF-rotated photo.
-   Try actual HEIC input, a long narrow receipt, unreadable print and a large 12/48 MP photo.
+2. On Android, open the single photo button's source menu; dismiss it by tapping outside, reopen it
+   and choose Take photo. Verify that Android opens the native camera, preferring the rear camera,
+   in both the browser and installed PWA. Cancel without taking a photo, then take a portrait and
+   an EXIF-rotated photo. Separately use Select existing photo, cancel, reopen and select an image.
+   On iOS, verify that the photo button still opens the native Safari camera/photo choices directly,
+   without an app source menu, and repeat capture, selection and cancellation there.
+   Try actual HEIC input, a long narrow receipt, unreadable print and a
+   large 12/48 MP photo.
 3. During extraction and again during derivation, switch to another app, lock/unlock the phone,
    and return. Repeat with a photo returned while the unchanged foreground freshness check runs.
 4. Repeat while changing the account/bound file or resetting; never reuse the old analysis on a

@@ -79,6 +79,8 @@
       "description": "Fotografiere einen Kassenbon oder wähle ein vorhandenes Foto auf deinem Gerät aus.",
       "semanticRisk": "Die KI kann Felder falsch lesen oder Artikel falsch zuordnen. Prüfe die vorgeschlagenen Daten vor dem Speichern.",
       "action": "Foto aufnehmen oder hochladen",
+      "captureAction": "Foto aufnehmen",
+      "uploadAction": "Vorhandenes Foto auswählen",
       "integrationPending": "Die Belegverarbeitung ist derzeit nicht verfügbar.",
       "normalizing": "Foto wird sicher vorbereitet...",
       "stageOne": "Foto auslesen",

@@ -7,7 +7,6 @@
   import type { ReceiptReviewDraft } from '../../receipt/receiptReviewDraft';
   import ReceiptReviewForm from './ReceiptReviewForm.svelte';
   let {
-    receiptFileInputElement = $bindable(null),
     receiptCaptureIsDisabled,
     receiptFileSelectionIsDisabled,
     receiptWorkflowIsActive,
@@ -24,7 +23,6 @@
     sourceIsDisabled,
     handleReceiptDraftChange,
   }: {
-    receiptFileInputElement?: HTMLInputElement | null;
     receiptCaptureIsDisabled: boolean;
     receiptFileSelectionIsDisabled: boolean;
     receiptWorkflowIsActive: boolean;
@@ -34,13 +32,35 @@
     receiptSourceAccountOptions: readonly AddTransferAccountOption[];
     handleReceiptFileChange: (event: Event) => void;
     handleReceiptFileCancel: (event: Event) => void;
-    openReceiptCapture: () => void;
+    openReceiptCapture: (input: HTMLInputElement | null) => void;
     handleReceiptSourceAccountChange: (event: Event) => void;
     receiptCategoryOptions: AddTransferOptionsState['categoryOptions'];
     reviewIsDisabled: boolean;
     sourceIsDisabled: boolean;
     handleReceiptDraftChange: (draft: ReceiptReviewDraft) => void;
   } = $props();
+
+  let receiptCameraInputElement = $state<HTMLInputElement | null>(null);
+  let receiptFileInputElement = $state<HTMLInputElement | null>(null);
+  let sourceMenuElement = $state<HTMLDivElement | null>(null);
+  // Keep the established native picker on iOS and desktop; Android needs an explicit camera choice.
+  const useAndroidSourceMenu =
+    typeof navigator !== 'undefined' && /\bAndroid\b/i.test(navigator.userAgent);
+  const fileInputIsDisabled = $derived(
+    receiptFileSelectionIsDisabled ||
+      (receiptWorkflowIsActive &&
+        receiptPreparationState.phase !== 'error' &&
+        !receiptPreparationState.draft),
+  );
+
+  const selectPhotoSource = (input: HTMLInputElement | null): void => {
+    sourceMenuElement?.hidePopover();
+    openReceiptCapture(input);
+  };
+
+  $effect(() => {
+    if (receiptCaptureIsDisabled || receiptWorkflowIsActive) sourceMenuElement?.hidePopover();
+  });
 </script>
 
 <section
@@ -55,6 +75,20 @@
       {$_('addTransfer.receipt.semanticRisk')}
     </p>
   </details>
+  {#if useAndroidSourceMenu}
+    <input
+      bind:this={receiptCameraInputElement}
+      id="receipt-camera-capture"
+      data-testid="receipt-camera-input"
+      type="file"
+      accept="image/*"
+      capture="environment"
+      hidden
+      disabled={fileInputIsDisabled}
+      onchange={handleReceiptFileChange}
+      oncancel={handleReceiptFileCancel}
+    />
+  {/if}
   <input
     bind:this={receiptFileInputElement}
     id="receipt-image-capture"
@@ -62,39 +96,60 @@
     type="file"
     accept="image/*"
     hidden
-    disabled={receiptFileSelectionIsDisabled ||
-      (receiptWorkflowIsActive &&
-        receiptPreparationState.phase !== 'error' &&
-        !receiptPreparationState.draft)}
+    disabled={fileInputIsDisabled}
     onchange={handleReceiptFileChange}
     oncancel={handleReceiptFileCancel}
   />
-  {#if receiptCaptureController === null}
+  {#if !receiptWorkflowIsActive}
     <button
       type="button"
       class="app-button app-button--secondary add-transfer-form__action"
       data-testid="receipt-photo-button"
-      aria-controls="receipt-image-capture"
-      disabled
+      popovertarget={useAndroidSourceMenu ? 'receipt-photo-menu' : undefined}
+      aria-controls={useAndroidSourceMenu ? undefined : 'receipt-image-capture'}
+      onclick={useAndroidSourceMenu ? undefined : () => openReceiptCapture(receiptFileInputElement)}
+      disabled={receiptCaptureController === null || receiptCaptureIsDisabled}
     >
       <span aria-hidden="true">📷</span>
       {$_('addTransfer.receipt.action')}
     </button>
-    <p class="add-transfer-form__receipt-hint" data-testid="receipt-capture-unavailable">
-      {$_('addTransfer.receipt.integrationPending')}
-    </p>
-  {:else if !receiptWorkflowIsActive}
-    <button
-      type="button"
-      class="app-button app-button--secondary add-transfer-form__action"
-      data-testid="receipt-photo-button"
-      aria-controls="receipt-image-capture"
-      disabled={receiptCaptureIsDisabled}
-      onclick={openReceiptCapture}
-    >
-      <span aria-hidden="true">📷</span>
-      {$_('addTransfer.receipt.action')}
-    </button>
+    {#if useAndroidSourceMenu}
+      <div
+        bind:this={sourceMenuElement}
+        id="receipt-photo-menu"
+        class="receipt-photo-menu"
+        data-testid="receipt-photo-menu"
+        popover="auto"
+        role="group"
+        aria-label={$_('addTransfer.receipt.action')}
+      >
+        <button
+          type="button"
+          class="app-button app-button--secondary add-transfer-form__action"
+          data-testid="receipt-camera-action"
+          aria-controls="receipt-camera-capture"
+          disabled={receiptCaptureController === null || receiptCaptureIsDisabled}
+          onclick={() => selectPhotoSource(receiptCameraInputElement)}
+        >
+          {$_('addTransfer.receipt.captureAction')}
+        </button>
+        <button
+          type="button"
+          class="app-button app-button--secondary add-transfer-form__action"
+          data-testid="receipt-upload-action"
+          aria-controls="receipt-image-capture"
+          disabled={receiptCaptureController === null || receiptCaptureIsDisabled}
+          onclick={() => selectPhotoSource(receiptFileInputElement)}
+        >
+          {$_('addTransfer.receipt.uploadAction')}
+        </button>
+      </div>
+    {/if}
+    {#if receiptCaptureController === null}
+      <p class="add-transfer-form__receipt-hint" data-testid="receipt-capture-unavailable">
+        {$_('addTransfer.receipt.integrationPending')}
+      </p>
+    {/if}
   {:else}
     <ol
       class="receipt-progress"
