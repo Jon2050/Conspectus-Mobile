@@ -4,7 +4,11 @@ import { PRIMARY_INCOME_ACCOUNT_TYPE_ID, PRIMARY_SPENDINGS_ACCOUNT_TYPE_ID } fro
 
 import type { AddTransferAccountOption, AddTransferFormFields } from './addTransferFormState';
 import { createInitialFormFields } from './addTransferFormState';
-import { validateAddTransfer } from './addTransferValidation';
+import {
+  FIELD_ELEMENT_IDS,
+  getInvalidAddTransferFields,
+  validateAddTransfer,
+} from './addTransferValidation';
 
 describe('validateAddTransfer', () => {
   const t = (key: string) => key;
@@ -118,5 +122,65 @@ describe('validateAddTransfer', () => {
     fields.toAccountId = 2; // PRIMARY_SPENDINGS
     const errors = validateAddTransfer(fields, fromOptions, toOptions, t);
     expect(errors).toContain('addTransfer.validation.incomeToSpendingsInvalid');
+  });
+
+  describe('getInvalidAddTransferFields', () => {
+    it('returns empty array when fields are valid', () => {
+      expect(getInvalidAddTransferFields(validFields(), fromOptions, toOptions)).toEqual([]);
+    });
+
+    it('identifies invalid date, name, and amount', () => {
+      const fields: AddTransferFormFields = {
+        ...validFields(),
+        date: 'invalid-date',
+        name: 'a',
+        amount: '0,00€',
+      };
+      const invalid = getInvalidAddTransferFields(fields, fromOptions, toOptions);
+      expect(invalid).toContain('date');
+      expect(invalid).toContain('name');
+      expect(invalid).toContain('amount');
+    });
+
+    it('identifies both accounts when left at PRIMARY_INCOME and PRIMARY_SPENDINGS defaults', () => {
+      const fields: AddTransferFormFields = {
+        ...validFields(),
+        fromAccountId: 1, // PRIMARY_INCOME (EINNAHMEN)
+        toAccountId: 2, // PRIMARY_SPENDINGS (AUSGABEN)
+      };
+      const invalid = getInvalidAddTransferFields(fields, fromOptions, toOptions);
+      expect(invalid).toContain('fromAccountId');
+      expect(invalid).toContain('toAccountId');
+    });
+
+    it('identifies missing accounts when null', () => {
+      const fields: AddTransferFormFields = {
+        ...validFields(),
+        fromAccountId: null,
+        toAccountId: null,
+      };
+      const invalid = getInvalidAddTransferFields(fields, fromOptions, toOptions);
+      expect(invalid).toContain('fromAccountId');
+      expect(invalid).toContain('toAccountId');
+    });
+
+    it('identifies both accounts when identical', () => {
+      const fields: AddTransferFormFields = {
+        ...validFields(),
+        fromAccountId: 10,
+        toAccountId: 10,
+      };
+      const invalid = getInvalidAddTransferFields(fields, fromOptions, toOptions);
+      expect(invalid).toContain('fromAccountId');
+      expect(invalid).toContain('toAccountId');
+    });
+
+    it('maps field keys to exact element IDs', () => {
+      expect(FIELD_ELEMENT_IDS.date).toBe('add-transfer-date');
+      expect(FIELD_ELEMENT_IDS.name).toBe('add-transfer-name');
+      expect(FIELD_ELEMENT_IDS.amount).toBe('add-transfer-amount');
+      expect(FIELD_ELEMENT_IDS.fromAccountId).toBe('add-transfer-from-account');
+      expect(FIELD_ELEMENT_IDS.toAccountId).toBe('add-transfer-to-account');
+    });
   });
 });

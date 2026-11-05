@@ -410,6 +410,19 @@ Safety invariants:
 
 - Manual entry and receipt batches use `transferCommitController`; their adapters own input
   validation and presentation, while the common controller owns commit, retry and recovery.
+- All forms collecting or preparing transfer fields (manual Add Transfer, Edit Transfer sheet, and
+  Receipt Preparation review) adhere to a unified required-field validation and focus standard:
+  - Submitting with missing or invalid inputs causes all invalid controls to blink via `.app-input--blink`
+    (`@keyframes app-input-blink`) and sets `aria-invalid="true"`.
+  - The viewport scrolls the first invalid control into view, and focus is placed on it
+    (`highlightAndFocusInvalidFields` from `app-shell/routes/fieldHighlight.ts`).
+  - When account comboboxes are left at their initial default pairing (_Primary Income_ and
+    _Primary Spendings_), both comboboxes are identified and highlighted simultaneously.
+  - In receipt review, clicking Save without a selected source account immediately scrolls to and
+    blinks the source account combobox without attempting database mutation or displaying a restart error.
+  - Any input change or selection clears the visual highlight (`clearFieldHighlights` / `clearValidation`).
+  - Motion reduction (`prefers-reduced-motion: reduce`) is respected via `scrollIntoView({ behavior: 'auto' })`
+    and `animation: none` with static error borders.
 - `databaseSession` binds a verified runtime to an immutable account, drive, item, base eTag and
   generation. A new transaction requires a verified, clean session; byte-only retry requires the
   original session. Identity is checked again after asynchronous cache and token work, before PUT.

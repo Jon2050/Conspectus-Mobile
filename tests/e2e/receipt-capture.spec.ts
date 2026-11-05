@@ -1402,3 +1402,40 @@ test('keeps German receipt footer actions side by side on narrow screens', async
       await page.screenshot({ path: testInfo.outputPath('receipt-footer-german.png') });
   }
 });
+
+test('highlights and scrolls to the source account combobox when clicking save without selecting an account', async ({
+  page,
+}) => {
+  await installReadyReceiptConfiguration(page);
+  await installReceiptAnalysisRoutes(page, [EXTRACTION, DERIVATION]);
+  await installReadyAddTransferTestDb(page, READY_RECEIPT_DB);
+  await page.goto(appPath('#/add'));
+  await expect(page.getByTestId('receipt-photo-button')).toBeEnabled();
+
+  await page.getByTestId('receipt-image-input').setInputFiles({
+    name: 'receipt.png',
+    mimeType: 'image/png',
+    buffer: RECEIPT_IMAGE,
+  });
+
+  await expect(page.getByTestId('receipt-review')).toBeVisible();
+  const sourceAccountSelect = page.locator('#receipt-source-account');
+  await expect(sourceAccountSelect).toHaveValue('');
+
+  // Click Save without selecting a source account
+  await page.getByTestId('receipt-review-save').click();
+
+  // The combobox receives aria-invalid and is focused
+  await expect(sourceAccountSelect).toHaveAttribute('aria-invalid', 'true');
+  await expect(sourceAccountSelect).toBeFocused();
+  expect(await getLocalTransferWriteCallCount(page)).toBe(0);
+  expect(await getGraphUploadCallCount(page)).toBe(0);
+
+  // Now selecting an account clears the invalid attribute
+  await sourceAccountSelect.selectOption('11');
+  await expect(sourceAccountSelect).not.toHaveAttribute('aria-invalid', 'true');
+
+  // And now saving succeeds
+  await page.getByTestId('receipt-review-save').click();
+  await expect(page.getByTestId('receipt-commit-success')).toContainText('1 transfer created');
+});

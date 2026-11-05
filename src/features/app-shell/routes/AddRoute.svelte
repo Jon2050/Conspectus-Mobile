@@ -47,8 +47,15 @@
   } from '../receiptTransferCommitController';
   import {
     createInitialFormFields,
+    isValidIsoDate,
     type AddTransferFormFields,
   } from '../../transfers/addTransferFormState';
+  import { parseAmountInputCents } from '../../transfers/addTransferAmountInput';
+  import {
+    FIELD_ELEMENT_IDS,
+    getInvalidAddTransferFields,
+  } from '../../transfers/addTransferValidation';
+  import { clearFieldHighlights, highlightAndFocusInvalidFields } from './fieldHighlight';
   import {
     createAddTransferOptionsController,
     shouldReloadAddTransferOptionsForSyncState,
@@ -236,6 +243,7 @@
     if (validationErrors.length > 0) {
       validationErrors = [];
     }
+    clearFieldHighlights(formElement);
   };
 
   const resetSuccessfulSave = (): void => {
@@ -265,8 +273,23 @@
     validationErrors = [...result.validationErrors];
     const saveCompleted = saveController.getState().phase === 'saved';
     resetSuccessfulSave();
-    if (validationErrors.length > 0 || saveCompleted) {
+    if (saveCompleted) {
+      clearFieldHighlights(formElement);
       await scrollFormToTop();
+    } else if (validationErrors.length > 0) {
+      const invalidKeys = getInvalidAddTransferFields(
+        fields,
+        optionsState.fromAccountOptions,
+        optionsState.toAccountOptions,
+      );
+      const invalidElements = invalidKeys.map((key) => {
+        const id = FIELD_ELEMENT_IDS[key];
+        return formElement?.querySelector<HTMLElement>(`#${id}`) ?? null;
+      });
+      highlightAndFocusInvalidFields(invalidElements);
+      if (invalidKeys.includes('date') || invalidKeys.includes('name')) {
+        await scrollFormToTop();
+      }
     }
   };
 
@@ -329,9 +352,52 @@
 
   const handleReceiptSave = async (): Promise<void> => {
     if (submitIsDisabled || receiptCaptureIsBusy || receiptCommitState.phase !== 'idle') return;
+
+    if (receiptPreparationState.sourceAccountId === null) {
+      const sourceAccountSelect =
+        formElement?.querySelector<HTMLSelectElement>('#receipt-source-account') ?? null;
+      if (sourceAccountSelect) {
+        highlightAndFocusInvalidFields([sourceAccountSelect]);
+      }
+      return;
+    }
+
+    if (receiptPreparationState.draft) {
+      const draft = receiptPreparationState.draft;
+      const invalidDraftElements: HTMLElement[] = [];
+
+      if (!isValidIsoDate(draft.date)) {
+        const dateInput = formElement?.querySelector<HTMLElement>('#receipt-review-date') ?? null;
+        if (dateInput) invalidDraftElements.push(dateInput);
+      }
+
+      for (const row of draft.transfers) {
+        if (row.name.trim().length <= 2) {
+          const nameInput =
+            formElement?.querySelector<HTMLElement>(`#receipt-review-name-${row.id}`) ?? null;
+          if (nameInput) invalidDraftElements.push(nameInput);
+        }
+        const cents = parseAmountInputCents(row.amount);
+        if (cents === null || cents <= 0) {
+          const amountInput =
+            formElement?.querySelector<HTMLElement>(`#receipt-review-amount-${row.id}`) ?? null;
+          if (amountInput) invalidDraftElements.push(amountInput);
+        }
+      }
+
+      if (invalidDraftElements.length > 0) {
+        highlightAndFocusInvalidFields(invalidDraftElements);
+        return;
+      }
+    }
+
     receiptPreparationController.prepareForSave(optionsState);
     const commands = receiptPreparationController.claimReadyForCommit();
-    if (commands === null) return;
+    if (commands === null) {
+      await scrollFormToTop();
+      return;
+    }
+    clearFieldHighlights(formElement);
     receiptSummary = commands;
     receiptCaptureController?.reset();
     receiptAnalysisController?.reset();
@@ -483,6 +549,7 @@
       return;
     }
 
+    clearFieldHighlights(formElement);
     receiptCaptureController?.cancel();
     receiptPreparationController.reset();
     if (receiptCommitController.getState().phase === 'saved') {

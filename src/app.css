@@ -311,6 +311,52 @@ body {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
+.app-input[aria-invalid='true'] {
+  border-color: var(--error);
+}
+
+.app-input[aria-invalid='true']:focus {
+  border-color: var(--error);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--error) 25%, transparent);
+}
+
+@keyframes app-input-blink {
+  0% {
+    border-color: var(--border);
+    box-shadow: none;
+    background-color: var(--app-bg);
+  }
+  20%,
+  60% {
+    border-color: var(--error);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--error) 40%, transparent);
+    background-color: color-mix(in srgb, var(--error) 12%, var(--surface-strong));
+  }
+  40%,
+  80% {
+    border-color: var(--border);
+    box-shadow: none;
+    background-color: var(--app-bg);
+  }
+  100% {
+    border-color: var(--error);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--error) 25%, transparent);
+    background-color: var(--app-bg);
+  }
+}
+
+.app-input--blink {
+  animation: app-input-blink 1.2s ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-input--blink {
+    animation: none;
+    border-color: var(--error) !important;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--error) 40%, transparent) !important;
+  }
+}
+
 .app-input::placeholder {
   color: var(--text-secondary);
   opacity: 0.7;
