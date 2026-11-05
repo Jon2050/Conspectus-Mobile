@@ -21,6 +21,16 @@ Settings presentation:
   primary spendings account by account type, preserving existing drafts. Receipt preparation keeps
   its separate deliberate source-account selection.
 
+Form presentation and required field validation:
+
+- All forms with required or validated fields (manual entry, transfer editing, receipt review) must
+  follow the field validation standard: on submit with missing or invalid values, all invalid fields
+  blink via `.app-input--blink` (`fieldHighlight.ts`), receive `aria-invalid="true"`, and the view
+  scrolls the first invalid control into the visible viewport with focus. If account comboboxes are
+  left at the default income-to-spendings pairing, both comboboxes are highlighted. In receipt review,
+  saving without a selected source account highlights and jumps to the source account selector without
+  remote mutation. Any user input immediately clears the highlight.
+
 Receipt AI settings:
 
 - `receipt/prompts/` owns the separate hidden stage prompts and versioned user-editable grouping-rule

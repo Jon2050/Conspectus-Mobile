@@ -2431,6 +2431,43 @@ test('scrolls add transfer validation errors into view after submit', async ({ p
     .toBe(0);
 });
 
+test('highlights and scrolls to account comboboxes when left at Primary Income and Primary Spendings', async ({
+  page,
+}) => {
+  await installReadyAddTransferTestDb(page, {
+    fromAccountOptionRows: [
+      { accountId: 1, name: 'Primary Income', amountCents: 0, accountTypeId: 1 },
+      { accountId: 11, name: 'Checking', amountCents: 1000, accountTypeId: 3 },
+    ],
+    toAccountOptionRows: [
+      { accountId: 2, name: 'Primary Spendings', amountCents: 0, accountTypeId: 2 },
+      { accountId: 12, name: 'Savings', amountCents: 5000, accountTypeId: 3 },
+    ],
+  });
+
+  await page.goto(appPath('#/add'));
+  await expect(page.getByTestId('add-transfer-date')).toBeVisible();
+
+  await page.getByTestId('add-transfer-name').fill('Grocery Shopping');
+  await page.getByTestId('add-transfer-amount').pressSequentially('2500');
+
+  const fromSelect = page.getByTestId('add-transfer-from-account');
+  const toSelect = page.getByTestId('add-transfer-to-account');
+  await expect(fromSelect).toHaveValue('1');
+  await expect(toSelect).toHaveValue('2');
+
+  await page.getByTestId('add-transfer-submit').scrollIntoViewIfNeeded();
+  await page.getByTestId('add-transfer-submit').click();
+
+  await expect(fromSelect).toHaveAttribute('aria-invalid', 'true');
+  await expect(toSelect).toHaveAttribute('aria-invalid', 'true');
+  await expect(fromSelect).toBeInViewport();
+  await expect(fromSelect).toBeFocused();
+
+  await fromSelect.selectOption('11');
+  await expect(fromSelect).not.toHaveAttribute('aria-invalid', 'true');
+});
+
 test('blocks a cleared transfer date before any local write or upload', async ({ page }) => {
   await seedAndBindTestDb(page);
   await page.goto(appPath('#/add'));

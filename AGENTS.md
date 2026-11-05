@@ -36,6 +36,22 @@ layout. Use `docs/CONTRIBUTING.md` for the contribution and delivery workflow.
   redirect URIs, Graph scopes, or sync/write behavior, update the canonical documentation named
   in the README documentation map.
 
+## Form Validation and Required Fields UX Standard
+
+- When creating or modifying forms with required or validated fields (such as manual transfer creation,
+  transfer editing, or receipt review):
+  - On submission with missing or invalid fields, all invalid controls must be identified, receive visual
+    blinking feedback via `.app-input--blink` and `aria-invalid="true"`, and the viewport must scroll the
+    first invalid field into view and focus it (`highlightAndFocusInvalidFields` from `fieldHighlight.ts`).
+  - Account comboboxes left at unconfigured or default invalid combinations (e.g. Primary Income to
+    Primary Spendings) must both be highlighted.
+  - Receipt preparation must highlight and scroll to the source account combobox if Save is clicked
+    without selecting an account.
+  - Modifying or changing an input must clear its invalid highlight immediately (`clearFieldHighlights` /
+    `clearValidation`).
+  - Motion preferences (`prefers-reduced-motion: reduce`) must be respected (instant scroll and static
+    highlight without CSS animation).
+
 ## Verification
 
 - Choose verification that matches the risk and surface area of the change, following

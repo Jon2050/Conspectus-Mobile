@@ -14,6 +14,11 @@
   import ManualTransferForm from './ManualTransferForm.svelte';
   import { createAddTransferOptionsController } from './addTransferOptionsController';
   import { transferToFormFields, type EditTransferController } from './editTransferController';
+  import {
+    FIELD_ELEMENT_IDS,
+    getInvalidAddTransferFields,
+  } from '../../transfers/addTransferValidation';
+  import { clearFieldHighlights, highlightAndFocusInvalidFields } from './fieldHighlight';
   import './addTransfer.css';
 
   export let transfer: TransferRecord;
@@ -49,8 +54,15 @@
   );
   let optionsState = optionsController.getState();
   let state = controller.getState();
+  let formElement: HTMLFormElement | null = null;
   let validationErrors: readonly string[] = [];
   let deleteConfirmationIsOpen = false;
+  const clearValidation = () => {
+    if (validationErrors.length > 0) {
+      validationErrors = [];
+    }
+    clearFieldHighlights(formElement);
+  };
   const unsubscribe = controller.subscribe((next) => {
     state = next;
   });
@@ -88,6 +100,20 @@
   };
   const submit = async () => {
     validationErrors = await controller.submit(fields, optionsState, $_, offline);
+    if (validationErrors.length > 0) {
+      const invalidKeys = getInvalidAddTransferFields(
+        fields,
+        optionsState.fromAccountOptions,
+        optionsState.toAccountOptions,
+      );
+      const invalidElements = invalidKeys.map((key) => {
+        const id = FIELD_ELEMENT_IDS[key];
+        return formElement?.querySelector<HTMLElement>(`#${id}`) ?? null;
+      });
+      highlightAndFocusInvalidFields(invalidElements);
+    } else {
+      clearFieldHighlights(formElement);
+    }
   };
   const refreshConflict = async () => {
     await controller.resolveConflict(async () => {
@@ -117,9 +143,12 @@
     >
   {/snippet}
   <form
+    bind:this={formElement}
     class="add-transfer-form"
     data-testid="edit-transfer-form"
     on:submit|preventDefault={submit}
+    on:input={clearValidation}
+    on:change={clearValidation}
   >
     <details class="edit-transfer-hint" data-testid="edit-transfer-balance-hint">
       <summary>{$_('editTransfer.balanceHintTitle')}</summary>
@@ -130,9 +159,7 @@
       {optionsState}
       controlsAreDisabled={disabled}
       sourceAccountIsDisabled={disabled}
-      clearValidation={() => {
-        validationErrors = [];
-      }}
+      {clearValidation}
     />
     {#if optionsState.operation === 'loading'}
       <p class="add-transfer-form__status">{$_('addTransfer.loadingOptions')}</p>
